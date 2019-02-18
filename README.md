@@ -35,11 +35,38 @@ and the spawner **jupyterhub.spawner.LocalProcessSpawner**.
 ## Configuration
 
 _Goal: list the configuration needed to have a spawner starting a web application that we will
-call Cylc Web, but it is actually just a dummy application for testing purposes.__
+call Cylc Web, but it is actually just a dummy application for testing purposes. Whereas JupyterHub
+has a "Single-User Notebook Server", it is good to thing of Cylc Web as a
+"Single-User Cylc Server".__
 
 ```bash
 (venv) $ jupyterhub --generate-config
 Writing default config to: jupyterhub_config.py
+(venv) $ jupyterhub -f $(pwd -P)/jupyterhub_config.py
 ```
 
-TODO
+By default we have `jupyterhub.spawner.LocalProcessSpawner` as the spawner. It invokes
+a bash shell that executes `jupyterhub-singleuser` with some parameters given via command
+line and environment variables.
+
+Alas this command cannot be changed in that spawner, so we have no other option but
+writing our own spawner.
+
+### Cylc Spawner 01
+
+Spawners in JupyterHub can also request extra information when started. This is possibly
+useful for Cylc, as we can ask what is the Suite name, or PBS job, etc.
+
+* https://jupyterhub.readthedocs.io/en/stable/reference/spawners.html#spawner-options-form
+* https://github.com/jupyterhub/jupyterhub/blob/master/examples/spawn-form/jupyterhub_config.py
+
+```bash
+(venv) $ PYTHONPATH=$(pwd -P) jupyterhub -f $(pwd -P)/jupyterhub_config.py
+```
+
+TODO - Using JupyterHub’s REST API
+
+## Services
+
+Q: Would Cylc Review be a service? Perhaps we could choose whether to start it with
+the UI server or not!
