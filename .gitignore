@@ -115,3 +115,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# JupyterHub files
+
+jupyterhub-proxy.pid
+jupyterhub.sqlite
+jupyterhub_cookie_secret
