@@ -26,3 +26,8 @@ added 45 packages from 62 contributors in 5.53s
 (venv) $ configurable-http-proxy --version
 4.0.1
 ```
+
+We can start the hub with: `(venv) $ jupyterhub`, and navigate to [http://localhost:8000](http://localhost:8000).
+
+This start a JupyterHub instance, with the authenticator **jupyterhub.auth.PAMAuthenticator**,
+and the spawner **jupyterhub.spawner.LocalProcessSpawner**.
