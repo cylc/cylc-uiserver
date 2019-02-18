@@ -1,6 +1,7 @@
 import tornado.ioloop
 import tornado.web
 import sys
+import os
 import signal
 import logging
 
@@ -14,7 +15,8 @@ class MainHandler(tornado.web.RequestHandler):
         self.write(f"""
         <p>Hello, world {username} !</p>
         <p>Click <a href="/hub/home">here</a> to go back to the hub... it is because
-        I am templeteless for now (a good joke, c'mon!)        
+        I am templeteless for now (a good joke, c'mon!)</p>
+        <p>I am process ID {os.getpid()}</p>       
         """)
 
 
