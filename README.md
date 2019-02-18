@@ -31,3 +31,15 @@ We can start the hub with: `(venv) $ jupyterhub`, and navigate to [http://localh
 
 This start a JupyterHub instance, with the authenticator **jupyterhub.auth.PAMAuthenticator**,
 and the spawner **jupyterhub.spawner.LocalProcessSpawner**.
+
+## Configuration
+
+_Goal: list the configuration needed to have a spawner starting a web application that we will
+call Cylc Web, but it is actually just a dummy application for testing purposes.__
+
+```bash
+(venv) $ jupyterhub --generate-config
+Writing default config to: jupyterhub_config.py
+```
+
+TODO
