@@ -1,3 +1,4 @@
+import os
 import pipes
 import shutil
 
@@ -20,11 +21,8 @@ class CylcSpawner01(LocalProcessSpawner):
 
         cmd.extend([
             "python",
-            "-m",
-            "http.server",
-            str(self.port),
-            "--directory",
-            "/tmp/"
+            os.path.join(os.path.dirname(os.path.realpath(__file__)), "cylc-singleuser.py"),
+            str(self.port)
         ])
         # cmd.extend(self.get_args())
 
