@@ -77,7 +77,7 @@ But if you start the hub as the root user, in a location that other users can ac
 (i.e. do not start under `/root`, use something like `/opt` and watch out for _selinux_),
 then you should be able to get all users in the local system authenticating fine.
 
-### AUthorization
+### Authorization
 
 Once authenticated, the authorization is handled in the UI server. In the vanilla installation,
 Jupyter Notebook would find the Cookie of the logged in user, and then query the Hub about it.
