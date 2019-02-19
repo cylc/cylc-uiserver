@@ -64,7 +64,27 @@ useful for Cylc, as we can ask what is the Suite name, or PBS job, etc.
 (venv) $ PYTHONPATH=$(pwd -P) jupyterhub -f $(pwd -P)/jupyterhub_config.py
 ```
 
-TODO - Using JupyterHub’s REST API
+### Authentication
+
+We are after the scenario where a user A can start the UI server, and another user B is able
+to access it too.
+
+With the default authenticator, `jupyterhub.auth.PAMAuthenticator`, if A starts the server,
+B is not even able to authenticate to the running hub. That is because in Linux PAM has
+restrictions in place, and you must be a super user, or wheel member, in order to use it.
+
+But if you start the hub as the root user, in a location that other users can access the files
+(i.e. do not start under `/root`, use something like `/opt` and watch out for _selinux_),
+then you should be able to get all users in the local system authenticating fine.
+
+Once authenticated, the authorization is handled in the UI server. In the vanilla installation,
+Jupyter Notebook would find the Cookie of the logged in user, and then query the Hub about it.
+As we do not have the notebook, the example from Cylc Spawner 01 should work.
+
+It should work means that all users see each others UI servers.
+
+TODO: explain whether we can use the Hub REST API and DB scheme for Cylc workflow services
+authentication.
 
 ## Services
 
