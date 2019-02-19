@@ -1,23 +1,37 @@
-import tornado.ioloop
-import tornado.web
-import sys
+import logging
 import os
 import signal
-import logging
+import sys
+
+import tornado.ioloop
+import tornado.web
+
+
+class MainHandlerOld(tornado.web.RequestHandler):
+    """A handler that displays the user name, and also the PID. Useful
+    for troubleshooting"""
+
+    def get(self, username):
+        """
+        Get for user area.
+
+        At this point we would have Cylc running, so we just ned to have
+        a handler that gives the user's Dashboard... this acts now as
+        the entry point, in the same way that the GUI gcylc was before...
+        """
+        self.write(f"""
+        <p>Hello, world {username} !</p>
+        <p>Click <a href="/hub/home">here</a> to go back to the hub.</p>
+        <p>I am process ID {os.getpid()}</p>       
+        """)
 
 
 class MainHandler(tornado.web.RequestHandler):
 
-    def get(self, username):
-        # At this point we would have Cylc running, so we just ned to have
-        # a handler that gives the user's Dashboard... this acts now as
-        # the entry point, in the same way that the GUI gcylc was before...
-        self.write(f"""
-        <p>Hello, world {username} !</p>
-        <p>Click <a href="/hub/home">here</a> to go back to the hub... it is because
-        I am templeteless for now (a good joke, c'mon!)</p>
-        <p>I am process ID {os.getpid()}</p>       
-        """)
+    def get(self):
+        """Render the UI prototype."""
+        index = os.path.join(os.path.dirname(__file__), "static", "index.html")
+        self.write(open(index).read())
 
 
 class MyApplication(tornado.web.Application):
@@ -35,9 +49,19 @@ class MyApplication(tornado.web.Application):
 
 
 def make_app():
-    return MyApplication([
-        (r"/user/(.*)", MainHandler),
-    ])
+    static_path = os.path.join(os.path.dirname(__file__), "static")
+    return MyApplication(
+        static_path=static_path,
+        debug=True,
+        handlers=[
+            # (r"/user/(.*)", MainHandler),
+            (r"/(css/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
+            (r"/(fonts/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
+            (r"/(img/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
+            (r"/(js/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
+            (r"/(favicon.png)", tornado.web.StaticFileHandler, {"path": static_path}),
+            (r"/.*", MainHandler),
+        ])
 
 
 if __name__ == "__main__":
