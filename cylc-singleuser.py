@@ -60,6 +60,13 @@ def make_app():
             (r"/(img/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
             (r"/(js/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
             (r"/(favicon.png)", tornado.web.StaticFileHandler, {"path": static_path}),
+
+            (r"/user/.*/(css/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
+            (r"/user/.*/(fonts/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
+            (r"/user/.*/(img/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
+            (r"/user/.*/(js/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
+            (r"/user/.*/(favicon.png)", tornado.web.StaticFileHandler, {"path": static_path}),
+
             (r"/.*", MainHandler),
         ])
 
