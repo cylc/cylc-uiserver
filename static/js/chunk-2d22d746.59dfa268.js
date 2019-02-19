@@ -1,2 +1,2 @@
 (window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d22d746"],{f820:function(t,e,n){"use strict";n.r(e);var l=function(){var t=this,e=t.$createElement,n=t._self._c||e;return n("v-container",{attrs:{"fill-height":"",fluid:"","grid-list-xl":""}},[n("v-layout",{attrs:{"justify-left":"",wrap:""}},[n("v-flex",{attrs:{md6:""}},[n("p",[t._v("Cylc Web version: "+t._s(t.$store.getters.appVersion))])])],1)],1)},r=[],s={metaInfo:function(){return{title:"Cylc Web | About"}}},i=s,u=n("2877"),a=Object(u["a"])(i,l,r,!1,null,null,null);e["default"]=a.exports}}]);
-//# sourceMappingURL=chunk-2d22d746.0973ccdf.js.map
+//# sourceMappingURL=chunk-2d22d746.59dfa268.js.map
