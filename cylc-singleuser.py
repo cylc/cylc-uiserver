@@ -3,11 +3,10 @@ import os
 import signal
 import sys
 
-import tornado.ioloop
-import tornado.web
+from tornado import web, ioloop
 
 
-class MainHandlerOld(tornado.web.RequestHandler):
+class MainHandlerOld(web.RequestHandler):
     """A handler that displays the user name, and also the PID. Useful
     for troubleshooting"""
 
@@ -26,7 +25,7 @@ class MainHandlerOld(tornado.web.RequestHandler):
         """)
 
 
-class MainHandler(tornado.web.RequestHandler):
+class MainHandler(web.RequestHandler):
 
     def get(self):
         """Render the UI prototype."""
@@ -34,7 +33,7 @@ class MainHandler(tornado.web.RequestHandler):
         self.write(open(index).read())
 
 
-class MyApplication(tornado.web.Application):
+class MyApplication(web.Application):
     is_closing = False
 
     def signal_handler(self, signum, frame):
@@ -44,42 +43,51 @@ class MyApplication(tornado.web.Application):
     def try_exit(self):
         if self.is_closing:
             # clean up here
-            tornado.ioloop.IOLoop.instance().stop()
+            ioloop.IOLoop.instance().stop()
             logging.info('exit success')
 
 
-def make_app():
-    static_path = os.path.join(os.path.dirname(__file__), "static")
-    return MyApplication(
-        static_path=static_path,
-        debug=True,
-        handlers=[
-            # (r"/user/(.*)", MainHandler),
-            (r"/(css/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
-            (r"/(fonts/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
-            (r"/(img/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
-            (r"/(js/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
-            (r"/(favicon.png)", tornado.web.StaticFileHandler, {"path": static_path}),
+class CylcUIServer(object):
 
-            (r"/user/.*/(css/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
-            (r"/user/.*/(fonts/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
-            (r"/user/.*/(img/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
-            (r"/user/.*/(js/.*)", tornado.web.StaticFileHandler, {"path": static_path}),
-            (r"/user/.*/(favicon.png)", tornado.web.StaticFileHandler, {"path": static_path}),
+    @staticmethod
+    def _make_app():
+        """Crete a Tornado web application."""
+        static_path = os.path.join(os.path.dirname(__file__), "static")
+        return MyApplication(
+            static_path=static_path,
+            debug=True,
+            handlers=[
+                # (r"/user/(.*)", MainHandler),
+                (r"/(css/.*)", web.StaticFileHandler, {"path": static_path}),
+                (r"/(fonts/.*)", web.StaticFileHandler, {"path": static_path}),
+                (r"/(img/.*)", web.StaticFileHandler, {"path": static_path}),
+                (r"/(js/.*)", web.StaticFileHandler, {"path": static_path}),
+                (r"/(favicon.png)", web.StaticFileHandler, {"path": static_path}),
 
-            (r"/.*", MainHandler),
-        ])
+                (r"/user/.*/(css/.*)", web.StaticFileHandler, {"path": static_path}),
+                (r"/user/.*/(fonts/.*)", web.StaticFileHandler, {"path": static_path}),
+                (r"/user/.*/(img/.*)", web.StaticFileHandler, {"path": static_path}),
+                (r"/user/.*/(js/.*)", web.StaticFileHandler, {"path": static_path}),
+                (r"/user/.*/(favicon.png)", web.StaticFileHandler, {"path": static_path}),
+
+                (r"/.*", MainHandler),
+            ])
+
+    def start(self, *args):
+        #ioloop.IOLoop.current().run_sync(self.check_hub_version)
+        app = self._make_app()
+        signal.signal(signal.SIGINT, app.signal_handler)
+        app.listen(int(args[0]))
+        ioloop.PeriodicCallback(app.try_exit, 100).start()
+        try:
+            ioloop.IOLoop.current().start()
+        except KeyboardInterrupt:
+            ioloop.IOLoop.instance().stop()
 
 
 if __name__ == "__main__":
-    app = make_app()
-    signal.signal(signal.SIGINT, app.signal_handler)
+    port = 8888
     if len(sys.argv) > 1:
-        app.listen(int(sys.argv[1]))
-    else:
-        app.listen(8888)
-    tornado.ioloop.PeriodicCallback(app.try_exit, 100).start()
-    try:
-        tornado.ioloop.IOLoop.current().start()
-    except KeyboardInterrupt:
-        tornado.ioloop.IOLoop.instance().stop()
+        port = int(sys.argv[1])
+    ui_server = CylcUIServer()
+    ui_server.start(port)
