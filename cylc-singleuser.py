@@ -4,6 +4,7 @@ import signal
 import sys
 
 from tornado import web, ioloop
+from jupyterhub import __version__ as jupyterhub_version
 
 
 class MainHandlerOld(web.RequestHandler):
@@ -29,6 +30,7 @@ class MainHandler(web.RequestHandler):
 
     def get(self):
         """Render the UI prototype."""
+        self.set_header("X-JupyterHub-Version", jupyterhub_version)
         index = os.path.join(os.path.dirname(__file__), "static", "index.html")
         self.write(open(index).read())
 
@@ -74,7 +76,6 @@ class CylcUIServer(object):
             ])
 
     def start(self, *args):
-        #ioloop.IOLoop.current().run_sync(self.check_hub_version)
         app = self._make_app()
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(int(args[0]))
