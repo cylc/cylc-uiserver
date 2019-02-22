@@ -5,6 +5,9 @@ import sys
 
 from tornado import web, ioloop
 from jupyterhub import __version__ as jupyterhub_version
+from jupyterhub.services.auth import HubOAuthenticated, HubOAuthCallbackHandler
+
+from jupyterhub.utils import url_path_join
 
 
 class MainHandlerOld(web.RequestHandler):
@@ -26,8 +29,13 @@ class MainHandlerOld(web.RequestHandler):
         """)
 
 
-class MainHandler(web.RequestHandler):
+class MainHandler(HubOAuthenticated, web.RequestHandler):
 
+    #hub_users = ["kinow"]
+    #hub_groups = []
+    #allow_admin = True
+
+    @web.authenticated
     def get(self):
         """Render the UI prototype."""
         self.set_header("X-JupyterHub-Version", jupyterhub_version)
@@ -59,7 +67,6 @@ class CylcUIServer(object):
             static_path=static_path,
             debug=True,
             handlers=[
-                # (r"/user/(.*)", MainHandler),
                 (r"/(css/.*)", web.StaticFileHandler, {"path": static_path}),
                 (r"/(fonts/.*)", web.StaticFileHandler, {"path": static_path}),
                 (r"/(img/.*)", web.StaticFileHandler, {"path": static_path}),
@@ -72,8 +79,12 @@ class CylcUIServer(object):
                 (r"/user/.*/(js/.*)", web.StaticFileHandler, {"path": static_path}),
                 (r"/user/.*/(favicon.png)", web.StaticFileHandler, {"path": static_path}),
 
-                (r"/.*", MainHandler),
-            ])
+                (url_path_join(os.environ['JUPYTERHUB_SERVICE_PREFIX'], 'oauth_callback'), HubOAuthCallbackHandler),
+
+                (os.environ['JUPYTERHUB_SERVICE_PREFIX'], MainHandler),
+            ],
+            cookie_secret="cylc123"
+        )
 
     def start(self, *args):
         app = self._make_app()
