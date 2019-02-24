@@ -1,12 +1,13 @@
+import json
 import logging
 import os
 import signal
 import sys
 
 from tornado import web, ioloop
+
 from jupyterhub import __version__ as jupyterhub_version
 from jupyterhub.services.auth import HubOAuthenticated, HubOAuthCallbackHandler
-
 from jupyterhub.utils import url_path_join
 
 
@@ -31,9 +32,9 @@ class MainHandlerOld(web.RequestHandler):
 
 class MainHandler(HubOAuthenticated, web.RequestHandler):
 
-    #hub_users = ["kinow"]
-    #hub_groups = []
-    #allow_admin = True
+    # hub_users = ["kinow"]
+    # hub_groups = []
+    # allow_admin = True
 
     @web.authenticated
     def get(self):
@@ -41,6 +42,16 @@ class MainHandler(HubOAuthenticated, web.RequestHandler):
         self.set_header("X-JupyterHub-Version", jupyterhub_version)
         index = os.path.join(os.path.dirname(__file__), "static", "index.html")
         self.write(open(index).read())
+
+
+class UserProfileHandler(HubOAuthenticated, web.RequestHandler):
+
+    def set_default_headers(self):
+        self.set_header("Content-Type", 'application/json')
+
+    @web.authenticated
+    def get(self):
+        self.write(json.dumps(self.get_current_user()))
 
 
 class MyApplication(web.Application):
@@ -80,6 +91,7 @@ class CylcUIServer(object):
                 (r"/user/.*/(favicon.png)", web.StaticFileHandler, {"path": static_path}),
 
                 (url_path_join(os.environ['JUPYTERHUB_SERVICE_PREFIX'], 'oauth_callback'), HubOAuthCallbackHandler),
+                (url_path_join(os.environ['JUPYTERHUB_SERVICE_PREFIX'], 'userprofile'), UserProfileHandler),
 
                 (os.environ['JUPYTERHUB_SERVICE_PREFIX'], MainHandler),
             ],
