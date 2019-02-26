@@ -11,12 +11,12 @@ New python executable in /home/kinow/Development/python/workspace/cylc-jupyterhu
 Installing setuptools, pip, wheel...
 done.
 $ . venv/bin/activate
-(venv) $ pip install -r requirements.txt
+(venv) $ pip install -e .
 ...
 ...
-Successfully built python-oauth2 alembic SQLAlchemy prometheus-client
-Installing collected packages: python-oauth2, MarkupSafe, jinja2, decorator, ipython-genutils, six, traitlets, pamela, SQLAlchemy, Mako, python-editor, python-dateutil, alembic, async-generator, tornado, prometheus-client, urllib3, chardet, idna, certifi, requests, jupyterhub, pyzmq, ptyprocess, terminado, Send2Trash, entrypoints, pandocfilters, defusedxml, testpath, jupyter-core, mistune, jsonschema, nbformat, pygments, webencodings, bleach, nbconvert, jupyter-client, backcall, parso, jedi, pexpect, wcwidth, prompt-toolkit, pickleshare, ipython, ipykernel, notebook
-Successfully installed Mako-1.0.7 MarkupSafe-1.1.0 SQLAlchemy-1.2.18 Send2Trash-1.5.0 alembic-1.0.7 async-generator-1.10 backcall-0.1.0 bleach-3.1.0 certifi-2018.11.29 chardet-3.0.4 decorator-4.3.2 defusedxml-0.5.0 entrypoints-0.3 idna-2.8 ipykernel-5.1.0 ipython-7.2.0 ipython-genutils-0.2.0 jedi-0.13.2 jinja2-2.10 jsonschema-2.6.0 jupyter-client-5.2.4 jupyter-core-4.4.0 jupyterhub-0.9.4 mistune-0.8.4 nbconvert-5.4.1 nbformat-4.4.0 notebook-5.7.4 pamela-1.0.0 pandocfilters-1.4.2 parso-0.3.4 pexpect-4.6.0 pickleshare-0.7.5 prometheus-client-0.5.0 prompt-toolkit-2.0.8 ptyprocess-0.6.0 pygments-2.3.1 python-dateutil-2.8.0 python-editor-1.0.4 python-oauth2-1.1.0 pyzmq-17.1.2 requests-2.21.0 six-1.12.0 terminado-0.8.1 testpath-0.4.2 tornado-5.1.1 traitlets-4.3.2 urllib3-1.24.1 wcwidth-0.1.7 webencodings-0.5.1
+Installing collected packages: tornado, prometheus-client, chardet, idna, certifi, urllib3, requests, pamela, async-generator, python-oauth2, six, python-dateutil, SQLAlchemy, MarkupSafe, Mako, python-editor, alembic, jinja2, ipython-genutils, decorator, traitlets, jupyterhub, cylc-jupyterhub
+  Running setup.py develop for cylc-jupyterhub
+Successfully installed Mako-1.0.7 MarkupSafe-1.1.1 SQLAlchemy-1.2.18 alembic-1.0.7 async-generator-1.10 certifi-2018.11.29 chardet-3.0.4 cylc-jupyterhub decorator-4.3.2 idna-2.8 ipython-genutils-0.2.0 jinja2-2.10 jupyterhub-0.9.4 pamela-1.0.0 prometheus-client-0.6.0 python-dateutil-2.8.0 python-editor-1.0.4 python-oauth2-1.1.0 requests-2.21.0 six-1.12.0 tornado-5.1.1 traitlets-4.3.2 urllib3-1.24.1
 (venv) $ npm install -g configurable-http-proxy
 /home/kinow/.nvm/versions/node/v11.6.0/bin/configurable-http-proxy -> /home/kinow/.nvm/versions/node/v11.6.0/lib/node_modules/configurable-http-proxy/bin/configurable-http-proxy
 + configurable-http-proxy@4.0.1
@@ -25,19 +25,20 @@ added 45 packages from 62 contributors in 5.53s
 0.9.4
 (venv) $ configurable-http-proxy --version
 4.0.1
+(venv) $ cylc-singleuser
+usage: cylc-singleuser [-h] [-p PORT] -s STATIC
+cylc-singleuser: error: the following arguments are required: -s/--static
 ```
 
 We can start the hub with: `(venv) $ jupyterhub`, and navigate to [http://localhost:8000](http://localhost:8000).
 
 This start a JupyterHub instance, with the authenticator **jupyterhub.auth.PAMAuthenticator**,
-and the spawner **jupyterhub.spawner.LocalProcessSpawner**.
+and the spawner **jupyterhub.spawner.LocalProcessSpawner**. Look at the file `jupyterhub_config.py`
+in this repository to confirm the spawner used, and the parameters passed. These parameters define
+the directory of static content, and also what is the command that the spawner in JupyterHub must
+use (`cylc-singleuser`).
 
 ## Configuration
-
-_Goal: list the configuration needed to have a spawner starting a web application that we will
-call Cylc Web, but it is actually just a dummy application for testing purposes. Whereas JupyterHub
-has a "Single-User Notebook Server", it is good to thing of Cylc Web as a
-"Single-User Cylc Server".__
 
 ```bash
 (venv) $ jupyterhub --generate-config
@@ -49,20 +50,22 @@ By default we have `jupyterhub.spawner.LocalProcessSpawner` as the spawner. It i
 a bash shell that executes `jupyterhub-singleuser` with some parameters given via command
 line and environment variables.
 
-Alas this command cannot be changed in that spawner, so we have no other option but
-writing our own spawner.
+In order to have JupyterHub spawning our Cylc UI server, which is initialized by `cylc-singleuser`,
+we have to add the following settings in `jupyterhub_config.py`:
 
-### Cylc Spawner 01
-
-Spawners in JupyterHub can also request extra information when started. This is possibly
-useful for Cylc, as we can ask what is the Suite name, or PBS job, etc.
-
-* https://jupyterhub.readthedocs.io/en/stable/reference/spawners.html#spawner-options-form
-* https://github.com/jupyterhub/jupyterhub/blob/master/examples/spawn-form/jupyterhub_config.py
-
-```bash
-(venv) $ PYTHONPATH=$(pwd -P) jupyterhub -f $(pwd -P)/jupyterhub_config.py
 ```
+# not necessary as the default, but good nonetheless
+c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
+c.Spawner.args = ['-s', '../cylc-web/dist/']
+c.Spawner.cmd = ['cylc-singleuser']
+```
+
+The `LocalProcessSpawner` will add `--port` with a random generated port number by default. The
+`c.Spawner.args` includes an extra `-s ../cylc-web/dist`, which is the location where we should
+find the application `index.html` (change for your environment if necessary).
+
+Also note that the `c.Spawner.cmd` is `cylc-singleuser`, which is put in the `$PATH` as part of
+the instructions of the `setup.py` in this repository.
 
 ### Authentication
 
