@@ -103,7 +103,7 @@ class CylcUIServer(object):
             ioloop.IOLoop.instance().stop()
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description="Start Cylc UI"
     )
@@ -119,3 +119,7 @@ if __name__ == "__main__":
 
     logging.info("Starting Cylc UI")
     ui_server.start()
+
+
+if __name__ == "__main__":
+    main()
