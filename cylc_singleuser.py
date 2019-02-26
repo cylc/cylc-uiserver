@@ -10,36 +10,20 @@ from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
 
 
-class MainHandlerOld(web.RequestHandler):
-    """A handler that displays the user name, and also the PID. Useful
-    for troubleshooting"""
-
-    def get(self, username):
-        """
-        Get for user area.
-
-        At this point we would have Cylc running, so we just ned to have
-        a handler that gives the user's Dashboard... this acts now as
-        the entry point, in the same way that the GUI gcylc was before...
-        """
-        self.write(f"""
-        <p>Hello, world {username} !</p>
-        <p>Click <a href="/hub/home">here</a> to go back to the hub.</p>
-        <p>I am process ID {os.getpid()}</p>       
-        """)
-
-
 class MainHandler(HubOAuthenticated, web.RequestHandler):
 
     # hub_users = ["kinow"]
     # hub_groups = []
     # allow_admin = True
 
+    def initialize(self, path):
+        self._static = path
+
     @web.authenticated
     def get(self):
         """Render the UI prototype."""
         self.set_header("X-JupyterHub-Version", jupyterhub_version)
-        index = os.path.join(os.path.dirname(__file__), "static", "index.html")
+        index = os.path.join(self._static, "index.html")
         self.write(open(index).read())
 
 
@@ -102,7 +86,7 @@ class CylcUIServer(object):
                 (url_path_join(self._jupyter_hub_service_prefix, 'oauth_callback'), HubOAuthCallbackHandler),
                 (url_path_join(self._jupyter_hub_service_prefix, 'userprofile'), UserProfileHandler),
 
-                (self._jupyter_hub_service_prefix, MainHandler),
+                (self._jupyter_hub_service_prefix, MainHandler, {"path": self._static}),
             ],
             # FIXME: decide (and document) whether cookies will be permanent after server restart.
             cookie_secret="cylc-secret-cookie"
@@ -123,9 +107,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Start Cylc UI"
     )
-    parser.add_argument('-p', action="store", dest="port", type=int,
+    parser.add_argument('-p', '--port', action="store", dest="port", type=int,
                         default=8888)
-    parser.add_argument('-s', action="store", dest="static", required=True)
+    parser.add_argument('-s', '--static', action="store", dest="static", required=True)
     args = parser.parse_args()
 
     jupyterhub_service_prefix = os.environ.get('JUPYTERHUB_SERVICE_PREFIX', '/')
