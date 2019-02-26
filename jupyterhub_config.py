@@ -361,9 +361,7 @@
 ## The class to use for spawning single-user servers.
 #  
 #  Should be a subclass of Spawner.
-#c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
-# Remember to put PYTHONPATH=$(pwd -P) jupyterhub...
-c.JupyterHub.spawner_class = 'spawner.CylcSpawner01'
+c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
 
 ## Path to SSL certificate file for the public facing interface of the proxy
 #  
@@ -454,7 +452,7 @@ c.JupyterHub.spawner_class = 'spawner.CylcSpawner01'
 #  Some spawners allow shell-style expansion here, allowing you to use
 #  environment variables here. Most, including the default, do not. Consult the
 #  documentation for your spawner to verify!
-#c.Spawner.args = []
+c.Spawner.args = ['-s', '../cylc-web/dist/']
 
 ## The command used for starting the single-user server.
 #  
@@ -468,6 +466,7 @@ c.JupyterHub.spawner_class = 'spawner.CylcSpawner01'
 #  environment variables. Most, including the default, do not. Consult the
 #  documentation for your spawner to verify!
 #c.Spawner.cmd = ['jupyterhub-singleuser']
+c.Spawner.cmd = ['cylc-singleuser']
 
 ## Maximum number of consecutive failures to allow before shutting down
 #  JupyterHub.
