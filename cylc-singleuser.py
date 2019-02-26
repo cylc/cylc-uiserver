@@ -4,11 +4,10 @@ import os
 import signal
 import sys
 
-from tornado import web, ioloop
-
 from jupyterhub import __version__ as jupyterhub_version
 from jupyterhub.services.auth import HubOAuthenticated, HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
+from tornado import web, ioloop
 
 
 class MainHandlerOld(web.RequestHandler):
