@@ -104,7 +104,8 @@ class CylcUIServer(object):
 
                 (self._jupyter_hub_service_prefix, MainHandler),
             ],
-            cookie_secret="cylc123"
+            # FIXME: decide (and document) whether cookies will be permanent after server restart.
+            cookie_secret="cylc-secret-cookie"
         )
 
     def start(self):
