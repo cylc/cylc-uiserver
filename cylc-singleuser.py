@@ -1,8 +1,8 @@
+import argparse
 import json
 import logging
 import os
 import signal
-import sys
 
 from jupyterhub import __version__ as jupyterhub_version
 from jupyterhub.services.auth import HubOAuthenticated, HubOAuthCallbackHandler
@@ -48,7 +48,7 @@ class UserProfileHandler(HubOAuthenticated, web.RequestHandler):
     def set_default_headers(self):
         self.set_header("Access-Control-Allow-Origin", "*")
         self.set_header("Access-Control-Allow-Headers", "x-requested-with")
-        self.setl_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
         self.set_header("Content-Type", 'application/json')
 
     @web.authenticated
@@ -72,38 +72,45 @@ class MyApplication(web.Application):
 
 class CylcUIServer(object):
 
-    @staticmethod
-    def _make_app():
+    def __init__(self, port, static, jupyter_hub_service_prefix):
+        self._port = port
+        if os.path.isabs(static):
+            self._static = static
+        else:
+            script_dir = os.path.dirname(__file__)
+            self._static = os.path.join(script_dir, static)
+        self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
+
+    def _make_app(self):
         """Crete a Tornado web application."""
-        static_path = os.path.join(os.path.dirname(__file__), "static")
         return MyApplication(
-            static_path=static_path,
+            static_path=self._static,
             debug=True,
             handlers=[
-                (r"/(css/.*)", web.StaticFileHandler, {"path": static_path}),
-                (r"/(fonts/.*)", web.StaticFileHandler, {"path": static_path}),
-                (r"/(img/.*)", web.StaticFileHandler, {"path": static_path}),
-                (r"/(js/.*)", web.StaticFileHandler, {"path": static_path}),
-                (r"/(favicon.png)", web.StaticFileHandler, {"path": static_path}),
+                (r"/(css/.*)", web.StaticFileHandler, {"path": self._static}),
+                (r"/(fonts/.*)", web.StaticFileHandler, {"path": self._static}),
+                (r"/(img/.*)", web.StaticFileHandler, {"path": self._static}),
+                (r"/(js/.*)", web.StaticFileHandler, {"path": self._static}),
+                (r"/(favicon.png)", web.StaticFileHandler, {"path": self._static}),
 
-                (r"/user/.*/(css/.*)", web.StaticFileHandler, {"path": static_path}),
-                (r"/user/.*/(fonts/.*)", web.StaticFileHandler, {"path": static_path}),
-                (r"/user/.*/(img/.*)", web.StaticFileHandler, {"path": static_path}),
-                (r"/user/.*/(js/.*)", web.StaticFileHandler, {"path": static_path}),
-                (r"/user/.*/(favicon.png)", web.StaticFileHandler, {"path": static_path}),
+                (r"/user/.*/(css/.*)", web.StaticFileHandler, {"path": self._static}),
+                (r"/user/.*/(fonts/.*)", web.StaticFileHandler, {"path": self._static}),
+                (r"/user/.*/(img/.*)", web.StaticFileHandler, {"path": self._static}),
+                (r"/user/.*/(js/.*)", web.StaticFileHandler, {"path": self._static}),
+                (r"/user/.*/(favicon.png)", web.StaticFileHandler, {"path": self._static}),
 
-                (url_path_join(os.environ['JUPYTERHUB_SERVICE_PREFIX'], 'oauth_callback'), HubOAuthCallbackHandler),
-                (url_path_join(os.environ['JUPYTERHUB_SERVICE_PREFIX'], 'userprofile'), UserProfileHandler),
+                (url_path_join(self._jupyter_hub_service_prefix, 'oauth_callback'), HubOAuthCallbackHandler),
+                (url_path_join(self._jupyter_hub_service_prefix, 'userprofile'), UserProfileHandler),
 
-                (os.environ['JUPYTERHUB_SERVICE_PREFIX'], MainHandler),
+                (self._jupyter_hub_service_prefix, MainHandler),
             ],
             cookie_secret="cylc123"
         )
 
-    def start(self, *args):
+    def start(self):
         app = self._make_app()
         signal.signal(signal.SIGINT, app.signal_handler)
-        app.listen(int(args[0]))
+        app.listen(self._port)
         ioloop.PeriodicCallback(app.try_exit, 100).start()
         try:
             ioloop.IOLoop.current().start()
@@ -112,8 +119,18 @@ class CylcUIServer(object):
 
 
 if __name__ == "__main__":
-    port = 8888
-    if len(sys.argv) > 1:
-        port = int(sys.argv[1])
-    ui_server = CylcUIServer()
-    ui_server.start(port)
+    parser = argparse.ArgumentParser(
+        description="Start Cylc UI"
+    )
+    parser.add_argument('-p', action="store", dest="port", type=int,
+                        default=8888)
+    parser.add_argument('-s', action="store", dest="static", required=True)
+    args = parser.parse_args()
+
+    jupyterhub_service_prefix = os.environ.get('JUPYTERHUB_SERVICE_PREFIX', '/')
+    logging.info(f"JupyterHub Service Prefix: {jupyterhub_service_prefix}")
+    ui_server = CylcUIServer(port=args.port, static=args.static, jupyter_hub_service_prefix=jupyterhub_service_prefix)
+    logging.info(f"Listening on {args.port} and serving static content from {args.static}")
+
+    logging.info("Starting Cylc UI")
+    ui_server.start()
