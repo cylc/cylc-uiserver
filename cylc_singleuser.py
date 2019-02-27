@@ -67,21 +67,18 @@ class CylcUIServer(object):
 
     def _make_app(self):
         """Crete a Tornado web application."""
+        logging.info(self._static)
         return MyApplication(
             static_path=self._static,
             debug=True,
             handlers=[
-                (r"/(css/.*)", web.StaticFileHandler, {"path": self._static}),
-                (r"/(fonts/.*)", web.StaticFileHandler, {"path": self._static}),
-                (r"/(img/.*)", web.StaticFileHandler, {"path": self._static}),
-                (r"/(js/.*)", web.StaticFileHandler, {"path": self._static}),
-                (r"/(favicon.png)", web.StaticFileHandler, {"path": self._static}),
+                (rf"{self._jupyter_hub_service_prefix}(.*.(css|js))", web.StaticFileHandler, {"path": self._static}),
+                (rf"{self._jupyter_hub_service_prefix}((fonts|img)/.*)", web.StaticFileHandler, {"path": self._static}),
+                (rf"{self._jupyter_hub_service_prefix}(favicon.png)", web.StaticFileHandler, {"path": self._static}),
 
-                (r"/user/.*/(css/.*)", web.StaticFileHandler, {"path": self._static}),
-                (r"/user/.*/(fonts/.*)", web.StaticFileHandler, {"path": self._static}),
-                (r"/user/.*/(img/.*)", web.StaticFileHandler, {"path": self._static}),
-                (r"/user/.*/(js/.*)", web.StaticFileHandler, {"path": self._static}),
-                (r"/user/.*/(favicon.png)", web.StaticFileHandler, {"path": self._static}),
+                (r"/(.*.(css|js))", web.StaticFileHandler, {"path": self._static}),
+                (r"/((fonts|img)/.*)", web.StaticFileHandler, {"path": self._static}),
+                (r"/(favicon.png)", web.StaticFileHandler, {"path": self._static}),
 
                 (url_path_join(self._jupyter_hub_service_prefix, 'oauth_callback'), HubOAuthCallbackHandler),
                 (url_path_join(self._jupyter_hub_service_prefix, 'userprofile'), UserProfileHandler),
