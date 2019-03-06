@@ -8,6 +8,7 @@ from jupyterhub import __version__ as jupyterhub_version
 from jupyterhub.services.auth import HubOAuthenticated, HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
+from handlers import *
 
 
 class MainHandler(HubOAuthenticated, web.RequestHandler):
@@ -82,6 +83,7 @@ class CylcUIServer(object):
 
                 (url_path_join(self._jupyter_hub_service_prefix, 'oauth_callback'), HubOAuthCallbackHandler),
                 (url_path_join(self._jupyter_hub_service_prefix, 'userprofile'), UserProfileHandler),
+                (url_path_join(self._jupyter_hub_service_prefix, 'suites'), CylcScanHandler),
 
                 (self._jupyter_hub_service_prefix, MainHandler, {"path": self._static}),
             ],
