@@ -17,7 +17,8 @@ setup(
     python_requires='>=3.6',
     install_requires=[
         'jupyterhub',
-        'tornado'
+        'tornado',
+        'graphene-tornado'
     ],
     entry_points={
         'console_scripts': [

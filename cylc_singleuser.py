@@ -4,10 +4,13 @@ import logging
 import os
 import signal
 
+from graphene_tornado.schema import schema
+from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from jupyterhub import __version__ as jupyterhub_version
 from jupyterhub.services.auth import HubOAuthenticated, HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
+
 from handlers import *
 
 
@@ -86,6 +89,14 @@ class CylcUIServer(object):
                 (url_path_join(self._jupyter_hub_service_prefix, 'suites'), CylcScanHandler),
 
                 (self._jupyter_hub_service_prefix, MainHandler, {"path": self._static}),
+
+                # graphql
+                (url_path_join(self._jupyter_hub_service_prefix, '/graphql'),
+                 TornadoGraphQLHandler, dict(graphiql=True, schema=schema)),
+                (url_path_join(self._jupyter_hub_service_prefix, '/graphql/batch'),
+                 TornadoGraphQLHandler, dict(graphiql=True, schema=schema, batch=True)),
+                (url_path_join(self._jupyter_hub_service_prefix, '/graphql/graphiql'),
+                 TornadoGraphQLHandler, dict(graphiql=True, schema=schema)),
             ],
             # FIXME: decide (and document) whether cookies will be permanent after server restart.
             cookie_secret="cylc-secret-cookie"
