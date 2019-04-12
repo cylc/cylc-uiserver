@@ -7,12 +7,12 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='cylc-jupyterhub',
+    name='cylc-uiserver',
     version='1.0',
-    description='Cylc JupyterHub project, providing a UI server to Cylc',
+    description='Cylc UI Server',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/cylc/cylc-jupyterhub/',
+    url='https://github.com/cylc/cylc-uiserver/',
     py_modules=['cylc_singleuser'],
     python_requires='>=3.6',
     install_requires=[
