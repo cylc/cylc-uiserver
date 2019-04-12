@@ -21,13 +21,16 @@ import logging
 import os
 import signal
 
-from graphene_tornado.schema import schema
+from schema import schema
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
+from graphql import get_default_backend
 from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
 
 from handlers import *
+from workflow_services_mgr import WorkflowServicesMgr
+from data_mgr import DataManager
 
 
 class MyApplication(web.Application):
@@ -44,6 +47,42 @@ class MyApplication(web.Application):
             logging.info('exit success')
 
 
+# This is needed in order to pass the server context in addition to existing.
+# It's possible to just overwrite TornadoGraphQLHandler.context but we would
+# somehow need to pass the request info (headers, username ...etc) in also
+class UIServerGraphQLHandler(TornadoGraphQLHandler):
+
+    # Declare extra attributes
+    uiserver = None
+
+    def initialize(self, schema=None, executor=None, middleware=None,
+                   root_value=None, graphiql=False, pretty=False,
+                   batch=False, backend=None, **kwargs):
+        super(TornadoGraphQLHandler, self).initialize()
+
+        self.schema = schema
+        if middleware is not None:
+            self.middleware = list(self.instantiate_middleware(middleware))
+        self.executor = executor
+        self.root_value = root_value
+        self.pretty = pretty
+        self.graphiql = graphiql
+        self.batch = batch
+        self.backend = backend or get_default_backend()
+        # Set extra attributes
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+
+    @property
+    def context(self):
+        wider_context = {
+            'uiserver': self.uiserver,
+            'request': self.request,
+        }
+        return wider_context
+
+
 class CylcUIServer(object):
 
     def __init__(self, port, static, jupyter_hub_service_prefix):
@@ -54,6 +93,8 @@ class CylcUIServer(object):
             script_dir = os.path.dirname(__file__)
             self._static = os.path.abspath(os.path.join(script_dir, static))
         self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
+        self.ws_mgr = WorkflowServicesMgr()
+        self.data_mgr = DataManager(self.ws_mgr)
 
     def _make_app(self):
         """Crete a Tornado web application."""
@@ -92,16 +133,16 @@ class CylcUIServer(object):
                 # graphql
                 (url_path_join(self._jupyter_hub_service_prefix,
                                '/graphql'),
-                    TornadoGraphQLHandler,
-                    dict(graphiql=True, schema=schema)),
+                    UIServerGraphQLHandler,
+                    dict(schema=schema, uiserver=self)),
                 (url_path_join(self._jupyter_hub_service_prefix,
                                '/graphql/batch'),
-                    TornadoGraphQLHandler,
-                    dict(graphiql=True, schema=schema, batch=True)),
+                    UIServerGraphQLHandler,
+                    dict(schema=schema, uiserver=self, batch=True)),
                 (url_path_join(self._jupyter_hub_service_prefix,
                                '/graphql/graphiql'),
-                    TornadoGraphQLHandler,
-                    dict(graphiql=True, schema=schema))
+                    UIServerGraphQLHandler,
+                    dict(schema=schema, uiserver=self, graphiql=True)),
             ],
             # FIXME: decide (and document) whether cookies will be permanent
             # after server restart.
@@ -113,6 +154,14 @@ class CylcUIServer(object):
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)
         ioloop.PeriodicCallback(app.try_exit, 100).start()
+        # Discover workflows on intiial start up.
+        ioloop.IOLoop.current().add_callback(self.ws_mgr.gather_workflows)
+        # Arbitrary intervals (msec) chosen for the two periodic callbacks
+        # below. These will likely change or be removed with PUB/SUB updates.
+        # Check for new workflows every 19sec.
+        ioloop.PeriodicCallback(self.ws_mgr.gather_workflows, 19000).start()
+        ioloop.PeriodicCallback(
+            self.data_mgr.entire_workflow_update, 5000).start()
         try:
             ioloop.IOLoop.current().start()
         except KeyboardInterrupt:
@@ -149,4 +198,4 @@ if __name__ == "__main__":
 
 
 __all__ = ['MainHandler', 'UserProfileHandler', 'MyApplication',
-           'CylcUIServer', 'main']
+           'UIServerGraphQLHandler', 'CylcUIServer', 'main']

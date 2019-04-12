@@ -93,7 +93,8 @@ class CylcScanHandler(HubOAuthenticated, APIHandler):
 
     @web.authenticated
     def get(self):
-        cylc_scan_proc = Popen("cylc scan", shell=True, stdout=PIPE)
+        cylc_scan_proc = Popen(
+            "cylc scan --color=never", shell=True, stdout=PIPE)
         cylc_scan_out = cylc_scan_proc.communicate()[0]
 
         suite_lines = cylc_scan_out.splitlines()
