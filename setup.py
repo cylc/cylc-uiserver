@@ -14,7 +14,7 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/cylc/cylc-jupyterhub/',
     py_modules=['cylc_singleuser'],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     install_requires=[
         'jupyterhub',
         'tornado',
