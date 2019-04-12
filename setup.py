@@ -13,7 +13,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/cylc/cylc-uiserver/',
-    py_modules=['cylc_singleuser'],
+    py_modules=['handlers', 'cylc_singleuser'],
     python_requires='>=3.7',
     install_requires=[
         'jupyterhub',
