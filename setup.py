@@ -20,6 +20,14 @@ setup(
         'tornado',
         'graphene-tornado'
     ],
+    setup_requires=[
+        'pytest-runner'
+    ],
+    tests_require=[
+        'pytest',
+        'coverage',
+        'pytest-cov'
+    ],
     entry_points={
         'console_scripts': [
             'cylc-singleuser=cylc_singleuser:main'
