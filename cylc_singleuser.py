@@ -66,7 +66,7 @@ class CylcUIServer(object):
             self._static = static
         else:
             script_dir = os.path.dirname(__file__)
-            self._static = os.path.join(script_dir, static)
+            self._static = os.path.abspath(os.path.join(script_dir, static))
         self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
 
     def _make_app(self):
@@ -133,3 +133,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+__all__ = ['MainHandler', 'UserProfileHandler', 'MyApplication', 'CylcUIServer', 'main']
