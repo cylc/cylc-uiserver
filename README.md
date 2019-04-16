@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/cylc/cylc-uiserver.svg?branch=master)](https://travis-ci.org/cylc/cylc-uiserver)
+[![codecov](https://codecov.io/gh/cylc/cylc-uiserver/branch/master/graph/badge.svg)](https://codecov.io/gh/cylc/cylc-uiserver)
+
 # Running Cylc with JupyterHub
 
 _This is a Work-In-Progress_
