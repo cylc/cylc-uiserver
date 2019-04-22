@@ -94,6 +94,18 @@ It should work means that all users see each others UI servers.
 TODO: explain whether we can use the Hub REST API and DB scheme for Cylc workflow services
 authentication.
 
+### Starting multiple instances of jupyterhub
+
+If you need to run multiple instances of `jupyterhub`, you will have to follow the steps described
+below:
+
+- copy `jupyterhub_config.py` to a different location
+- change the following settings (change the ports to your environment):
+    * `c.JupyterHub.bind_url = 'http://:7000'`
+    * `c.JupyterHub.hub_bind_url = 'http://127.0.0.1:7878'`
+    * `c.JupyterHub.proxy_api_port = 9001`
+- finally start `jupyterhub` using that configuration file
+
 ## Services
 
 Q: Would Cylc Review be a service? Perhaps we could choose whether to start it with
