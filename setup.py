@@ -24,19 +24,19 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 install_requires = [
-    'jupyterhub',
-    'tornado',
-    'graphene-tornado'
+    'jupyterhub==0.9.*',
+    'tornado==6.0.*',
+    'graphene-tornado==2.0.*'
 ]
 
 setup_requires = [
-    'pytest-runner'
+    'pytest-runner==4.4.*'
 ]
 
 tests_require = [
-    'pytest',
-    'coverage',
-    'pytest-cov'
+    'pytest==4.4.*',
+    'coverage==4.5.*',
+    'pytest-cov==2.6.*'
 ]
 
 extras_require = {
