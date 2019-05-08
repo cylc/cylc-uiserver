@@ -17,49 +17,17 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
-import json
 import logging
 import os
 import signal
 
 from graphene_tornado.schema import schema
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
-from jupyterhub import __version__ as jupyterhub_version
-from jupyterhub.services.auth import HubOAuthenticated, HubOAuthCallbackHandler
+from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
 
 from handlers import *
-
-
-class MainHandler(HubOAuthenticated, web.RequestHandler):
-
-    # hub_users = ["kinow"]
-    # hub_groups = []
-    # allow_admin = True
-
-    def initialize(self, path):
-        self._static = path
-
-    @web.authenticated
-    def get(self):
-        """Render the UI prototype."""
-        self.set_header("X-JupyterHub-Version", jupyterhub_version)
-        index = os.path.join(self._static, "index.html")
-        self.write(open(index).read())
-
-
-class UserProfileHandler(HubOAuthenticated, web.RequestHandler):
-
-    def set_default_headers(self):
-        self.set_header("Access-Control-Allow-Origin", "*")
-        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
-        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
-        self.set_header("Content-Type", 'application/json')
-
-    @web.authenticated
-    def get(self):
-        self.write(json.dumps(self.get_current_user()))
 
 
 class MyApplication(web.Application):
