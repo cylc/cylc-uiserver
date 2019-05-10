@@ -16,20 +16,50 @@
 
 import json
 import re
+import os
 from subprocess import Popen, PIPE
 
 from jupyterhub.services.auth import HubOAuthenticated
 from tornado import web
 from typing import List, Union
 
+from jupyterhub import __version__ as jupyterhub_version
 
-class CylcScanHandler(HubOAuthenticated, web.RequestHandler):
 
-    def set_default_headers(self):
+class BaseHandler(web.RequestHandler):
+
+    def set_default_headers(self) -> None:
+        self.set_header("X-JupyterHub-Version", jupyterhub_version)
         self.set_header("Access-Control-Allow-Origin", "*")
         self.set_header("Access-Control-Allow-Headers", "x-requested-with")
         self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
         self.set_header("Content-Type", 'application/json')
+
+
+class MainHandler(HubOAuthenticated, BaseHandler):
+
+    # hub_users = ["kinow"]
+    # hub_groups = []
+    # allow_admin = True
+
+    def initialize(self, path):
+        self._static = path
+
+    @web.authenticated
+    def get(self):
+        """Render the UI prototype."""
+        index = os.path.join(self._static, "index.html")
+        self.write(open(index).read())
+
+
+class UserProfileHandler(HubOAuthenticated, BaseHandler):
+
+    @web.authenticated
+    def get(self):
+        self.write(json.dumps(self.get_current_user()))
+
+
+class CylcScanHandler(HubOAuthenticated, BaseHandler):
 
     def _parse_suite_line(self, suite_line: bytes) -> Union[dict, None]:
         if suite_line:
@@ -51,7 +81,6 @@ class CylcScanHandler(HubOAuthenticated, web.RequestHandler):
                 suites.append(suite)
         return suites
 
-
     @web.authenticated
     def get(self):
         cylc_scan_proc = Popen("cylc scan", shell=True, stdout=PIPE)
@@ -62,4 +91,4 @@ class CylcScanHandler(HubOAuthenticated, web.RequestHandler):
         self.write(json.dumps(suites))
 
 
-__all__ = ["CylcScanHandler"]
+__all__ = ["MainHandler", "UserProfileHandler", "CylcScanHandler"]
