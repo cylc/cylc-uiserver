@@ -23,11 +23,11 @@ import signal
 
 from graphene_tornado.schema import schema
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
-from jupyterhub.services.auth import HubOAuthCallbackHandler
-from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
 
 from handlers import *
+from jupyterhub.services.auth import HubOAuthCallbackHandler
+from jupyterhub.utils import url_path_join
 
 
 class MyApplication(web.Application):
@@ -83,6 +83,11 @@ class CylcUIServer(object):
                  TornadoGraphQLHandler, dict(graphiql=True, schema=schema, batch=True)),
                 (url_path_join(self._jupyter_hub_service_prefix, '/graphql/graphiql'),
                  TornadoGraphQLHandler, dict(graphiql=True, schema=schema)),
+
+                # since jupyterhub 1.0.0, the "My Server link the hub page removed the last
+                # slash from the URL. This handler is based on the handler with the same name
+                # in jupyterhub 1.0.0, and adds back the last `/` to every URL in the app.
+                (r".*", AddSlashHandler)
             ],
             # FIXME: decide (and document) whether cookies will be permanent after server restart.
             cookie_secret="cylc-secret-cookie"

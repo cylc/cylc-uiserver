@@ -15,15 +15,17 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-import re
 import os
+import re
 from subprocess import Popen, PIPE
-
-from jupyterhub.services.auth import HubOAuthenticated
-from tornado import web
 from typing import List, Union
+from urllib.parse import urlparse
+from urllib.parse import urlunparse
+
+from tornado import web
 
 from jupyterhub import __version__ as jupyterhub_version
+from jupyterhub.services.auth import HubOAuthenticated
 
 
 class BaseHandler(web.RequestHandler):
@@ -101,4 +103,17 @@ class CylcScanHandler(HubOAuthenticated, APIHandler):
         self.write(json.dumps(suites))
 
 
-__all__ = ["MainHandler", "UserProfileHandler", "CylcScanHandler"]
+class AddSlashHandler(web.RequestHandler):
+
+    def get(self, *args):
+        src = urlparse(self.request.uri)
+        dest = src._replace(path=src.path + '/')
+        self.redirect(urlunparse(dest))
+
+
+__all__ = [
+    "MainHandler",
+    "UserProfileHandler",
+    "CylcScanHandler",
+    "AddSlashHandler"
+]
