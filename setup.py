@@ -24,9 +24,9 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 install_requires = [
-    'jupyterhub==0.9.*',
+    'jupyterhub==1.0.*',
     'tornado==6.0.*',
-    'graphene-tornado==2.0.*'
+    'graphene-tornado==2.1.*'
 ]
 
 setup_requires = [
