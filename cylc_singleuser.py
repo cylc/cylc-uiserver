@@ -86,7 +86,7 @@ class CylcUIServer(object):
                     self._jupyter_hub_service_prefix, 'suites'),
                     CylcScanHandler),
 
-                (self._jupyter_hub_service_prefix,
+                (rf"{self._jupyter_hub_service_prefix}?",
                     MainHandler, {"path": self._static}),
 
                 # graphql
@@ -101,13 +101,7 @@ class CylcUIServer(object):
                 (url_path_join(self._jupyter_hub_service_prefix,
                                '/graphql/graphiql'),
                     TornadoGraphQLHandler,
-                    dict(graphiql=True, schema=schema)),
-
-                # since jupyterhub 1.0.0, the "My Server link the hub page
-                # removed the last slash from the URL. This handler is based
-                # on the handler with the same name in jupyterhub 1.0.0,
-                # and adds back the last `/` to every URL in the app.
-                (r".*", AddSlashHandler)
+                    dict(graphiql=True, schema=schema))
             ],
             # FIXME: decide (and document) whether cookies will be permanent
             # after server restart.
