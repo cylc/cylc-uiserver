@@ -33,6 +33,12 @@ class BaseHandler(web.RequestHandler):
         self.set_header("Access-Control-Allow-Origin", "*")
         self.set_header("Access-Control-Allow-Headers", "x-requested-with")
         self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+
+
+class APIHandler(BaseHandler):
+
+    def set_default_headers(self) -> None:
+        super().set_default_headers()
         self.set_header("Content-Type", 'application/json')
 
 
@@ -52,14 +58,18 @@ class MainHandler(HubOAuthenticated, BaseHandler):
         self.write(open(index).read())
 
 
-class UserProfileHandler(HubOAuthenticated, BaseHandler):
+class UserProfileHandler(HubOAuthenticated, APIHandler):
+
+    def set_default_headers(self) -> None:
+        super().set_default_headers()
+        self.set_header("Content-Type", 'application/json')
 
     @web.authenticated
     def get(self):
         self.write(json.dumps(self.get_current_user()))
 
 
-class CylcScanHandler(HubOAuthenticated, BaseHandler):
+class CylcScanHandler(HubOAuthenticated, APIHandler):
 
     def _parse_suite_line(self, suite_line: bytes) -> Union[dict, None]:
         if suite_line:
