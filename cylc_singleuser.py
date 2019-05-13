@@ -23,11 +23,11 @@ import signal
 
 from graphene_tornado.schema import schema
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
+from jupyterhub.services.auth import HubOAuthCallbackHandler
+from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
 
 from handlers import *
-from jupyterhub.services.auth import HubOAuthCallbackHandler
-from jupyterhub.utils import url_path_join
 
 
 class MyApplication(web.Application):
