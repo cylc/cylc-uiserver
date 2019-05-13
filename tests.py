@@ -51,7 +51,6 @@ class MainHandlerTest(AsyncHTTPTestCase):
             shutil.rmtree(self.tempdir, ignore_errors=True)
 
 
-
 class UserProfileHandlerTest(AsyncHTTPTestCase):
     """Test for UserProfile handler"""
     def get_app(self) -> Application:
@@ -69,7 +68,7 @@ class UserProfileHandlerTest(AsyncHTTPTestCase):
             assert "Access-Control-Allow-Headers" in response.headers
             assert "Access-Control-Allow-Methods" in response.headers
             assert "Content-Type" in response.headers
-            assert b'yossarian' in  response.body
+            assert b'yossarian' in response.body
 
 
 def test_my_application():
