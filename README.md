@@ -35,7 +35,7 @@ cylc-singleuser: error: the following arguments are required: -s/--static
 
 We can start the hub with: `(venv) $ jupyterhub`, and navigate to [http://localhost:8000](http://localhost:8000).
 
-This start a JupyterHub instance, with the authenticator **jupyterhub.auth.PAMAuthenticator**,
+This starts a JupyterHub instance, with the authenticator **jupyterhub.auth.PAMAuthenticator**,
 and the spawner **jupyterhub.spawner.LocalProcessSpawner**. Look at the file `jupyterhub_config.py`
 in this repository to confirm the spawner used, and the parameters passed. These parameters define
 the directory of static content, and also what is the command that the spawner in JupyterHub must
