@@ -22,10 +22,9 @@ from typing import List, Union
 from urllib.parse import urlparse
 from urllib.parse import urlunparse
 
-from tornado import web
-
 from jupyterhub import __version__ as jupyterhub_version
 from jupyterhub.services.auth import HubOAuthenticated
+from tornado import web
 
 
 class BaseHandler(web.RequestHandler):
