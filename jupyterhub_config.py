@@ -468,7 +468,7 @@ c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
 #  Some spawners allow shell-style expansion here, allowing you to use
 #  environment variables here. Most, including the default, do not. Consult the
 #  documentation for your spawner to verify!
-c.Spawner.args = ['-s', '../cylc-web/dist/']
+c.Spawner.args = ['-s', '../cylc-ui/dist/']
 
 ## The command used for starting the single-user server.
 #  
