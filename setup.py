@@ -54,7 +54,12 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/cylc/cylc-uiserver/',
-    py_modules=['handlers', 'cylc_singleuser'],
+    py_modules=[
+        'handlers',
+        'cylc_singleuser',
+        'data_mgr',
+        'workflow_services_mgr',
+        'schema'],
     python_requires='>=3.7',
     install_requires=install_requires,
     setup_requires=setup_requires,

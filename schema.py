@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # -*- coding: utf-8 -*-
 # Copyright (C) 2019 NIWA & British Crown (Met Office) & Contributors.
 #
@@ -18,11 +16,12 @@
 
 """GraphQL API schema via Graphene implementation."""
 
+from fnmatch import fnmatchcase
+
 from graphene import (
     Boolean, Field, Float, ID, InputObjectType, Int,
     List, Mutation, ObjectType, Schema, String, Union
 )
-from graphene.types.resolver import dict_resolver
 from graphene.types.generic import GenericScalar
 from graphene.utils.str_converters import to_snake_case
 
@@ -38,18 +37,25 @@ NODE_MAP = {
 
 CYCLING_TYPES = [
     'family_proxies',
+    'family_proxy',
     'jobs',
+    'job',
     'task_proxies',
+    'task_proxy',
 ]
 
 PROXY_TYPES = [
     'family_proxies',
+    'family_proxy',
     'task_proxies',
+    'task_proxy',
 ]
 
 DEF_TYPES = [
     'families',
+    'family',
     'tasks',
+    'task',
 ]
 
 
@@ -103,16 +109,16 @@ def parse_node_id(item, node_type=None):
 
         None type is set for missing components.
     """
-    if ":" in item:
-        head, state = item.rsplit(":", 1)
+    if ':' in item:
+        head, state = item.rsplit(':', 1)
     else:
         head, state = (item, None)
-    if "/" in head:
-        dil_count = head.count("/")
-        parts = head.split("/", dil_count)
+    if '/' in head:
+        dil_count = head.count('/')
+        parts = head.split('/', dil_count)
     else:
-        dil_count = head.count(".")
-        parts = head.split(".", dil_count)[::-1]
+        dil_count = head.count('.')
+        parts = head.split('.', dil_count)[::-1]
     if node_type in DEF_TYPES:
         owner, workflow, name = [None] * (2 - dil_count) + parts
         parts = [owner, workflow, None, name, None]
@@ -233,7 +239,7 @@ def get_nodes_all(root, info, **args):
     return data_mgr.get_nodes_all(node_type, args)
 
 
-def get_nodes_id(root, info, **args):
+def get_nodes_by_id(root, info, **args):
     """Resolver for returning job, task, family node"""
     field_name = to_snake_case(info.field_name)
     field_ids = getattr(root, field_name, None)
@@ -253,10 +259,10 @@ def get_nodes_id(root, info, **args):
     args['ids'] = [parse_node_id(n_id, node_type) for n_id in args['ids']]
     args['exids'] = [parse_node_id(n_id, node_type) for n_id in args['exids']]
     data_mgr = info.context.get('uiserver').data_mgr
-    return data_mgr.get_nodes_id(node_type, args)
+    return data_mgr.get_nodes_by_id(node_type, args)
 
 
-def get_node_id(root, info, **args):
+def get_node_by_id(root, info, **args):
     """Resolver for returning job, task, family node"""
     field_name = to_snake_case(info.field_name)
     field_id = getattr(root, field_name, None)
@@ -269,7 +275,7 @@ def get_node_id(root, info, **args):
     except AttributeError:
         obj_type = str(info.return_type)
     data_mgr = info.context.get('uiserver').data_mgr
-    return data_mgr.get_node_id(NODE_MAP[obj_type], args)
+    return data_mgr.get_node_by_id(NODE_MAP[obj_type], args)
 
 
 def get_edges_all(root, info, **args):
@@ -277,7 +283,7 @@ def get_edges_all(root, info, **args):
     return data_mgr.get_edges_all(args)
 
 
-def get_edges_id(root, info, **args):
+def get_edges_by_id(root, info, **args):
     field_name = to_snake_case(info.field_name)
     field_ids = getattr(root, field_name, None)
     if field_ids:
@@ -285,11 +291,10 @@ def get_edges_id(root, info, **args):
     elif field_ids == []:
         return []
     data_mgr = info.context.get('uiserver').data_mgr
-    return data_mgr.get_edges_id(args)
+    return data_mgr.get_edges_by_id(args)
+
 
 # Types:
-
-
 class Meta(ObjectType):
     """Meta data fields, and custom fields generic userdefined dump"""
     title = String(default_value=None)
@@ -335,12 +340,12 @@ class Workflow(ObjectType):
         lambda: Task,
         description="""Task definitions.""",
         args=def_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
     families = List(
         lambda: Family,
         description="""Family definitions.""",
         args=def_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
     edges = Field(
         lambda: Edges,
         args=edge_args,
@@ -372,7 +377,7 @@ class Job(ObjectType):
         lambda: TaskProxy,
         description="""Associated Task Proxy""",
         required=True,
-        resolver=get_node_id)
+        resolver=get_node_by_id)
     submitted_time = String()
     started_time = String()
     finished_time = String()
@@ -409,7 +414,7 @@ class Task(ObjectType):
         lambda: TaskProxy,
         description="""Associated cycle point proxies""",
         args=proxy_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
     namespace = List(String, required=True)
 
 
@@ -427,7 +432,7 @@ class Condition(ObjectType):
     task_proxy = Field(
         lambda: TaskProxy,
         description="""Associated Task Proxy""",
-        resolver=get_node_id)
+        resolver=get_node_by_id)
     expr_alias = String()
     req_state = String()
     satisfied = Boolean()
@@ -451,14 +456,14 @@ class TaskProxy(ObjectType):
         Task,
         description="""Task definition""",
         required=True,
-        resolver=get_node_id)
+        resolver=get_node_by_id)
     state = String()
     cycle_point = String()
     spawned = Boolean()
     depth = Int()
     job_submits = Int()
     latest_message = String()
-    outputs = GenericScalar(default_value=[])
+    outputs = List(String, default_value=[])
     broadcasts = List(String, default_value=[])
     namespace = List(String, required=True)
     proxy_namespace = List(String)
@@ -467,12 +472,12 @@ class TaskProxy(ObjectType):
         Job,
         description="""Task jobs.""",
         args=jobs_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
     parents = List(
         lambda: FamilyProxy,
         description="""Task parents.""",
         args=proxy_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
 
 
 class Family(ObjectType):
@@ -485,22 +490,22 @@ class Family(ObjectType):
         lambda: FamilyProxy,
         description="""Associated cycle point proxies""",
         args=proxy_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
     parents = List(
         lambda: Family,
         description="""Family definition parent.""",
         args=def_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
     child_tasks = List(
         Task,
         description="""Descendedant definition tasks.""",
         args=def_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
     child_families = List(
         lambda: Family,
         description="""Descendedant desc families.""",
         args=def_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
 
 
 class FamilyProxy(ObjectType):
@@ -513,24 +518,24 @@ class FamilyProxy(ObjectType):
         Family,
         description="""Family definition""",
         required=True,
-        resolver=get_node_id)
+        resolver=get_node_by_id)
     state = String()
     depth = Int()
     parents = List(
         lambda: FamilyProxy,
         description="""Family parent proxies.""",
         args=proxy_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
     child_tasks = List(
         TaskProxy,
         description="""Descendedant task proxies.""",
         args=proxy_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
     child_families = List(
         lambda: FamilyProxy,
         description="""Descendedant family proxies.""",
         args=proxy_args,
-        resolver=get_nodes_id)
+        resolver=get_nodes_by_id)
 
 
 class Node(Union):
@@ -550,10 +555,10 @@ class Edge(ObjectType):
     id = ID(required=True)
     tail_node = Field(
         Node,
-        resolver=get_node_id)
+        resolver=get_node_by_id)
     head_node = Field(
         Node,
-        resolver=get_node_id)
+        resolver=get_node_by_id)
     suicide = Boolean()
     cond = Boolean()
 
@@ -565,14 +570,13 @@ class Edges(ObjectType):
         Edge,
         required=True,
         args=edge_args,
-        resolver=get_edges_id)
+        resolver=get_edges_by_id)
     workflow_polling_tasks = List(PollTask)
     leaves = List(String)
     feet = List(String)
 
+
 # Query declaration
-
-
 class Query(ObjectType):
     workflows = List(
         Workflow,
@@ -582,7 +586,7 @@ class Query(ObjectType):
     job = Field(
         Job,
         id=ID(required=True),
-        resolver=get_node_id)
+        resolver=get_node_by_id)
     jobs = List(
         Job,
         args=all_jobs_args,
@@ -590,7 +594,7 @@ class Query(ObjectType):
     task = Field(
         Task,
         id=ID(required=True),
-        resolver=get_node_id)
+        resolver=get_node_by_id)
     tasks = List(
         Task,
         args=all_def_args,
@@ -598,7 +602,7 @@ class Query(ObjectType):
     task_proxy = Field(
         TaskProxy,
         id=ID(required=True),
-        resolver=get_node_id)
+        resolver=get_node_by_id)
     task_proxies = List(
         TaskProxy,
         args=all_proxy_args,
@@ -606,7 +610,7 @@ class Query(ObjectType):
     family = Field(
         Family,
         id=ID(required=True),
-        resolver=get_node_id)
+        resolver=get_node_by_id)
     families = List(
         Family,
         args=all_def_args,
@@ -614,7 +618,7 @@ class Query(ObjectType):
     family_proxy = Field(
         FamilyProxy,
         id=ID(required=True),
-        resolver=get_node_id)
+        resolver=get_node_by_id)
     family_proxies = List(
         FamilyProxy,
         args=all_proxy_args,
@@ -626,156 +630,211 @@ class Query(ObjectType):
 
 
 # ** Mutation Related ** #
-# Mutations defined:
-class Broadcast(Mutation):
+
+# Generic containers
+class GenericResponse(ObjectType):
     class Meta:
-        description = """Clear, Expire, or Put a broadcast:
-- Clear settings globally, or for listed namespaces and/or points
-- Expire all settings targeting cycle points earlier than cutoff.
-- Put up new broadcast settings (server side interface)."""
+        description = """Container for command queued response"""
+
+    response = GenericScalar()
+
+
+# Mutation resolvers:
+async def mutator(self, info, command, workflows, exworkflows=[], **args):
+    w_ids = [
+        flow.id for flow in
+        get_workflows(self, info, ids=workflows, exids=exworkflows)]
+    if args.get('args', None):
+        for arg, val in args['args'].items():
+            args[arg] = val
+        args.pop('args')
+    ws_mgr = info.context.get('uiserver').ws_mgr
+    res = await ws_mgr.multi_request(command, w_ids, args)
+    return GenericResponse(response=res)
+
+
+# Mutations defined:
+class ClearBroadcast(Mutation):
+    class Meta:
+        description = """Expire all settings targeting cycle points
+earlier than cutoff."""
+        resolver = mutator
 
     class Arguments:
-        action = String(
-            description="""String options:
-- put
-- clear
-- expire""",
-            required=True,)
-        points = List(
-            String,
-            description="""points: ["*"]""",)
+        workflows = List(String, required=True)
+        command = String(default_value='clear_broadcast')
+        cutoff = String(description="""String""")
+
+    response = GenericScalar()
+
+
+class ExpireBroadcast(Mutation):
+    class Meta:
+        description = """Clear settings globally,
+or for listed namespaces and/or points."""
+        resolver = mutator
+
+    class Arguments:
+        workflows = List(String, required=True)
+        command = String(default_value='expire_broadcast')
+        points = List(String, description="""`["*"]`""")
         namespaces = List(
             String,
-            description="""namespaces: ["foo", "BAZ"]""",)
-        settings = List(
+            description="""namespaces: `["foo", "BAZ"]`""",)
+        cancel_settings = List(
             GenericScalar,
             description="""
-settings: [{envronment: {ENVKEY: "env_val"}}, ...]""",)
+settings: `[{envronment: {ENVKEY: "env_val"}}, ...]`""",)
 
-    modified_settings = GenericScalar()
-    bad_options = GenericScalar()
-
-    def mutate(self, info, action, points=[], namespaces=[], settings=[]):
-        data_mgr = info.context.get('uiserver').data_mgr
-        broadcast_mgr = data_mgr.task_events_mgr.broadcast_mgr
-        mod_ret = []
-        if action == 'put':
-            mod_ret, bad_ret = broadcast_mgr.put_broadcast(
-                points, namespaces, settings)
-        elif action == 'clear':
-            mod_ret, bad_ret = broadcast_mgr.clear_broadcast(
-                points, namespaces, settings)
-        elif action == 'expire':
-            if points:
-                cutoff = points[0]
-                mod_ret, bad_ret = broadcast_mgr.expire_broadcast(cutoff)
-        else:
-            bad_ret = {'action': action}
-        return Broadcast(modified_settings=mod_ret, bad_options=bad_ret)
+    response = GenericScalar()
 
 
 class HoldWorkflow(Mutation):
     class Meta:
-        description = """Hold items/workflow:
-- set hold on workflow.  (default)
-- Set hold point of workflow."""
+        description = """Hold workflow.
+- hold on workflow. (default)
+- hold point of workflow."""
+        resolver = mutator
 
     class Arguments:
-        hold_type = String(
-            description="""String options:
-- hold_suite  (default)
-- hold_after_point_string""")
+        command = String(
+            description="""options:
+- `hold_suite` (default)
+- `hold_after_point_string`""",
+            default_value='hold_suite')
         point_string = String()
-    command_queued = Boolean()
+        workflows = List(String, required=True)
 
-    def mutate(self, info, hold_type='hold_suite', point_string=None):
-        data_mgr = info.context.get('uiserver').data_mgr
-        item_tuple = ()
-        if point_string is not None:
-            item_tuple = (point_string,)
-        data_mgr.command_queue.put((hold_type, item_tuple, {}))
-        return HoldWorkflow(command_queued=True)
+    response = GenericScalar()
 
 
 class NudgeWorkflow(Mutation):
     class Meta:
         description = """Tell workflow to try task processing."""
-    command_queued = Boolean()
+        resolver = mutator
 
-    def mutate(self, info):
-        data_mgr = info.context.get('uiserver').data_mgr
-        data_mgr.command_queue.put(("nudge", (), {}))
-        return NudgeWorkflow(command_queued=True)
+    class Arguments:
+        command = String(default_value='nudge')
+        workflows = List(String, required=True)
+
+    response = GenericScalar()
+
+
+class PutBroadcast(Mutation):
+    class Meta:
+        description = """Put up new broadcast settings
+(server side interface)."""
+        resolver = mutator
+
+    class Arguments:
+        command = String(default_value='put_broadcast')
+        workflows = List(String, required=True)
+        points = List(String, description="""["*"]""")
+        namespaces = List(
+            String,
+            description="""namespaces: `["foo", "BAZ"]`""",)
+        settings = List(
+            GenericScalar,
+            description="""
+settings: `[{envronment: {ENVKEY: "env_val"}}, ...]`""",)
+
+    response = GenericScalar()
 
 
 class PutMessages(Mutation):
     class Meta:
         description = """Put task messages in queue for processing
-            later by the main loop."""
+later by the main loop."""
 
     class Arguments:
-        job_id = String(
-            description="""Task job in the form "CYCLE/TASK_NAME/SUBMIT_NUM""",
+        workflows = List(String, required=True)
+        command = String(default_value='put_messages')
+        task_job = String(
+            description="""Task job in the form
+`"CYCLE/TASK_NAME/SUBMIT_NUM"`""",
             required=True)
-        event_time = String(required=True)
+        event_time = String(default_value=None)
         messages = List(
-            List(String, required=True),
-            description="""List in the form [[severity, message], ...].""")
-    messages_queued = String()
+            List(String),
+            description="""List in the form `[[severity, message], ...]`.""",
+            default_value=None)
 
-    def mutate(self, info, job_id, event_time, messages):
-        data_mgr = info.context.get('uiserver').data_mgr
-        for severity, message in messages:
-            data_mgr.message_queue.put((job_id, event_time, severity, message))
-        return PutMessages(messages_queued='%d' % len(messages))
+    response = GenericScalar()
+
+    async def mutate(self, info, command, task_job,
+                     workflows=None, exworkflows=None, **args):
+        owner, workflow, cycle, name, submit_num, state = (
+            parse_node_id(task_job, 'jobs'))
+        # if the workflow args is empty extract from proxy args
+        if workflows is None:
+            workflows = []
+            if owner and workflow:
+                workflows.append(f'{owner}/{workflow}')
+        if exworkflows is None:
+            exworkflows = []
+        # search for matching workflows in UI Server data structure
+        w_ids = [
+            flow.id for flow in
+            get_workflows(self, info, ids=workflows, exids=exworkflows)]
+        if not w_ids:
+            return GenericResponse(response="Error: No matching Workflow")
+        if state is None:
+            item = f'{cycle}/{name}/{submit_num}'
+        else:
+            item = f'{cycle}/{name}/{submit_num}:{state}'
+        args['task_job'] = item
+        ws_mgr = info.context.get('uiserver').ws_mgr
+        res = await ws_mgr.multi_request(command, w_ids, args)
+        return GenericResponse(response=res)
 
 
 class ReleaseWorkflow(Mutation):
     class Meta:
-        description = """Tell workflow to reload the workflow definition."""
-    # class Arguments:
-    #    workflows
-    command_queued = Boolean()
+        description = """Reload workflow definitions."""
+        resolver = mutator
 
-    def mutate(self, info):
-        data_mgr = info.context.get('uiserver').data_mgr
-        data_mgr.command_queue.put(("release_suite", (), {}))
-        return ReleaseWorkflow(command_queued=True)
+    class Arguments:
+        command = String(default_value='release_suite')
+        workflows = List(String, required=True)
+
+    response = GenericScalar()
 
 
 class ReloadWorkflow(Mutation):
     class Meta:
         description = """Tell workflow to reload the workflow definition."""
-    command_queued = Boolean()
+        resolver = mutator
 
-    def mutate(self, info):
-        data_mgr = info.context.get('uiserver').data_mgr
-        data_mgr.command_queue.put(("reload_suite", (), {}))
-        return ReloadWorkflow(command_queued=True)
+    class Arguments:
+        workflows = List(String, required=True)
+        command = String(default_value='reload_suite')
+
+    response = GenericScalar()
 
 
 class SetVerbosity(Mutation):
     class Meta:
         description = """Set workflow verbosity to new level."""
+        resolver = mutator
 
     class Arguments:
+        workflows = List(String, required=True)
+        command = String(default_value='set_verbosity')
         level = String(
             description="""levels:
-INFO, WARNING, NORMAL, CRITICAL, ERROR, DEBUG""",
+`INFO`, `WARNING`, `NORMAL`, `CRITICAL`, `ERROR`, `DEBUG`""",
             required=True)
-    command_queued = Boolean()
 
-    def mutate(self, info, level):
-        data_mgr = info.context.get('uiserver').data_mgr
-        data_mgr.command_queue.put(("set_verbosity", (level,), {}))
-        return SetVerbosity(command_queued=True)
+    response = GenericScalar()
 
 
 class StopWorkflowArgs(InputObjectType):
-    kill_active_tasks = Boolean(description="""Use with:
-- set_stop_cleanly""")
-    Terminate = Boolean(description="""Use with:
-- stop_now""")
+    datetime_string = String(description="""ISO 8601 compatible or
+`YYYY/MM/DD-HH:mm` of wallclock/real-world date-time""")
+    point_string = String(description="""Workflow formated point string""")
+    task_id = String()
+    kill_active_tasks = Boolean(description="""Use with: set_stop_cleanly""")
+    terminate = Boolean(description="""Use with: `stop_now`""")
 
 
 class StopWorkflow(Mutation):
@@ -783,49 +842,43 @@ class StopWorkflow(Mutation):
         description = """Workflow stop actions:
 - Cleanly or after kill active tasks. (default)
 - After cycle point.
+- After wallclock time.
 - On event handler completion, or terminate right away.
 - After an instance of a task."""
+        resolver = mutator
 
     class Arguments:
-        action = String(
+        workflows = List(String, required=True)
+        command = String(
             description="""String options:
-- set_stop_cleanly  (default)
-- set_stop_after_clock_time
-- set_stop_after_task
-- stop_now""")
-        item = String(
-            description="""Stop items:
-- after_clock_time: ISO 8601 compatible or YYYY/MM/DD-HH:mm
-- after_task: task ID""",)
+- `set_stop_cleanly`  (default)
+- `set_stop_after_clock_time`
+- `set_stop_after_point`
+- `set_stop_after_task`
+- `stop_now`""",
+            default_value='set_stop_cleanly',)
         args = StopWorkflowArgs()
-    command_queued = Boolean()
 
-    def mutate(self, info, action='set_stop_cleanly', item=None, args={}):
-        data_mgr = info.context.get('uiserver').data_mgr
-        item_tuple = ()
-        if item is not None:
-            item_tuple = (item,)
-        data_mgr.command_queue.put((action, item_tuple, args))
-        return StopWorkflow(command_queued=True)
+    response = GenericScalar()
 
 
 class TaskArgs(InputObjectType):
     check_syntax = Boolean(description="""Use with actions:
-- dry_run_tasks""")
+- `dry_run_tasks`""")
     no_check = Boolean(description="""Use with actions:
-- insert_tasks""")
+- `insert_tasks`""")
     stop_point_string = String(description="""Use with actions:
-- insert_tasks""")
+- `insert_tasks`""")
     poll_succ = Boolean(description="""Use with actions:
-- poll_tasks""")
+- `poll_tasks`""")
     spawn = Boolean(description="""Use with actions:
-- remove_tasks""")
+- `remove_tasks`""")
     state = String(description="""Use with actions:
-- reset_task_states""")
+- `reset_task_states`""")
     outputs = List(String, description="""Use with actions:
-- reset_task_states""")
+- `reset_task_states`""")
     back_out = Boolean(description="""Use with actions:
-- trigger_tasks""")
+- `trigger_tasks`""")
 
 
 class TaskActions(Mutation):
@@ -843,74 +896,130 @@ class TaskActions(Mutation):
 - Trigger submission of task jobs where possible."""
 
     class Arguments:
-        action = String(
+        workflows = List(String)
+        command = String(
             description="""Task actions:
-- dry_run_tasks
-- hold_tasks
-- insert_tasks
-- kill_tasks
-- poll_tasks
-- release_tasks
-- remove_tasks
-- reset_task_states
-- spawn_tasks
-- trigger_tasks""",
+- `dry_run_tasks`
+- `hold_tasks`
+- `insert_tasks`
+- `kill_tasks`
+- `poll_tasks`
+- `release_tasks`
+- `remove_tasks`
+- `reset_task_states`
+- `spawn_tasks`
+- `trigger_tasks`""",
             required=True,)
-        items = List(
+        ids = List(
             String,
-            description="""
-A list of identifiers (family/glob/id) for matching task proxies, i.e.
-["foo.201901*:failed", "201901*/baa:failed", "FAM.20190101T0000Z", "FAM2",
-    "*.20190101T0000Z"]
-""",
-            required=True,)
-        args = TaskArgs()
-    command_queued = Boolean()
+            description="""Used with:
+- All Commands
 
-    def mutate(self, info, action, items, args={}):
-        data_mgr = info.context.get('uiserver').data_mgr
-        data_mgr.command_queue.put((action, (items,), args))
-        return TaskActions(command_queued=True)
+A list of identifiers (family/glob/id) for matching task proxies, i.e.
+```
+[
+    "owner/workflow/201905*/foo",
+    "foo.201901*:failed",
+    "201901*/baa:failed",
+    "FAM.20190101T0000Z",
+    "FAM2",
+    "*.20190101T0000Z"
+]
+```
+
+Splits argument into componnents, creates workflows argument if non-existent.
+""",
+            required=True)
+        args = TaskArgs()
+
+    response = GenericScalar()
+
+    async def mutate(self, info, command, ids, workflows=None,
+                     exworkflows=None, **args):
+        # split proxies arg into components
+        ids = [parse_node_id(n_id, 'task_proxy') for n_id in ids]
+        # if the workflows arg is empty extract from proxy args
+        if workflows is None:
+            workflows = []
+            for owner, workflow, cycle, name, submit_num, state in ids:
+                if owner and workflow:
+                    workflows.append(f'{owner}/{workflow}')
+                else:
+                    workflows = append(workflow)
+        if exworkflows is None:
+            exworkflows = []
+        # search for matching workflows in UI Server data structure
+        w_ids = [
+            flow.id for flow in
+            get_workflows(self, info, ids=workflows, exids=exworkflows)]
+        if not w_ids:
+            return GenericResponse(response="Error: No matching Workflow")
+        # match proxy ID args with workflows
+        flow_ids = []
+        multi_args = {}
+        for w_id in w_ids:
+            items = []
+            for owner, workflow, cycle, name, submit_num, state in ids:
+                if (not (owner and workflow) or
+                        fnmatchcase(w_id, f'{owner}/{workflow}')):
+                    if not cycle:
+                        cycle = '*'
+                    if state is None:
+                        items.append(f'{name}.{cycle}')
+                    else:
+                        items.append(f'{name}.{cycle}:{state}')
+            if items:
+                flow_ids.append(w_id)
+                multi_args[w_id] = args.get('args', {})
+                if command == 'insert_tasks':
+                    multi_args[w_id]['items'] = items
+                else:
+                    multi_args[w_id]['task_globs'] = items
+        ws_mgr = info.context.get('uiserver').ws_mgr
+        res = await ws_mgr.multi_request(
+            command, flow_ids, multi_args=multi_args)
+        return GenericResponse(response=res)
 
 
 class TakeCheckpoint(Mutation):
     class Meta:
         description = """Checkpoint current task pool."""
+        resolver = mutator
 
     class Arguments:
-        items = List(
-            String,
-            description="""items[0] used as checkpoint event name).""",
+        workflows = List(String, required=True)
+        command = String(default_value='take_checkpoints')
+        name = String(
+            description="""The checkpoint name""",
             required=True,)
-    command_queued = Boolean()
 
-    def mutate(self, info, items):
-        data_mgr = info.context.get('uiserver').data_mgr
-        data_mgr.command_queue.put(("take_checkpoints", (items,), {}))
-        return TakeCheckpoint(command_queued=True)
+    response = GenericScalar()
 
 
-class XTrigger(Mutation):
+class ExternalTrigger(Mutation):
     class Meta:
         description = """Server-side external event trigger interface."""
+        resolver = mutator
 
     class Arguments:
+        workflows = List(String, required=True)
+        command = String(default_value='put_external_trigger')
         event_message = String(required=True)
         event_id = String(required=True)
-    event_queued = Boolean()
 
-    def mutate(self, info, event_message, event_id):
-        data_mgr = info.context.get('uiserver').data_mgr
-        data_mgr.ext_trigger_queue.put((event_message, event_id))
-        return XTrigger(event_queued=True)
+    response = GenericScalar()
 
 
 # Mutation declarations
 class Mutation(ObjectType):
-    broadcast = Broadcast.Field(
-        description=Broadcast._meta.description)
-    x_trigger = XTrigger.Field(
-        description=XTrigger._meta.description)
+    clear_broadcast = ClearBroadcast.Field(
+        description=ClearBroadcast._meta.description)
+    expire_broadcast = ExpireBroadcast.Field(
+        description=ExpireBroadcast._meta.description)
+    put_broadcast = PutBroadcast.Field(
+        description=PutBroadcast._meta.description)
+    ext_trigger = ExternalTrigger.Field(
+        description=ExternalTrigger._meta.description)
     hold_workflow = HoldWorkflow.Field(
         description=HoldWorkflow._meta.description)
     nudge_workflow = NudgeWorkflow.Field(

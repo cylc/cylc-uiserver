@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # -*- coding: utf-8 -*-
 # Copyright (C) 2019 NIWA & British Crown (Met Office) & Contributors.
 #
@@ -18,17 +16,18 @@
 
 """Create and update the data structure for all workflow services."""
 
+import asyncio
 from fnmatch import fnmatchcase
 
-from tornado import gen
 # from google.protobuf.json_format import MessageToDict
 
-# from cylc import flags
 from cylc.exceptions import ClientError, ClientTimeout
 from cylc.ws_messages_pb2 import PbEntireWorkflow
 from cylc.network.scan import MSG_TIMEOUT
 
 
+# TODO: define in and import this from cylc-flow
+# maps methods in cylc-flow server to the returned bytes message
 METHOD_MAP = {
     'pb_entire_workflow': PbEntireWorkflow
 }
@@ -54,9 +53,7 @@ class DataManager(object):
         self.ws_mgr = ws_mgr
         self.data = {}
 
-    # **
     # Data syncing
-    # **
     async def entire_workflow_update(self, ids=None):
         if ids is None:
             ids = []
@@ -64,9 +61,11 @@ class DataManager(object):
         ws_args = (
             (w_id, info['req_client'], 'pb_entire_workflow')
             for w_id, info in self.ws_mgr.workflows.items())
-        items = await gen.multi(
-            get_workflow_data(*args) for args in ws_args
-            if not ids or args[0] in ids)
+        gathers = ()
+        for args in ws_args:
+            if not ids or args[0] in ids:
+                gathers += (get_workflow_data(*args),)
+        items = await asyncio.gather(*gathers)
         for w_id, result in items:
             if result is not None and result != MSG_TIMEOUT:
                 new_data[w_id] = result
@@ -74,23 +73,20 @@ class DataManager(object):
             # atomic update
             self.data = new_data
         else:
-            # apparently faster than update(new_data)
-            for w_id, flow in new_data.items():
-                self.data[w_id] = flow
+            self.data.update(new_data)
 
-    # **
     # Data access filters
-    # **
     def get_workflow_msgs(self, args):
         """Return list of workflows."""
         result = []
         for flow_msg in self.data.values():
             if self._workflow_filter(flow_msg, args):
                 result.append(flow_msg)
+        # TODO: Sorting and Pagination
         return result
 
     def get_nodes_all(self, node_type, args):
-        """Return list of nodes (defns/proxies/jobs)."""
+        """Return nodes from all workflows, filter by args."""
         w_args = {
             'ids': args['workflows'],
             'exids': args['exworkflows'],
@@ -102,9 +98,10 @@ class DataManager(object):
         for node in nodes:
             if self._node_filter(node, args):
                 result.append(node)
+        # TODO: Sorting and Pagination
         return result
 
-    def get_nodes_id(self, node_type, args):
+    def get_nodes_by_id(self, node_type, args):
         """Return protobuf node objects for given id."""
         nat_ids = args.get('native_ids', [])
         w_ids = []
@@ -126,9 +123,10 @@ class DataManager(object):
             if ((not nat_ids or node.id in set(nat_ids)) and
                     self._node_filter(node, args)):
                 result.append(node)
+        # TODO: Sorting and Pagination
         return result
 
-    def get_node_id(self, node_type, args):
+    def get_node_by_id(self, node_type, args):
         """Return protobuf node object for given id."""
         n_id = args.get('id')
         o_name, w_name, remainder = n_id.split('/', 2)
@@ -145,7 +143,7 @@ class DataManager(object):
         return None
 
     def get_edges_all(self, args):
-        """Return all workflows protobuf edge objects for given id."""
+        """Return edges from all workflows, filter by args."""
         w_args = {
             'ids': args['workflows'],
             'exids': args['exworkflows'],
@@ -155,9 +153,10 @@ class DataManager(object):
                 n for k in self.get_workflow_msgs(w_args)
                 for n in getattr(k, 'edges')]:
             result.append(edge)
+        # TODO: Sorting and Pagination
         return result
 
-    def get_edges_id(self, args):
+    def get_edges_by_id(self, args):
         """Return protobuf edge objects for given id."""
         nat_ids = args.get('native_ids', [])
         w_ids = []
@@ -170,27 +169,12 @@ class DataManager(object):
                 e for k in w_ids
                 for e in getattr(self.data[k], 'edges')]:
             result.append(edge)
+        # TODO: Sorting and Pagination
         return result
 
     def _node_filter(self, node, args):
         """Filter nodes based on attribute arguments"""
-        node_id = getattr(node, 'id')
-        slash_count = node_id.count('/')
-        n_id = node_id.split('/', slash_count)
-        if slash_count == 2:
-            n_cycle = None
-            n_name = n_id[2]
-        else:
-            n_cycle = n_id[2]
-            n_name = n_id[3]
-        natts = [
-            n_id[0],
-            n_id[1],
-            n_cycle,
-            getattr(node, 'namespace', [n_name]),
-            getattr(node, 'submit_num', None),
-            getattr(node, 'state', None),
-        ]
+        natts = self._collate_node_atts(node)
         return (
                 (not args.get('states') or node.state in args['states']) and
                 not (args.get('exstates') and
@@ -236,3 +220,24 @@ class DataManager(object):
                     (not state or natts[5] == state)):
                 return True
         return False
+
+    @staticmethod
+    def _collate_node_atts(node):
+        """Collate node filter attributes."""
+        node_id = getattr(node, 'id')
+        slash_count = node_id.count('/')
+        n_id = node_id.split('/', slash_count)
+        if slash_count == 2:
+            n_cycle = None
+            n_name = n_id[2]
+        else:
+            n_cycle = n_id[2]
+            n_name = n_id[3]
+        return [
+            n_id[0],
+            n_id[1],
+            n_cycle,
+            getattr(node, 'namespace', [n_name]),
+            getattr(node, 'submit_num', None),
+            getattr(node, 'state', None),
+        ]

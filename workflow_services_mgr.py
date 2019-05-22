@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # -*- coding: utf-8 -*-
 # Copyright (C) 2019 NIWA & British Crown (Met Office) & Contributors.
 #
@@ -27,10 +25,10 @@ Includes:
 """
 import sys
 import socket
-
-from tornado import gen
+import asyncio
 
 from cylc import flags
+from cylc.exceptions import ClientError, ClientTimeout
 from cylc.hostuserutil import is_remote_host, get_host_ip_by_name
 from cylc.network.client import SuiteRuntimeClient
 from cylc.network.scan import (
@@ -39,8 +37,22 @@ from cylc.network.scan import (
 CLIENT_TIMEOUT = 2.0
 
 
+async def workflow_request(client, command, args=None,
+                           timeout=None, context=None):
+    """Workflow request command."""
+    if context is None:
+        context = command
+    try:
+        result = await client.async_request(command, args, timeout)
+        return (context, result)
+    except ClientTimeout as exc:
+        return (context, MSG_TIMEOUT)
+    except ClientError as exc:
+        return (context, None)
+
+
 async def est_workflow(reg, host, port, timeout=None):
-    """Establish communication with workflow, setting up REQ client."""
+    """Establish communication with workflow, instantiating REQ client."""
     if is_remote_host(host):
         try:
             host = get_host_ip_by_name(host)  # IP reduces DNS traffic
@@ -55,18 +67,8 @@ async def est_workflow(reg, host, port, timeout=None):
     #       which would be unnecessary as we have already done so.
     # NOTE: This part of the scan *is* IO blocking.
     client = SuiteRuntimeClient(reg, host=host, port=port, timeout=timeout)
-
-    result = {}
-    result['client'] = client
-    try:
-        msg = await client.async_request('identify')
-    except ClientTimeout as exc:
-        return (reg, host, port, MSG_TIMEOUT)
-    except ClientError as exc:
-        return (reg, host, port, result or None)
-    else:
-        result.update(msg)
-    return (reg, host, port, result)
+    context, result = await workflow_request(client, 'identify')
+    return (reg, host, port, client, result)
 
 
 class WorkflowServicesMgr(object):
@@ -85,9 +87,11 @@ class WorkflowServicesMgr(object):
             (reg, host, port, CLIENT_TIMEOUT)
             for reg, host, port in
             get_scan_items_from_fs(cre_owner, cre_name))
-
-        items = await gen.multi([est_workflow(*x) for x in scan_args])
-        for reg, host, port, info in items:
+        gathers = ()
+        for arg in scan_args:
+            gathers += (est_workflow(*arg),)
+        items = await asyncio.gather(*gathers)
+        for reg, host, port, client, info in items:
             if info is not None and info != MSG_TIMEOUT:
                 owner = info['owner']
                 workflows[f"{owner}/{reg}"] = {
@@ -96,7 +100,32 @@ class WorkflowServicesMgr(object):
                     'host': host,
                     'port': port,
                     'version': info['version'],
-                    'req_client': info['client'],
+                    'req_client': client,
                 }
         # atomic update
         self.workflows = workflows
+
+    async def multi_request(self, command, workflows, args=None,
+                            multi_args=None, timeout=None):
+        """Send requests to multiple workflows."""
+        if args is None:
+            args = {}
+        if multi_args is None:
+            multi_args = {}
+        req_args = {}
+        for w_id in workflows:
+            cmd_args = multi_args.get(w_id, args)
+            req_args[w_id] = (
+                self.workflows[w_id]['req_client'],
+                command,
+                cmd_args,
+                timeout,
+            )
+        gathers = ()
+        for info, request_args in req_args.items():
+            gathers += (workflow_request(context=info, *request_args),)
+        results = await asyncio.gather(*gathers)
+        res = []
+        for key, val in results:
+            res.append({'id': key, 'response': val})
+        return res

@@ -22,8 +22,6 @@ import os
 import signal
 
 from schema import schema
-from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
-from graphql import get_default_backend
 from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
@@ -45,42 +43,6 @@ class MyApplication(web.Application):
             # clean up here
             ioloop.IOLoop.instance().stop()
             logging.info('exit success')
-
-
-# This is needed in order to pass the server context in addition to existing.
-# It's possible to just overwrite TornadoGraphQLHandler.context but we would
-# somehow need to pass the request info (headers, username ...etc) in also
-class UIServerGraphQLHandler(TornadoGraphQLHandler):
-
-    # Declare extra attributes
-    uiserver = None
-
-    def initialize(self, schema=None, executor=None, middleware=None,
-                   root_value=None, graphiql=False, pretty=False,
-                   batch=False, backend=None, **kwargs):
-        super(TornadoGraphQLHandler, self).initialize()
-
-        self.schema = schema
-        if middleware is not None:
-            self.middleware = list(self.instantiate_middleware(middleware))
-        self.executor = executor
-        self.root_value = root_value
-        self.pretty = pretty
-        self.graphiql = graphiql
-        self.batch = batch
-        self.backend = backend or get_default_backend()
-        # Set extra attributes
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-
-    @property
-    def context(self):
-        wider_context = {
-            'uiserver': self.uiserver,
-            'request': self.request,
-        }
-        return wider_context
 
 
 class CylcUIServer(object):
@@ -154,7 +116,7 @@ class CylcUIServer(object):
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)
         ioloop.PeriodicCallback(app.try_exit, 100).start()
-        # Discover workflows on intiial start up.
+        # Discover workflows on initial start up.
         ioloop.IOLoop.current().add_callback(self.ws_mgr.gather_workflows)
         # Arbitrary intervals (msec) chosen for the two periodic callbacks
         # below. These will likely change or be removed with PUB/SUB updates.
@@ -198,4 +160,4 @@ if __name__ == "__main__":
 
 
 __all__ = ['MainHandler', 'UserProfileHandler', 'MyApplication',
-           'UIServerGraphQLHandler', 'CylcUIServer', 'main']
+           'CylcUIServer', 'main']
