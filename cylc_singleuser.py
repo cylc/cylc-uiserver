@@ -133,7 +133,7 @@ def main():
                         default=8888)
     parser.add_argument('-s', '--static', action="store", dest="static",
                         required=True)
-    args = parser.parse_args()
+    args = parser.parse_known_args()[0]
 
     jupyterhub_service_prefix = os.environ.get(
         'JUPYTERHUB_SERVICE_PREFIX', '/')
