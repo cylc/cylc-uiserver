@@ -16,8 +16,6 @@
 
 """GraphQL API schema via Graphene implementation."""
 
-from fnmatch import fnmatchcase
-
 from graphene import (
     Boolean, Field, Float, ID, InputObjectType, Int,
     List, Mutation, ObjectType, Schema, String, Union
@@ -207,14 +205,15 @@ all_edge_args = dict(
 
 # Resolvers:
 
-def get_workflows(root, info, **args):
-    data_mgr = info.context.get('uiserver').data_mgr
-    args['ids'] = [parse_workflow_id(w_id) for w_id in args['ids']]
-    args['exids'] = [parse_workflow_id(w_id) for w_id in args['exids']]
-    return [flow.workflow for flow in data_mgr.get_workflow_msgs(args)]
+async def get_workflows(root, info, **args):
+    args['workflows'] = [parse_workflow_id(w_id) for w_id in args['ids']]
+    args['exworkflows'] = [parse_workflow_id(w_id) for w_id in args['exids']]
+    resolvers = info.context.get('resolvers')
+    flows = await resolvers.get_workflow_msgs(args)
+    return [flow.workflow for flow in flows]
 
 
-def get_nodes_all(root, info, **args):
+async def get_nodes_all(root, info, **args):
     """Resolver for returning job, task, family nodes"""
     field_name = to_snake_case(info.field_name)
     field_ids = getattr(root, field_name, None)
@@ -235,11 +234,11 @@ def get_nodes_all(root, info, **args):
         parse_workflow_id(w_id) for w_id in args['workflows']]
     args['exworkflows'] = [
         parse_workflow_id(w_id) for w_id in args['exworkflows']]
-    data_mgr = info.context.get('uiserver').data_mgr
-    return data_mgr.get_nodes_all(node_type, args)
+    resolvers = info.context.get('resolvers')
+    return await resolvers.get_nodes_all(node_type, args)
 
 
-def get_nodes_by_id(root, info, **args):
+async def get_nodes_by_id(root, info, **args):
     """Resolver for returning job, task, family node"""
     field_name = to_snake_case(info.field_name)
     field_ids = getattr(root, field_name, None)
@@ -258,11 +257,11 @@ def get_nodes_by_id(root, info, **args):
     node_type = NODE_MAP[obj_type]
     args['ids'] = [parse_node_id(n_id, node_type) for n_id in args['ids']]
     args['exids'] = [parse_node_id(n_id, node_type) for n_id in args['exids']]
-    data_mgr = info.context.get('uiserver').data_mgr
-    return data_mgr.get_nodes_by_id(node_type, args)
+    resolvers = info.context.get('resolvers')
+    return await resolvers.get_nodes_by_id(node_type, args)
 
 
-def get_node_by_id(root, info, **args):
+async def get_node_by_id(root, info, **args):
     """Resolver for returning job, task, family node"""
     field_name = to_snake_case(info.field_name)
     field_id = getattr(root, field_name, None)
@@ -274,24 +273,24 @@ def get_node_by_id(root, info, **args):
         obj_type = str(info.return_type.of_type).replace('!', '')
     except AttributeError:
         obj_type = str(info.return_type)
-    data_mgr = info.context.get('uiserver').data_mgr
-    return data_mgr.get_node_by_id(NODE_MAP[obj_type], args)
+    resolvers = info.context.get('resolvers')
+    return await resolvers.get_node_by_id(NODE_MAP[obj_type], args)
 
 
-def get_edges_all(root, info, **args):
-    data_mgr = info.context.get('uiserver').data_mgr
-    return data_mgr.get_edges_all(args)
+async def get_edges_all(root, info, **args):
+    resolvers = info.context.get('resolvers')
+    return await resolvers.get_edges_all(args)
 
 
-def get_edges_by_id(root, info, **args):
+async def get_edges_by_id(root, info, **args):
     field_name = to_snake_case(info.field_name)
     field_ids = getattr(root, field_name, None)
     if field_ids:
         args['native_ids'] = list(field_ids)
     elif field_ids == []:
         return []
-    data_mgr = info.context.get('uiserver').data_mgr
-    return data_mgr.get_edges_by_id(args)
+    resolvers = info.context.get('resolvers')
+    return await resolvers.get_edges_by_id(args)
 
 
 # Types:
@@ -636,21 +635,55 @@ class GenericResponse(ObjectType):
     class Meta:
         description = """Container for command queued response"""
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 # Mutation resolvers:
-async def mutator(self, info, command, workflows, exworkflows=[], **args):
-    w_ids = [
-        flow.id for flow in
-        get_workflows(self, info, ids=workflows, exids=exworkflows)]
-    if args.get('args', None):
-        for arg, val in args['args'].items():
-            args[arg] = val
+async def mutator(self, info, command, workflows=None,
+                  exworkflows=None, **args):
+    if workflows is None:
+        workflows = []
+    if exworkflows is None:
+        exworkflows = []
+    w_args = {}
+    w_args['workflows'] = [parse_workflow_id(w_id) for w_id in workflows]
+    w_args['exworkflows'] = [parse_workflow_id(w_id) for w_id in exworkflows]
+    if args.get('args', False):
+        args.update(args.get('args', {}))
         args.pop('args')
-    ws_mgr = info.context.get('uiserver').ws_mgr
-    res = await ws_mgr.multi_request(command, w_ids, args)
-    return GenericResponse(response=res)
+    resolvers = info.context.get('resolvers')
+    res = await resolvers.mutator(command, w_args, args)
+    return GenericResponse(result=res)
+
+
+async def nodes_mutator(self, info, command, ids, workflows=None,
+                        exworkflows=None, **args):
+    if command == 'put_messages':
+        node_type = 'jobs'
+    else:
+        node_type = 'task_proxy'
+    ids = [parse_node_id(n_id, node_type) for n_id in ids]
+    # if the workflows arg is empty extract from proxy args
+    if workflows is None:
+        workflows = []
+        for owner, workflow, cycle, name, submit_num, state in ids:
+            if owner and workflow:
+                workflows.append(f'{owner}/{workflow}')
+            elif workflow:
+                workflows = append(workflow)
+    if workflows == []:
+        return GenericResponse(result="Error: No given Workflow(s)")
+    if exworkflows is None:
+        exworkflows = []
+    w_args = {}
+    w_args['workflows'] = [parse_workflow_id(w_id) for w_id in workflows]
+    w_args['exworkflows'] = [parse_workflow_id(w_id) for w_id in exworkflows]
+    if args.get('args', False):
+        args.update(args.get('args', {}))
+        args.pop('args')
+    resolvers = info.context.get('resolvers')
+    res = await resolvers.nodes_mutator(command, ids, w_args, args)
+    return GenericResponse(result=res)
 
 
 # Mutations defined:
@@ -663,9 +696,19 @@ earlier than cutoff."""
     class Arguments:
         workflows = List(String, required=True)
         command = String(default_value='clear_broadcast')
-        cutoff = String(description="""String""")
+        point_strings = List(
+            String,
+            description="""`["*"]`""",
+            default_value=['*'])
+        namespaces = List(
+            String,
+            description="""namespaces: `["foo", "BAZ"]`""",)
+        cancel_settings = List(
+            GenericScalar,
+            description="""
+settings: `[{envronment: {ENVKEY: "env_val"}}, ...]`""",)
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 class ExpireBroadcast(Mutation):
@@ -677,16 +720,9 @@ or for listed namespaces and/or points."""
     class Arguments:
         workflows = List(String, required=True)
         command = String(default_value='expire_broadcast')
-        points = List(String, description="""`["*"]`""")
-        namespaces = List(
-            String,
-            description="""namespaces: `["foo", "BAZ"]`""",)
-        cancel_settings = List(
-            GenericScalar,
-            description="""
-settings: `[{envronment: {ENVKEY: "env_val"}}, ...]`""",)
+        cutoff = String(description="""String""")
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 class HoldWorkflow(Mutation):
@@ -705,7 +741,7 @@ class HoldWorkflow(Mutation):
         point_string = String()
         workflows = List(String, required=True)
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 class NudgeWorkflow(Mutation):
@@ -717,7 +753,7 @@ class NudgeWorkflow(Mutation):
         command = String(default_value='nudge')
         workflows = List(String, required=True)
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 class PutBroadcast(Mutation):
@@ -729,7 +765,10 @@ class PutBroadcast(Mutation):
     class Arguments:
         command = String(default_value='put_broadcast')
         workflows = List(String, required=True)
-        points = List(String, description="""["*"]""")
+        point_strings = List(
+            String,
+            description="""`["*"]`""",
+            default_value=['*'])
         namespaces = List(
             String,
             description="""namespaces: `["foo", "BAZ"]`""",)
@@ -738,18 +777,20 @@ class PutBroadcast(Mutation):
             description="""
 settings: `[{envronment: {ENVKEY: "env_val"}}, ...]`""",)
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 class PutMessages(Mutation):
     class Meta:
         description = """Put task messages in queue for processing
 later by the main loop."""
+        resolver = nodes_mutator
 
     class Arguments:
         workflows = List(String, required=True)
         command = String(default_value='put_messages')
-        task_job = String(
+        ids = List(
+            String,
             description="""Task job in the form
 `"CYCLE/TASK_NAME/SUBMIT_NUM"`""",
             required=True)
@@ -759,33 +800,7 @@ later by the main loop."""
             description="""List in the form `[[severity, message], ...]`.""",
             default_value=None)
 
-    response = GenericScalar()
-
-    async def mutate(self, info, command, task_job,
-                     workflows=None, exworkflows=None, **args):
-        owner, workflow, cycle, name, submit_num, state = (
-            parse_node_id(task_job, 'jobs'))
-        # if the workflow args is empty extract from proxy args
-        if workflows is None:
-            workflows = []
-            if owner and workflow:
-                workflows.append(f'{owner}/{workflow}')
-        if exworkflows is None:
-            exworkflows = []
-        # search for matching workflows in UI Server data structure
-        w_ids = [
-            flow.id for flow in
-            get_workflows(self, info, ids=workflows, exids=exworkflows)]
-        if not w_ids:
-            return GenericResponse(response="Error: No matching Workflow")
-        if state is None:
-            item = f'{cycle}/{name}/{submit_num}'
-        else:
-            item = f'{cycle}/{name}/{submit_num}:{state}'
-        args['task_job'] = item
-        ws_mgr = info.context.get('uiserver').ws_mgr
-        res = await ws_mgr.multi_request(command, w_ids, args)
-        return GenericResponse(response=res)
+    result = GenericScalar()
 
 
 class ReleaseWorkflow(Mutation):
@@ -797,7 +812,7 @@ class ReleaseWorkflow(Mutation):
         command = String(default_value='release_suite')
         workflows = List(String, required=True)
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 class ReloadWorkflow(Mutation):
@@ -809,7 +824,7 @@ class ReloadWorkflow(Mutation):
         workflows = List(String, required=True)
         command = String(default_value='reload_suite')
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 class SetVerbosity(Mutation):
@@ -825,7 +840,7 @@ class SetVerbosity(Mutation):
 `INFO`, `WARNING`, `NORMAL`, `CRITICAL`, `ERROR`, `DEBUG`""",
             required=True)
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 class StopWorkflowArgs(InputObjectType):
@@ -859,7 +874,7 @@ class StopWorkflow(Mutation):
             default_value='set_stop_cleanly',)
         args = StopWorkflowArgs()
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 class TaskArgs(InputObjectType):
@@ -894,6 +909,7 @@ class TaskActions(Mutation):
 - Reset statuses tasks.
 - Spawn tasks.
 - Trigger submission of task jobs where possible."""
+        resolver = nodes_mutator
 
     class Arguments:
         workflows = List(String)
@@ -932,53 +948,7 @@ Splits argument into componnents, creates workflows argument if non-existent.
             required=True)
         args = TaskArgs()
 
-    response = GenericScalar()
-
-    async def mutate(self, info, command, ids, workflows=None,
-                     exworkflows=None, **args):
-        # split proxies arg into components
-        ids = [parse_node_id(n_id, 'task_proxy') for n_id in ids]
-        # if the workflows arg is empty extract from proxy args
-        if workflows is None:
-            workflows = []
-            for owner, workflow, cycle, name, submit_num, state in ids:
-                if owner and workflow:
-                    workflows.append(f'{owner}/{workflow}')
-                else:
-                    workflows = append(workflow)
-        if exworkflows is None:
-            exworkflows = []
-        # search for matching workflows in UI Server data structure
-        w_ids = [
-            flow.id for flow in
-            get_workflows(self, info, ids=workflows, exids=exworkflows)]
-        if not w_ids:
-            return GenericResponse(response="Error: No matching Workflow")
-        # match proxy ID args with workflows
-        flow_ids = []
-        multi_args = {}
-        for w_id in w_ids:
-            items = []
-            for owner, workflow, cycle, name, submit_num, state in ids:
-                if (not (owner and workflow) or
-                        fnmatchcase(w_id, f'{owner}/{workflow}')):
-                    if not cycle:
-                        cycle = '*'
-                    if state is None:
-                        items.append(f'{name}.{cycle}')
-                    else:
-                        items.append(f'{name}.{cycle}:{state}')
-            if items:
-                flow_ids.append(w_id)
-                multi_args[w_id] = args.get('args', {})
-                if command == 'insert_tasks':
-                    multi_args[w_id]['items'] = items
-                else:
-                    multi_args[w_id]['task_globs'] = items
-        ws_mgr = info.context.get('uiserver').ws_mgr
-        res = await ws_mgr.multi_request(
-            command, flow_ids, multi_args=multi_args)
-        return GenericResponse(response=res)
+    result = GenericScalar()
 
 
 class TakeCheckpoint(Mutation):
@@ -993,7 +963,7 @@ class TakeCheckpoint(Mutation):
             description="""The checkpoint name""",
             required=True,)
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 class ExternalTrigger(Mutation):
@@ -1007,7 +977,7 @@ class ExternalTrigger(Mutation):
         event_message = String(required=True)
         event_id = String(required=True)
 
-    response = GenericScalar()
+    result = GenericScalar()
 
 
 # Mutation declarations

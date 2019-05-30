@@ -27,11 +27,11 @@ import sys
 import socket
 import asyncio
 
-from cylc import flags
-from cylc.exceptions import ClientError, ClientTimeout
-from cylc.hostuserutil import is_remote_host, get_host_ip_by_name
-from cylc.network.client import SuiteRuntimeClient
-from cylc.network.scan import (
+from cylc.flow import flags
+from cylc.flow.exceptions import ClientError, ClientTimeout
+from cylc.flow.hostuserutil import is_remote_host, get_host_ip_by_name
+from cylc.flow.network.client import SuiteRuntimeClient
+from cylc.flow.network.scan import (
     get_scan_items_from_fs, re_compile_filters, MSG_TIMEOUT)
 
 CLIENT_TIMEOUT = 2.0
@@ -71,7 +71,7 @@ async def est_workflow(reg, host, port, timeout=None):
     return (reg, host, port, client, result)
 
 
-class WorkflowServicesMgr(object):
+class WorkflowsManager(object):
 
     def __init__(self):
         self.workflows = {}

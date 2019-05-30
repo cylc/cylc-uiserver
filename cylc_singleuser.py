@@ -27,8 +27,9 @@ from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
 
 from handlers import *
-from workflow_services_mgr import WorkflowServicesMgr
+from workflows_mgr import WorkflowsManager
 from data_mgr import DataManager
+from resolvers import Resolvers
 
 
 class MyApplication(web.Application):
@@ -55,8 +56,10 @@ class CylcUIServer(object):
             script_dir = os.path.dirname(__file__)
             self._static = os.path.abspath(os.path.join(script_dir, static))
         self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
-        self.ws_mgr = WorkflowServicesMgr()
+        self.ws_mgr = WorkflowsManager()
         self.data_mgr = DataManager(self.ws_mgr)
+        self.resolvers = Resolvers(
+            self.ws_mgr, self.data_mgr)
 
     def _make_app(self):
         """Crete a Tornado web application."""
@@ -96,15 +99,16 @@ class CylcUIServer(object):
                 (url_path_join(self._jupyter_hub_service_prefix,
                                '/graphql'),
                     UIServerGraphQLHandler,
-                    dict(schema=schema, uiserver=self)),
+                    dict(schema=schema, resolvers=self.resolvers)),
                 (url_path_join(self._jupyter_hub_service_prefix,
                                '/graphql/batch'),
                     UIServerGraphQLHandler,
-                    dict(schema=schema, uiserver=self, batch=True)),
+                    dict(schema=schema, resolvers=self.resolvers, batch=True)),
                 (url_path_join(self._jupyter_hub_service_prefix,
                                '/graphql/graphiql'),
                     UIServerGraphQLHandler,
-                    dict(schema=schema, uiserver=self, graphiql=True)),
+                    dict(schema=schema, resolvers=self.resolvers,
+                         graphiql=True)),
             ],
             # FIXME: decide (and document) whether cookies will be permanent
             # after server restart.

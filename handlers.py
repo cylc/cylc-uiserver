@@ -110,7 +110,7 @@ class CylcScanHandler(HubOAuthenticated, APIHandler):
 class UIServerGraphQLHandler(TornadoGraphQLHandler):
 
     # Declare extra attributes
-    uiserver = None
+    resolvers = None
 
     def initialize(self, schema=None, executor=None, middleware=None,
                    root_value=None, graphiql=False, pretty=False,
@@ -134,8 +134,8 @@ class UIServerGraphQLHandler(TornadoGraphQLHandler):
     @property
     def context(self):
         wider_context = {
-            'uiserver': self.uiserver,
             'request': self.request,
+            'resolvers': self.resolvers,
         }
         return wider_context
 

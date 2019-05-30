@@ -23,13 +23,13 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-# TODO: update cylc/cylc-flow dependency after cylc-flow PR has been merged
 install_requires = [
     'jupyterhub==1.0.*',
     'tornado==6.0.*',
     'graphene-tornado==2.1.*',
-    ('cylc @ https://github.com/dwsutherland/cylc'
-     '/tarball/protobuf-uis-feed#egg=cylc-8.0a1.dev')
+    ('cylc-flow @ https://github.com/cylc/cylc-flow'
+     '/tarball/master#egg=cylc-8.0a1.dev')
+    #'cylc-flow==8.*'
 ]
 
 setup_requires = [
@@ -58,7 +58,8 @@ setup(
         'handlers',
         'cylc_singleuser',
         'data_mgr',
-        'workflow_services_mgr',
+        'workflows_mgr',
+        'resolvers',
         'schema'],
     python_requires='>=3.7',
     install_requires=install_requires,
