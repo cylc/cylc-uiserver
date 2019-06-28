@@ -81,6 +81,7 @@ class WorkflowsManager(object):
         pass
 
     async def gather_workflows(self):
+        scanflows = {}
         workflows = {}
         cre_owner, cre_name = re_compile_filters(None, ['.*'])
         scan_args = (
@@ -94,7 +95,7 @@ class WorkflowsManager(object):
         for reg, host, port, client, info in items:
             if info is not None and info != MSG_TIMEOUT:
                 owner = info['owner']
-                workflows[f"{owner}/{reg}"] = {
+                scanflows[f"{owner}/{reg}"] = {
                     'name': info['name'],
                     'owner': owner,
                     'host': host,
@@ -102,8 +103,18 @@ class WorkflowsManager(object):
                     'version': info['version'],
                     'req_client': client,
                 }
-        # atomic update
-        self.workflows = workflows
+
+        # Check existing against scan
+        for w_id, info in list(self.workflows.items()):
+            if w_id in scanflows:
+                if (info['host'] == scanflows[w_id]['host'] and
+                        info['port'] == scanflows[w_id]['port']):
+                    scanflows.pop(w_id)
+                continue
+            self.workflows.pop(w_id)
+
+        # update with new
+        self.workflows.update(scanflows)
 
     async def multi_request(self, command, workflows, args=None,
                             multi_args=None, timeout=None):
