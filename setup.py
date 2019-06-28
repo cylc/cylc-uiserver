@@ -26,7 +26,10 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 install_requires = [
     'jupyterhub==1.0.*',
     'tornado==6.0.*',
-    'graphene-tornado==2.1.*'
+    'graphene-tornado==2.1.*',
+    ('cylc-flow @ https://github.com/cylc/cylc-flow'
+     '/tarball/master#egg=cylc-8.0a1.dev')
+    #'cylc-flow==8.*'
 ]
 
 setup_requires = [
@@ -51,7 +54,13 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/cylc/cylc-uiserver/',
-    py_modules=['handlers', 'cylc_singleuser'],
+    py_modules=[
+        'handlers',
+        'cylc_singleuser',
+        'data_mgr',
+        'workflows_mgr',
+        'resolvers',
+        'schema'],
     python_requires='>=3.7',
     install_requires=install_requires,
     setup_requires=setup_requires,

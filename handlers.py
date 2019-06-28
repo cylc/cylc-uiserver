@@ -23,6 +23,8 @@ from typing import List, Union
 from jupyterhub import __version__ as jupyterhub_version
 from jupyterhub.services.auth import HubOAuthenticated
 from tornado import web
+from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
+from graphql import get_default_backend
 
 
 class BaseHandler(web.RequestHandler):
@@ -93,7 +95,8 @@ class CylcScanHandler(HubOAuthenticated, APIHandler):
 
     @web.authenticated
     def get(self):
-        cylc_scan_proc = Popen("cylc scan", shell=True, stdout=PIPE)
+        cylc_scan_proc = Popen(
+            "cylc scan --color=never", shell=True, stdout=PIPE)
         cylc_scan_out = cylc_scan_proc.communicate()[0]
 
         suite_lines = cylc_scan_out.splitlines()
@@ -101,8 +104,45 @@ class CylcScanHandler(HubOAuthenticated, APIHandler):
         self.write(json.dumps(suites))
 
 
+# This is needed in order to pass the server context in addition to existing.
+# It's possible to just overwrite TornadoGraphQLHandler.context but we would
+# somehow need to pass the request info (headers, username ...etc) in also
+class UIServerGraphQLHandler(TornadoGraphQLHandler):
+
+    # Declare extra attributes
+    resolvers = None
+
+    def initialize(self, schema=None, executor=None, middleware=None,
+                   root_value=None, graphiql=False, pretty=False,
+                   batch=False, backend=None, **kwargs):
+        super(TornadoGraphQLHandler, self).initialize()
+
+        self.schema = schema
+        if middleware is not None:
+            self.middleware = list(self.instantiate_middleware(middleware))
+        self.executor = executor
+        self.root_value = root_value
+        self.pretty = pretty
+        self.graphiql = graphiql
+        self.batch = batch
+        self.backend = backend or get_default_backend()
+        # Set extra attributes
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+
+    @property
+    def context(self):
+        wider_context = {
+            'request': self.request,
+            'resolvers': self.resolvers,
+        }
+        return wider_context
+
+
 __all__ = [
     "MainHandler",
     "UserProfileHandler",
-    "CylcScanHandler"
+    "CylcScanHandler",
+    "UIServerGraphQLHandler"
 ]

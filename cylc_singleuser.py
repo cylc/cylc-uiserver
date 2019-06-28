@@ -21,13 +21,15 @@ import logging
 import os
 import signal
 
-from graphene_tornado.schema import schema
-from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
+from schema import schema
 from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
 
 from handlers import *
+from workflows_mgr import WorkflowsManager
+from data_mgr import DataManager
+from resolvers import Resolvers
 
 
 class MyApplication(web.Application):
@@ -54,6 +56,10 @@ class CylcUIServer(object):
             script_dir = os.path.dirname(__file__)
             self._static = os.path.abspath(os.path.join(script_dir, static))
         self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
+        self.ws_mgr = WorkflowsManager()
+        self.data_mgr = DataManager(self.ws_mgr)
+        self.resolvers = Resolvers(
+            self.ws_mgr, self.data_mgr)
 
     def _make_app(self):
         """Crete a Tornado web application."""
@@ -92,16 +98,17 @@ class CylcUIServer(object):
                 # graphql
                 (url_path_join(self._jupyter_hub_service_prefix,
                                '/graphql'),
-                    TornadoGraphQLHandler,
-                    dict(graphiql=True, schema=schema)),
+                    UIServerGraphQLHandler,
+                    dict(schema=schema, resolvers=self.resolvers)),
                 (url_path_join(self._jupyter_hub_service_prefix,
                                '/graphql/batch'),
-                    TornadoGraphQLHandler,
-                    dict(graphiql=True, schema=schema, batch=True)),
+                    UIServerGraphQLHandler,
+                    dict(schema=schema, resolvers=self.resolvers, batch=True)),
                 (url_path_join(self._jupyter_hub_service_prefix,
                                '/graphql/graphiql'),
-                    TornadoGraphQLHandler,
-                    dict(graphiql=True, schema=schema))
+                    UIServerGraphQLHandler,
+                    dict(schema=schema, resolvers=self.resolvers,
+                         graphiql=True)),
             ],
             # FIXME: decide (and document) whether cookies will be permanent
             # after server restart.
@@ -113,6 +120,14 @@ class CylcUIServer(object):
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)
         ioloop.PeriodicCallback(app.try_exit, 100).start()
+        # Discover workflows on initial start up.
+        ioloop.IOLoop.current().add_callback(self.ws_mgr.gather_workflows)
+        # Arbitrary intervals (msec) chosen for the two periodic callbacks
+        # below. These will likely change or be removed with PUB/SUB updates.
+        # Check for new workflows every 19sec.
+        ioloop.PeriodicCallback(self.ws_mgr.gather_workflows, 19000).start()
+        ioloop.PeriodicCallback(
+            self.data_mgr.entire_workflow_update, 5000).start()
         try:
             ioloop.IOLoop.current().start()
         except KeyboardInterrupt:
