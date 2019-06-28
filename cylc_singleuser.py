@@ -21,7 +21,7 @@ import logging
 import os
 import signal
 
-from schema import schema
+from cylc.flow.network.schema import schema
 from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
@@ -122,10 +122,9 @@ class CylcUIServer(object):
         ioloop.PeriodicCallback(app.try_exit, 100).start()
         # Discover workflows on initial start up.
         ioloop.IOLoop.current().add_callback(self.ws_mgr.gather_workflows)
-        # Arbitrary intervals (msec) chosen for the two periodic callbacks
-        # below. These will likely change or be removed with PUB/SUB updates.
-        # Check for new workflows every 19sec.
-        ioloop.PeriodicCallback(self.ws_mgr.gather_workflows, 19000).start()
+        # If the client is already established it's not overridden,
+        # so the following callbacks can happen at the same time.
+        ioloop.PeriodicCallback(self.ws_mgr.gather_workflows, 10000).start()
         ioloop.PeriodicCallback(
             self.data_mgr.entire_workflow_update, 5000).start()
         try:

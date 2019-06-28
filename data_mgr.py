@@ -21,15 +21,8 @@ import asyncio
 # from google.protobuf.json_format import MessageToDict
 
 from cylc.flow.exceptions import ClientError, ClientTimeout
-from cylc.flow.ws_messages_pb2 import PbEntireWorkflow
+from cylc.flow.network.server import PB_METHOD_MAP
 from cylc.flow.network.scan import MSG_TIMEOUT
-
-
-# TODO: define in and import this from cylc.flow
-# maps methods in cylc-flow server to the returned bytes message
-METHOD_MAP = {
-    'pb_entire_workflow': PbEntireWorkflow
-}
 
 
 async def get_workflow_data(w_id, client, method):
@@ -41,7 +34,7 @@ async def get_workflow_data(w_id, client, method):
     except ClientError as exc:
         return (w_id, None)
     else:
-        ws_data = METHOD_MAP[method]()
+        ws_data = PB_METHOD_MAP[method]()
         ws_data.ParseFromString(pb_msg)
     return (w_id, ws_data)
 

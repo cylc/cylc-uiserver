@@ -29,7 +29,7 @@ install_requires = [
     'graphene-tornado==2.1.*',
     ('cylc-flow @ https://github.com/cylc/cylc-flow'
      '/tarball/master#egg=cylc-8.0a1.dev')
-    #'cylc-flow==8.*'
+    # 'cylc-flow==8.*'
 ]
 
 setup_requires = [
