@@ -115,7 +115,7 @@ class Resolvers(object):
         """Mutate node items of associated workflows."""
         w_ids = [flow.workflow.id
                  for flow in await self.get_workflow_msgs(w_args)]
-        if w_ids == []:
+        if not w_ids:
             return 'Error: No matching Workflow'
         # match proxy ID args with workflows
         flow_ids = []
