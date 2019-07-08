@@ -82,7 +82,6 @@ class WorkflowsManager(object):
 
     async def gather_workflows(self):
         scanflows = {}
-        workflows = {}
         cre_owner, cre_name = re_compile_filters(None, ['.*'])
         scan_args = (
             (reg, host, port, CLIENT_TIMEOUT)
