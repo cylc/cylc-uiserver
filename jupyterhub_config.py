@@ -306,7 +306,7 @@
 #c.JupyterHub.load_groups = {}
 
 ## Specify path to a logo image to override the Jupyter logo in the banner.
-#c.JupyterHub.logo_file = ''
+c.JupyterHub.logo_file = '../cylc-ui/dist/img/logo.png'
 
 ## File to write PID Useful for daemonizing JupyterHub.
 #c.JupyterHub.pid_file = ''
