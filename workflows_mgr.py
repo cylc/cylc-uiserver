@@ -27,6 +27,8 @@ import sys
 import socket
 import asyncio
 
+from contextlib import suppress
+
 from cylc.flow import flags
 from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.hostuserutil import is_remote_host, get_host_ip_by_name
@@ -109,8 +111,14 @@ class WorkflowsManager(object):
             if w_id in scanflows:
                 if (info['host'] == scanflows[w_id]['host'] and
                         info['port'] == scanflows[w_id]['port']):
+                    client = scanflows[w_id]['req_client']
+                    with suppress(IOError):
+                        client.socket.close()
                     scanflows.pop(w_id)
                 continue
+            client = self.workflows[w_id]['req_client']
+            with suppress(IOError):
+                client.socket.close()
             self.workflows.pop(w_id)
 
         # update with new
