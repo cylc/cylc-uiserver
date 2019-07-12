@@ -59,7 +59,7 @@ async def est_workflow(reg, host, port, timeout=None):
         try:
             host = get_host_ip_by_name(host)  # IP reduces DNS traffic
         except socket.error as exc:
-            if cylc.flags.debug:
+            if flags.debug:
                 raise
             sys.stderr.write("ERROR: %s: %s\n" % (exc, host))
             return (reg, host, port, None)
@@ -84,7 +84,6 @@ class WorkflowsManager(object):
 
     async def gather_workflows(self):
         scanflows = {}
-        workflows = {}
         cre_owner, cre_name = re_compile_filters(None, ['.*'])
         scan_args = (
             (reg, host, port, CLIENT_TIMEOUT)

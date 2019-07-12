@@ -17,9 +17,7 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 from fnmatch import fnmatchcase
-from cylc.flow.network.resolvers import (
-    collate_workflow_atts, workflow_atts_filter, workflow_filter,
-    collate_node_atts, node_atts_filter, node_filter)
+from cylc.flow.network.resolvers import (workflow_filter, node_filter)
 
 
 class Resolvers(object):
@@ -115,7 +113,7 @@ class Resolvers(object):
         """Mutate node items of associated workflows."""
         w_ids = [flow.workflow.id
                  for flow in await self.get_workflow_msgs(w_args)]
-        if w_ids == []:
+        if not w_ids:
             return 'Error: No matching Workflow'
         # match proxy ID args with workflows
         flow_ids = []
