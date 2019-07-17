@@ -23,6 +23,8 @@ from typing import List, Union
 from jupyterhub import __version__ as jupyterhub_version
 from jupyterhub.services.auth import HubOAuthenticated
 from tornado import web
+from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPError
+from tornado.httputil import HTTPHeaders
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
 
@@ -69,6 +71,41 @@ class UserProfileHandler(HubOAuthenticated, APIHandler):
     @web.authenticated
     def get(self):
         self.write(json.dumps(self.get_current_user()))
+
+
+class RoutesHandler(HubOAuthenticated, APIHandler):
+    """Return the list of routes in the JupyterHub proxy."""
+
+    def set_default_headers(self) -> None:
+        super().set_default_headers()
+        self.set_header("Content-Type", 'application/json')
+
+    @web.authenticated
+    async def get(self):
+        # auth token set up in jupyterhub_config.py
+        auth_token = os.environ.get('CONFIGPROXY_AUTH_TOKEN', None)
+        # proxy URL set up in jupyterhub_config.py
+        proxy_url = os.environ.get('CONFIGPROXY_URL', None)
+        if auth_token and proxy_url:
+            http_client = AsyncHTTPClient()
+            # headers required by configurable-http-proxy API auth
+            headers = HTTPHeaders({
+                'Authorization': f'token {auth_token}'
+            })
+            # default location of configurable-http-proxy API
+            url = f'{proxy_url}/api/routes'
+            try:
+                request = HTTPRequest(url=url, headers=headers)
+                response = await http_client.fetch(request)
+                # TODO: limit the information returned for security?
+                self.write(response.body)
+            except HTTPError as e:
+                # TODO: log e and do better error reporting (rfc7807?)
+                # Do not log auth and proxy information!
+                self.write(json.dumps("Error retrieving routes!"))
+        else:
+            # TODO: return no-content http status, or something else?
+            self.write(json.dumps(""))
 
 
 class CylcScanHandler(HubOAuthenticated, APIHandler):
@@ -144,5 +181,6 @@ __all__ = [
     "MainHandler",
     "UserProfileHandler",
     "CylcScanHandler",
-    "UIServerGraphQLHandler"
+    "UIServerGraphQLHandler",
+    "RoutesHandler"
 ]
