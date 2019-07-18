@@ -14,14 +14,28 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from os import path
+import codecs
+import re
+from os.path import join, abspath, dirname
 
-from setuptools import setup
+from setuptools import setup, find_namespace_packages
 
-here = path.abspath(path.dirname(__file__))
+here = abspath(dirname(__file__))
 
-with open(path.join(here, 'README.md'), encoding='utf-8') as f:
-    long_description = f.read()
+
+def read(*parts):
+    with codecs.open(join(here, *parts), "r") as fp:
+        return fp.read()
+
+
+def find_version(*file_paths):
+    version_file = read(*file_paths)
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
+                              version_file, re.M)
+    if version_match:
+        return version_match.group(1)
+    raise RuntimeError("Unable to find version string.")
+
 
 install_requires = [
     'jupyterhub==1.0.*',
@@ -48,27 +62,17 @@ extras_require = {
 }
 
 setup(
-    name='cylc-uiserver',
-    version='1.0',
-    description='Cylc UI Server',
-    long_description=long_description,
+    version=find_version("cylc", "uiserver", "__init__.py"),
+    long_description=read("README.md"),
     long_description_content_type='text/markdown',
-    url='https://github.com/cylc/cylc-uiserver/',
-    py_modules=[
-        'handlers',
-        'cylc_singleuser',
-        'data_mgr',
-        'workflows_mgr',
-        'resolvers',
-        'schema'],
-    python_requires='>=3.7',
+    packages=find_namespace_packages(include=["cylc.*"]),
     install_requires=install_requires,
     setup_requires=setup_requires,
     tests_require=tests_require,
     extras_require=extras_require,
     entry_points={
         'console_scripts': [
-            'cylc-singleuser=cylc_singleuser:main'
+            'cylc-uiserver=cylc.uiserver.main:main'
         ]
     }
 )

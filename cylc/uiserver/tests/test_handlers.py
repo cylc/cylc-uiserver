@@ -23,7 +23,7 @@ from tornado.httpclient import HTTPResponse
 from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application
 
-from cylc_singleuser import *
+from cylc.uiserver.main import *
 
 
 class MainHandlerTest(AsyncHTTPTestCase):
@@ -69,27 +69,3 @@ class UserProfileHandlerTest(AsyncHTTPTestCase):
             assert "Access-Control-Allow-Methods" in response.headers
             assert "Content-Type" in response.headers
             assert b'yossarian' in response.body
-
-
-def test_my_application():
-    """Test creating the Tornado app."""
-    my_application = MyApplication(handlers=[])
-    assert not my_application.is_closing
-    my_application.signal_handler(None, None)
-    assert my_application.is_closing
-
-
-def test_cylcuiserver_absolute_path():
-    """Test a Cylc UI server created with absolute path for static assets."""
-    cylc_uiserver = CylcUIServer(8000, '/static/path', '/users/test')
-    assert cylc_uiserver._port == 8000
-    assert cylc_uiserver._static == '/static/path'
-    assert cylc_uiserver._jupyter_hub_service_prefix == '/users/test'
-
-
-def test_cylcuiserver_relative_path():
-    """Test a Cylc UI server created with relative path for static assets."""
-    cylc_uiserver = CylcUIServer(8000, './', '/users/test')
-    assert cylc_uiserver._port == 8000
-    assert cylc_uiserver._static == os.path.dirname(__file__)
-    assert cylc_uiserver._jupyter_hub_service_prefix == '/users/test'

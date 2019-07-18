@@ -22,14 +22,14 @@ import os
 import signal
 
 from cylc.flow.network.schema import schema
-from jupyterhub.services.auth import HubOAuthCallbackHandler
-from jupyterhub.utils import url_path_join
 from tornado import web, ioloop
 
-from handlers import *
-from workflows_mgr import WorkflowsManager
-from data_mgr import DataManager
-from resolvers import Resolvers
+from jupyterhub.services.auth import HubOAuthCallbackHandler
+from jupyterhub.utils import url_path_join
+from .data_mgr import DataManager
+from .handlers import *
+from .resolvers import Resolvers
+from .workflows_mgr import WorkflowsManager
 
 
 class MyApplication(web.Application):
