@@ -27,14 +27,13 @@ disable_warnings=
     # include-ignored
 omit =
     venv/*
-    tests.py
+    cylc/uiserver/tests/*
     setup.py
     jupyterhub_config.py
 parallel = True
 plugins=
 include=
-    *cylc_singleuser.py*
-    *handlers.py*
+    cylc/uiserver/*
 timid = False
 
 
