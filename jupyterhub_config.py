@@ -482,7 +482,7 @@ c.Spawner.args = ['-s', '../cylc-ui/dist/']
 #  environment variables. Most, including the default, do not. Consult the
 #  documentation for your spawner to verify!
 #c.Spawner.cmd = ['jupyterhub-singleuser']
-c.Spawner.cmd = ['cylc-singleuser']
+c.Spawner.cmd = ['cylc-uiserver']
 
 ## Maximum number of consecutive failures to allow before shutting down
 #  JupyterHub.
