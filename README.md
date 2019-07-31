@@ -28,9 +28,9 @@ added 45 packages from 62 contributors in 5.53s
 0.9.4
 (venv) $ configurable-http-proxy --version
 4.0.1
-(venv) $ cylc-singleuser
-usage: cylc-singleuser [-h] [-p PORT] -s STATIC
-cylc-singleuser: error: the following arguments are required: -s/--static
+(venv) $ cylc-uiserver
+usage: cylc-uiserver [-h] [-p PORT] -s STATIC
+cylc-uiserver: error: the following arguments are required: -s/--static
 ```
 
 We can start the hub with: `(venv) $ jupyterhub`, and navigate to [http://localhost:8000](http://localhost:8000).
@@ -39,7 +39,7 @@ This starts a JupyterHub instance, with the authenticator **jupyterhub.auth.PAMA
 and the spawner **jupyterhub.spawner.LocalProcessSpawner**. Look at the file `jupyterhub_config.py`
 in this repository to confirm the spawner used, and the parameters passed. These parameters define
 the directory of static content, and also what is the command that the spawner in JupyterHub must
-use (`cylc-singleuser`).
+use (`cylc-uiserver`).
 
 ## Configuration
 
@@ -53,21 +53,21 @@ By default we have `jupyterhub.spawner.LocalProcessSpawner` as the spawner. It i
 a bash shell that executes `jupyterhub-singleuser` with some parameters given via command
 line and environment variables.
 
-In order to have JupyterHub spawning our Cylc UI server, which is initialized by `cylc-singleuser`,
+In order to have JupyterHub spawning our Cylc UI server, which is initialized by `cylc-uiserver`,
 we have to add the following settings in `jupyterhub_config.py`:
 
 ```
 # not necessary as the default, but good nonetheless
 c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
 c.Spawner.args = ['-s', '../cylc-web/dist/']
-c.Spawner.cmd = ['cylc-singleuser']
+c.Spawner.cmd = ['cylc-uiserver']
 ```
 
 The `LocalProcessSpawner` will add `--port` with a random generated port number by default. The
 `c.Spawner.args` includes an extra `-s ../cylc-web/dist`, which is the location where we should
 find the application `index.html` (change for your environment if necessary).
 
-Also note that the `c.Spawner.cmd` is `cylc-singleuser`, which is put in the `$PATH` as part of
+Also note that the `c.Spawner.cmd` is `cylc-uiserver`, which is put in the `$PATH` as part of
 the instructions of the `setup.py` in this repository.
 
 ### Authentication
