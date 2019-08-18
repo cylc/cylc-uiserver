@@ -16,7 +16,6 @@
 
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
-from fnmatch import fnmatchcase
 from cylc.flow.network.resolvers import (
     workflow_filter, node_filter, sort_elements
 )
@@ -124,10 +123,10 @@ class Resolvers(object):
             flow.workflow.id
             for flow in await self.get_workflow_msgs(w_args)]
         # Pass the request to the workflow GraphQL endpoints
-        req_str, vars, _, _ = info.context.get('handler').graphql_params
+        req_str, variables, _, _ = info.context.get('graphql_params')
         graphql_args = {
             'request_string': req_str,
-            'variables': vars,
+            'variables': variables,
         }
         return self.ws_mgr.multi_request('graphql', w_ids, graphql_args)
 
@@ -139,10 +138,10 @@ class Resolvers(object):
         if not w_ids:
             return 'Error: No matching Workflow'
         # Pass the multi-node request to the workflow GraphQL endpoints
-        req_str, vars, _, _ = info.context.get('handler').graphql_params
+        req_str, variables, _, _ = info.context.get('graphql_params')
         graphql_args = {
             'request_string': req_str,
-            'variables': vars,
+            'variables': variables,
         }
         multi_args = {w_id: graphql_args for w_id in w_ids}
         return self.ws_mgr.multi_request(

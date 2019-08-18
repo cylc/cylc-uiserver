@@ -134,7 +134,7 @@ class UIServerGraphQLHandler(TornadoGraphQLHandler):
     @property
     def context(self):
         wider_context = {
-            'handler': self,
+            'graphql_params': self.graphql_params,
             'request': self.request,
             'resolvers': self.resolvers,
         }
