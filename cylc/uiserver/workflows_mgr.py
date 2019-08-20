@@ -35,6 +35,7 @@ from cylc.flow.hostuserutil import is_remote_host, get_host_ip_by_name
 from cylc.flow.network.client import SuiteRuntimeClient
 from cylc.flow.network.scan import (
     get_scan_items_from_fs, re_compile_filters, MSG_TIMEOUT)
+from cylc.flow.ws_data_mgr import ID_DELIM
 
 CLIENT_TIMEOUT = 2.0
 
@@ -96,7 +97,7 @@ class WorkflowsManager(object):
         for reg, host, port, client, info in items:
             if info is not None and info != MSG_TIMEOUT:
                 owner = info['owner']
-                scanflows[f"{owner}/{reg}"] = {
+                scanflows[f"{owner}{ID_DELIM}{reg}"] = {
                     'name': info['name'],
                     'owner': owner,
                     'host': host,
