@@ -49,7 +49,13 @@ class DataManager(object):
     async def entire_workflow_update(self, ids=None):
         if ids is None:
             ids = []
-        new_data = {}
+
+        # Prune old data
+        for w_id in list(self.data):
+            if w_id not in self.ws_mgr.workflows:
+                del self.data[w_id]
+
+        # Fetch new data
         ws_args = (
             (w_id, info['req_client'], 'pb_entire_workflow')
             for w_id, info in self.ws_mgr.workflows.items())
@@ -58,11 +64,17 @@ class DataManager(object):
             if not ids or args[0] in ids:
                 gathers += (get_workflow_data(*args),)
         items = await asyncio.gather(*gathers)
+        new_data = {}
         for w_id, result in items:
             if result is not None and result != MSG_TIMEOUT:
-                new_data[w_id] = result
-        if not ids:
-            # atomic update
-            self.data = new_data
-        else:
-            self.data.update(new_data)
+                new_data[w_id] = {
+                    'edges': {e.id: e for e in result.edges},
+                    'families': {f.id: f for f in result.families},
+                    'family_proxies': {n.id: n for n in result.family_proxies},
+                    'jobs': {j.id: j for j in result.jobs},
+                    'tasks': {t.id: t for t in result.tasks},
+                    'task_proxies': {n.id: n for n in result.task_proxies},
+                    'workflow': result.workflow,
+                }
+
+        self.data.update(new_data)
