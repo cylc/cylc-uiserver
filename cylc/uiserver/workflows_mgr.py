@@ -146,5 +146,8 @@ class WorkflowsManager(object):
         results = await asyncio.gather(*gathers)
         res = []
         for key, val in results:
-            res.append({'id': key, 'response': val})
+            res.extend([
+                msg_core
+                for msg_core in list(val.values())[0].get('result')
+                if isinstance(val, dict) and list(val.values())])
         return res
