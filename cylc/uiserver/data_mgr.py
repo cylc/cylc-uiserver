@@ -17,6 +17,7 @@
 """Create and update the data structure for all workflow services."""
 
 import asyncio
+import logging
 
 from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.network.server import PB_METHOD_MAP
@@ -25,15 +26,19 @@ from cylc.flow.ws_data_mgr import (
     EDGES, FAMILIES, FAMILY_PROXIES, JOBS, TASKS, TASK_PROXIES, WORKFLOW
 )
 
+logger = logging.getLogger(__name__)
+
 
 async def get_workflow_data(w_id, client, method):
     """Call WS endpoint for entire workflow protobuf message."""
     # Use already established client
     try:
         pb_msg = await client.async_request(method)
-    except ClientTimeout:
+    except ClientTimeout as exc:
+        logger.exception(exc)
         return (w_id, MSG_TIMEOUT)
-    except ClientError:
+    except ClientError as exc:
+        logger.exception(exc)
         return (w_id, None)
     else:
         ws_data = PB_METHOD_MAP[method]()
