@@ -66,6 +66,11 @@ setup(
     long_description=read("README.md"),
     long_description_content_type='text/markdown',
     packages=find_namespace_packages(include=["cylc.*"]),
+    package_data={
+        'cylc.uiserver': [
+            'logging_config.ini'
+        ]
+    },
     install_requires=install_requires,
     setup_requires=setup_requires,
     tests_require=tests_require,
