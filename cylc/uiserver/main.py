@@ -61,12 +61,16 @@ class CylcUIServer(object):
         self.resolvers = Resolvers(
             self.ws_mgr, self.data_mgr)
 
-    def _make_app(self):
-        """Crete a Tornado web application."""
+    def _make_app(self, debug: bool):
+        """Crete a Tornado web application.
+
+        Args:
+            debug (bool): flag to set debugging in the Tornado application
+        """
         logging.info(self._static)
         return MyApplication(
             static_path=self._static,
-            debug=True,
+            debug=debug,
             handlers=[
                 (rf"{self._jupyter_hub_service_prefix}(.*.(css|js))",
                  web.StaticFileHandler, {"path": self._static}),
@@ -115,8 +119,8 @@ class CylcUIServer(object):
             cookie_secret="cylc-secret-cookie"
         )
 
-    def start(self):
-        app = self._make_app()
+    def start(self, debug: bool):
+        app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)
         ioloop.PeriodicCallback(app.try_exit, 100).start()
@@ -141,6 +145,8 @@ def main():
                         default=8888)
     parser.add_argument('-s', '--static', action="store", dest="static",
                         required=True)
+    parser.add_argument('--debug', action="store_true", dest="debug",
+                        default=False)
     args = parser.parse_known_args()[0]
 
     jupyterhub_service_prefix = os.environ.get(
@@ -155,7 +161,7 @@ def main():
                  f"{args.static}")
 
     logging.info("Starting Cylc UI")
-    ui_server.start()
+    ui_server.start(args.debug)
 
 
 if __name__ == "__main__":
