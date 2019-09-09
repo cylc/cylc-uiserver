@@ -22,6 +22,8 @@ import os
 import signal
 
 from cylc.flow.network.schema import schema
+from logging.config import fileConfig
+from os.path import join, abspath, dirname
 from tornado import web, ioloop
 
 from jupyterhub.services.auth import HubOAuthCallbackHandler
@@ -31,19 +33,21 @@ from .handlers import *
 from .resolvers import Resolvers
 from .workflows_mgr import WorkflowsManager
 
+logger = logging.getLogger(__name__)
+
 
 class MyApplication(web.Application):
     is_closing = False
 
     def signal_handler(self, signum, frame):
-        logging.info('exiting...')
+        logger.info('exiting...')
         self.is_closing = True
 
     def try_exit(self):
         if self.is_closing:
             # clean up here
             ioloop.IOLoop.instance().stop()
-            logging.info('exit success')
+            logger.info('exit success')
 
 
 class CylcUIServer(object):
@@ -68,7 +72,7 @@ class CylcUIServer(object):
         Args:
             debug (bool): flag to set debugging in the Tornado application
         """
-        logging.info(self._static)
+        logger.info(self._static)
         return MyApplication(
             static_path=self._static,
             debug=debug,
@@ -148,20 +152,27 @@ def main():
                         required=True)
     parser.add_argument('--debug', action="store_true", dest="debug",
                         default=False)
+    here = abspath(dirname(__file__))
+    parser.add_argument('--logging-config', type=argparse.FileType('r'),
+                        help='path to logging configuration file',
+                        action="store", dest="logging_config",
+                        default=join(here, 'logging_config.ini'))
     args = parser.parse_known_args()[0]
+
+    fileConfig(args.logging_config)
 
     jupyterhub_service_prefix = os.environ.get(
         'JUPYTERHUB_SERVICE_PREFIX', '/')
-    logging.info(f"JupyterHub Service Prefix: {jupyterhub_service_prefix}")
+    logger.info(f"JupyterHub Service Prefix: {jupyterhub_service_prefix}")
     ui_server = CylcUIServer(
         port=args.port,
         static=args.static,
         jupyter_hub_service_prefix=jupyterhub_service_prefix
     )
-    logging.info(f"Listening on {args.port} and serving static content from "
-                 f"{args.static}")
+    logger.info(f"Listening on {args.port} and serving static content from "
+                f"{args.static}")
 
-    logging.info("Starting Cylc UI")
+    logger.info("Starting Cylc UI")
     ui_server.start(args.debug)
 
 

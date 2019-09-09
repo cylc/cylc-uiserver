@@ -23,9 +23,9 @@ Includes:
     - ?
 
 """
-import sys
 import socket
 import asyncio
+import logging
 
 from contextlib import suppress
 
@@ -37,6 +37,7 @@ from cylc.flow.network.scan import (
     get_scan_items_from_fs, re_compile_filters, MSG_TIMEOUT)
 from cylc.flow.ws_data_mgr import ID_DELIM
 
+logger = logging.getLogger(__name__)
 CLIENT_TIMEOUT = 2.0
 
 
@@ -49,8 +50,10 @@ async def workflow_request(client, command, args=None,
         result = await client.async_request(command, args, timeout)
         return (context, result)
     except ClientTimeout as exc:
+        logger.exception(exc)
         return (context, MSG_TIMEOUT)
     except ClientError as exc:
+        logger.exception(exc)
         return (context, None)
 
 
@@ -62,7 +65,7 @@ async def est_workflow(reg, host, port, timeout=None):
         except socket.error as exc:
             if flags.debug:
                 raise
-            sys.stderr.write("ERROR: %s: %s\n" % (exc, host))
+            logger.error("ERROR: %s: %s\n" % (exc, host))
             return (reg, host, port, None)
 
     # NOTE: Connect to the suite by host:port. This way the
