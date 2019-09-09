@@ -107,7 +107,7 @@ class CylcScanHandler(HubOAuthenticated, APIHandler):
 # This is needed in order to pass the server context in addition to existing.
 # It's possible to just overwrite TornadoGraphQLHandler.context but we would
 # somehow need to pass the request info (headers, username ...etc) in also
-class UIServerGraphQLHandler(TornadoGraphQLHandler):
+class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
 
     # Declare extra attributes
     resolvers = None
@@ -139,6 +139,10 @@ class UIServerGraphQLHandler(TornadoGraphQLHandler):
             'resolvers': self.resolvers,
         }
         return wider_context
+
+    @web.authenticated
+    def prepare(self):
+        super().prepare()
 
 
 __all__ = [
