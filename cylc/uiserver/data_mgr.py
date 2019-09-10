@@ -18,20 +18,22 @@
 
 import asyncio
 
-# from google.protobuf.json_format import MessageToDict
-
 from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.network.server import PB_METHOD_MAP
 from cylc.flow.network.scan import MSG_TIMEOUT
+from cylc.flow.ws_data_mgr import (
+    EDGES, FAMILIES, FAMILY_PROXIES, JOBS, TASKS, TASK_PROXIES, WORKFLOW
+)
 
 
 async def get_workflow_data(w_id, client, method):
+    """Call WS endpoint for entire workflow protobuf message."""
     # Use already established client
     try:
         pb_msg = await client.async_request(method)
-    except ClientTimeout as exc:
+    except ClientTimeout:
         return (w_id, MSG_TIMEOUT)
-    except ClientError as exc:
+    except ClientError:
         return (w_id, None)
     else:
         ws_data = PB_METHOD_MAP[method]()
@@ -39,7 +41,8 @@ async def get_workflow_data(w_id, client, method):
     return (w_id, ws_data)
 
 
-class DataManager(object):
+class DataManager:
+    """Manage the local data-store acquisition/updates from all workflows."""
 
     def __init__(self, ws_mgr):
         self.ws_mgr = ws_mgr
@@ -47,6 +50,7 @@ class DataManager(object):
 
     # Data syncing
     async def entire_workflow_update(self, ids=None):
+        """Update all data of workflow(s) from associated WS."""
         if ids is None:
             ids = []
 
@@ -68,13 +72,17 @@ class DataManager(object):
         for w_id, result in items:
             if result is not None and result != MSG_TIMEOUT:
                 new_data[w_id] = {
-                    'edges': {e.id: e for e in result.edges},
-                    'families': {f.id: f for f in result.families},
-                    'family_proxies': {n.id: n for n in result.family_proxies},
-                    'jobs': {j.id: j for j in result.jobs},
-                    'tasks': {t.id: t for t in result.tasks},
-                    'task_proxies': {n.id: n for n in result.task_proxies},
-                    'workflow': result.workflow,
+                    EDGES: {e.id: e for e in getattr(result, EDGES)},
+                    FAMILIES: {f.id: f for f in getattr(result, FAMILIES)},
+                    FAMILY_PROXIES: {
+                        n.id: n
+                        for n in getattr(result, FAMILY_PROXIES)},
+                    JOBS: {j.id: j for j in getattr(result, JOBS)},
+                    TASKS: {t.id: t for t in getattr(result, TASKS)},
+                    TASK_PROXIES: {
+                        n.id: n
+                        for n in getattr(result, TASK_PROXIES)},
+                    WORKFLOW: getattr(result, WORKFLOW),
                 }
 
         self.data.update(new_data)

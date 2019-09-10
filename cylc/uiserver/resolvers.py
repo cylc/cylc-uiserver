@@ -17,6 +17,7 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 from cylc.flow.network.resolvers import BaseResolvers
+from cylc.flow.ws_data_mgr import WORKFLOW
 
 
 class Resolvers(BaseResolvers):
@@ -33,10 +34,12 @@ class Resolvers(BaseResolvers):
                 setattr(self, key, value)
 
     # Mutations
-    async def mutator(self, info, command, w_args, args):
+    async def mutator(self, info, *m_args):
         """Mutate workflow."""
-        w_ids = [flow['workflow'].id
-                 for flow in await self.get_workflows_data(w_args)]
+        _, w_args, _ = m_args
+        w_ids = [
+            flow[WORKFLOW].id
+            for flow in await self.get_workflows_data(w_args)]
         # Pass the request to the workflow GraphQL endpoints
         req_str, variables, _, _ = info.context.get('graphql_params')
         graphql_args = {
@@ -45,10 +48,12 @@ class Resolvers(BaseResolvers):
         }
         return self.ws_mgr.multi_request('graphql', w_ids, graphql_args)
 
-    async def nodes_mutator(self, info, command, ids, w_args, args):
+    async def nodes_mutator(self, info, *m_args):
         """Mutate node items of associated workflows."""
-        w_ids = [flow['workflow'].id
-                 for flow in await self.get_workflows_data(w_args)]
+        _, _, w_args, _ = m_args
+        w_ids = [
+            flow[WORKFLOW].id
+            for flow in await self.get_workflows_data(w_args)]
         if not w_ids:
             return 'Error: No matching Workflow'
         # Pass the multi-node request to the workflow GraphQL endpoints
