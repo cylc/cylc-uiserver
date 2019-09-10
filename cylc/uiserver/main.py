@@ -17,12 +17,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
+import json
 import logging
 import os
 import signal
 
 from cylc.flow.network.schema import schema
-from logging.config import fileConfig
+from logging.config import dictConfig
 from os.path import join, abspath, dirname
 from tornado import web, ioloop
 
@@ -156,10 +157,13 @@ def main():
     parser.add_argument('--logging-config', type=argparse.FileType('r'),
                         help='path to logging configuration file',
                         action="store", dest="logging_config",
-                        default=join(here, 'logging_config.ini'))
+                        default=join(here, 'logging_config.json'))
     args = parser.parse_known_args()[0]
 
-    fileConfig(args.logging_config)
+    # args.logging_config will be a io.TextIOWrapper resource
+    with args.logging_config as logging_config_json:
+        config = json.load(logging_config_json)
+        dictConfig(config["logging"])
 
     jupyterhub_service_prefix = os.environ.get(
         'JUPYTERHUB_SERVICE_PREFIX', '/')
