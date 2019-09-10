@@ -1,0 +1,45 @@
+{
+  "logging": {
+    "version": 1,
+    "disable_existing_loggers": true,
+    "formatters": {
+      "basic": {
+        "format": "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+      }
+    },
+    "handlers": {
+      "console": {
+        "level": "DEBUG",
+        "class": "logging.StreamHandler",
+        "formatter": "basic",
+        "stream" : "ext://sys.stdout"
+      }
+    },
+    "loggers": {
+      "tornado.access": {
+        "level": "WARN",
+        "handlers": ["console"],
+        "propagate": false
+      },
+      "tornado.application": {
+        "level": "WARN",
+        "handlers": ["console"],
+        "propagate": false
+      },
+      "cylc.flow": {
+        "level": "DEBUG",
+        "handlers": ["console"],
+        "propagate": false
+      },
+      "cylc.uiserver": {
+        "level": "DEBUG",
+        "handlers": ["console"],
+        "propagate": false
+      }
+    },
+    "root": {
+      "handlers": ["console"],
+      "level": "WARN"
+    }
+  }
+}

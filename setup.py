@@ -68,7 +68,7 @@ setup(
     packages=find_namespace_packages(include=["cylc.*"]),
     package_data={
         'cylc.uiserver': [
-            'logging_config.ini'
+            'logging_config.json'
         ]
     },
     install_requires=install_requires,
