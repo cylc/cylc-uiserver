@@ -59,7 +59,8 @@ class CylcUIServer(object):
         self.ws_mgr = WorkflowsManager()
         self.data_mgr = DataManager(self.ws_mgr)
         self.resolvers = Resolvers(
-            self.ws_mgr, self.data_mgr)
+            self.data_mgr.data,
+            ws_mgr=self.ws_mgr)
 
     def _make_app(self):
         """Crete a Tornado web application."""
