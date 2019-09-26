@@ -17,23 +17,23 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
-from functools import partial
 import json
 import logging
-from logging.config import dictConfig
 import os
-from os.path import join, abspath, dirname
 import signal
+from functools import partial
+from logging.config import dictConfig
+from os.path import join, abspath, dirname
+
+from tornado import web, ioloop
 
 from cylc.flow.network.schema import schema
-from tornado import web, ioloop
-from tornado_ws import TornadoSubscriptionServer
-
 from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
 from .data_store_mgr import DataStoreMgr
 from .handlers import *
 from .resolvers import Resolvers
+from .tornado_ws import TornadoSubscriptionServer
 from .workflows_mgr import WorkflowsManager
 
 logger = logging.getLogger(__name__)
