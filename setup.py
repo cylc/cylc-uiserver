@@ -41,7 +41,8 @@ install_requires = [
     'jupyterhub==1.0.*',
     'tornado==6.0.*',
     'graphene-tornado==2.1.*',
-    'cylc-flow==8.0a1'
+    'cylc-flow==8.0a1',
+    'graphql-ws==0.3.*'
 ]
 
 setup_requires = [
