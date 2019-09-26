@@ -33,7 +33,7 @@ from jupyterhub.utils import url_path_join
 from .data_store_mgr import DataStoreMgr
 from .handlers import *
 from .resolvers import Resolvers
-from .tornado_ws import TornadoSubscriptionServer
+from .websockets.tornado import TornadoSubscriptionServer
 from .workflows_mgr import WorkflowsManager
 
 logger = logging.getLogger(__name__)
