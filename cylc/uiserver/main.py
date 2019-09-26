@@ -122,7 +122,7 @@ class CylcUIServer(object):
                     dict(schema=schema, resolvers=self.resolvers, batch=True)),
                 (url_path_join(self._jupyter_hub_service_prefix,
                                '/graphql/graphiql'),
-                    UIServerGraphQLHandler,
+                    GraphiQLHandler,
                     dict(schema=schema, resolvers=self.resolvers,
                          graphiql=True)),
                 (url_path_join(

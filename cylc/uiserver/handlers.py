@@ -29,6 +29,8 @@ from jupyterhub.services.auth import HubOAuthenticated
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
+from .websockets.template import render_graphiql
+
 
 class BaseHandler(web.RequestHandler):
 
@@ -137,9 +139,23 @@ class SubscriptionHandler(websocket.WebSocketHandler):
         return True
 
 
+class GraphiQLHandler(UIServerGraphQLHandler):
+    """A tornado handler for the GraphiQL websockets calls.
+
+    Uses a different function to render the GraphiQL template, which uses
+    a React app to subscribe to the query and display the result dynamically.
+    """
+
+    def get(self):
+        self.finish(
+            render_graphiql(
+                f'user/{self.hub_auth.get_user(self)["name"]}/'))
+
+
 __all__ = [
     "MainHandler",
     "UserProfileHandler",
     "UIServerGraphQLHandler",
-    "SubscriptionHandler"
+    "SubscriptionHandler",
+    "GraphiQLHandler"
 ]
