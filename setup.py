@@ -43,7 +43,8 @@ install_requires = [
     'tornado==6.0.*',
     'graphene-tornado==2.1.*',
     ('cylc-flow @ https://github.com/cylc/cylc-flow'
-     '/tarball/master#egg=cylc-8.0a2.dev')
+     '/tarball/master#egg=cylc-8.0a2.dev'),
+    'graphql-ws==0.3.*'
 ]
 
 # Only include pytest-runner in setup_requires if we're invoking tests
