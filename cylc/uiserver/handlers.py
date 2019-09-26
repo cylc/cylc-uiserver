@@ -17,14 +17,17 @@
 import json
 import os
 import re
+from asyncio import Queue
 from subprocess import Popen, PIPE
 from typing import List, Union
 
-from jupyterhub import __version__ as jupyterhub_version
-from jupyterhub.services.auth import HubOAuthenticated
-from tornado import web
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
+from graphql_ws.constants import GRAPHQL_WS
+from jupyterhub import __version__ as jupyterhub_version
+from jupyterhub.services.auth import HubOAuthenticated
+from tornado import web, websocket
+from tornado.ioloop import IOLoop
 
 
 class BaseHandler(web.RequestHandler):
@@ -112,8 +115,31 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
         super().prepare()
 
 
+class SubscriptionHandler(websocket.WebSocketHandler):
+
+    def initialize(self, sub_server):
+        self.subscription_server = sub_server
+        self.queue = Queue(100)
+
+    def select_subprotocol(self, subprotocols):
+        return GRAPHQL_WS
+
+    def open(self, *args, **kwargs):
+        IOLoop.current().spawn_callback(self.subscription_server.handle, self)
+
+    async def on_message(self, message):
+        await self.queue.put(message)
+
+    async def recv(self):
+        return await self.queue.get()
+
+    def check_origin(self, origin: str) -> bool:
+        return True
+
+
 __all__ = [
     "MainHandler",
     "UserProfileHandler",
-    "UIServerGraphQLHandler"
+    "UIServerGraphQLHandler",
+    "SubscriptionHandler"
 ]

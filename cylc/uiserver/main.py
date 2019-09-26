@@ -27,6 +27,7 @@ import signal
 
 from cylc.flow.network.schema import schema
 from tornado import web, ioloop
+from tornado_ws import TornadoSubscriptionServer
 
 from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
@@ -124,6 +125,10 @@ class CylcUIServer(object):
                     UIServerGraphQLHandler,
                     dict(schema=schema, resolvers=self.resolvers,
                          graphiql=True)),
+                (url_path_join(
+                    self._jupyter_hub_service_prefix, '/subscriptions'),
+                    SubscriptionHandler,
+                    dict(sub_server=TornadoSubscriptionServer(schema)))
             ],
             # FIXME: decide (and document) whether cookies will be permanent
             # after server restart.
