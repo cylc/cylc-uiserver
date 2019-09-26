@@ -24,7 +24,7 @@ python: 3.7
 
 before_install:
   - pip install pycodestyle
-  - pycodestyle --exclude=".git,.tox,__pycache,venv,.eggs,build,jupyterhub_config.py"
+  - pycodestyle --exclude=".git,.tox,__pycache,venv,.eggs,build,jupyterhub_config.py,cylc/uiserver/tornado_ws.py"
 install:
   - pip install .[all]
 script:
