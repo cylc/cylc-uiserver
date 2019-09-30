@@ -98,6 +98,10 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
             await self.send_error(connection_context, op_id, e, GQL_CONNECTION_ERROR)
             await connection_context.close(1011)
 
+    def execute(self, request_context, params):
+        params['context_value'] = request_context
+        return super().execute(request_context, params)
+
     async def on_start(self, connection_context, op_id, params):
         execution_result = self.execute(
             connection_context.request_context, params)
