@@ -128,7 +128,8 @@ class CylcUIServer(object):
                 (url_path_join(
                     self._jupyter_hub_service_prefix, '/subscriptions'),
                     SubscriptionHandler,
-                    dict(sub_server=TornadoSubscriptionServer(schema)))
+                    dict(sub_server=TornadoSubscriptionServer(schema),
+                         resolvers=self.resolvers))
             ],
             # FIXME: decide (and document) whether cookies will be permanent
             # after server restart.

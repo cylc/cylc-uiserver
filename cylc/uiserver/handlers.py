@@ -118,10 +118,13 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
 
 
 class SubscriptionHandler(websocket.WebSocketHandler):
+    subscription_server = None
+    resolvers = None
+    queue = Queue(100)
 
-    def initialize(self, sub_server):
+    def initialize(self, sub_server, resolvers):
         self.subscription_server = sub_server
-        self.queue = Queue(100)
+        self.resolvers = resolvers
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
@@ -137,6 +140,14 @@ class SubscriptionHandler(websocket.WebSocketHandler):
 
     def check_origin(self, origin: str) -> bool:
         return True
+
+    @property
+    def context(self):
+        wider_context = {
+            'request': self.request,
+            'resolvers': self.resolvers,
+        }
+        return wider_context
 
 
 class GraphiQLHandler(UIServerGraphQLHandler):
