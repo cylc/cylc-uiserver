@@ -130,7 +130,8 @@ class SubscriptionHandler(websocket.WebSocketHandler):
         return GRAPHQL_WS
 
     def open(self, *args, **kwargs):
-        IOLoop.current().spawn_callback(self.subscription_server.handle, self)
+        IOLoop.current().spawn_callback(self.subscription_server.handle, self,
+                                        self.context)
 
     async def on_message(self, message):
         await self.queue.put(message)
