@@ -38,6 +38,7 @@ below.
  - Bruno Kinoshita
  - David Sutherland
  - Tim Pillinger
+ - Stephen McVeigh
 
 (All contributors are identifiable with email addresses in the git version
 control logs or otherwise.)
