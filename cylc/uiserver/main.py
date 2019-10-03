@@ -197,5 +197,8 @@ if __name__ == "__main__":
     main()
 
 
-__all__ = ['MainHandler', 'UserProfileHandler', 'MyApplication',
-           'CylcUIServer', 'main']
+__all__ = [
+    'MyApplication',
+    'CylcUIServer',
+    'main'
+]

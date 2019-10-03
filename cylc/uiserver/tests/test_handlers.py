@@ -17,17 +17,22 @@
 import os
 import shutil
 import tempfile
-from unittest.mock import patch
+from functools import partial
+from unittest.mock import patch, MagicMock
 
+from graphql_ws.constants import GRAPHQL_WS
 from tornado.httpclient import HTTPResponse
-from tornado.testing import AsyncHTTPTestCase
+from tornado.httputil import HTTPServerRequest
+from tornado.testing import AsyncHTTPTestCase, get_async_test_timeout
 from tornado.web import Application
 
+from cylc.uiserver.handlers import *
 from cylc.uiserver.main import *
 
 
 class MainHandlerTest(AsyncHTTPTestCase):
     """Test for the Main handler"""
+
     def get_app(self) -> Application:
         self.tempdir = tempfile.mkdtemp(suffix='mainhandlertest')
         return MyApplication(
@@ -53,6 +58,7 @@ class MainHandlerTest(AsyncHTTPTestCase):
 
 class UserProfileHandlerTest(AsyncHTTPTestCase):
     """Test for UserProfile handler"""
+
     def get_app(self) -> Application:
         return MyApplication(
             handlers=[
@@ -69,3 +75,60 @@ class UserProfileHandlerTest(AsyncHTTPTestCase):
             assert "Access-Control-Allow-Methods" in response.headers
             assert "Content-Type" in response.headers
             assert b'yossarian' in response.body
+
+
+class SubscriptionHandlerTest(AsyncHTTPTestCase):
+    """Test for SubscriptionHandler"""
+
+    def get_app(self) -> Application:
+        return MyApplication(
+            handlers=[
+                ('/subscriptions', SubscriptionHandler,
+                 dict(sub_server=None, resolvers=None))
+            ]
+        )
+
+    def test_websockets_reject_get_requests(self):
+        response = self.fetch('/subscriptions')
+        assert 400 == response.code
+        assert b"WebSocket" in response.body
+
+    def _create_handler(self):
+        app = self.get_app()
+        request = HTTPServerRequest(method='GET', uri='/subscriptions')
+        request.connection = MagicMock()
+        return SubscriptionHandler(application=app, request=request,
+                                   sub_server=None, resolvers=None)
+
+    def test_websockets_subprotocol(self):
+        handler = self._create_handler()
+        assert handler.select_subprotocol(subprotocols=[]) == GRAPHQL_WS
+
+    def test_websockets_check_origin(self):
+        handler = self._create_handler()
+        assert handler.check_origin(origin='')
+
+    def test_websockets_context(self):
+        handler = self._create_handler()
+        assert handler.request == handler.context['request']
+        assert 'resolvers' in handler.context
+
+    def test_websockets_queue(self):
+        handler = self._create_handler()
+        message = 'a message'
+        assert handler.queue.empty()
+        self.io_loop.run_sync(partial(handler.on_message, message),
+                              get_async_test_timeout())
+        assert not handler.queue.empty()
+        assert message == self.io_loop.run_sync(handler.recv,
+                                                get_async_test_timeout())
+        assert handler.queue.empty()
+
+    def test_assert_callback_handler_gets_called(self):
+        handler = self._create_handler()
+        handler.subscription_server = MagicMock()
+        handler.subscription_server.handle = MagicMock()
+        handler.subscription_server.handle.assert_not_called()
+        self.io_loop.run_sync(handler.open,
+                              get_async_test_timeout())
+        handler.subscription_server.handle.assert_called_once()
