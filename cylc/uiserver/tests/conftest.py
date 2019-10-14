@@ -21,7 +21,7 @@ import pytest
 from cylc.flow.network.client import ZMQClient
 
 
-class TestAsyncClient(ZMQClient):
+class AsyncClientFixture(ZMQClient):
     host = ''
     port = 0
     encode_method = None
@@ -43,4 +43,4 @@ class TestAsyncClient(ZMQClient):
 
 @pytest.fixture
 def async_client():
-    return TestAsyncClient()
+    return AsyncClientFixture()
