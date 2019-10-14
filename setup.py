@@ -49,9 +49,10 @@ setup_requires = [
 ]
 
 tests_require = [
-    'pytest==4.4.*',
-    'coverage==4.5.*',
-    'pytest-cov==2.6.*'
+    'pytest',
+    'coverage',
+    'pytest-cov',
+    'pytest-asyncio'
 ]
 
 extras_require = {
