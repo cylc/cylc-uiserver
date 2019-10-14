@@ -52,7 +52,8 @@ tests_require = [
     'pytest',
     'coverage',
     'pytest-cov',
-    'pytest-asyncio'
+    'pytest-asyncio',
+    'pytest-mock'
 ]
 
 extras_require = {
