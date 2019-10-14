@@ -98,9 +98,6 @@ class CylcUIServer(object):
                 (url_path_join(
                     self._jupyter_hub_service_prefix, 'userprofile'),
                     UserProfileHandler),
-                (url_path_join(
-                    self._jupyter_hub_service_prefix, 'suites'),
-                    CylcScanHandler),
 
                 (rf"{self._jupyter_hub_service_prefix}?",
                     MainHandler, {"path": self._static}),

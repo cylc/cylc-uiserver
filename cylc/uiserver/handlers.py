@@ -71,39 +71,6 @@ class UserProfileHandler(HubOAuthenticated, APIHandler):
         self.write(json.dumps(self.get_current_user()))
 
 
-class CylcScanHandler(HubOAuthenticated, APIHandler):
-
-    def _parse_suite_line(self, suite_line: bytes) -> Union[dict, None]:
-        if suite_line:
-            parts = re.split(r"[ :@]", suite_line.decode())
-            if len(parts) == 4:
-                return {
-                    "name": parts[0],
-                    "user": parts[1],
-                    "host": parts[2],
-                    "port": int(parts[3])
-                }
-        return None
-
-    def _get_suites(self, suite_lines: List[bytes]) -> List[dict]:
-        suites = []
-        for suite_line in suite_lines:
-            suite = self._parse_suite_line(suite_line)
-            if suite:
-                suites.append(suite)
-        return suites
-
-    @web.authenticated
-    def get(self):
-        cylc_scan_proc = Popen(
-            "cylc scan --color=never", shell=True, stdout=PIPE)
-        cylc_scan_out = cylc_scan_proc.communicate()[0]
-
-        suite_lines = cylc_scan_out.splitlines()
-        suites = self._get_suites(suite_lines)
-        self.write(json.dumps(suites))
-
-
 # This is needed in order to pass the server context in addition to existing.
 # It's possible to just overwrite TornadoGraphQLHandler.context but we would
 # somehow need to pass the request info (headers, username ...etc) in also
@@ -148,6 +115,5 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
 __all__ = [
     "MainHandler",
     "UserProfileHandler",
-    "CylcScanHandler",
     "UIServerGraphQLHandler"
 ]
