@@ -26,6 +26,7 @@ Includes:
 import socket
 import asyncio
 import logging
+import zmq.asyncio
 
 from contextlib import suppress
 
@@ -42,22 +43,22 @@ CLIENT_TIMEOUT = 2.0
 
 
 async def workflow_request(client, command, args=None,
-                           timeout=None, context=None):
+                           timeout=None, req_context=None):
     """Workflow request command."""
-    if context is None:
-        context = command
+    if req_context is None:
+        req_context = command
     try:
         result = await client.async_request(command, args, timeout)
-        return (context, result)
+        return (req_context, result)
     except ClientTimeout as exc:
         logger.exception(exc)
-        return (context, MSG_TIMEOUT)
+        return (req_context, MSG_TIMEOUT)
     except ClientError as exc:
         logger.exception(exc)
-        return (context, None)
+        return (req_context, None)
 
 
-async def est_workflow(reg, host, port, timeout=None):
+async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
     """Establish communication with workflow, instantiating REQ client."""
     if is_remote_host(host):
         try:
@@ -66,20 +67,25 @@ async def est_workflow(reg, host, port, timeout=None):
             if flags.debug:
                 raise
             logger.error("ERROR: %s: %s\n" % (exc, host))
-            return (reg, host, port, None)
+            return (reg, host, port, pub_port, None)
 
     # NOTE: Connect to the suite by host:port. This way the
     #       SuiteRuntimeClient will not attempt to check the contact file
     #       which would be unnecessary as we have already done so.
     # NOTE: This part of the scan *is* IO blocking.
-    client = SuiteRuntimeClient(reg, host=host, port=port, timeout=timeout)
-    context, result = await workflow_request(client, 'identify')
-    return (reg, host, port, client, result)
+    client = SuiteRuntimeClient(reg, host=host, port=port,
+                                context=context, timeout=timeout)
+    req_context, result = await workflow_request(client, 'identify')
+    return (reg, host, port, pub_port, client, result)
 
 
-class WorkflowsManager(object):
+class WorkflowsManager:
 
-    def __init__(self):
+    def __init__(self, context=None):
+        if context is None:
+            self.context = zmq.asyncio.Context()
+        else:
+            self.context = context
         self.workflows = {}
 
     def spawn_workflow(self):
@@ -90,14 +96,14 @@ class WorkflowsManager(object):
         scanflows = {}
         cre_owner, cre_name = re_compile_filters(None, ['.*'])
         scan_args = (
-            (reg, host, port, CLIENT_TIMEOUT)
-            for reg, host, port in
+            (reg, host, port, pub_port, self.context, CLIENT_TIMEOUT)
+            for reg, host, port, pub_port in
             get_scan_items_from_fs(cre_owner, cre_name))
         gathers = ()
         for arg in scan_args:
             gathers += (est_workflow(*arg),)
         items = await asyncio.gather(*gathers)
-        for reg, host, port, client, info in items:
+        for reg, host, port, pub_port, client, info in items:
             if info is not None and info != MSG_TIMEOUT:
                 owner = info['owner']
                 scanflows[f"{owner}{ID_DELIM}{reg}"] = {
@@ -105,6 +111,7 @@ class WorkflowsManager(object):
                     'owner': owner,
                     'host': host,
                     'port': port,
+                    'pub_port': pub_port,
                     'version': info['version'],
                     'req_client': client,
                 }
@@ -145,7 +152,7 @@ class WorkflowsManager(object):
             )
         gathers = ()
         for info, request_args in req_args.items():
-            gathers += (workflow_request(context=info, *request_args),)
+            gathers += (workflow_request(req_context=info, *request_args),)
         results = await asyncio.gather(*gathers)
         res = []
         for key, val in results:

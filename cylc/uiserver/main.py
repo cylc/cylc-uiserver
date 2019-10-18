@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import signal
+from functools import partial
 
 from cylc.flow.network.schema import schema
 from logging.config import dictConfig
@@ -44,9 +45,12 @@ class MyApplication(web.Application):
         logger.info('exiting...')
         self.is_closing = True
 
-    def try_exit(self):
+    def try_exit(self, uis):
         if self.is_closing:
             # clean up here
+            for sub in uis.data_mgr.w_subs.values():
+                sub.stop()
+            uis.workflows_mgr.context.destroy()
             ioloop.IOLoop.instance().stop()
             logger.info('exit success')
 
@@ -61,11 +65,11 @@ class CylcUIServer(object):
             script_dir = os.path.dirname(__file__)
             self._static = os.path.abspath(os.path.join(script_dir, static))
         self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
-        self.ws_mgr = WorkflowsManager()
-        self.data_mgr = DataManager(self.ws_mgr)
+        self.workflows_mgr = WorkflowsManager()
+        self.data_mgr = DataManager(self.workflows_mgr)
         self.resolvers = Resolvers(
             self.data_mgr.data,
-            ws_mgr=self.ws_mgr)
+            workflows_mgr=self.workflows_mgr)
 
     def _make_app(self, debug: bool):
         """Crete a Tornado web application.
@@ -126,14 +130,17 @@ class CylcUIServer(object):
         app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)
-        ioloop.PeriodicCallback(app.try_exit, 100).start()
+        ioloop.PeriodicCallback(
+            partial(app.try_exit, uis=self), 100).start()
         # Discover workflows on initial start up.
-        ioloop.IOLoop.current().add_callback(self.ws_mgr.gather_workflows)
+        ioloop.IOLoop.current().add_callback(
+            self.workflows_mgr.gather_workflows)
+        # Start the workflow data-store sync
+        ioloop.IOLoop.current().add_callback(self.data_mgr.sync_workflows)
         # If the client is already established it's not overridden,
         # so the following callbacks can happen at the same time.
-        ioloop.PeriodicCallback(self.ws_mgr.gather_workflows, 10000).start()
         ioloop.PeriodicCallback(
-            self.data_mgr.entire_workflow_update, 5000).start()
+            self.workflows_mgr.gather_workflows, 10000).start()
         try:
             ioloop.IOLoop.current().start()
         except KeyboardInterrupt:

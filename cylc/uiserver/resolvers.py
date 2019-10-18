@@ -23,7 +23,7 @@ from cylc.flow.ws_data_mgr import WORKFLOW
 class Resolvers(BaseResolvers):
     """UI Server context GraphQL query and mutation resolvers."""
 
-    ws_mgr = None
+    workflows_mgr = None
 
     def __init__(self, data, **kwargs):
         super().__init__(data)
@@ -46,7 +46,7 @@ class Resolvers(BaseResolvers):
             'request_string': req_str,
             'variables': variables,
         }
-        return self.ws_mgr.multi_request('graphql', w_ids, graphql_args)
+        return self.workflows_mgr.multi_request('graphql', w_ids, graphql_args)
 
     async def nodes_mutator(self, info, *m_args):
         """Mutate node items of associated workflows."""
@@ -63,5 +63,5 @@ class Resolvers(BaseResolvers):
             'variables': variables,
         }
         multi_args = {w_id: graphql_args for w_id in w_ids}
-        return self.ws_mgr.multi_request(
+        return self.workflows_mgr.multi_request(
             'graphql', w_ids, multi_args=multi_args)

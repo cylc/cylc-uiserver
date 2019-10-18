@@ -19,39 +19,133 @@
 import asyncio
 import logging
 
-from cylc.flow.exceptions import ClientError, ClientTimeout
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+from time import sleep
+
 from cylc.flow.network.server import PB_METHOD_MAP
 from cylc.flow.network.scan import MSG_TIMEOUT
+from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
 from cylc.flow.ws_data_mgr import (
-    EDGES, FAMILIES, FAMILY_PROXIES, JOBS, TASKS, TASK_PROXIES, WORKFLOW
+    EDGES, FAMILIES, FAMILY_PROXIES, JOBS, TASKS, TASK_PROXIES, WORKFLOW,
+    DELTAS_MAP, apply_delta, generate_checksum
 )
+from .workflows_mgr import workflow_request
 
 logger = logging.getLogger(__name__)
-
-
-async def get_workflow_data(w_id, client, method):
-    """Call WS endpoint for entire workflow protobuf message."""
-    # Use already established client
-    try:
-        pb_msg = await client.async_request(method)
-    except ClientTimeout as exc:
-        logger.exception(exc)
-        return (w_id, MSG_TIMEOUT)
-    except ClientError as exc:
-        logger.exception(exc)
-        return (w_id, None)
-    else:
-        ws_data = PB_METHOD_MAP[method]()
-        ws_data.ParseFromString(pb_msg)
-    return (w_id, ws_data)
 
 
 class DataManager:
     """Manage the local data-store acquisition/updates from all workflows."""
 
-    def __init__(self, ws_mgr):
-        self.ws_mgr = ws_mgr
+    def __init__(self, workfloworkflows_mgr):
+        self.workflows_mgr = workfloworkflows_mgr
         self.data = {}
+        self.w_subs = {}
+        self.topics = {topic.encode('utf-8') for topic in DELTAS_MAP}
+        self.loop = None
+
+    async def sync_workflows(self):
+        """Run data store sync with workflow services.
+
+        Subscriptions and sync management is instantiated and run in
+        a separate thread for each workflow. This is to avoid the sync loop
+        blocking the main loop.
+        """
+        self.loop = asyncio.get_running_loop()
+        # Might be options other than threads to achieve
+        # non-blocking subscriptions, but this works.
+        with ThreadPoolExecutor() as pool:
+            while True:
+                for w_id, info in self.workflows_mgr.workflows.items():
+                    if w_id not in self.w_subs:
+                        pool.submit(
+                            partial(
+                                self._start_subscription,
+                                w_id,
+                                info['host'],
+                                info['pub_port']))
+                        await self.entire_workflow_update(ids=[w_id])
+                for w_id in list(self.w_subs):
+                    if w_id not in self.workflows_mgr.workflows:
+                        self.w_subs[w_id].stop()
+                        del self.w_subs[w_id]
+                        if w_id in self.data:
+                            del self.data[w_id]
+
+                await asyncio.sleep(1.0)
+
+    def _start_subscription(self, w_id, host, port):
+        """Instatiate and run subscriber and data-store management."""
+        self.w_subs[w_id] = WorkflowSubscriber(
+            host, port,
+            context=self.workflows_mgr.context, topics=self.topics)
+        self.w_subs[w_id].loop.run_until_complete(
+            self.w_subs[w_id].subscribe(
+                process_delta_msg,
+                func=self.update_workflow_data,
+                w_id=w_id))
+
+    def update_workflow_data(self, topic, delta, w_id):
+        """Manage and apply incomming data-store deltas."""
+        loop_cnt = 0
+        while loop_cnt < 5:
+            if w_id not in self.data:
+                sleep(0.5)
+                loop_cnt += 1
+                continue
+            break
+        if w_id not in self.data:
+            return
+        delta_time = getattr(
+                delta, 'time', getattr(delta, 'last_updated', 0.0))
+        # If the workflow has reloaded recreate the data
+        if delta.reloaded:
+            self.data[w_id][topic] = {ele.id: ele for ele in delta.deltas}
+            self.data[w_id]['delta_times'][topic] = delta_time
+        elif delta_time >= self.data[w_id]['delta_times'][topic]:
+            apply_delta(topic, delta, self.data[w_id])
+            self.data[w_id]['delta_times'][topic] = delta_time
+            self.reconcile_update(topic, delta, w_id)
+
+    def reconcile_update(self, topic, delta, w_id):
+        """Reconcile local with workflow data-store.
+
+        Verify data-store is in sync by topic/element-type
+        and on failure request entire set of respective data elements.
+
+        """
+        if topic == WORKFLOW:
+            return
+        if topic == EDGES:
+            s_att = 'id'
+        else:
+            s_att = 'stamp'
+        local_checksum = generate_checksum(
+            [getattr(e, s_att)
+             for e in self.data[w_id][topic].values()])
+        if local_checksum != delta.checksum:
+            future = asyncio.run_coroutine_threadsafe(
+                workflow_request(
+                    self.workflows_mgr.workflows[w_id]['req_client'],
+                    'pb_data_elements',
+                    args={'element_type': topic}
+                ),
+                self.loop
+            )
+            try:
+                _, new_delta_msg = future.result(5.0)
+            except asyncio.TimeoutError:
+                logger.info(f'The reconcile update coroutine {w_id} {topic}'
+                            f'took too long, cancelling the task...')
+                future.cancel()
+            except Exception as exc:
+                logger.exception(exc)
+            else:
+                new_delta = DELTAS_MAP[topic]()
+                new_delta.ParseFromString(new_delta_msg)
+                apply_delta(topic, new_delta, self.data[w_id])
+                self.data[w_id]['delta_times'][topic] = new_delta.time
 
     # Data syncing
     async def entire_workflow_update(self, ids=None):
@@ -61,33 +155,41 @@ class DataManager:
 
         # Prune old data
         for w_id in list(self.data):
-            if w_id not in self.ws_mgr.workflows:
+            if w_id not in self.workflows_mgr.workflows:
                 del self.data[w_id]
 
-        # Fetch new data
-        ws_args = (
-            (w_id, info['req_client'], 'pb_entire_workflow')
-            for w_id, info in self.ws_mgr.workflows.items())
+        # Request new data
+        req_method = 'pb_entire_workflow'
+        req_kwargs = (
+            {'client': info['req_client'],
+             'command': req_method,
+             'req_context': w_id}
+            for w_id, info in self.workflows_mgr.workflows.items())
         gathers = ()
-        for args in ws_args:
-            if not ids or args[0] in ids:
-                gathers += (get_workflow_data(*args),)
+        for kwargs in req_kwargs:
+            if not ids or kwargs['req_context'] in ids:
+                gathers += (workflow_request(**kwargs),)
         items = await asyncio.gather(*gathers)
         new_data = {}
         for w_id, result in items:
             if result is not None and result != MSG_TIMEOUT:
+                pb_data = PB_METHOD_MAP[req_method]()
+                pb_data.ParseFromString(result)
                 new_data[w_id] = {
-                    EDGES: {e.id: e for e in getattr(result, EDGES)},
-                    FAMILIES: {f.id: f for f in getattr(result, FAMILIES)},
+                    EDGES: {e.id: e for e in getattr(pb_data, EDGES)},
+                    FAMILIES: {f.id: f for f in getattr(pb_data, FAMILIES)},
                     FAMILY_PROXIES: {
                         n.id: n
-                        for n in getattr(result, FAMILY_PROXIES)},
-                    JOBS: {j.id: j for j in getattr(result, JOBS)},
-                    TASKS: {t.id: t for t in getattr(result, TASKS)},
+                        for n in getattr(pb_data, FAMILY_PROXIES)},
+                    JOBS: {j.id: j for j in getattr(pb_data, JOBS)},
+                    TASKS: {t.id: t for t in getattr(pb_data, TASKS)},
                     TASK_PROXIES: {
                         n.id: n
-                        for n in getattr(result, TASK_PROXIES)},
-                    WORKFLOW: getattr(result, WORKFLOW),
+                        for n in getattr(pb_data, TASK_PROXIES)},
+                    WORKFLOW: getattr(pb_data, WORKFLOW),
+                    'delta_times': {
+                        topic: getattr(pb_data, WORKFLOW).last_updated
+                        for topic in DELTAS_MAP.keys()}
                 }
 
         self.data.update(new_data)
