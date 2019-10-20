@@ -63,7 +63,14 @@ def render_graphiql(base_url: str) -> str:
     }
     var fetcher;
     if (true) {
-      var subscriptionsClient = new window.SubscriptionsTransportWs.SubscriptionClient('${subscriptionsEndpoint}', {
+      var port = "80";
+      if (Object.hasOwnProperty.call(window.location, 'port') && window.location.port !== '') {
+        port = window.location.port;
+      } else if (window.location.protocol.search('https')) {
+        port = "443";
+      }
+      var wsUrl = 'ws://' + window.location.hostname + ':' + port + '${subscriptionsEndpoint}';
+      var subscriptionsClient = new window.SubscriptionsTransportWs.SubscriptionClient(wsUrl, {
         reconnect: true
       });
       fetcher = window.GraphiQLSubscriptionsFetcher.graphQLFetcher(subscriptionsClient, graphQLFetcher);
@@ -124,7 +131,7 @@ def render_graphiql(base_url: str) -> str:
 </html>''').substitute(
         GRAPHIQL_VERSION='0.10.2',
         SUBSCRIPTIONS_TRANSPORT_VERSION='0.7.0',
-        subscriptionsEndpoint=f'ws://localhost:8000/{base_url}subscriptions',
-        # subscriptionsEndpoint='ws://localhost:8000/',
+        # subscriptionsEndpoint is appended to a URL in the format ws://127.0.0.1:8080
+        subscriptionsEndpoint=f'/{base_url}subscriptions',
         endpointURL=f'/{base_url}graphql',
     )
