@@ -17,16 +17,15 @@
 import inspect
 
 import pytest
+import zmq
 
-from cylc.flow.network.client import ZMQClient
+from cylc.flow.network import ZMQSocketBase
 
 
-class AsyncClientFixture(ZMQClient):
+class AsyncClientFixture(ZMQSocketBase):
+    pattern = zmq.REQ
     host = ''
     port = 0
-    encode_method = None
-    decode_method = None
-    secret_method = None
 
     def __init__(self):
         self.returns = None

@@ -46,10 +46,12 @@ class MyApplication(web.Application):
         self.is_closing = True
 
     def try_exit(self, uis):
+        # clean up and stop in here
         if self.is_closing:
-            # clean up here
+            # stop the subscribers running in the thread pool executor
             for sub in uis.data_mgr.w_subs.values():
                 sub.stop()
+            # Destroy ZeroMQ context of all sockets
             uis.workflows_mgr.context.destroy()
             ioloop.IOLoop.instance().stop()
             logger.info('exit success')
@@ -130,6 +132,7 @@ class CylcUIServer(object):
         app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)
+        # pass in server object for clean exit
         ioloop.PeriodicCallback(
             partial(app.try_exit, uis=self), 100).start()
         # Discover workflows on initial start up.

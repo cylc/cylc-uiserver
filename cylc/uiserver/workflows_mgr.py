@@ -123,12 +123,12 @@ class WorkflowsManager:
                         info['port'] == scanflows[w_id]['port']):
                     client = scanflows[w_id]['req_client']
                     with suppress(IOError):
-                        client.socket.close()
+                        client.stop(stop_loop=False)
                     scanflows.pop(w_id)
                 continue
             client = self.workflows[w_id]['req_client']
             with suppress(IOError):
-                client.socket.close()
+                client.stop(stop_loop=False)
             self.workflows.pop(w_id)
 
         # update with new

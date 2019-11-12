@@ -13,8 +13,24 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""Manage a local data-store replica of all workflow service data-stores.
 
-"""Create and update the data structure for all workflow services."""
+A local data-store is created and synced for all workflows established by
+the workflow service manager.
+
+The workflows publish the updated fields of the updated data elements (deltas),
+and these elements are grouped by type/topic. Once subscribed to, the publisher
+queues these messages until the are received, if the delta creation time is
+newer than that of the last update then it is applied (updates merged, pruned
+deleted) then a checksum is generated from the time stamped IDs and compared to
+the published one.
+
+Reconciliation on failed verification is done by requesting all elements of a
+topic, and replacing the respective data-store elements with this.
+
+Subscriptions are currently run in a different thread (via ThreadPoolExecutor).
+
+"""
 
 import asyncio
 import logging
@@ -36,10 +52,10 @@ logger = logging.getLogger(__name__)
 
 
 class DataManager:
-    """Manage the local data-store acquisition/updates from all workflows."""
+    """Manage the local data-store acquisition/updates for all workflows."""
 
-    def __init__(self, workfloworkflows_mgr):
-        self.workflows_mgr = workfloworkflows_mgr
+    def __init__(self, workflows_mgr):
+        self.workflows_mgr = workflows_mgr
         self.data = {}
         self.w_subs = {}
         self.topics = {topic.encode('utf-8') for topic in DELTAS_MAP}
@@ -76,7 +92,14 @@ class DataManager:
                 await asyncio.sleep(1.0)
 
     def _start_subscription(self, w_id, host, port):
-        """Instatiate and run subscriber and data-store management."""
+        """Instatiate and run subscriber and data-store management.
+
+        Args:
+            w_id (str): Workflow external ID.
+            host (str): Hostname of target workflow.
+            port (int): Port of target workflow.
+
+        """
         self.w_subs[w_id] = WorkflowSubscriber(
             host, port,
             context=self.workflows_mgr.context, topics=self.topics)
@@ -87,7 +110,15 @@ class DataManager:
                 w_id=w_id))
 
     def update_workflow_data(self, topic, delta, w_id):
-        """Manage and apply incomming data-store deltas."""
+        """Manage and apply incomming data-store deltas.
+
+        Args:
+            topic (str): topic of published data.
+            delta (object): Published protobuf message data container.
+            w_id (str): Workflow external ID.
+
+        """
+        # wait until data-store is populated for this workflow
         loop_cnt = 0
         while loop_cnt < 5:
             if w_id not in self.data:
@@ -100,6 +131,7 @@ class DataManager:
         delta_time = getattr(
                 delta, 'time', getattr(delta, 'last_updated', 0.0))
         # If the workflow has reloaded recreate the data
+        # otherwise apply the delta if it's newer than the previously applied.
         if delta.reloaded:
             self.data[w_id][topic] = {ele.id: ele for ele in delta.deltas}
             self.data[w_id]['delta_times'][topic] = delta_time
@@ -114,6 +146,11 @@ class DataManager:
         Verify data-store is in sync by topic/element-type
         and on failure request entire set of respective data elements.
 
+        Args:
+            topic (str): topic of published data.
+            delta (object): Published protobuf message data container.
+            w_id (str): Workflow external ID.
+
         """
         if topic == WORKFLOW:
             return
@@ -125,6 +162,7 @@ class DataManager:
             [getattr(e, s_att)
              for e in self.data[w_id][topic].values()])
         if local_checksum != delta.checksum:
+            # use threadsafe as client socket is in main loop thread.
             future = asyncio.run_coroutine_threadsafe(
                 workflow_request(
                     self.workflows_mgr.workflows[w_id]['req_client'],
@@ -147,9 +185,14 @@ class DataManager:
                 apply_delta(topic, new_delta, self.data[w_id])
                 self.data[w_id]['delta_times'][topic] = new_delta.time
 
-    # Data syncing
     async def entire_workflow_update(self, ids=None):
-        """Update all data of workflow(s) from associated WS."""
+        """Update entire local data-store of workflow(s).
+
+        Args:
+            ids (list): List of workflow external IDs.
+
+
+        """
         if ids is None:
             ids = []
 
