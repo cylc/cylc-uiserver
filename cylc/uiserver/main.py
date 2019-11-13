@@ -19,13 +19,13 @@
 import argparse
 import json
 import logging
+from logging.config import dictConfig
 import os
+from os.path import join, abspath, dirname
 import signal
 from functools import partial
 
 from cylc.flow.network.schema import schema
-from logging.config import dictConfig
-from os.path import join, abspath, dirname
 from tornado import web, ioloop
 
 from jupyterhub.services.auth import HubOAuthCallbackHandler
@@ -51,6 +51,8 @@ class MyApplication(web.Application):
             # stop the subscribers running in the thread pool executor
             for sub in uis.data_mgr.w_subs.values():
                 sub.stop()
+            # Shutdown the thread pool executor
+            uis.data_mgr.executor.shutdown(wait=False)
             # Destroy ZeroMQ context of all sockets
             uis.workflows_mgr.context.destroy()
             ioloop.IOLoop.instance().stop()
@@ -67,7 +69,7 @@ class CylcUIServer(object):
             script_dir = os.path.dirname(__file__)
             self._static = os.path.abspath(os.path.join(script_dir, static))
         self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
-        self.workflows_mgr = WorkflowsManager()
+        self.workflows_mgr = WorkflowsManager(self)
         self.data_mgr = DataManager(self.workflows_mgr)
         self.resolvers = Resolvers(
             self.data_mgr.data,
@@ -138,12 +140,10 @@ class CylcUIServer(object):
         # Discover workflows on initial start up.
         ioloop.IOLoop.current().add_callback(
             self.workflows_mgr.gather_workflows)
-        # Start the workflow data-store sync
-        ioloop.IOLoop.current().add_callback(self.data_mgr.sync_workflows)
         # If the client is already established it's not overridden,
         # so the following callbacks can happen at the same time.
         ioloop.PeriodicCallback(
-            self.workflows_mgr.gather_workflows, 10000).start()
+            self.workflows_mgr.gather_workflows, 7000).start()
         try:
             ioloop.IOLoop.current().start()
         except KeyboardInterrupt:

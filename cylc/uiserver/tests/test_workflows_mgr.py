@@ -140,12 +140,12 @@ async def test_est_workflow(
 
 
 def test_workflows_manager_constructor():
-    mgr = WorkflowsManager()
+    mgr = WorkflowsManager(None)
     assert not mgr.workflows
 
 
 def test_workflows_manager_spawn_workflow():
-    mgr = WorkflowsManager()
+    mgr = WorkflowsManager(None)
     mgr.spawn_workflow()
     assert not mgr.workflows
 

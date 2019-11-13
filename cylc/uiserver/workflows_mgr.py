@@ -23,12 +23,12 @@ Includes:
     - ?
 
 """
-import socket
 import asyncio
-import logging
-import zmq.asyncio
-
 from contextlib import suppress
+import logging
+import socket
+
+import zmq.asyncio
 
 from cylc.flow import flags
 from cylc.flow.exceptions import ClientError, ClientTimeout
@@ -66,7 +66,7 @@ async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
         except socket.error as exc:
             if flags.debug:
                 raise
-            logger.error("ERROR: %s: %s\n" % (exc, host))
+            logger.error("ERROR: %s: %s\n", exc, host)
             return (reg, host, port, pub_port, None)
 
     # NOTE: Connect to the suite by host:port. This way the
@@ -75,30 +75,39 @@ async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
     # NOTE: This part of the scan *is* IO blocking.
     client = SuiteRuntimeClient(reg, host=host, port=port,
                                 context=context, timeout=timeout)
-    req_context, result = await workflow_request(client, 'identify')
+    _, result = await workflow_request(client, 'identify')
     return (reg, host, port, pub_port, client, result)
 
 
 class WorkflowsManager:
+    """Discover and Manage workflows."""
 
-    def __init__(self, context=None):
+    def __init__(self, uiserver, context=None):
+        self.uiserver = uiserver
         if context is None:
             self.context = zmq.asyncio.Context()
         else:
             self.context = context
         self.workflows = {}
+        self.stopping = set()
 
     def spawn_workflow(self):
+        """Start/spawn a workflow."""
         # TODO - Spawn workflows
         pass
 
     async def gather_workflows(self):
+        """Scan, establish, and discard workflows."""
         scanflows = {}
         cre_owner, cre_name = re_compile_filters(None, ['.*'])
         scan_args = (
             (reg, host, port, pub_port, self.context, CLIENT_TIMEOUT)
             for reg, host, port, pub_port in
-            get_scan_items_from_fs(cre_owner, cre_name))
+            get_scan_items_from_fs(cre_owner, cre_name)
+            if reg not in self.stopping)
+        # clear stopping set
+        self.stopping.clear()
+
         gathers = ()
         for arg in scan_args:
             gathers += (est_workflow(*arg),)
@@ -130,9 +139,18 @@ class WorkflowsManager:
             with suppress(IOError):
                 client.stop(stop_loop=False)
             self.workflows.pop(w_id)
+            self.uiserver.data_mgr.purge_workflow(w_id)
 
-        # update with new
-        self.workflows.update(scanflows)
+        # update with new, and start data sync
+        gathers = ()
+        for w_id, w_info in scanflows.items():
+            self.workflows[w_id] = w_info
+            gathers += (
+                self.uiserver.data_mgr.sync_workflow(
+                    w_id, w_info['name'], w_info['host'], w_info['pub_port']
+                ),
+            )
+        await asyncio.gather(*gathers)
 
     async def multi_request(self, command, workflows, args=None,
                             multi_args=None, timeout=None):
@@ -155,7 +173,7 @@ class WorkflowsManager:
             gathers += (workflow_request(req_context=info, *request_args),)
         results = await asyncio.gather(*gathers)
         res = []
-        for key, val in results:
+        for _, val in results:
             res.extend([
                 msg_core
                 for msg_core in list(val.values())[0].get('result')

@@ -54,55 +54,63 @@ logger = logging.getLogger(__name__)
 class DataManager:
     """Manage the local data-store acquisition/updates for all workflows."""
 
+    INIT_DATA_WAIT_TIME = 5.  # seconds
+    INIT_DATA_RETRY_DELAY = 0.5  # seconds
+    RECONCILE_TIMEOUT = 5.  # seconds
+
     def __init__(self, workflows_mgr):
         self.workflows_mgr = workflows_mgr
         self.data = {}
         self.w_subs = {}
         self.topics = {topic.encode('utf-8') for topic in DELTAS_MAP}
+        self.topics.add(b'shutdown')
         self.loop = None
+        # Might be options other than threads to achieve
+        # non-blocking subscriptions, but this works.
+        self.executor = ThreadPoolExecutor()
 
-    async def sync_workflows(self):
+    async def sync_workflow(self, w_id, *args, **kwargs):
         """Run data store sync with workflow services.
 
         Subscriptions and sync management is instantiated and run in
         a separate thread for each workflow. This is to avoid the sync loop
         blocking the main loop.
+
         """
-        self.loop = asyncio.get_running_loop()
-        # Might be options other than threads to achieve
-        # non-blocking subscriptions, but this works.
-        with ThreadPoolExecutor() as pool:
-            while True:
-                for w_id, info in self.workflows_mgr.workflows.items():
-                    if w_id not in self.w_subs:
-                        pool.submit(
-                            partial(
-                                self._start_subscription,
-                                w_id,
-                                info['host'],
-                                info['pub_port']))
-                        await self.entire_workflow_update(ids=[w_id])
-                for w_id in list(self.w_subs):
-                    if w_id not in self.workflows_mgr.workflows:
-                        self.w_subs[w_id].stop()
-                        del self.w_subs[w_id]
-                        if w_id in self.data:
-                            del self.data[w_id]
+        if self.loop is None:
+            self.loop = asyncio.get_running_loop()
+        if w_id in self.w_subs:
+            return
+        self.executor.submit(
+            partial(self.start_subscription, w_id, *args, **kwargs)
+        )
+        await self.entire_workflow_update(ids=[w_id])
 
-                await asyncio.sleep(1.0)
+    def purge_workflow(self, w_id):
+        """Purge the manager of a workflow's subscription and data."""
+        if w_id in self.w_subs:
+            self.w_subs[w_id].stop()
+            del self.w_subs[w_id]
+        if w_id in self.data:
+            del self.data[w_id]
 
-    def _start_subscription(self, w_id, host, port):
-        """Instatiate and run subscriber and data-store management.
+    def start_subscription(self, w_id, reg, host, port):
+        """Instatiate and run subscriber data-store sync.
 
         Args:
             w_id (str): Workflow external ID.
+            reg (str): Registered workflow name.
             host (str): Hostname of target workflow.
             port (int): Port of target workflow.
 
         """
         self.w_subs[w_id] = WorkflowSubscriber(
-            host, port,
-            context=self.workflows_mgr.context, topics=self.topics)
+            reg,
+            host=host,
+            port=port,
+            context=self.workflows_mgr.context,
+            topics=self.topics
+        )
         self.w_subs[w_id].loop.run_until_complete(
             self.w_subs[w_id].subscribe(
                 process_delta_msg,
@@ -120,16 +128,20 @@ class DataManager:
         """
         # wait until data-store is populated for this workflow
         loop_cnt = 0
-        while loop_cnt < 5:
+        while loop_cnt < self.INIT_DATA_WAIT_TIME:
             if w_id not in self.data:
-                sleep(0.5)
+                sleep(self.INIT_DATA_RETRY_DELAY)
                 loop_cnt += 1
                 continue
             break
         if w_id not in self.data:
             return
+        if topic == 'shutdown':
+            self.workflows_mgr.stopping.add(w_id)
+            self.w_subs[w_id].stop()
+            return
         delta_time = getattr(
-                delta, 'time', getattr(delta, 'last_updated', 0.0))
+            delta, 'time', getattr(delta, 'last_updated', 0.0))
         # If the workflow has reloaded recreate the data
         # otherwise apply the delta if it's newer than the previously applied.
         if delta.reloaded:
@@ -174,9 +186,13 @@ class DataManager:
             try:
                 _, new_delta_msg = future.result(5.0)
             except asyncio.TimeoutError:
-                logger.info(f'The reconcile update coroutine {w_id} {topic}'
-                            f'took too long, cancelling the task...')
+                logger.info(
+                    f'The reconcile update coroutine {w_id} {topic}'
+                    f'took too long, cancelling the subscription/sync.'
+                )
                 future.cancel()
+                self.workflows_mgr.stopping.add(w_id)
+                self.w_subs[w_id].stop()
             except Exception as exc:
                 logger.exception(exc)
             else:
