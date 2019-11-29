@@ -17,7 +17,7 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 from cylc.flow.network.resolvers import BaseResolvers
-from cylc.flow.ws_data_mgr import WORKFLOW
+from cylc.flow.data_store_mgr import WORKFLOW
 
 
 class Resolvers(BaseResolvers):

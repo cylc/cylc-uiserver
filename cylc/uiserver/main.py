@@ -17,20 +17,20 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
+from functools import partial
 import json
 import logging
 from logging.config import dictConfig
 import os
 from os.path import join, abspath, dirname
 import signal
-from functools import partial
 
 from cylc.flow.network.schema import schema
 from tornado import web, ioloop
 
 from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
-from .data_mgr import DataManager
+from .data_store_mgr import DataStoreMgr
 from .handlers import *
 from .resolvers import Resolvers
 from .workflows_mgr import WorkflowsManager
@@ -49,10 +49,10 @@ class MyApplication(web.Application):
         # clean up and stop in here
         if self.is_closing:
             # stop the subscribers running in the thread pool executor
-            for sub in uis.data_mgr.w_subs.values():
+            for sub in uis.data_store_mgr.w_subs.values():
                 sub.stop()
             # Shutdown the thread pool executor
-            uis.data_mgr.executor.shutdown(wait=False)
+            uis.data_store_mgr.executor.shutdown(wait=False)
             # Destroy ZeroMQ context of all sockets
             uis.workflows_mgr.context.destroy()
             ioloop.IOLoop.instance().stop()
@@ -70,9 +70,9 @@ class CylcUIServer(object):
             self._static = os.path.abspath(os.path.join(script_dir, static))
         self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
         self.workflows_mgr = WorkflowsManager(self)
-        self.data_mgr = DataManager(self.workflows_mgr)
+        self.data_store_mgr = DataStoreMgr(self.workflows_mgr)
         self.resolvers = Resolvers(
-            self.data_mgr.data,
+            self.data_store_mgr.data,
             workflows_mgr=self.workflows_mgr)
 
     def _make_app(self, debug: bool):

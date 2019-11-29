@@ -42,7 +42,7 @@ from time import sleep
 from cylc.flow.network.server import PB_METHOD_MAP
 from cylc.flow.network.scan import MSG_TIMEOUT
 from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
-from cylc.flow.ws_data_mgr import (
+from cylc.flow.data_store_mgr import (
     EDGES, FAMILIES, FAMILY_PROXIES, JOBS, TASKS, TASK_PROXIES, WORKFLOW,
     DELTAS_MAP, apply_delta, generate_checksum
 )
@@ -51,7 +51,7 @@ from .workflows_mgr import workflow_request
 logger = logging.getLogger(__name__)
 
 
-class DataManager:
+class DataStoreMgr:
     """Manage the local data-store acquisition/updates for all workflows."""
 
     INIT_DATA_WAIT_TIME = 5.  # seconds
@@ -184,7 +184,7 @@ class DataManager:
                 self.loop
             )
             try:
-                _, new_delta_msg = future.result(5.0)
+                _, new_delta_msg = future.result(self.RECONCILE_TIMEOUT)
             except asyncio.TimeoutError:
                 logger.info(
                     f'The reconcile update coroutine {w_id} {topic}'

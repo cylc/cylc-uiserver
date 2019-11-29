@@ -33,10 +33,11 @@ import zmq.asyncio
 from cylc.flow import flags
 from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.hostuserutil import is_remote_host, get_host_ip_by_name
+from cylc.flow.network import API
 from cylc.flow.network.client import SuiteRuntimeClient
 from cylc.flow.network.scan import (
     get_scan_items_from_fs, re_compile_filters, MSG_TIMEOUT)
-from cylc.flow.ws_data_mgr import ID_DELIM
+from cylc.flow.data_store_mgr import ID_DELIM
 
 logger = logging.getLogger(__name__)
 CLIENT_TIMEOUT = 2.0
@@ -44,7 +45,19 @@ CLIENT_TIMEOUT = 2.0
 
 async def workflow_request(client, command, args=None,
                            timeout=None, req_context=None):
-    """Workflow request command."""
+    """Workflow request command.
+
+    Args:
+        client (object): Instantiated workflow client.
+        command (str): Command/Endpoint name.
+        args (dict): Endpoint arguments.
+        timeout (float): Client request timeout (secs).
+        req_context (str): A string to identifier.
+
+    Returns:
+        tuple: (req_context, result)
+
+    """
     if req_context is None:
         req_context = command
     try:
@@ -102,9 +115,9 @@ class WorkflowsManager:
         cre_owner, cre_name = re_compile_filters(None, ['.*'])
         scan_args = (
             (reg, host, port, pub_port, self.context, CLIENT_TIMEOUT)
-            for reg, host, port, pub_port in
+            for reg, host, port, pub_port, api in
             get_scan_items_from_fs(cre_owner, cre_name)
-            if reg not in self.stopping)
+            if reg not in self.stopping and api == str(API))
         # clear stopping set
         self.stopping.clear()
 
@@ -139,14 +152,14 @@ class WorkflowsManager:
             with suppress(IOError):
                 client.stop(stop_loop=False)
             self.workflows.pop(w_id)
-            self.uiserver.data_mgr.purge_workflow(w_id)
+            self.uiserver.data_store_mgr.purge_workflow(w_id)
 
         # update with new, and start data sync
         gathers = ()
         for w_id, w_info in scanflows.items():
             self.workflows[w_id] = w_info
             gathers += (
-                self.uiserver.data_mgr.sync_workflow(
+                self.uiserver.data_store_mgr.sync_workflow(
                     w_id, w_info['name'], w_info['host'], w_info['pub_port']
                 ),
             )
