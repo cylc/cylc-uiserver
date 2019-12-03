@@ -17,19 +17,20 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
+from functools import partial
 import json
 import logging
+from logging.config import dictConfig
 import os
+from os.path import join, abspath, dirname
 import signal
 
 from cylc.flow.network.schema import schema
-from logging.config import dictConfig
-from os.path import join, abspath, dirname
 from tornado import web, ioloop
 
 from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
-from .data_mgr import DataManager
+from .data_store_mgr import DataStoreMgr
 from .handlers import *
 from .resolvers import Resolvers
 from .workflows_mgr import WorkflowsManager
@@ -44,9 +45,16 @@ class MyApplication(web.Application):
         logger.info('exiting...')
         self.is_closing = True
 
-    def try_exit(self):
+    def try_exit(self, uis):
+        # clean up and stop in here
         if self.is_closing:
-            # clean up here
+            # stop the subscribers running in the thread pool executor
+            for sub in uis.data_store_mgr.w_subs.values():
+                sub.stop()
+            # Shutdown the thread pool executor
+            uis.data_store_mgr.executor.shutdown(wait=False)
+            # Destroy ZeroMQ context of all sockets
+            uis.workflows_mgr.context.destroy()
             ioloop.IOLoop.instance().stop()
             logger.info('exit success')
 
@@ -61,11 +69,11 @@ class CylcUIServer(object):
             script_dir = os.path.dirname(__file__)
             self._static = os.path.abspath(os.path.join(script_dir, static))
         self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
-        self.ws_mgr = WorkflowsManager()
-        self.data_mgr = DataManager(self.ws_mgr)
+        self.workflows_mgr = WorkflowsManager(self)
+        self.data_store_mgr = DataStoreMgr(self.workflows_mgr)
         self.resolvers = Resolvers(
-            self.data_mgr.data,
-            ws_mgr=self.ws_mgr)
+            self.data_store_mgr.data,
+            workflows_mgr=self.workflows_mgr)
 
     def _make_app(self, debug: bool):
         """Crete a Tornado web application.
@@ -126,14 +134,16 @@ class CylcUIServer(object):
         app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)
-        ioloop.PeriodicCallback(app.try_exit, 100).start()
+        # pass in server object for clean exit
+        ioloop.PeriodicCallback(
+            partial(app.try_exit, uis=self), 100).start()
         # Discover workflows on initial start up.
-        ioloop.IOLoop.current().add_callback(self.ws_mgr.gather_workflows)
+        ioloop.IOLoop.current().add_callback(
+            self.workflows_mgr.gather_workflows)
         # If the client is already established it's not overridden,
         # so the following callbacks can happen at the same time.
-        ioloop.PeriodicCallback(self.ws_mgr.gather_workflows, 10000).start()
         ioloop.PeriodicCallback(
-            self.data_mgr.entire_workflow_update, 5000).start()
+            self.workflows_mgr.gather_workflows, 7000).start()
         try:
             ioloop.IOLoop.current().start()
         except KeyboardInterrupt:
