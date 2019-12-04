@@ -16,7 +16,8 @@ None or N/A.
 
 ### Enhancements
 
-None.
+[#82](https://github.com/cylc/cylc-uiserver/pull/82) - Add subscriptions
+support to GraphQL.
 
 ### Fixes
 

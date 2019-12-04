@@ -17,14 +17,19 @@
 import json
 import os
 import re
+from asyncio import Queue
 from subprocess import Popen, PIPE
 from typing import List, Union
 
-from jupyterhub import __version__ as jupyterhub_version
-from jupyterhub.services.auth import HubOAuthenticated
-from tornado import web
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
+from graphql_ws.constants import GRAPHQL_WS
+from jupyterhub import __version__ as jupyterhub_version
+from jupyterhub.services.auth import HubOAuthenticated
+from tornado import web, websocket
+from tornado.ioloop import IOLoop
+
+from .websockets.template import render_graphiql
 
 
 class BaseHandler(web.RequestHandler):
@@ -112,8 +117,57 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
         super().prepare()
 
 
+class SubscriptionHandler(websocket.WebSocketHandler):
+    subscription_server = None
+    resolvers = None
+    queue = Queue(100)
+
+    def initialize(self, sub_server, resolvers):
+        self.subscription_server = sub_server
+        self.resolvers = resolvers
+
+    def select_subprotocol(self, subprotocols):
+        return GRAPHQL_WS
+
+    def open(self, *args, **kwargs):
+        IOLoop.current().spawn_callback(self.subscription_server.handle, self,
+                                        self.context)
+
+    async def on_message(self, message):
+        await self.queue.put(message)
+
+    async def recv(self):
+        return await self.queue.get()
+
+    def check_origin(self, origin: str) -> bool:
+        return True
+
+    @property
+    def context(self):
+        wider_context = {
+            'request': self.request,
+            'resolvers': self.resolvers,
+        }
+        return wider_context
+
+
+class GraphiQLHandler(UIServerGraphQLHandler):
+    """A tornado handler for the GraphiQL websockets calls.
+
+    Uses a different function to render the GraphiQL template, which uses
+    a React app to subscribe to the query and display the result dynamically.
+    """
+
+    def get(self):
+        self.finish(
+            render_graphiql(
+                f'user/{self.hub_auth.get_user(self)["name"]}/'))
+
+
 __all__ = [
     "MainHandler",
     "UserProfileHandler",
-    "UIServerGraphQLHandler"
+    "UIServerGraphQLHandler",
+    "SubscriptionHandler",
+    "GraphiQLHandler"
 ]

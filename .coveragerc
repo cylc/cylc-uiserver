@@ -28,6 +28,7 @@ disable_warnings=
 omit =
     venv/*
     cylc/uiserver/tests/*
+    cylc/uiserver/websockets/*
     setup.py
     jupyterhub_config.py
 parallel = True
@@ -50,7 +51,8 @@ fail_under=0
 ignore_errors = False
 omit =
     venv/*
-    tests.py
+    cylc/uiserver/tests/*
+    cylc/uiserver/websockets/*
     setup.py
     jupyterhub_config.py
 precision=2

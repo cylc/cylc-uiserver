@@ -12,24 +12,5 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
----
-cache: pip
-dist: xenial
-addons:
-  apt:
-    update: true  # instruct travis-ci to always run apt-get before each build
 
-language: python
-python: 3.7
-
-before_install:
-  - pip install pycodestyle
-  - pycodestyle --exclude=".git,.tox,__pycache,venv,.eggs,build,jupyterhub_config.py,cylc/uiserver/websockets/"
-install:
-  - pip install .[all]
-script:
-  - python setup.py test
-after_success:
-  # Report metrics, such as coverage
-  - coverage xml --ignore-errors
-  - bash <(curl -s https://codecov.io/bash)
+"""Websockets and subscriptions related code."""
