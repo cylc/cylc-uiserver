@@ -44,6 +44,7 @@ install_requires = [
     'graphene-tornado==2.1.*',
     ('cylc-flow @ https://github.com/cylc/cylc-flow'
      '/tarball/master#egg=cylc-8.0a2.dev'),
+    'graphql-core<3,>=2.1',  # TODO: graphql-python/graphql-ws#39
     'graphql-ws==0.3.*'
 ]
 
