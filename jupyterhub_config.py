@@ -17,7 +17,7 @@
 # Configuration file for jupyterhub.
 
 from pathlib import Path
-
+import pkg_resources
 
 HERE = Path(__file__).resolve().parent
 DIST = HERE.joinpath(Path('../cylc-ui/dist'))
@@ -35,11 +35,24 @@ c.Spawner.args = ['-s', str(DIST)]
 #  documentation for your spawner to verify!
 c.Spawner.cmd = ['cylc-uiserver']
 
-# --- Specify path to a logo image to override the Jupyter logo in the banner.
-
-c.JupyterHub.logo_file = str(DIST.joinpath(Path('img/logo.png')))
 
 # --- The class to use for spawning single-user servers.
 
 #  Should be a subclass of Spawner.
 c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
+
+
+# --- Cylc-ise Jupyterhub
+
+# TODO: move logo to a shared location
+# https://github.com/cylc/cylc-admin/issues/69
+c.JupyterHub.logo_file = str(DIST.joinpath(Path('img/logo.svg')))
+# use ISO8601 (expanded) date format for logging
+c.JupyterHub.log_datefmt = '%Y-%m-%dT%H:%M:%S'
+# specifiy custom HTML templates
+c.JupyterHub.template_paths = [
+    pkg_resources.resource_filename(
+        'cylc.uiserver',
+        'templates'
+    )
+]
