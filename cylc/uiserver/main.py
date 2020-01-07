@@ -21,9 +21,11 @@ import json
 import logging
 import os
 import signal
+import ssl
 from functools import partial
 from logging.config import dictConfig
 from os.path import join, abspath, dirname
+from typing import Union
 
 from tornado import web, ioloop
 
@@ -59,6 +61,15 @@ class MyApplication(web.Application):
             ioloop.IOLoop.instance().stop()
             logger.info('exit success')
 
+    def listen(
+            self, port: int, address: str = "",
+            ssl_options: Union[ssl.SSLContext, None] = None
+    ) -> web.HTTPServer:
+        server = web.HTTPServer(self)
+        server.ssl_options = ssl_options
+        server.listen(port, address)
+        return server
+
 
 class CylcUIServer(object):
 
@@ -75,6 +86,20 @@ class CylcUIServer(object):
         self.resolvers = Resolvers(
             self.data_store_mgr.data,
             workflows_mgr=self.workflows_mgr)
+
+    @staticmethod
+    def _get_ssl_options(keyfile: str,
+                         certfile: str) -> Union[dict, None]:
+        logger.info(os.environ.items())
+        if not certfile:
+            logger.info("No SSL context created: missing certificate")
+            return None
+        logger.info(f"Creating SSL context with certificate file [{certfile}]"
+                    f" and keyfile [{keyfile}]")
+        return {
+            "certfile": certfile,
+            "keyfile": keyfile
+        }
 
     def _make_app(self, debug: bool):
         """Crete a Tornado web application.
@@ -136,10 +161,11 @@ class CylcUIServer(object):
             cookie_secret="cylc-secret-cookie"
         )
 
-    def start(self, debug: bool):
+    def start(self, debug: bool, keyfile: str, certfile: str):
         app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
-        app.listen(self._port)
+        ssl_options = CylcUIServer._get_ssl_options(keyfile, certfile)
+        app.listen(self._port, ssl_options=ssl_options)
         # pass in server object for clean exit
         ioloop.PeriodicCallback(
             partial(app.try_exit, uis=self), 100).start()
@@ -171,6 +197,14 @@ def main():
                         help='path to logging configuration file',
                         action="store", dest="logging_config",
                         default=join(here, 'logging_config.json'))
+    parser.add_argument(
+        '--keyfile', action="store_true", dest="keyfile",
+        help="path to certificate key file",
+        default=os.environ.get('JUPYTERHUB_SSL_KEYFILE') or '')
+    parser.add_argument(
+        '--certfile', action="store_true", dest="certfile",
+        help="path to certificate file",
+        default=os.environ.get('JUPYTERHUB_SSL_CERTFILE') or '')
     args = parser.parse_known_args()[0]
 
     # args.logging_config will be a io.TextIOWrapper resource
@@ -190,7 +224,7 @@ def main():
                 f"{args.static}")
 
     logger.info("Starting Cylc UI")
-    ui_server.start(args.debug)
+    ui_server.start(args.debug, args.keyfile, args.certfile)
 
 
 if __name__ == "__main__":
