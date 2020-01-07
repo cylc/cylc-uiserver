@@ -43,6 +43,10 @@ class BaseHandler(web.RequestHandler):
 
 class APIHandler(BaseHandler):
 
+    def initialize(self, certfile, keyfile):
+        self.certfile = certfile
+        self.keyfile = keyfile
+
     def set_default_headers(self) -> None:
         super().set_default_headers()
         self.set_header("Content-Type", 'application/json')
