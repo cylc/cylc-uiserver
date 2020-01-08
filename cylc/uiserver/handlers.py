@@ -16,10 +16,7 @@
 
 import json
 import os
-import re
 from asyncio import Queue
-from subprocess import Popen, PIPE
-from typing import List, Union
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
