@@ -15,6 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from cylc.uiserver.main import *
+from tornado.web import StaticFileHandler, RequestHandler
+from cylc.uiserver.handlers import TornadoGraphQLHandler
 
 
 def test_my_application():
@@ -41,3 +43,34 @@ def test_cylcuiserver_relative_path():
     # the code is using the directory relative to the main script ATM
     assert cylc_uiserver._static.endswith('cylc/uiserver')
     assert cylc_uiserver._jupyter_hub_service_prefix == '/users/test'
+
+
+def test_cylcuiserver_create_static_handler():
+    cylc_uiserver = CylcUIServer(8000, './static', '/prefix/')
+    handler = cylc_uiserver._create_static_handler('(imgs/*.png)')
+    assert "/prefix/((imgs/*.png))" == handler[0]
+    assert handler[1] == StaticFileHandler
+    assert handler[2].get('path').endswith("/static")
+
+
+def test_cylcuiserver_create_handler():
+    cylc_uiserver = CylcUIServer(8000, './', '/prefix/')
+    handler = cylc_uiserver._create_handler('tests', RequestHandler,
+                                            schema=True, table=False,
+                                            number=1)
+    assert "/prefix/tests" == handler[0]
+    assert handler[1] == RequestHandler
+    assert handler[2].get('schema')
+    assert not handler[2].get('table')
+    assert handler[2].get('number') == 1
+
+
+def test_cylcuiserver_create_graphql_handler():
+    cylc_uiserver = CylcUIServer(8000, './', '/prefix/')
+    handler = cylc_uiserver._create_graphql_handler(
+        'tests', TornadoGraphQLHandler, graphiql=True)
+    assert "/prefix/tests" == handler[0]
+    assert handler[1] == TornadoGraphQLHandler
+    assert handler[2].get('schema')
+    assert handler[2].get('resolvers')
+    assert handler[2].get('graphiql') == 1
