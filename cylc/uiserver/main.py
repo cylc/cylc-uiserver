@@ -24,10 +24,12 @@ import signal
 from functools import partial
 from logging.config import dictConfig
 from os.path import join, abspath, dirname
+from typing import Any, Tuple, Type
 
 from tornado import web, ioloop
 
 from cylc.flow.network.schema import schema
+from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
 from .data_store_mgr import DataStoreMgr
@@ -76,6 +78,70 @@ class CylcUIServer(object):
             self.data_store_mgr.data,
             workflows_mgr=self.workflows_mgr)
 
+    def _create_static_handler(
+            self,
+            path: str
+    ) -> Tuple[str, Type[web.StaticFileHandler], dict]:
+        """
+        Create a static content handler.
+
+        Args:
+            path (str): handler path (supports regular expressions)
+        Returns:
+            Tornado handler tuple
+        """
+        return (
+            rf"{self._jupyter_hub_service_prefix}({path})",
+            web.StaticFileHandler,
+            {"path": self._static}
+        )
+
+    def _create_handler(
+            self,
+            path: str,
+            clazz: Type[web.RequestHandler],
+            **kwargs: Any
+    ) -> Tuple[str, Type[web.RequestHandler], dict]:
+        """
+        Create a Tornado handler.
+
+        Args:
+            path (str): handler path
+            clazz (class): handler class
+            kwargs: extra params
+        Returns:
+            Tornado handler tuple
+        """
+        return (
+            url_path_join(self._jupyter_hub_service_prefix, path),
+            clazz,
+            kwargs
+        )
+
+    def _create_graphql_handler(
+            self,
+            path: str,
+            clazz: Type[TornadoGraphQLHandler],
+            **kwargs: Any
+    ) -> Tuple[str, Type[web.RequestHandler], dict]:
+        """
+        Create a GraphQL handler.
+
+        Args:
+            path (str): handler path
+            clazz (class): handler class
+            kwargs: extra params
+        Returns:
+            Tornado handler tuple
+        """
+        return self._create_handler(
+            path,
+            clazz,
+            schema=schema,
+            resolvers=self.resolvers,
+            **kwargs
+        )
+
     def _make_app(self, debug: bool):
         """Crete a Tornado web application.
 
@@ -83,53 +149,41 @@ class CylcUIServer(object):
             debug (bool): flag to set debugging in the Tornado application
         """
         logger.info(self._static)
+        # subscription/websockets server
+        subscription_server = TornadoSubscriptionServer(schema)
         return MyApplication(
             static_path=self._static,
             debug=debug,
             handlers=[
-                (rf"{self._jupyter_hub_service_prefix}(.*.(css|js))",
-                 web.StaticFileHandler, {"path": self._static}),
-                (rf"{self._jupyter_hub_service_prefix}((fonts|img)/.*)",
-                 web.StaticFileHandler, {"path": self._static}),
-                (rf"{self._jupyter_hub_service_prefix}(favicon.png)",
-                 web.StaticFileHandler, {"path": self._static}),
-
-                (r"/(.*.(css|js))",
-                 web.StaticFileHandler, {"path": self._static}),
-                (r"/((fonts|img)/.*)",
-                 web.StaticFileHandler, {"path": self._static}),
-                (r"/(favicon.png)",
-                 web.StaticFileHandler, {"path": self._static}),
-
-                (url_path_join(
-                    self._jupyter_hub_service_prefix, 'oauth_callback'),
-                    HubOAuthCallbackHandler),
-                (url_path_join(
-                    self._jupyter_hub_service_prefix, 'userprofile'),
-                    UserProfileHandler),
-
-                (rf"{self._jupyter_hub_service_prefix}?",
-                    MainHandler, {"path": self._static}),
-
-                # graphql
-                (url_path_join(self._jupyter_hub_service_prefix,
-                               '/graphql'),
-                    UIServerGraphQLHandler,
-                    dict(schema=schema, resolvers=self.resolvers)),
-                (url_path_join(self._jupyter_hub_service_prefix,
-                               '/graphql/batch'),
-                    UIServerGraphQLHandler,
-                    dict(schema=schema, resolvers=self.resolvers, batch=True)),
-                (url_path_join(self._jupyter_hub_service_prefix,
-                               '/graphql/graphiql'),
-                    GraphiQLHandler,
-                    dict(schema=schema, resolvers=self.resolvers,
-                         graphiql=True)),
-                (url_path_join(
-                    self._jupyter_hub_service_prefix, '/subscriptions'),
-                    SubscriptionHandler,
-                    dict(sub_server=TornadoSubscriptionServer(schema),
-                         resolvers=self.resolvers))
+                # static content
+                self._create_static_handler(".*.(css|js)"),
+                self._create_static_handler("(fonts|img)/.*"),
+                self._create_static_handler("favicon.png"),
+                # normal handlers, with auth
+                self._create_handler("oauth_callback",
+                                     HubOAuthCallbackHandler),
+                self._create_handler("userprofile",
+                                     UserProfileHandler),
+                # graphql handlers
+                self._create_graphql_handler("graphql",
+                                             UIServerGraphQLHandler),
+                self._create_graphql_handler("graphql/batch",
+                                             UIServerGraphQLHandler,
+                                             batch=True),
+                self._create_graphql_handler("graphql/graphiql",
+                                             GraphiQLHandler,
+                                             graphiql=True),
+                # subscription/websockets handler
+                self._create_handler("subscriptions",
+                                     SubscriptionHandler,
+                                     sub_server=subscription_server,
+                                     resolvers=self.resolvers),
+                # main handler
+                (
+                    rf"{self._jupyter_hub_service_prefix}?",
+                    MainHandler,
+                    {"path": self._static}
+                )
             ],
             # FIXME: decide (and document) whether cookies will be permanent
             # after server restart.
