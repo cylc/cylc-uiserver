@@ -115,11 +115,9 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
 
 
 class SubscriptionHandler(websocket.WebSocketHandler):
-    subscription_server = None
-    resolvers = None
-    queue = Queue(100)
 
     def initialize(self, sub_server, resolvers):
+        self.queue = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
 
