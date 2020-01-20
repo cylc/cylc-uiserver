@@ -44,7 +44,7 @@ from cylc.flow.network.scan import MSG_TIMEOUT
 from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
 from cylc.flow.data_store_mgr import (
     EDGES, FAMILIES, FAMILY_PROXIES, JOBS, TASKS, TASK_PROXIES, WORKFLOW,
-    DELTAS_MAP, apply_delta, generate_checksum
+    ALL_DELTAS, DELTAS_MAP, apply_delta, generate_checksum
 )
 from .workflows_mgr import workflow_request
 
@@ -62,10 +62,10 @@ class DataStoreMgr:
         self.workflows_mgr = workflows_mgr
         self.data = {}
         self.w_subs = {}
-        self.topics = {topic.encode('utf-8') for topic in DELTAS_MAP}
-        self.topics.add(b'shutdown')
+        self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown'}
         self.loop = None
         self.executors = {}
+        self.delta_queues = {}
 
     async def sync_workflow(self, w_id, *args, **kwargs):
         """Run data store sync with workflow services.
@@ -80,12 +80,16 @@ class DataStoreMgr:
         if w_id in self.w_subs:
             return
 
+        self.delta_queues[w_id] = {}
+
         # Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.
         self.executors[w_id] = ThreadPoolExecutor()
         self.executors[w_id].submit(
+        self.executor.submit(
             partial(self.start_subscription, w_id, *args, **kwargs)
         )
+
         await self.entire_workflow_update(ids=[w_id])
 
     def purge_workflow(self, w_id):
@@ -95,6 +99,8 @@ class DataStoreMgr:
             del self.w_subs[w_id]
         if w_id in self.data:
             del self.data[w_id]
+        if w_id in self.delta_queues:
+            del self.delta_queues[w_id]
         self.executors[w_id].shutdown(wait=True)
         del self.executors[w_id]
 
@@ -130,6 +136,8 @@ class DataStoreMgr:
             w_id (str): Workflow external ID.
 
         """
+        for delta_queue in self.delta_queues[w_id].values():
+            delta_queue.put((w_id, topic, delta))
         # wait until data-store is populated for this workflow
         if w_id not in self.data:
             loop_cnt = 0
@@ -143,23 +151,24 @@ class DataStoreMgr:
             self.workflows_mgr.stopping.add(w_id)
             self.w_subs[w_id].stop()
             return
-        delta_time = getattr(
-            delta, 'time', getattr(delta, 'last_updated', 0.0))
-        # If the workflow has reloaded recreate the data
-        # otherwise apply the delta if it's newer than the previously applied.
-        if delta.reloaded:
-            if topic == WORKFLOW:
-                self.data[w_id][topic].CopyFrom(delta)
-            else:
-                self.data[w_id][topic] = {
-                    ele.id: ele
-                    for ele in delta.deltas
-                }
-            self.data[w_id]['delta_times'][topic] = delta_time
-        elif delta_time >= self.data[w_id]['delta_times'][topic]:
-            apply_delta(topic, delta, self.data[w_id])
-            self.data[w_id]['delta_times'][topic] = delta_time
-            self.reconcile_update(topic, delta, w_id)
+        for field, sub_delta in delta.ListFields():
+            delta_time = getattr(
+                sub_delta, 'time', getattr(sub_delta, 'last_updated', 0.0))
+            # If the workflow has reloaded recreate the data
+            # otherwise apply the delta if newer than the previously applied.
+            if sub_delta.reloaded:
+                if field.name == WORKFLOW:
+                    self.data[w_id][field.name].CopyFrom(sub_delta)
+                else:
+                    self.data[w_id][field.name] = {
+                        ele.id: ele
+                        for ele in sub_delta.deltas
+                    }
+                self.data[w_id]['delta_times'][field.name] = delta_time
+            elif delta_time >= self.data[w_id]['delta_times'][field.name]:
+                apply_delta(field.name, sub_delta, self.data[w_id])
+                self.data[w_id]['delta_times'][field.name] = delta_time
+                self.reconcile_update(field.name, sub_delta, w_id)
 
     def reconcile_update(self, topic, delta, w_id):
         """Reconcile local with workflow data-store.

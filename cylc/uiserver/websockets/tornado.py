@@ -4,12 +4,13 @@
 # The file was copied from this revision:
 # https://github.com/graphql-python/graphql-ws/blob/cf560b9a5d18d4a3908dc2cfe2199766cc988fef/graphql_ws/tornado.py
 
-from inspect import isawaitable
+from inspect import isawaitable, isclass
 
 from asyncio import create_task, gather, wait, shield, sleep
 from asyncio.queues import QueueEmpty
 from tornado.websocket import WebSocketClosedError
 from graphql.execution.executors.asyncio import AsyncioExecutor
+from graphql.execution.middleware import MiddlewareManager
 from graphql_ws.base import ConnectionClosedException, BaseConnectionContext, BaseSubscriptionServer
 from graphql_ws.observable_aiter import setup_observable_extension
 from graphql_ws.constants import (
@@ -46,14 +47,35 @@ class TornadoConnectionContext(BaseConnectionContext):
 
 
 class TornadoSubscriptionServer(BaseSubscriptionServer):
-    def __init__(self, schema, keep_alive=True, loop=None):
+    def __init__(self, schema, keep_alive=True, loop=None, backend=None, middleware=None):
         self.loop = loop
+        self.backend = backend or None
+        if middleware is not None:
+            self.middleware = MiddlewareManager(*middleware, wrap_in_promise=False)
+        else:
+            self.middleware = None
+        self.strip_null = True
         super().__init__(schema, keep_alive)
+
+    @staticmethod
+    def instantiate_middleware(middlewares):
+        for middleware in middlewares:
+            if isclass(middleware):
+                yield middleware()
+                continue
+            yield middleware
 
     def get_graphql_params(self, *args, **kwargs):
         params = super(TornadoSubscriptionServer,
                        self).get_graphql_params(*args, **kwargs)
-        return dict(params, return_promise=True, executor=AsyncioExecutor(loop=self.loop))
+        return dict(
+            params,
+            return_promise=True,
+            executor=AsyncioExecutor(loop=self.loop),
+            backend=self.backend,
+            middleware=self.middleware,
+            strip_null=self.strip_null,
+        )
 
     async def _handle(self, ws, request_context):
         connection_context = TornadoConnectionContext(ws, request_context)

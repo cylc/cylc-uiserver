@@ -99,6 +99,7 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
         self.graphiql = graphiql
         self.batch = batch
         self.backend = backend or get_default_backend()
+        self.strip_null = True
         # Set extra attributes
         for key, value in kwargs.items():
             if hasattr(self, key):
