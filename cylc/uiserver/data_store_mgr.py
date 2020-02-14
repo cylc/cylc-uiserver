@@ -127,15 +127,14 @@ class DataStoreMgr:
 
         """
         # wait until data-store is populated for this workflow
-        loop_cnt = 0
-        while loop_cnt < self.INIT_DATA_WAIT_TIME:
-            if w_id not in self.data:
+        if w_id not in self.data:
+            loop_cnt = 0
+            while loop_cnt < self.INIT_DATA_WAIT_TIME:
+                if w_id in self.data:
+                    break
                 sleep(self.INIT_DATA_RETRY_DELAY)
                 loop_cnt += 1
                 continue
-            break
-        if w_id not in self.data:
-            return
         if topic == 'shutdown':
             self.workflows_mgr.stopping.add(w_id)
             self.w_subs[w_id].stop()
@@ -145,7 +144,13 @@ class DataStoreMgr:
         # If the workflow has reloaded recreate the data
         # otherwise apply the delta if it's newer than the previously applied.
         if delta.reloaded:
-            self.data[w_id][topic] = {ele.id: ele for ele in delta.deltas}
+            if topic == WORKFLOW:
+                self.data[w_id][topic].CopyFrom(delta)
+            else:
+                self.data[w_id][topic] = {
+                    ele.id: ele
+                    for ele in delta.deltas
+                }
             self.data[w_id]['delta_times'][topic] = delta_time
         elif delta_time >= self.data[w_id]['delta_times'][topic]:
             apply_delta(topic, delta, self.data[w_id])
