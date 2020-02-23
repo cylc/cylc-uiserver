@@ -26,6 +26,8 @@ from jupyterhub.services.auth import HubOAuthenticated
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
+from .websockets import authenticated as websockets_authenticated
+
 
 class BaseHandler(web.RequestHandler):
 
@@ -135,7 +137,8 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
         )
 
 
-class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
+class SubscriptionHandler(BaseHandler, HubOAuthenticated,
+                          websocket.WebSocketHandler):
 
     def initialize(self, sub_server, resolvers):
         self.queue = Queue(100)
@@ -145,6 +148,7 @@ class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
 
+    @websockets_authenticated
     def open(self, *args, **kwargs):
         IOLoop.current().spawn_callback(self.subscription_server.handle, self,
                                         self.context)
