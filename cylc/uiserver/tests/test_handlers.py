@@ -24,7 +24,7 @@ from graphql_ws.constants import GRAPHQL_WS
 from tornado.httpclient import HTTPResponse
 from tornado.httputil import HTTPServerRequest
 from tornado.testing import AsyncHTTPTestCase, get_async_test_timeout
-from tornado.web import Application
+from tornado.web import Application, HTTPError
 
 from cylc.uiserver.handlers import *
 from cylc.uiserver.main import *
@@ -99,12 +99,17 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         assert 400 == response.code
         assert b"WebSocket" in response.body
 
-    def _create_handler(self):
+    def _create_handler(self, logged_in=True):
         app = self.get_app()
         request = HTTPServerRequest(method='GET', uri='/subscriptions')
         request.connection = MagicMock()
-        return SubscriptionHandler(application=app, request=request,
-                                   sub_server=None, resolvers=None)
+        handler = SubscriptionHandler(application=app, request=request,
+                                      sub_server=None, resolvers=None)
+        if logged_in:
+            handler.get_current_user = lambda: {'name': 'yossarian'}
+        else:
+            handler.get_current_user = lambda: None
+        return handler
 
     def test_websockets_subprotocol(self):
         handler = self._create_handler()
@@ -160,3 +165,14 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         self.io_loop.run_sync(handler.open,
                               get_async_test_timeout())
         handler.subscription_server.handle.assert_called_once()
+
+    def test_unauthenticated_request_http_403_error(self) -> None:
+        """
+        When the user is not logged-in, the open function for
+        WebSockets should raise an HTTPError with status code 403.
+        """
+        handler = self._create_handler(logged_in=False)
+        with self.assertRaises(HTTPError) as cm:
+            self.io_loop.run_sync(handler.open,
+                                  get_async_test_timeout())
+        assert 403 == cm.exception.status_code
