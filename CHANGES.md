@@ -18,6 +18,8 @@ None or N/A.
 
 [#125](https://github.com/cylc/cylc-uiserver/pull/125) - Use Tornado
 default WebSocket check_origin function.
+[#124](https://github.com/cylc/cylc-uiserver/pull/124) - Add decorator
+for websockets authentication.
 
 ### Fixes
 
