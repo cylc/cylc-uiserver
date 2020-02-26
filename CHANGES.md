@@ -6,6 +6,32 @@ milestones](https://github.com/cylc/cylc-uiserver/milestones?state=closed) for
 each release.
 
 -------------------------------------------------------------------------------
+## __cylc-uiserver-0.3 (2020-??-??)__
+
+Release 0.3 of Cylc UI Server.
+
+### Backward incompatible changes
+
+None or N/A.
+
+### Enhancements
+
+[#125](https://github.com/cylc/cylc-uiserver/pull/125) - Use Tornado
+default WebSocket check_origin function.
+
+### Fixes
+
+None.
+
+### Documentation
+
+None.
+
+### Security issues
+
+None.
+
+-------------------------------------------------------------------------------
 ## __cylc-uiserver-0.2 (2019-??-??)__
 
 Release 0.2 of Cylc UI Server.
