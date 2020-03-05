@@ -19,6 +19,9 @@ None or N/A.
 [#82](https://github.com/cylc/cylc-uiserver/pull/82) - Add subscriptions
 support to GraphQL.
 
+[#126](https://github.com/cylc/cylc-uiserver/pull/126) - Update JupyterHub
+dependency to 1.1.*, and Graphene-Tornado to 2.6.*.
+
 ### Fixes
 
 None.
