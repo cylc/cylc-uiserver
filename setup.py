@@ -45,9 +45,9 @@ def find_version(*file_paths):
 install_requires = [
     ('cylc-flow @ https://github.com/cylc/cylc-flow'
      '/tarball/master#egg=cylc-8.0a2.dev'),
-    'jupyterhub==1.0.*',
+    'jupyterhub==1.1.*',
     'tornado==6.0.*',
-    'graphene-tornado==2.1.*',
+    'graphene-tornado==2.6.*',
     'graphql-core<3,>=2.1',  # TODO: graphql-python/graphql-ws#39
     'graphql-ws==0.3.*'
 ]
