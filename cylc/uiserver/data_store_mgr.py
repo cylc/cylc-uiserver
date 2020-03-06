@@ -33,10 +33,10 @@ Subscriptions are currently run in a different thread (via ThreadPoolExecutor).
 """
 
 import asyncio
-import logging
-
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from functools import partial
+import logging
 from time import sleep
 
 from cylc.flow.network.server import PB_METHOD_MAP
@@ -44,7 +44,7 @@ from cylc.flow.network.scan import MSG_TIMEOUT
 from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
 from cylc.flow.data_store_mgr import (
     EDGES, FAMILIES, FAMILY_PROXIES, JOBS, TASKS, TASK_PROXIES, WORKFLOW,
-    ALL_DELTAS, DELTAS_MAP, apply_delta, generate_checksum
+    DATA_TEMPLATE, ALL_DELTAS, DELTAS_MAP, apply_delta, generate_checksum
 )
 from .workflows_mgr import workflow_request
 
@@ -136,8 +136,6 @@ class DataStoreMgr:
             w_id (str): Workflow external ID.
 
         """
-        for delta_queue in self.delta_queues[w_id].values():
-            delta_queue.put((w_id, topic, delta))
         # wait until data-store is populated for this workflow
         if w_id not in self.data:
             loop_cnt = 0
@@ -152,23 +150,23 @@ class DataStoreMgr:
             self.w_subs[w_id].stop()
             return
         for field, sub_delta in delta.ListFields():
-            delta_time = getattr(
-                sub_delta, 'time', getattr(sub_delta, 'last_updated', 0.0))
-            # If the workflow has reloaded recreate the data
-            # otherwise apply the delta if newer than the previously applied.
+            delta_time = getattr(sub_delta, 'time', 0.0)
+            # If the workflow has reloaded clear the data before
+            # delta application.
             if sub_delta.reloaded:
                 if field.name == WORKFLOW:
-                    self.data[w_id][field.name].CopyFrom(sub_delta)
+                    self.data[w_id][field.name].Clear()
                 else:
-                    self.data[w_id][field.name] = {
-                        ele.id: ele
-                        for ele in sub_delta.deltas
-                    }
-                self.data[w_id]['delta_times'][field.name] = delta_time
-            elif delta_time >= self.data[w_id]['delta_times'][field.name]:
+                    self.data[w_id][field.name].clear()
+                self.data[w_id]['delta_times'][field.name] = 0.0
+            # Apply the delta if newer than the previously applied.
+            if delta_time >= self.data[w_id]['delta_times'][field.name]:
                 apply_delta(field.name, sub_delta, self.data[w_id])
                 self.data[w_id]['delta_times'][field.name] = delta_time
                 self.reconcile_update(field.name, sub_delta, w_id)
+        # Queue delta for graphql subscription resolving
+        for delta_queue in self.delta_queues[w_id].values():
+            delta_queue.put((w_id, topic, delta))
 
     def reconcile_update(self, topic, delta, w_id):
         """Reconcile local with workflow data-store.
@@ -247,26 +245,18 @@ class DataStoreMgr:
             if not ids or kwargs['req_context'] in ids:
                 gathers += (workflow_request(**kwargs),)
         items = await asyncio.gather(*gathers)
-        new_data = {}
         for w_id, result in items:
             if result is not None and result != MSG_TIMEOUT:
                 pb_data = PB_METHOD_MAP[req_method]()
                 pb_data.ParseFromString(result)
-                new_data[w_id] = {
-                    EDGES: {e.id: e for e in getattr(pb_data, EDGES)},
-                    FAMILIES: {f.id: f for f in getattr(pb_data, FAMILIES)},
-                    FAMILY_PROXIES: {
-                        n.id: n
-                        for n in getattr(pb_data, FAMILY_PROXIES)},
-                    JOBS: {j.id: j for j in getattr(pb_data, JOBS)},
-                    TASKS: {t.id: t for t in getattr(pb_data, TASKS)},
-                    TASK_PROXIES: {
-                        n.id: n
-                        for n in getattr(pb_data, TASK_PROXIES)},
-                    WORKFLOW: getattr(pb_data, WORKFLOW),
-                    'delta_times': {
-                        topic: getattr(pb_data, WORKFLOW).last_updated
-                        for topic in DELTAS_MAP.keys()}
-                }
-
-        self.data.update(new_data)
+                new_data = deepcopy(DATA_TEMPLATE)
+                for field, value in pb_data.ListFields():
+                    if field.name == WORKFLOW:
+                        new_data[field.name].CopyFrom(value)
+                        new_data['delta_times'] = {
+                            key: value.last_updated
+                            for key in DATA_TEMPLATE
+                        }
+                        continue
+                    new_data[field.name] = {n.id: n for n in value}
+                self.data[w_id] = new_data
