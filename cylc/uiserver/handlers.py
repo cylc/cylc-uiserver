@@ -95,7 +95,7 @@ class UIServerGraphQLHandler(
             graphiql: bool = False,
             pretty: bool = False,
             batch: bool = False,
-            backend: GraphQLBackend = None,
+            backend: Optional[GraphQLBackend] = None,
             **kwargs: Dict[Any, Any]) -> None:
         super(TornadoGraphQLHandler, self).initialize()
 
