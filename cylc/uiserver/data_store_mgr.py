@@ -66,7 +66,7 @@ class DataStoreMgr:
         self.w_subs: Dict[Any, Any] = {}
         self.topics = {topic.encode('utf-8') for topic in DELTAS_MAP}
         self.topics.add(b'shutdown')
-        self.loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+        self.loop: Any = None
         # Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.
         self.executor = ThreadPoolExecutor()
@@ -83,6 +83,8 @@ class DataStoreMgr:
         blocking the main loop.
 
         """
+        if self.loop is None:
+            self.loop = asyncio.get_running_loop()
         if w_id in self.w_subs:
             return
         self.executor.submit(

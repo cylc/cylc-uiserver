@@ -88,7 +88,7 @@ async def test_est_workflow_socket_error(
     def side_effect(*_, **__):
         raise socket.error
     mocked_get_host_ip_by_name.side_effect = side_effect
-    reg, host, port, pub_port, client = await est_workflow(
+    reg, host, port, pub_port, client, result = await est_workflow(
         '', '', 0, 0)
     assert not any([reg, host, port, pub_port, client])
     assert client is None
