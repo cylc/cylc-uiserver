@@ -25,10 +25,10 @@ python: 3.7
 before_install:
   - pip install pycodestyle mypy==0.770
   - pycodestyle --exclude=".git,.tox,__pycache,venv,.eggs,build,jupyterhub_config.py,cylc/uiserver/websockets/"
-  - python -m mypy -v --namespace-packages --config-file mypy.ini -p cylc.uiserver
 install:
   - pip install .[all]
 script:
+  - python -m mypy --namespace-packages --config-file mypy.ini -p cylc.uiserver
   - python setup.py test
 after_success:
   # Report metrics, such as coverage
