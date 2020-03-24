@@ -17,16 +17,20 @@
 import json
 import os
 from asyncio import Queue
+from typing import Any, Dict, List, Optional, Union
 
+from graphene.types import Schema
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
-from graphql import get_default_backend
+from graphql import get_default_backend, GraphQLBackend
 from graphql_ws.constants import GRAPHQL_WS
-from jupyterhub import __version__ as jupyterhub_version
-from jupyterhub.services.auth import HubOAuthenticated
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
+from jupyterhub import __version__ as jupyterhub_version
+from jupyterhub.services.auth import HubOAuthenticated
+from .resolvers import Resolvers
 from .websockets.template import render_graphiql
+from .websockets.tornado import TornadoSubscriptionServer
 
 
 class BaseHandler(web.RequestHandler):
@@ -45,45 +49,54 @@ class APIHandler(BaseHandler):
         self.set_header("Content-Type", 'application/json')
 
 
-class MainHandler(HubOAuthenticated, BaseHandler):
+class MainHandler(HubOAuthenticated, BaseHandler):  # type: ignore
 
     # hub_users = ["kinow"]
     # hub_groups = []
     # allow_admin = True
 
-    def initialize(self, path):
+    def initialize(self, path: str) -> None:
         self._static = path
 
     @web.addslash
     @web.authenticated
-    def get(self):
+    def get(self) -> None:
         """Render the UI prototype."""
         index = os.path.join(self._static, "index.html")
         self.write(open(index).read())
 
 
-class UserProfileHandler(HubOAuthenticated, APIHandler):
+class UserProfileHandler(HubOAuthenticated, APIHandler):  # type: ignore
 
     def set_default_headers(self) -> None:
         super().set_default_headers()
         self.set_header("Content-Type", 'application/json')
 
     @web.authenticated
-    def get(self):
+    def get(self) -> None:
         self.write(json.dumps(self.get_current_user()))
 
 
 # This is needed in order to pass the server context in addition to existing.
 # It's possible to just overwrite TornadoGraphQLHandler.context but we would
 # somehow need to pass the request info (headers, username ...etc) in also
-class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
+class UIServerGraphQLHandler(
+        HubOAuthenticated, TornadoGraphQLHandler):  # type: ignore
 
     # Declare extra attributes
     resolvers = None
 
-    def initialize(self, schema=None, executor=None, middleware=None,
-                   root_value=None, graphiql=False, pretty=False,
-                   batch=False, backend=None, **kwargs):
+    def initialize(
+            self,
+            schema: Schema = None,
+            executor: Any = None,
+            middleware: Optional[Any] = None,
+            root_value: Any = None,
+            graphiql: bool = False,
+            pretty: bool = False,
+            batch: bool = False,
+            backend: GraphQLBackend = None,
+            **kwargs: Dict[Any, Any]) -> None:
         super(TornadoGraphQLHandler, self).initialize()
 
         self.schema = schema
@@ -101,7 +114,7 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
                 setattr(self, key, value)
 
     @property
-    def context(self):
+    def context(self) -> Dict[str, Any]:
         wider_context = {
             'graphql_params': self.graphql_params,
             'request': self.request,
@@ -110,35 +123,36 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
         return wider_context
 
     @web.authenticated
-    def prepare(self):
+    def prepare(self) -> None:
         super().prepare()
 
 
 class SubscriptionHandler(websocket.WebSocketHandler):
 
-    def initialize(self, sub_server, resolvers):
-        self.queue = Queue(100)
+    def initialize(self, sub_server: TornadoSubscriptionServer,
+                   resolvers: Resolvers) -> None:
+        self.queue: Queue[Union[str, bytes]] = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
 
-    def select_subprotocol(self, subprotocols):
+    def select_subprotocol(self, subprotocols: List[str]) -> Optional[str]:
         return GRAPHQL_WS
 
-    def open(self, *args, **kwargs):
+    def open(self, *args: str, **kwargs: str) -> None:
         IOLoop.current().spawn_callback(self.subscription_server.handle, self,
                                         self.context)
 
-    async def on_message(self, message):
+    async def on_message(self, message: Union[str, bytes]) -> None:
         await self.queue.put(message)
 
-    async def recv(self):
+    async def recv(self) -> Union[str, bytes]:
         return await self.queue.get()
 
     def check_origin(self, origin: str) -> bool:
         return True
 
     @property
-    def context(self):
+    def context(self) -> Dict[str, Any]:
         wider_context = {
             'request': self.request,
             'resolvers': self.resolvers,
@@ -153,7 +167,7 @@ class GraphiQLHandler(UIServerGraphQLHandler):
     a React app to subscribe to the query and display the result dynamically.
     """
 
-    def get(self):
+    def get(self) -> None:
         self.finish(
             render_graphiql(
                 f'user/{self.hub_auth.get_user(self)["name"]}/'))

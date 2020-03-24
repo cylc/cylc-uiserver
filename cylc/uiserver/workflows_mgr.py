@@ -39,12 +39,19 @@ from cylc.flow.network.scan import (
     get_scan_items_from_fs, re_compile_filters, MSG_TIMEOUT)
 from cylc.flow.data_store_mgr import ID_DELIM
 
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
 logger = logging.getLogger(__name__)
 CLIENT_TIMEOUT = 2.0
 
 
-async def workflow_request(client, command, args=None,
-                           timeout=None, req_context=None):
+async def workflow_request(
+        client: Any,
+        command: str,
+        args: Optional[Dict[str, Any]] = None,
+        timeout: Optional[int] = None,
+        req_context: Any = None)\
+        -> Tuple[Any, Optional[Union[str, Dict[Any, Any]]]]:
     """Workflow request command.
 
     Args:
@@ -71,7 +78,11 @@ async def workflow_request(client, command, args=None,
         return (req_context, None)
 
 
-async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
+async def est_workflow(reg: str, host: str, port: int,
+                       pub_port: int, context: Any = None,
+                       timeout: Optional[int] = None)\
+        -> Tuple[str, str, int, int, Any,
+                 Optional[Union[str, Dict[Any, Any]]]]:
     """Establish communication with workflow, instantiating REQ client."""
     if is_remote_host(host):
         try:
@@ -80,7 +91,7 @@ async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
             if flags.debug:
                 raise
             logger.error("ERROR: %s: %s\n", exc, host)
-            return (reg, host, port, pub_port, None)
+            return (reg, host, port, pub_port, None, None)
 
     # NOTE: Connect to the suite by host:port. This way the
     #       SuiteRuntimeClient will not attempt to check the contact file
@@ -95,35 +106,36 @@ async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
 class WorkflowsManager:
     """Discover and Manage workflows."""
 
-    def __init__(self, uiserver, context=None):
+    def __init__(self, uiserver: Any, context: zmq.asyncio.Context = None) \
+            -> None:
         self.uiserver = uiserver
         if context is None:
             self.context = zmq.asyncio.Context()
         else:
             self.context = context
-        self.workflows = {}
-        self.stopping = set()
+        self.workflows: Dict[Any, Any] = {}
+        self.stopping: Set[Any] = set()
 
-    def spawn_workflow(self):
+    def spawn_workflow(self) -> None:
         """Start/spawn a workflow."""
         # TODO - Spawn workflows
         pass
 
-    async def gather_workflows(self):
+    async def gather_workflows(self) -> None:
         """Scan, establish, and discard workflows."""
-        scanflows = {}
+        scanflows: Dict[str, Dict[Any, Any]] = {}
         cre_owner, cre_name = re_compile_filters(None, ['.*'])
-        scan_args = (
+        scan_args: List[Any] = [
             (reg, host, port, pub_port, self.context, CLIENT_TIMEOUT)
             for reg, host, port, pub_port, api in
             get_scan_items_from_fs(cre_owner, cre_name)
-            if reg not in self.stopping and api == str(API))
+            if reg not in self.stopping and api == str(API)]
         # clear stopping set
         self.stopping.clear()
 
-        gathers = ()
+        gathers: List[Any] = []
         for arg in scan_args:
-            gathers += (est_workflow(*arg),)
+            gathers.append(est_workflow(*arg))
         items = await asyncio.gather(*gathers)
         for reg, host, port, pub_port, client, info in items:
             if info is not None and info != MSG_TIMEOUT:
@@ -155,18 +167,23 @@ class WorkflowsManager:
             self.uiserver.data_store_mgr.purge_workflow(w_id)
 
         # update with new, and start data sync
-        gathers = ()
+        gathers = []
         for w_id, w_info in scanflows.items():
             self.workflows[w_id] = w_info
-            gathers += (
+            gathers.append(
                 self.uiserver.data_store_mgr.sync_workflow(
                     w_id, w_info['name'], w_info['host'], w_info['pub_port']
-                ),
+                )
             )
         await asyncio.gather(*gathers)
 
-    async def multi_request(self, command, workflows, args=None,
-                            multi_args=None, timeout=None):
+    async def multi_request(
+            self,
+            command: str,
+            workflows: List[Any],
+            args: Optional[Dict[str, Any]] = None,
+            multi_args: Optional[Dict[str, Any]] = None,
+            timeout: Optional[int] = None) -> List[Any]:
         """Send requests to multiple workflows."""
         if args is None:
             args = {}
@@ -181,9 +198,9 @@ class WorkflowsManager:
                 cmd_args,
                 timeout,
             )
-        gathers = ()
+        gathers: List[Any] = []
         for info, request_args in req_args.items():
-            gathers += (workflow_request(req_context=info, *request_args),)
+            gathers.append(workflow_request(req_context=info, *request_args))
         results = await asyncio.gather(*gathers)
         res = []
         for _, val in results:

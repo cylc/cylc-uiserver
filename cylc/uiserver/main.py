@@ -24,7 +24,7 @@ import signal
 from functools import partial
 from logging.config import dictConfig
 from os.path import join, abspath, dirname
-from typing import Any, Tuple, Type
+from typing import Any, Dict, Tuple, Type
 
 from tornado import web, ioloop
 
@@ -42,13 +42,13 @@ logger = logging.getLogger(__name__)
 
 
 class MyApplication(web.Application):
-    is_closing = False
+    is_closing: bool = False
 
-    def signal_handler(self, signum, frame):
+    def signal_handler(self, signum: Any, frame: Any) -> None:
         logger.info('exiting...')
         self.is_closing = True
 
-    def try_exit(self, uis):
+    def try_exit(self, uis: "CylcUIServer") -> None:
         # clean up and stop in here
         if self.is_closing:
             # stop the subscribers running in the thread pool executor
@@ -64,7 +64,8 @@ class MyApplication(web.Application):
 
 class CylcUIServer(object):
 
-    def __init__(self, port, static, jupyter_hub_service_prefix):
+    def __init__(self, port: int, static: str,
+                 jupyter_hub_service_prefix: str) -> None:
         self._port = port
         if os.path.isabs(static):
             self._static = static
@@ -72,16 +73,16 @@ class CylcUIServer(object):
             script_dir = os.path.dirname(__file__)
             self._static = os.path.abspath(os.path.join(script_dir, static))
         self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
-        self.workflows_mgr = WorkflowsManager(self)
+        self.workflows_mgr: Any = WorkflowsManager(self)
         self.data_store_mgr = DataStoreMgr(self.workflows_mgr)
         self.resolvers = Resolvers(
-            self.data_store_mgr.data,
+            data=self.data_store_mgr.data,
             workflows_mgr=self.workflows_mgr)
 
     def _create_static_handler(
             self,
             path: str
-    ) -> Tuple[str, Type[web.StaticFileHandler], dict]:
+    ) -> Tuple[str, Type[web.StaticFileHandler], Dict[Any, Any]]:
         """
         Create a static content handler.
 
@@ -101,7 +102,7 @@ class CylcUIServer(object):
             path: str,
             clazz: Type[web.RequestHandler],
             **kwargs: Any
-    ) -> Tuple[str, Type[web.RequestHandler], dict]:
+    ) -> Tuple[str, Type[web.RequestHandler], Dict[Any, Any]]:
         """
         Create a Tornado handler.
 
@@ -121,9 +122,9 @@ class CylcUIServer(object):
     def _create_graphql_handler(
             self,
             path: str,
-            clazz: Type[TornadoGraphQLHandler],
+            clazz: Any,
             **kwargs: Any
-    ) -> Tuple[str, Type[web.RequestHandler], dict]:
+    ) -> Tuple[str, Type[web.RequestHandler], Dict[Any, Any]]:
         """
         Create a GraphQL handler.
 
@@ -142,7 +143,7 @@ class CylcUIServer(object):
             **kwargs
         )
 
-    def _make_app(self, debug: bool):
+    def _make_app(self, debug: bool) -> MyApplication:
         """Crete a Tornado web application.
 
         Args:
@@ -190,7 +191,7 @@ class CylcUIServer(object):
             cookie_secret="cylc-secret-cookie"
         )
 
-    def start(self, debug: bool):
+    def start(self, debug: bool) -> None:
         app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)
@@ -210,7 +211,7 @@ class CylcUIServer(object):
             ioloop.IOLoop.instance().stop()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Start Cylc UI"
     )

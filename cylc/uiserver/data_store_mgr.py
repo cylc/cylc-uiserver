@@ -48,6 +48,8 @@ from cylc.flow.data_store_mgr import (
 )
 from .workflows_mgr import workflow_request
 
+from typing import Any, Dict, List, Optional
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,18 +60,22 @@ class DataStoreMgr:
     INIT_DATA_RETRY_DELAY = 0.5  # seconds
     RECONCILE_TIMEOUT = 5.  # seconds
 
-    def __init__(self, workflows_mgr):
+    def __init__(self, workflows_mgr: Any) -> None:
         self.workflows_mgr = workflows_mgr
-        self.data = {}
-        self.w_subs = {}
+        self.data: Dict[Any, Any] = {}
+        self.w_subs: Dict[Any, Any] = {}
         self.topics = {topic.encode('utf-8') for topic in DELTAS_MAP}
         self.topics.add(b'shutdown')
-        self.loop = None
+        self.loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
         # Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.
         self.executor = ThreadPoolExecutor()
 
-    async def sync_workflow(self, w_id, *args, **kwargs):
+    async def sync_workflow(
+            self,
+            w_id: str,
+            *args: List[Any],
+            **kwargs: Dict[Any, Any]) -> None:
         """Run data store sync with workflow services.
 
         Subscriptions and sync management is instantiated and run in
@@ -77,8 +83,6 @@ class DataStoreMgr:
         blocking the main loop.
 
         """
-        if self.loop is None:
-            self.loop = asyncio.get_running_loop()
         if w_id in self.w_subs:
             return
         self.executor.submit(
@@ -86,7 +90,7 @@ class DataStoreMgr:
         )
         await self.entire_workflow_update(ids=[w_id])
 
-    def purge_workflow(self, w_id):
+    def purge_workflow(self, w_id: str) -> None:
         """Purge the manager of a workflow's subscription and data."""
         if w_id in self.w_subs:
             self.w_subs[w_id].stop()
@@ -94,7 +98,12 @@ class DataStoreMgr:
         if w_id in self.data:
             del self.data[w_id]
 
-    def start_subscription(self, w_id, reg, host, port):
+    def start_subscription(
+            self,
+            w_id: str,
+            reg: str,
+            host: str,
+            port: int) -> None:
         """Instantiate and run subscriber data-store sync.
 
         Args:
@@ -117,7 +126,11 @@ class DataStoreMgr:
                 func=self.update_workflow_data,
                 w_id=w_id))
 
-    def update_workflow_data(self, topic, delta, w_id):
+    def update_workflow_data(
+            self,
+            topic: str,
+            delta: Any,
+            w_id: str) -> None:
         """Manage and apply incoming data-store deltas.
 
         Args:
@@ -157,7 +170,11 @@ class DataStoreMgr:
             self.data[w_id]['delta_times'][topic] = delta_time
             self.reconcile_update(topic, delta, w_id)
 
-    def reconcile_update(self, topic, delta, w_id):
+    def reconcile_update(
+            self,
+            topic: str,
+            delta: Any,
+            w_id: str) -> None:
         """Reconcile local with workflow data-store.
 
         Verify data-store is in sync by topic/element-type
@@ -206,7 +223,9 @@ class DataStoreMgr:
                 apply_delta(topic, new_delta, self.data[w_id])
                 self.data[w_id]['delta_times'][topic] = new_delta.time
 
-    async def entire_workflow_update(self, ids=None):
+    async def entire_workflow_update(
+            self,
+            ids: Optional[List[str]] = None) -> None:
         """Update entire local data-store of workflow(s).
 
         Args:
@@ -229,10 +248,10 @@ class DataStoreMgr:
              'command': req_method,
              'req_context': w_id}
             for w_id, info in self.workflows_mgr.workflows.items())
-        gathers = ()
+        gathers: List[Any] = []
         for kwargs in req_kwargs:
             if not ids or kwargs['req_context'] in ids:
-                gathers += (workflow_request(**kwargs),)
+                gathers.append(workflow_request(**kwargs))
         items = await asyncio.gather(*gathers)
         new_data = {}
         for w_id, result in items:

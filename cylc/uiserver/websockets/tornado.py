@@ -44,7 +44,7 @@ class TornadoConnectionContext(BaseConnectionContext):
 
 
 class TornadoSubscriptionServer(BaseSubscriptionServer):
-    def __init__(self, schema, keep_alive=True, loop=None):
+    def __init__(self, schema, keep_alive=True, loop=None) -> None:
         self.loop = loop
         super().__init__(schema, keep_alive)
 

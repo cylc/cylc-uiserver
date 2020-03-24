@@ -19,22 +19,25 @@
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.data_store_mgr import WORKFLOW
 
+from typing import Any, Dict, List, Optional, Union
 
-class Resolvers(BaseResolvers):
+
+class Resolvers(BaseResolvers):  # type: ignore
     """UI Server context GraphQL query and mutation resolvers."""
 
-    workflows_mgr = None
+    workflows_mgr: Any = None
 
-    def __init__(self, data, **kwargs):
+    def __init__(self, data: Dict[Any, Any],
+                 **kwargs: Dict[Any, Any]) -> None:
         super().__init__(data)
-
+        self.workflows_mgr = None
         # Set extra attributes
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
 
     # Mutations
-    async def mutator(self, info, *m_args):
+    async def mutator(self, info: Any, *m_args: List[str]) -> List[Any]:
         """Mutate workflow."""
         _, w_args, _ = m_args
         w_ids = [
@@ -48,7 +51,8 @@ class Resolvers(BaseResolvers):
         }
         return self.workflows_mgr.multi_request('graphql', w_ids, graphql_args)
 
-    async def nodes_mutator(self, info, *m_args):
+    async def nodes_mutator(self, info: Any, *m_args: List[str]) \
+            -> Union[str, List[Any]]:
         """Mutate node items of associated workflows."""
         _, _, w_args, _ = m_args
         w_ids = [
