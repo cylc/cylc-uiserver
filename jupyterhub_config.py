@@ -49,7 +49,7 @@ c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
 c.JupyterHub.logo_file = str(DIST.joinpath(Path('img/logo.svg')))
 # use ISO8601 (expanded) date format for logging
 c.JupyterHub.log_datefmt = '%Y-%m-%dT%H:%M:%S'
-# specifiy custom HTML templates
+# specify custom HTML templates
 c.JupyterHub.template_paths = [
     pkg_resources.resource_filename(
         'cylc.uiserver',
