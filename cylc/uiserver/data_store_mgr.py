@@ -95,7 +95,7 @@ class DataStoreMgr:
             del self.data[w_id]
 
     def start_subscription(self, w_id, reg, host, port):
-        """Instatiate and run subscriber data-store sync.
+        """Instantiate and run subscriber data-store sync.
 
         Args:
             w_id (str): Workflow external ID.
@@ -118,7 +118,7 @@ class DataStoreMgr:
                 w_id=w_id))
 
     def update_workflow_data(self, topic, delta, w_id):
-        """Manage and apply incomming data-store deltas.
+        """Manage and apply incoming data-store deltas.
 
         Args:
             topic (str): topic of published data.
