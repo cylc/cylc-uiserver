@@ -59,7 +59,7 @@ class MainHandler(HubOAuthenticated, BaseHandler):
     def get(self):
         """Render the UI prototype."""
         index = os.path.join(self._static, "index.html")
-        self.write(open(index).read())
+        self.render(index)
 
 
 class UserProfileHandler(HubOAuthenticated, APIHandler):
