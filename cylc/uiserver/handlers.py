@@ -60,7 +60,9 @@ class MainHandler(HubOAuthenticated, BaseHandler):
         """Render the UI prototype."""
         index = os.path.join(self._static, "index.html")
         user = self.get_current_user()
-        base_url = user['server']
+        protocol = self.request.protocol
+        host = self.request.host
+        base_url = f'{protocol}://{host}/{user["server"]}'
         self.render(index, python_base_url=base_url)
 
 
