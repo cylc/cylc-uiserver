@@ -43,7 +43,10 @@ class MainHandlerTest(AsyncHTTPTestCase):
 
     def test_jupyterhub_version_returned(self):
         with patch.object(MainHandler, 'get_current_user') as mocked:
-            mocked.return_value = {'name': 'yossarian'}
+            mocked.return_value = {
+                'name': 'yossarian',
+                'server': 'catch:22'
+            }
             with open(os.path.join(self.tempdir, "index.html"), "w+") as nf:
                 nf.write("TESTING!")
                 nf.flush()
@@ -68,7 +71,10 @@ class UserProfileHandlerTest(AsyncHTTPTestCase):
 
     def test_user_profile_handler_cors_headers(self):
         with patch.object(UserProfileHandler, 'get_current_user') as mocked:
-            mocked.return_value = {'name': 'yossarian'}
+            mocked.return_value = {
+                'name': 'yossarian',
+                'server': 'catch:22'
+            }
             response = self.fetch("/userprofile")  # type: HTTPResponse
             assert "Access-Control-Allow-Origin" in response.headers
             assert "Access-Control-Allow-Headers" in response.headers
