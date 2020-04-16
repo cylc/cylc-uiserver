@@ -50,11 +50,7 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
     def __init__(self, schema, keep_alive=True, loop=None, backend=None, middleware=None):
         self.loop = loop
         self.backend = backend or None
-        if middleware is not None:
-            self.middleware = MiddlewareManager(*middleware, wrap_in_promise=False)
-        else:
-            self.middleware = None
-        self.strip_null = True
+        self.middleware = middleware
         super().__init__(schema, keep_alive)
 
     @staticmethod
@@ -68,13 +64,23 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
     def get_graphql_params(self, *args, **kwargs):
         params = super(TornadoSubscriptionServer,
                        self).get_graphql_params(*args, **kwargs)
+        # If middleware get instantiated here (optional), they will
+        # be local/private to each subscription.
+        if self.middleware is not None:
+            middleware = list(
+                self.instantiate_middleware(self.middleware)
+            )
+        else:
+            middleware = self.middleware
         return dict(
             params,
             return_promise=True,
             executor=AsyncioExecutor(loop=self.loop),
             backend=self.backend,
-            middleware=self.middleware,
-            strip_null=self.strip_null,
+            middleware=MiddlewareManager(
+                *middleware,
+                wrap_in_promise=False
+            ),
         )
 
     async def _handle(self, ws, request_context):

@@ -43,8 +43,8 @@ from cylc.flow.network.server import PB_METHOD_MAP
 from cylc.flow.network.scan import MSG_TIMEOUT
 from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
 from cylc.flow.data_store_mgr import (
-    EDGES, FAMILIES, FAMILY_PROXIES, JOBS, TASKS, TASK_PROXIES, WORKFLOW,
-    DATA_TEMPLATE, ALL_DELTAS, DELTAS_MAP, apply_delta, generate_checksum
+    EDGES, DATA_TEMPLATE, ALL_DELTAS, DELTAS_MAP, WORKFLOW,
+    apply_delta, generate_checksum, create_delta_store
 )
 from .workflows_mgr import workflow_request
 
@@ -86,10 +86,8 @@ class DataStoreMgr:
         # non-blocking subscriptions, but this works.
         self.executors[w_id] = ThreadPoolExecutor()
         self.executors[w_id].submit(
-        self.executor.submit(
             partial(self.start_subscription, w_id, *args, **kwargs)
         )
-
         await self.entire_workflow_update(ids=[w_id])
 
     def purge_workflow(self, w_id):
@@ -146,8 +144,8 @@ class DataStoreMgr:
                 loop_cnt += 1
                 continue
         if topic == 'shutdown':
+            self.delta_store_to_queues(w_id, topic, delta)
             self.workflows_mgr.stopping.add(w_id)
-            self.w_subs[w_id].stop()
             return
         for field, sub_delta in delta.ListFields():
             delta_time = getattr(sub_delta, 'time', 0.0)
@@ -164,9 +162,15 @@ class DataStoreMgr:
                 apply_delta(field.name, sub_delta, self.data[w_id])
                 self.data[w_id]['delta_times'][field.name] = delta_time
                 self.reconcile_update(field.name, sub_delta, w_id)
+
+        self.delta_store_to_queues(w_id, topic, delta)
+
+    def delta_store_to_queues(self, w_id, topic, delta):
         # Queue delta for graphql subscription resolving
-        for delta_queue in self.delta_queues[w_id].values():
-            delta_queue.put((w_id, topic, delta))
+        if self.delta_queues[w_id]:
+            delta_store = create_delta_store(delta, w_id)
+            for delta_queue in self.delta_queues[w_id].values():
+                delta_queue.put((w_id, topic, delta_store))
 
     def reconcile_update(self, topic, delta, w_id):
         """Reconcile local with workflow data-store.
@@ -202,13 +206,12 @@ class DataStoreMgr:
             try:
                 _, new_delta_msg = future.result(self.RECONCILE_TIMEOUT)
             except asyncio.TimeoutError:
-                logger.info(
+                logger.debug(
                     f'The reconcile update coroutine {w_id} {topic}'
                     f'took too long, cancelling the subscription/sync.'
                 )
                 future.cancel()
                 self.workflows_mgr.stopping.add(w_id)
-                self.w_subs[w_id].stop()
             except Exception as exc:
                 logger.exception(exc)
             else:

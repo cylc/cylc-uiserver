@@ -99,7 +99,6 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
         self.graphiql = graphiql
         self.batch = batch
         self.backend = backend or get_default_backend()
-        self.strip_null = True
         # Set extra attributes
         for key, value in kwargs.items():
             if hasattr(self, key):
@@ -117,6 +116,16 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
     @web.authenticated
     def prepare(self):
         super().prepare()
+
+    async def execute(self, *args, **kwargs):
+        # Use own backend, and TornadoGraphQLHandler already does validation.
+        return await self.schema.execute(
+            *args,
+            backend=self.backend,
+            variable_values=kwargs.get('variables'),
+            validate=False,
+            **kwargs,
+        )
 
 
 class SubscriptionHandler(websocket.WebSocketHandler):

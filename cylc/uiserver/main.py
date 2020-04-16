@@ -29,7 +29,7 @@ from typing import Any, Tuple, Type
 from tornado import web, ioloop
 
 from cylc.flow.network.graphql import (
-    GraphQLCoreBackend, IgnoreFieldMiddleware
+    CylcGraphQLBackend, IgnoreFieldMiddleware
 )
 from cylc.flow.network.schema import schema
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
@@ -42,9 +42,6 @@ from .websockets.tornado import TornadoSubscriptionServer
 from .workflows_mgr import WorkflowsManager
 
 logger = logging.getLogger(__name__)
-
-# Avoid re-instantiation
-MIDDLEWARE = [IgnoreFieldMiddleware()]
 
 
 class MyApplication(web.Application):
@@ -146,8 +143,8 @@ class CylcUIServer(object):
             clazz,
             schema=schema,
             resolvers=self.resolvers,
-            backend=GraphQLCoreBackend(),
-            middleware=MIDDLEWARE,
+            backend=CylcGraphQLBackend(),
+            middleware=[IgnoreFieldMiddleware],
             **kwargs
         )
 
@@ -161,8 +158,8 @@ class CylcUIServer(object):
         # subscription/websockets server
         subscription_server = TornadoSubscriptionServer(
             schema,
-            backend=GraphQLCoreBackend(),
-            middleware=MIDDLEWARE,
+            backend=CylcGraphQLBackend(),
+            middleware=[IgnoreFieldMiddleware],
         )
         return MyApplication(
             static_path=self._static,
