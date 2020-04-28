@@ -7,6 +7,14 @@ This project contains the Cylc UI Server. A JupyterHub-compatible application,
 used to display the Cylc UI (or simply UI) to users, and to communicate with
 Workflow Services (WFS).
 
+[Cylc Website](https://cylc.org/) |
+[Contributing](CONTRIBUTING.md)
+
+## Contents
+
+- [Installation](#installation)
+- [Copyright](#copyright-and-terms-of-use)
+
 ## Installation
 
 To install the production version, run:
@@ -33,3 +41,17 @@ the steps described below:
     * `c.JupyterHub.proxy_api_port = 9001`
 - finally start `jupyterhub` using that configuration file
 
+## Copyright and Terms of Use
+
+Copyright (C) 2019-2020 NIWA & British Crown (Met Office) & Contributors.
+
+Cylc is free software: you can redistribute it and/or modify it under the terms
+of the GNU General Public License as published by the Free Software Foundation,
+either version 3 of the License, or (at your option) any later version.
+
+Cylc is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+Cylc.  If not, see [GNU licenses](http://www.gnu.org/licenses/).
