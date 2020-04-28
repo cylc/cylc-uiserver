@@ -12,8 +12,8 @@ Workflow Services (WFS).
 
 ## Contents
 
-[Installation](#installation)
-[Copyright](#copyright-and-terms-of-use)
+- [Installation](#installation)
+- [Copyright](#copyright-and-terms-of-use)
 
 ## Installation
 
