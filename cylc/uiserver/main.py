@@ -185,9 +185,10 @@ class CylcUIServer(object):
                     {"path": self._static}
                 )
             ],
-            # FIXME: decide (and document) whether cookies will be permanent
-            # after server restart.
-            cookie_secret="cylc-secret-cookie"
+            # always generate a new cookie secret on launch
+            # ensures that each spawn clears any cookies from
+            # previous session, triggering OAuth again
+            cookie_secret=os.urandom(32)
         )
 
     def start(self, debug: bool):
