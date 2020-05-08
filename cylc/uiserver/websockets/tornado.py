@@ -6,7 +6,8 @@
 
 from inspect import isawaitable
 
-from asyncio import ensure_future, gather, wait, shield
+from asyncio import ensure_future, gather, wait, shield, sleep
+from asyncio.queues import QueueEmpty
 from tornado.websocket import WebSocketClosedError
 from graphql.execution.executors.asyncio import AsyncioExecutor
 from graphql_ws.base import ConnectionClosedException, BaseConnectionContext, BaseSubscriptionServer
@@ -25,7 +26,7 @@ setup_observable_extension()
 class TornadoConnectionContext(BaseConnectionContext):
     async def receive(self):
         try:
-            msg = await self.ws.recv()
+            msg = self.ws.recv_nowait()
             return msg
         except WebSocketClosedError:
             raise ConnectionClosedException()
@@ -58,19 +59,24 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
         await self.on_open(connection_context)
         pending = set()
         while True:
+            message = None
             try:
                 if connection_context.closed:
                     raise ConnectionClosedException()
                 message = await connection_context.receive()
             except ConnectionClosedException:
                 break
+            except QueueEmpty:
+                pass
             finally:
                 if pending:
                     (_, pending) = await wait(pending, timeout=0, loop=self.loop)
 
-            task = ensure_future(
-                self.on_message(connection_context, message), loop=self.loop)
-            pending.add(task)
+            if message:
+                task = ensure_future(
+                    self.on_message(connection_context, message), loop=self.loop)
+                pending.add(task)
+            await sleep(1)
 
         self.on_close(connection_context)
         for task in pending:
