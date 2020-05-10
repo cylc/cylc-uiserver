@@ -22,6 +22,8 @@ from typing import Union, Awaitable, Any, List, Tuple, Dict
 
 setup_observable_extension()
 
+NO_MSG_DELAY = 1.0
+
 
 class TornadoConnectionContext(BaseConnectionContext):
     async def receive(self):
@@ -76,7 +78,8 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
                 task = ensure_future(
                     self.on_message(connection_context, message), loop=self.loop)
                 pending.add(task)
-            await sleep(1)
+            else:
+                await sleep(NO_MSG_DELAY)
 
         self.on_close(connection_context)
         for task in pending:
