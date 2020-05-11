@@ -65,9 +65,7 @@ class DataStoreMgr:
         self.topics = {topic.encode('utf-8') for topic in DELTAS_MAP}
         self.topics.add(b'shutdown')
         self.loop = None
-        # Might be options other than threads to achieve
-        # non-blocking subscriptions, but this works.
-        self.executor = ThreadPoolExecutor()
+        self.executors = {}
 
     async def sync_workflow(self, w_id, *args, **kwargs):
         """Run data store sync with workflow services.
@@ -81,7 +79,11 @@ class DataStoreMgr:
             self.loop = asyncio.get_running_loop()
         if w_id in self.w_subs:
             return
-        self.executor.submit(
+
+        # Might be options other than threads to achieve
+        # non-blocking subscriptions, but this works.
+        self.executors[w_id] = ThreadPoolExecutor()
+        self.executors[w_id].submit(
             partial(self.start_subscription, w_id, *args, **kwargs)
         )
         await self.entire_workflow_update(ids=[w_id])
@@ -93,6 +95,8 @@ class DataStoreMgr:
             del self.w_subs[w_id]
         if w_id in self.data:
             del self.data[w_id]
+        self.executors[w_id].shutdown(wait=True)
+        del self.executors[w_id]
 
     def start_subscription(self, w_id, reg, host, port):
         """Instantiate and run subscriber data-store sync.

@@ -55,7 +55,8 @@ class MyApplication(web.Application):
             for sub in uis.data_store_mgr.w_subs.values():
                 sub.stop()
             # Shutdown the thread pool executor
-            uis.data_store_mgr.executor.shutdown(wait=False)
+            for executor in uis.data_store_mgr.executors.values():
+                executor.shutdown(wait=False)
             # Destroy ZeroMQ context of all sockets
             uis.workflows_mgr.context.destroy()
             ioloop.IOLoop.instance().stop()
