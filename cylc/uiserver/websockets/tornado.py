@@ -26,10 +26,9 @@ NO_MSG_DELAY = 1.0
 
 
 class TornadoConnectionContext(BaseConnectionContext):
-    async def receive(self):
+    def receive(self):
         try:
-            msg = self.ws.recv_nowait()
-            return msg
+            return self.ws.recv_nowait()
         except WebSocketClosedError:
             raise ConnectionClosedException()
 
@@ -65,7 +64,7 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
             try:
                 if connection_context.closed:
                     raise ConnectionClosedException()
-                message = await connection_context.receive()
+                message = connection_context.receive()
             except ConnectionClosedException:
                 break
             except QueueEmpty:
