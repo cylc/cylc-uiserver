@@ -6,7 +6,7 @@
 
 from inspect import isawaitable
 
-from asyncio import ensure_future, gather, wait, shield, sleep
+from asyncio import create_task, gather, wait, shield, sleep
 from asyncio.queues import QueueEmpty
 from tornado.websocket import WebSocketClosedError
 from graphql.execution.executors.asyncio import AsyncioExecutor
@@ -74,8 +74,8 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
                     (_, pending) = await wait(pending, timeout=0, loop=self.loop)
 
             if message:
-                task = ensure_future(
-                    self.on_message(connection_context, message), loop=self.loop)
+                task = create_task(
+                    self.on_message(connection_context, message))
                 pending.add(task)
             else:
                 await sleep(NO_MSG_DELAY)
