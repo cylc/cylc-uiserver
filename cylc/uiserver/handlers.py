@@ -138,6 +138,9 @@ class SubscriptionHandler(websocket.WebSocketHandler):
     async def recv(self):
         return await self.queue.get()
 
+    def recv_nowait(self):
+        return self.queue.get_nowait()
+
     def check_origin(self, origin: str) -> bool:
         return True
 
