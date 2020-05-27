@@ -30,14 +30,13 @@ import socket
 
 import zmq.asyncio
 
-from cylc.flow import flags
+from cylc.flow import flags, ID_DELIM
 from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.hostuserutil import is_remote_host, get_host_ip_by_name
 from cylc.flow.network import API
 from cylc.flow.network.client import SuiteRuntimeClient
 from cylc.flow.network.scan import (
     get_scan_items_from_fs, re_compile_filters, MSG_TIMEOUT)
-from cylc.flow.data_store_mgr import ID_DELIM
 
 logger = logging.getLogger(__name__)
 CLIENT_TIMEOUT = 2.0
