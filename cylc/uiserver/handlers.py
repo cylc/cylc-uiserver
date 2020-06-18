@@ -117,6 +117,16 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
     def prepare(self):
         super().prepare()
 
+    async def execute(self, *args, **kwargs):
+        # Use own backend, and TornadoGraphQLHandler already does validation.
+        return await self.schema.execute(
+            *args,
+            backend=self.backend,
+            variable_values=kwargs.get('variables'),
+            validate=False,
+            **kwargs,
+        )
+
 
 class SubscriptionHandler(websocket.WebSocketHandler):
 

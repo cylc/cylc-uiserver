@@ -28,6 +28,9 @@ from typing import Any, Tuple, Type
 
 from tornado import web, ioloop
 
+from cylc.flow.network.graphql import (
+    CylcGraphQLBackend, IgnoreFieldMiddleware
+)
 from cylc.flow.network.schema import schema
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from jupyterhub.services.auth import HubOAuthCallbackHandler
@@ -76,7 +79,7 @@ class CylcUIServer(object):
         self.workflows_mgr = WorkflowsManager(self)
         self.data_store_mgr = DataStoreMgr(self.workflows_mgr)
         self.resolvers = Resolvers(
-            self.data_store_mgr.data,
+            self.data_store_mgr,
             workflows_mgr=self.workflows_mgr)
 
     def _create_static_handler(
@@ -140,6 +143,8 @@ class CylcUIServer(object):
             clazz,
             schema=schema,
             resolvers=self.resolvers,
+            backend=CylcGraphQLBackend(),
+            middleware=[IgnoreFieldMiddleware],
             **kwargs
         )
 
@@ -151,7 +156,11 @@ class CylcUIServer(object):
         """
         logger.info(self._static)
         # subscription/websockets server
-        subscription_server = TornadoSubscriptionServer(schema)
+        subscription_server = TornadoSubscriptionServer(
+            schema,
+            backend=CylcGraphQLBackend(),
+            middleware=[IgnoreFieldMiddleware],
+        )
         return MyApplication(
             static_path=self._static,
             debug=debug,
@@ -166,14 +175,20 @@ class CylcUIServer(object):
                 self._create_handler("userprofile",
                                      UserProfileHandler),
                 # graphql handlers
-                self._create_graphql_handler("graphql",
-                                             UIServerGraphQLHandler),
-                self._create_graphql_handler("graphql/batch",
-                                             UIServerGraphQLHandler,
-                                             batch=True),
-                self._create_graphql_handler("graphql/graphiql",
-                                             GraphiQLHandler,
-                                             graphiql=True),
+                self._create_graphql_handler(
+                    "graphql",
+                    UIServerGraphQLHandler,
+                ),
+                self._create_graphql_handler(
+                    "graphql/batch",
+                    UIServerGraphQLHandler,
+                    batch=True
+                ),
+                self._create_graphql_handler(
+                    "graphql/graphiql",
+                    GraphiQLHandler,
+                    graphiql=True
+                ),
                 # subscription/websockets handler
                 self._create_handler("subscriptions",
                                      SubscriptionHandler,
