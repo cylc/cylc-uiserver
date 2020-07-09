@@ -85,7 +85,7 @@ class CylcUIServer(object):
     def _create_static_handler(
             self,
             path: str
-    ) -> Tuple[str, Type[web.StaticFileHandler], dict]:
+    ) -> Tuple[str, Type[StaticHandler], dict]:
         """
         Create a static content handler.
 
@@ -96,7 +96,7 @@ class CylcUIServer(object):
         """
         return (
             rf"{self._jupyter_hub_service_prefix}({path})",
-            web.StaticFileHandler,
+            StaticHandler,
             {"path": self._static}
         )
 
