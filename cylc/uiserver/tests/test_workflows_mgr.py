@@ -35,7 +35,9 @@ async def test_workflow_request_client_timeout(
 
 
 @pytest.mark.asyncio
-async def test_workflow_request_client_error(async_client: AsyncClientFixture):
+async def test_workflow_request_client_error(
+        async_client: AsyncClientFixture, caplog):
+    caplog.set_level(logging.CRITICAL, logger='cylc')
     async_client.will_return(ClientError)
     ctx, msg = await workflow_request(client=async_client, command='')
     assert not ctx
