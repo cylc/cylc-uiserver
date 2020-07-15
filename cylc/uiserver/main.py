@@ -184,11 +184,6 @@ class CylcUIServer(object):
                     UIServerGraphQLHandler,
                     batch=True
                 ),
-                self._create_graphql_handler(
-                    "graphql/graphiql",
-                    GraphiQLHandler,
-                    graphiql=True
-                ),
                 # subscription/websockets handler
                 self._create_handler("subscriptions",
                                      SubscriptionHandler,
