@@ -25,6 +25,7 @@ Includes:
 """
 import asyncio
 from contextlib import suppress
+from getpass import getuser
 import logging
 import socket
 
@@ -35,8 +36,14 @@ from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.hostuserutil import is_remote_host, get_host_ip_by_name
 from cylc.flow.network import API
 from cylc.flow.network.client import SuiteRuntimeClient
-from cylc.flow.network.scan import (
-    get_scan_items_from_fs, re_compile_filters, MSG_TIMEOUT)
+from cylc.flow.network.scan import MSG_TIMEOUT
+from cylc.flow.network.scan_nt import (
+    api_version,
+    contact_info,
+    is_active,
+    scan
+)
+from cylc.flow.suite_files import ContactFileFields
 
 logger = logging.getLogger(__name__)
 CLIENT_TIMEOUT = 2.0
@@ -101,6 +108,16 @@ class WorkflowsManager:
             self.context = context
         self.workflows = {}
         self.stopping = set()
+        self.scan_pipe = (
+            # all flows on the filesystem
+            scan
+            # only flows which have a contact file
+            | is_active(True)
+            # extract info from the contact file
+            | contact_info
+            # only flows which are using the same api version
+            | api_version(f'=={API}')
+        )
 
     def spawn_workflow(self):
         """Start/spawn a workflow."""
@@ -109,59 +126,77 @@ class WorkflowsManager:
 
     async def gather_workflows(self):
         """Scan, establish, and discard workflows."""
+        logger.info('SCAN')
+        # scan filesystem
         scanflows = {}
-        cre_owner, cre_name = re_compile_filters(None, ['.*'])
-        scan_args = (
-            (reg, host, port, pub_port, self.context, CLIENT_TIMEOUT)
-            for reg, host, port, pub_port, api in
-            get_scan_items_from_fs(cre_owner, cre_name)
-            if reg not in self.stopping and api == str(API))
+        async for flow in self.scan_pipe:
+            logger.info(f'SCAN: {flow["name"]}')
+            if flow['name'] in self.stopping:
+                continue
+            scanflows[f'{getuser()}{ID_DELIM}{flow["name"]}'] = {
+                'name': flow['name'],
+                'owner': getuser(),
+                'host': flow[ContactFileFields.HOST],
+                'port': flow[ContactFileFields.PORT],
+                'pub_port': flow[ContactFileFields.PUBLISH_PORT],
+                'version': flow[ContactFileFields.VERSION],
+                'uuid': flow[ContactFileFields.UUID]
+            }
+
+            # TODO: everything should get done in this for loop
+            #       that way even the sync_workflow becomes async
+
         # clear stopping set
         self.stopping.clear()
 
-        gathers = ()
-        for arg in scan_args:
-            gathers += (est_workflow(*arg),)
-        items = await asyncio.gather(*gathers)
-        for reg, host, port, pub_port, client, info in items:
-            if info is not None and info != MSG_TIMEOUT:
-                owner = info['owner']
-                scanflows[f"{owner}{ID_DELIM}{reg}"] = {
-                    'name': info['name'],
-                    'owner': owner,
-                    'host': host,
-                    'port': port,
-                    'pub_port': pub_port,
-                    'version': info['version'],
-                    'req_client': client,
-                }
+        # diff this scan from the previous one
+        before = set(self.workflows)
+        after = set(scanflows)
+        added = after - before
+        removed = before - after
+        unchanged = before & after
 
-        # Check existing against scan
-        for w_id, info in list(self.workflows.items()):
-            if w_id in scanflows:
-                if (info['host'] == scanflows[w_id]['host'] and
-                        info['port'] == scanflows[w_id]['port']):
-                    client = scanflows[w_id]['req_client']
-                    with suppress(IOError):
-                        client.stop(stop_loop=False)
-                    scanflows.pop(w_id)
-                continue
-            client = self.workflows[w_id]['req_client']
+        # workflows which were running before and are still running now
+        for wid in unchanged:
+            bef = self.workflows[wid]
+            aft = scanflows[wid]
+            # ensure that we are looking at the same run
+            if bef['uuid'] != aft['uuid']:
+                # if not it is a new flow, remove the old one
+                added.add(wid)
+                removed.add(wid)
+            else:
+                logger.info(f'SCAN: {flow["name"]} - pass')
+
+        # workflows which were running before but aren't running now
+        for wid in removed:
+            client = self.workflows[wid]['req_client']
             with suppress(IOError):
                 client.stop(stop_loop=False)
-            self.workflows.pop(w_id)
-            self.uiserver.data_store_mgr.purge_workflow(w_id)
+            self.workflows.pop(wid)
+            self.uiserver.data_store_mgr.purge_workflow(wid)
+            logger.info(f'SCAN: {flow["name"]} - removed')
 
-        # update with new, and start data sync
+        # workflows which are running now but which weren't running before
         gathers = ()
-        for w_id, w_info in scanflows.items():
-            self.workflows[w_id] = w_info
+        for wid in added:
+            flow = scanflows[wid]
+            try:
+                flow['req_client'] = SuiteRuntimeClient(flow['name'])
+            except:  # TODO
+                # either a network error or workflow isn't actually
+                # running e.g. stuck contact file
+                continue
+            self.workflows[wid] = flow
             gathers += (
                 self.uiserver.data_store_mgr.sync_workflow(
-                    w_id, w_info['name'], w_info['host'], w_info['pub_port']
+                    wid, flow['name'], flow['host'], flow['pub_port']
                 ),
             )
+            logger.info(f'SCAN: {flow["name"]} - added')
+
         await asyncio.gather(*gathers)
+        logger.info('END SCAN')
 
     async def multi_request(self, command, workflows, args=None,
                             multi_args=None, timeout=None):
