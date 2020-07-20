@@ -40,7 +40,7 @@ import logging
 from time import sleep
 
 from cylc.flow.network.server import PB_METHOD_MAP
-from cylc.flow.network.scan import MSG_TIMEOUT
+from cylc.flow.network import MSG_TIMEOUT
 from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
 from cylc.flow.data_store_mgr import (
     EDGES, DATA_TEMPLATE, ALL_DELTAS, DELTAS_MAP, WORKFLOW,
@@ -89,6 +89,15 @@ class DataStoreMgr:
             partial(self.start_subscription, w_id, *args, **kwargs)
         )
         await self.entire_workflow_update(ids=[w_id])
+
+    async def register_workflow(self, w_id, name, owner):
+        data = deepcopy(DATA_TEMPLATE)
+        flow = data[WORKFLOW]
+        flow.id = w_id
+        flow.name = name
+        flow.owner = owner
+        flow.status = 'stopped'
+        self.data[w_id] = data
 
     def purge_workflow(self, w_id):
         """Purge the manager of a workflow's subscription and data."""
@@ -233,7 +242,7 @@ class DataStoreMgr:
 
         # Prune old data
         for w_id in list(self.data):
-            if w_id not in self.workflows_mgr.workflows:
+            if w_id not in self.workflows_mgr.active:
                 del self.data[w_id]
 
         # Request new data
@@ -242,7 +251,7 @@ class DataStoreMgr:
             {'client': info['req_client'],
              'command': req_method,
              'req_context': w_id}
-            for w_id, info in self.workflows_mgr.workflows.items())
+            for w_id, info in self.workflows_mgr.active.items())
         gathers = ()
         for kwargs in req_kwargs:
             if not ids or kwargs['req_context'] in ids:
