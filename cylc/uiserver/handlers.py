@@ -26,8 +26,6 @@ from jupyterhub.services.auth import HubOAuthenticated
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
-from .websockets.template import render_graphiql
-
 
 class BaseHandler(web.RequestHandler):
 
@@ -36,6 +34,11 @@ class BaseHandler(web.RequestHandler):
         self.set_header("Access-Control-Allow-Origin", "*")
         self.set_header("Access-Control-Allow-Headers", "x-requested-with")
         self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+        self.set_header('Server', '')
+
+
+class StaticHandler(BaseHandler, web.StaticFileHandler):
+    """A static handler that extends BaseHandler (for headers)."""
 
 
 class APIHandler(BaseHandler):
@@ -85,6 +88,9 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
     # Declare extra attributes
     resolvers = None
 
+    def set_default_headers(self) -> None:
+        self.set_header('Server', '')
+
     def initialize(self, schema=None, executor=None, middleware=None,
                    root_value=None, graphiql=False, pretty=False,
                    batch=False, backend=None, **kwargs):
@@ -128,7 +134,7 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
         )
 
 
-class SubscriptionHandler(websocket.WebSocketHandler):
+class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
 
     def initialize(self, sub_server, resolvers):
         self.queue = Queue(100)
@@ -160,23 +166,10 @@ class SubscriptionHandler(websocket.WebSocketHandler):
         return wider_context
 
 
-class GraphiQLHandler(UIServerGraphQLHandler):
-    """A tornado handler for the GraphiQL websockets calls.
-
-    Uses a different function to render the GraphiQL template, which uses
-    a React app to subscribe to the query and display the result dynamically.
-    """
-
-    def get(self):
-        self.finish(
-            render_graphiql(
-                f'user/{self.hub_auth.get_user(self)["name"]}/'))
-
-
 __all__ = [
     "MainHandler",
+    "StaticHandler",
     "UserProfileHandler",
     "UIServerGraphQLHandler",
-    "SubscriptionHandler",
-    "GraphiQLHandler"
+    "SubscriptionHandler"
 ]
