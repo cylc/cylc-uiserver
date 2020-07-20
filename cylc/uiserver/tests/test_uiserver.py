@@ -49,7 +49,7 @@ def test_cylcuiserver_create_static_handler():
     cylc_uiserver = CylcUIServer(8000, './static', '/prefix/')
     handler = cylc_uiserver._create_static_handler('(imgs/*.png)')
     assert "/prefix/((imgs/*.png))" == handler[0]
-    assert handler[1] == StaticFileHandler
+    assert issubclass(handler[1], StaticFileHandler)
     assert handler[2].get('path').endswith("/static")
 
 

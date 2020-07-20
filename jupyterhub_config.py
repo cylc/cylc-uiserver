@@ -56,3 +56,11 @@ c.JupyterHub.template_paths = [
         'templates'
     )
 ]
+c.JupyterHub.tornado_settings = {
+    'headers': {
+      # 'Access-Control-Allow-Origin': '*',
+      # 'Access-Control-Allow-Headers': '*',
+      # 'Access-Control-Allow-Methods': '*',
+      'Server': ''
+   },
+}
