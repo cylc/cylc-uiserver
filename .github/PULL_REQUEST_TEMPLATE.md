@@ -23,3 +23,6 @@ This is a small change with no associated Issue.
 <!-- choose one: -->
 - [ ] I have opened a documentation PR at cylc/cylc-doc/pull/XXXX.
 - [ ] No documentation update required.
+<!-- choose one: -->
+- [ ] Created an issue at [cylc-uiserver conda-forge repository](https://github.com/conda-forge/cylc-uiserver-feedstock) with version changes (if you changed dependencies in `setup.py`, see `recipe/meta.yaml`).
+- [ ] No dependency changes.
