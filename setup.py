@@ -47,8 +47,7 @@ install_requires = [
     'jupyterhub==1.1.*',
     'tornado==6.0.*',
     'graphene-tornado==2.6.*',
-    'graphql-core<3,>=2.1',  # TODO: graphql-python/graphql-ws#39
-    'graphql-ws==0.3.*'
+    'graphql-ws>=0.3.1,<0.4'
 ]
 
 # Only include pytest-runner in setup_requires if we're invoking tests
