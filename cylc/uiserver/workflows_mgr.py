@@ -36,14 +36,14 @@ from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.hostuserutil import is_remote_host, get_host_ip_by_name
 from cylc.flow.network import API
 from cylc.flow.network.client import SuiteRuntimeClient
-from cylc.flow.network.scan import MSG_TIMEOUT
-from cylc.flow.network.scan_nt import (
+from cylc.flow.network import MSG_TIMEOUT
+from cylc.flow.network.scan import (
     api_version,
     contact_info,
     is_active,
     scan
 )
-from cylc.flow.suite_files import ContactFileFields
+from cylc.flow.suite_files import ContactFileFields as CFF
 
 logger = logging.getLogger(__name__)
 CLIENT_TIMEOUT = 2.0
@@ -106,13 +106,16 @@ class WorkflowsManager:
             self.context = zmq.asyncio.Context()
         else:
             self.context = context
-        self.workflows = {}
+        self.active = {}
         self.stopping = set()
-        self.scan_pipe = (
+        self.inactive = set()
+        self._scan_pipe = (
             # all flows on the filesystem
             scan
             # only flows which have a contact file
-            | is_active(True)
+            # | is_active(True)
+            # stop here is the flow is stopped, else...
+            | is_active(True, filter_stop=False)
             # extract info from the contact file
             | contact_info
             # only flows which are using the same api version
@@ -129,51 +132,61 @@ class WorkflowsManager:
         self.stopping.clear()
 
         # keep track of what's changed since the last scan
-        before = set(self.workflows)
-        after = set()
+        active_before = set(self.active)
+        inactive_before = self.inactive
+        owner = getuser()
 
         # start scanning
-        async for flow in self.scan_pipe:
+        async for flow in self._scan_pipe:
             name = flow['name']
-            wid = f'{getuser()}{ID_DELIM}{flow["name"]}'
-            after.add(wid)
-            present_before = wid in before
+            wid = f'{owner}{ID_DELIM}{flow["name"]}'
+            flow['id'] = wid
 
-            # reshape the data for the uiserver
-            flow.update({
-                'id': wid,
-                # 'name': name,
-                'owner': getuser(),
-                'host': flow[ContactFileFields.HOST],
-                'port': flow[ContactFileFields.PORT],
-                'pub_port': flow[ContactFileFields.PUBLISH_PORT],
-                'version': flow[ContactFileFields.VERSION],
-                'uuid': flow[ContactFileFields.UUID]
-            })
+            if not flow.get('contact'):
+                # this flow isn't running
+                if wid in active_before:
+                    self.active.pop(wid)
+                if wid not in inactive_before:
+                    await self.uiserver.data_store_mgr.register_workflow(
+                        wid, name, owner
+                    )
+                    self.inactive.add(wid)
+                continue
+
+            # this workflow is running
+            if wid in self.inactive:
+                self.inactive.remove(wid)
 
             # if this workflow was present before, is it still the same run?
-            restarted = False
-            if present_before:
-                if flow['uuid'] != self.workflows[wid]['uuid']:
-                    restarted = True
-                    self.workflows.pop(wid)
+            new_run = False
+            if wid in active_before:
+                if flow[CFF.UUID] != self.active[wid].get(CFF.UUID):
+                    new_run = True
+                    self.active.pop(wid)
                     self.uiserver.data_store_mgr.purge_workflow(wid)
 
             # is it a new run?
-            if restarted or not present_before:
+            if new_run or wid not in active_before:
                 flow['req_client'] = SuiteRuntimeClient(name)
-                self.workflows[wid] = flow
+                self.active[wid] = flow
                 await self.uiserver.data_store_mgr.sync_workflow(
-                    wid, name, flow['host'], flow['pub_port']
+                    wid,
+                    name,
+                    flow[CFF.HOST],
+                    flow[CFF.PUBLISH_PORT]
                 )
 
         # tidy up stopped flows
-        for wid in before - after:
-            client = self.workflows[wid]['req_client']
+        for wid in active_before - set(self.active):
+            client = self.active[wid]['req_client']
             with suppress(IOError):
                 client.stop(stop_loop=False)
-            self.workflows.pop(wid)
+            self.active.pop(wid)
             self.uiserver.data_store_mgr.purge_workflow(wid)
+
+        # tidy up deleted / unregistered flows
+        for wid in inactive_before - self.inactive:
+            self.inactive.remove(wid)
 
     async def multi_request(self, command, workflows, args=None,
                             multi_args=None, timeout=None):
@@ -186,13 +199,15 @@ class WorkflowsManager:
         for w_id in workflows:
             cmd_args = multi_args.get(w_id, args)
             req_args[w_id] = (
-                self.workflows[w_id]['req_client'],
+                self.active[w_id]['req_client'],
                 command,
                 cmd_args,
                 timeout,
             )
         gathers = ()
         for info, request_args in req_args.items():
+            if request_args[0] is None:
+                continue
             gathers += (workflow_request(req_context=info, *request_args),)
         results = await asyncio.gather(*gathers)
         res = []
