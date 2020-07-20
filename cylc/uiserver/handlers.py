@@ -157,9 +157,6 @@ class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
     def recv_nowait(self):
         return self.queue.get_nowait()
 
-    def check_origin(self, origin: str) -> bool:
-        return True
-
     @property
     def context(self):
         wider_context = {

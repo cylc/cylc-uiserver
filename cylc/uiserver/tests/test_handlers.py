@@ -110,9 +110,31 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         handler = self._create_handler()
         assert handler.select_subprotocol(subprotocols=[]) == GRAPHQL_WS
 
-    def test_websockets_check_origin(self):
+    def test_websockets_check_origin_accepts_same_origin(self):
+        """A request that includes the Host header must use the same
+        value as the server host, or an error is raised.
+
+        This prevents CORS attacks. In Cylc UI, it should work as we
+        expect the Host header to be set by the browser when you navigate
+        to the UI Server. Once your browser opens the WebSocket request
+        it should match the Host of the UI Server.
+        """
         handler = self._create_handler()
-        assert handler.check_origin(origin='')
+        host_header = 'ui.cylc'
+        handler.request.headers['Host'] = host_header
+        assert handler.check_origin(origin=f'http://{host_header}')
+
+    def test_websockets_check_origin_rejects_different_origin(self):
+        """A request from a different Host MUST be blocked to prevent
+        CORS attacks.
+
+        This is the default after Tornado 4, and helps secure Cylc UI
+        WebSocket endpoint. Change this behavior carefully.
+        """
+        handler = self._create_handler()
+        host_header = 'ui.cylc'
+        handler.request.headers['Host'] = host_header
+        assert not handler.check_origin(origin=f'http://ui.notcylc')
 
     def test_websockets_context(self):
         handler = self._create_handler()
