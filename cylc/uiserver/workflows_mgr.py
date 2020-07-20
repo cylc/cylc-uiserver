@@ -126,77 +126,54 @@ class WorkflowsManager:
 
     async def gather_workflows(self):
         """Scan, establish, and discard workflows."""
-        logger.info('SCAN')
-        # scan filesystem
-        scanflows = {}
+        self.stopping.clear()
+
+        # keep track of what's changed since the last scan
+        before = set(self.workflows)
+        after = set()
+
+        # start scanning
         async for flow in self.scan_pipe:
-            logger.info(f'SCAN: {flow["name"]}')
-            if flow['name'] in self.stopping:
-                continue
-            scanflows[f'{getuser()}{ID_DELIM}{flow["name"]}'] = {
-                'name': flow['name'],
+            name = flow['name']
+            wid = f'{getuser()}{ID_DELIM}{flow["name"]}'
+            after.add(wid)
+            present_before = wid in before
+
+            # reshape the data for the uiserver
+            flow.update({
+                'id': wid,
+                # 'name': name,
                 'owner': getuser(),
                 'host': flow[ContactFileFields.HOST],
                 'port': flow[ContactFileFields.PORT],
                 'pub_port': flow[ContactFileFields.PUBLISH_PORT],
                 'version': flow[ContactFileFields.VERSION],
                 'uuid': flow[ContactFileFields.UUID]
-            }
+            })
 
-            # TODO: everything should get done in this for loop
-            #       that way even the sync_workflow becomes async
+            # if this workflow was present before, is it still the same run?
+            restarted = False
+            if present_before:
+                if flow['uuid'] != self.workflows[wid]['uuid']:
+                    restarted = True
+                    self.workflows.pop(wid)
+                    self.uiserver.data_store_mgr.purge_workflow(wid)
 
-        # clear stopping set
-        self.stopping.clear()
+            # is it a new run?
+            if restarted or not present_before:
+                flow['req_client'] = SuiteRuntimeClient(name)
+                self.workflows[wid] = flow
+                await self.uiserver.data_store_mgr.sync_workflow(
+                    wid, name, flow['host'], flow['pub_port']
+                )
 
-        # diff this scan from the previous one
-        before = set(self.workflows)
-        after = set(scanflows)
-        added = after - before
-        removed = before - after
-        unchanged = before & after
-
-        # workflows which were running before and are still running now
-        for wid in unchanged:
-            bef = self.workflows[wid]
-            aft = scanflows[wid]
-            # ensure that we are looking at the same run
-            if bef['uuid'] != aft['uuid']:
-                # if not it is a new flow, remove the old one
-                added.add(wid)
-                removed.add(wid)
-            else:
-                logger.info(f'SCAN: {flow["name"]} - pass')
-
-        # workflows which were running before but aren't running now
-        for wid in removed:
+        # tidy up stopped flows
+        for wid in before - after:
             client = self.workflows[wid]['req_client']
             with suppress(IOError):
                 client.stop(stop_loop=False)
             self.workflows.pop(wid)
             self.uiserver.data_store_mgr.purge_workflow(wid)
-            logger.info(f'SCAN: {flow["name"]} - removed')
-
-        # workflows which are running now but which weren't running before
-        gathers = ()
-        for wid in added:
-            flow = scanflows[wid]
-            try:
-                flow['req_client'] = SuiteRuntimeClient(flow['name'])
-            except:  # TODO
-                # either a network error or workflow isn't actually
-                # running e.g. stuck contact file
-                continue
-            self.workflows[wid] = flow
-            gathers += (
-                self.uiserver.data_store_mgr.sync_workflow(
-                    wid, flow['name'], flow['host'], flow['pub_port']
-                ),
-            )
-            logger.info(f'SCAN: {flow["name"]} - added')
-
-        await asyncio.gather(*gathers)
-        logger.info('END SCAN')
 
     async def multi_request(self, command, workflows, args=None,
                             multi_args=None, timeout=None):
