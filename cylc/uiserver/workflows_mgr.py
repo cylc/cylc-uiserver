@@ -47,7 +47,7 @@ async def workflow_request(client, command, args=None,
     """Workflow request command.
 
     Args:
-        client (object): Instantiated workflow client.
+        client (SuiteRuntimeClient): Instantiated workflow client.
         command (str): Command/Endpoint name.
         args (dict): Endpoint arguments.
         timeout (float): Client request timeout (secs).
