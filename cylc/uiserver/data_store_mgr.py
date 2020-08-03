@@ -302,10 +302,11 @@ class DataStoreMgr:
              'command': req_method,
              'req_context': w_id}
             for w_id, info in self.workflows_mgr.active.items())
-        gathers = ()
-        for kwargs in req_kwargs:
-            if not ids or kwargs['req_context'] in ids:
-                gathers += (workflow_request(**kwargs),)
+        gathers = [
+            workflow_request(**kwargs)
+            for kwargs in req_kwargs
+            if not ids or kwargs['req_context'] in ids
+        ]
         items = await asyncio.gather(*gathers)
         for w_id, result in items:
             if result is not None and result != MSG_TIMEOUT:
