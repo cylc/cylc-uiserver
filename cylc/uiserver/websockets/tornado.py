@@ -177,6 +177,11 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
                 resolving_items.append(
                     self.__resolve_container_item(container, key, item))
 
+        # FIXME: If we have multiple items in the queue, and one of them
+        #        fails, then we won't send the execution results.
+        #        We could use return_exceptions=True here, but it is not
+        #        clear how we should proceed. Should we re-queue the
+        #        failed item? Send the error? Ignore it? Log?
         await gather(*resolving_items)
 
         await super().send_execution_result(connection_context, op_id,
