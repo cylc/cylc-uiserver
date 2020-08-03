@@ -21,7 +21,8 @@ default WebSocket check_origin function.
 
 ### Fixes
 
-None.
+[#153](https://github.com/cylc/cylc-uiserver/pull/153) - Fix websocket
+connections on webkit based browsers.
 
 ### Documentation
 
