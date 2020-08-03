@@ -139,7 +139,7 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
         return super().execute(request_context, params)
 
     async def send_execution_result(self, connection_context, op_id,
-                              execution_result):
+                                    execution_result):
         """
         Our schema contains a subscription ObjectType that contains other
         ObjectType's. These are resolved with functions that are awaitable,
