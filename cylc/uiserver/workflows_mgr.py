@@ -295,11 +295,16 @@ class WorkflowsManager:
             workflow_request(req_context=info, *request_args)
             for info, request_args in req_args.items()
         ]
-        results = await asyncio.gather(*gathers)
+        results = await asyncio.gather(*gathers, return_exceptions=True)
         res = []
-        for _, val in results:
-            res.extend([
-                msg_core
-                for msg_core in list(val.values())[0].get('result')
-                if isinstance(val, dict) and list(val.values())])
+        for result in results:
+            if isinstance(result, Exception):
+                logger.exception('Failed to send requests to '
+                                 'multiple workflows', exc_info=result)
+            else:
+                _, val = result
+                res.extend([
+                    msg_core
+                    for msg_core in list(val.values())[0].get('result')
+                    if isinstance(val, dict) and list(val.values())])
         return res
