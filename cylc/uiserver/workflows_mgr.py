@@ -291,11 +291,10 @@ class WorkflowsManager:
                 cmd_args,
                 timeout,
             )
-        gathers = ()
-        for info, request_args in req_args.items():
-            if request_args[0] is None:
-                continue
-            gathers += (workflow_request(req_context=info, *request_args),)
+        gathers = [
+            workflow_request(req_context=info, *request_args)
+            for info, request_args in req_args.items()
+        ]
         results = await asyncio.gather(*gathers)
         res = []
         for _, val in results:
