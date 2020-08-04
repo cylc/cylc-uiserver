@@ -19,6 +19,8 @@ import logging
 
 import pytest
 
+from cylc.flow.network.scan import MSG_TIMEOUT
+
 import cylc.uiserver.data_store_mgr as data_store_mgr_module
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from .conftest import AsyncClientFixture
@@ -54,6 +56,34 @@ async def test_entire_workflow_update(
     # de-serialized and added to the ``DataStoreMgr.data``
     # (the workflow ID is its key).
     assert entire_workflow.workflow.id == w_id_data['workflow'].id
+
+
+@pytest.mark.asyncio
+async def test_entire_workflow_update_ignores_timeout_message(
+        async_client: AsyncClientFixture,
+        data_store_mgr: DataStoreMgr
+):
+    """
+    Test that ``entire_workflow_update`` ignores if the client
+    receives a ``MSG_TIMEOUT`` message.
+    """
+    w_id = 'workflow_id'
+    async_client.will_return(MSG_TIMEOUT)
+
+    # Set the client used by our test workflow.
+    data_store_mgr.workflows_mgr.workflows[w_id] = {
+        'req_client': async_client
+    }
+
+    # Call the entire_workflow_update function.
+    # This should use the client defined above (``async_client``) when
+    # calling ``workflow_request``.
+    await data_store_mgr.entire_workflow_update()
+
+    # When a ``MSG_TIMEOUT`` happens, the ``DataStoreMgr`` object ignores
+    # that message. So it means that its ``.data`` dictionary MUST NOT
+    # have an entry for the Workflow ID.
+    assert w_id not in data_store_mgr.data
 
 
 @pytest.mark.asyncio
