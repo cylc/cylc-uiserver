@@ -19,7 +19,8 @@ import inspect
 
 import pytest
 import zmq
-from cylc.flow.data_messages_pb2 import PbEntireWorkflow, PbWorkflow
+from cylc.flow.data_messages_pb2 import PbEntireWorkflow, PbWorkflow,\
+    PbFamilyProxy
 from cylc.flow.network import ZMQSocketBase
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
@@ -79,6 +80,9 @@ def make_entire_workflow():
         workflow.id = workflow_id
         entire_workflow = PbEntireWorkflow()
         entire_workflow.workflow.CopyFrom(workflow)
+        root_family = PbFamilyProxy()
+        root_family.name = 'root'
+        entire_workflow.family_proxies.extend([root_family])
         return entire_workflow
 
     return _make_entire_workflow

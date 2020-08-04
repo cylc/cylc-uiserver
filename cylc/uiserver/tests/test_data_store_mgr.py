@@ -18,7 +18,6 @@
 import logging
 
 import pytest
-
 from cylc.flow.network.scan import MSG_TIMEOUT
 
 import cylc.uiserver.data_store_mgr as data_store_mgr_module
