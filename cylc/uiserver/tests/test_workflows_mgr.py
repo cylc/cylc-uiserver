@@ -144,10 +144,10 @@ async def test_est_workflow(
 # --- WorkflowsManager
 
 
-def test_workflows_manager_spawn_workflow():
-    mgr = WorkflowsManager(None)
-    mgr.spawn_workflow()
-    assert not mgr.active
+def test_workflows_manager_spawn_workflow(workflows_manager):
+    workflows_manager.spawn_workflow()
+    assert not workflows_manager.active
+
 
 
 # TODO: add tests for remaining methods in WorkflowsManager
