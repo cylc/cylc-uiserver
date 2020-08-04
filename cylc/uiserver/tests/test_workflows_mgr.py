@@ -23,6 +23,7 @@ from itertools import product
 from pytest_mock import MockFixture
 
 from cylc.uiserver.workflows_mgr import *
+import cylc.uiserver.workflows_mgr as workflows_mgr_module
 from .conftest import AsyncClientFixture
 
 
@@ -252,3 +253,54 @@ async def test_workflow_state_change_restart(tmp_path):
 
     # it should have picked up the new uuid too
     assert changes[1][3][CFF.UUID] == '42'
+
+
+@pytest.mark.asyncio
+async def test_multi_request(
+        workflows_manager, async_client: AsyncClientFixture):
+    workflow_id = 'multi-request-workflow'
+    # The response for a workflow multi-request.
+    value = 42
+    res = {
+        workflow_id: {
+            'result': [
+                value
+            ]
+        }
+    }
+    async_client.will_return(res)
+    multi_args = {
+        workflow_id: None
+    }
+
+    workflows_manager.active[workflow_id] = {
+        'req_client': async_client
+    }
+
+    response = await workflows_manager.multi_request(
+        '', [workflow_id], None, multi_args)
+    assert 1 == len(response)
+    assert value == response[0]
+
+
+@pytest.mark.asyncio
+async def test_multi_request_gather_errors(
+        workflows_manager, async_client: AsyncClientFixture,
+        mocker: MockFixture):
+    workflow_id = 'gather-error-workflow'
+    error_type = ValueError
+    async_client.will_return(error_type)
+
+    workflows_manager.active[workflow_id] = {
+        'req_client': async_client
+    }
+
+    logger = logging.getLogger(workflows_mgr_module.__name__)
+    mocked_exception_function = mocker.patch.object(logger, 'exception')
+    await workflows_manager.multi_request('', [workflow_id], None, None)
+    mocked_exception_function.assert_called_once()
+    assert mocked_exception_function.call_args[1][
+               'exc_info'].__class__ == error_type
+
+
+# TODO: add tests for remaining methods in WorkflowsManager

@@ -18,7 +18,7 @@
 import logging
 
 import pytest
-from cylc.flow.network.scan import MSG_TIMEOUT
+from cylc.flow.network import MSG_TIMEOUT
 
 import cylc.uiserver.data_store_mgr as data_store_mgr_module
 from cylc.uiserver.data_store_mgr import DataStoreMgr
@@ -70,7 +70,7 @@ async def test_entire_workflow_update_ignores_timeout_message(
     async_client.will_return(MSG_TIMEOUT)
 
     # Set the client used by our test workflow.
-    data_store_mgr.workflows_mgr.workflows[w_id] = {
+    data_store_mgr.workflows_mgr.active[w_id] = {
         'req_client': async_client
     }
 
