@@ -21,6 +21,10 @@ default WebSocket check_origin function.
 [#124](https://github.com/cylc/cylc-uiserver/pull/124) - Add decorator
 for websockets authentication.
 
+[#151](https://github.com/cylc/cylc-uiserver/pull/151) - Prevent
+`asyncio.gather` errors to be ignored, and allow execution to continue,
+logging errors when found.
+
 ### Fixes
 
 [#153](https://github.com/cylc/cylc-uiserver/pull/153) - Fix websocket
