@@ -149,6 +149,7 @@ def test_workflows_manager_spawn_workflow():
     mgr.spawn_workflow()
     assert not mgr.active
 
+
 # TODO: add tests for remaining methods in WorkflowsManager
 
 
