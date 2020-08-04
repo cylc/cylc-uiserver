@@ -19,7 +19,11 @@ import inspect
 
 import pytest
 import zmq
+from cylc.flow.data_messages_pb2 import PbEntireWorkflow, PbWorkflow
 from cylc.flow.network import ZMQSocketBase
+
+from cylc.uiserver.data_store_mgr import DataStoreMgr
+from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
 class AsyncClientFixture(ZMQSocketBase):
@@ -56,3 +60,25 @@ def event_loop():
     for task in asyncio.all_tasks(loop):
         task.cancel()
     loop.close()
+
+
+@pytest.fixture
+def workflows_manager() -> WorkflowsManager:
+    return WorkflowsManager(None)
+
+
+@pytest.fixture
+def data_store_mgr(workflows_manager: WorkflowsManager) -> DataStoreMgr:
+    return DataStoreMgr(workflows_mgr=workflows_manager)
+
+
+@pytest.fixture
+def make_entire_workflow():
+    def _make_entire_workflow(workflow_id):
+        workflow = PbWorkflow()
+        workflow.id = workflow_id
+        entire_workflow = PbEntireWorkflow()
+        entire_workflow.workflow.CopyFrom(workflow)
+        return entire_workflow
+
+    return _make_entire_workflow
