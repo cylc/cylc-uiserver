@@ -43,7 +43,8 @@ def find_version(*file_paths):
 #     don't pin versions, we will get whatever cylc-flow needs, and not
 #     the bleeding-edge version.
 install_requires = [
-    'cylc-flow==8.0a2',
+    ('cylc-flow @ https://github.com/cylc/cylc-flow'
+     '/tarball/master#egg=cylc-8.0a3.dev'),
     'jupyterhub==1.1.*',
     'tornado==6.0.*',
     'graphene-tornado==2.6.*',
