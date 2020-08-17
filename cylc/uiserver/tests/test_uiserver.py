@@ -16,7 +16,7 @@
 
 from cylc.uiserver.main import *
 from tornado.web import StaticFileHandler, RequestHandler
-from cylc.uiserver.handlers import TornadoGraphQLHandler
+from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 
 
 def test_my_application():
