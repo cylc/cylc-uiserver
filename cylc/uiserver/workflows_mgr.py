@@ -85,8 +85,7 @@ async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
     #       SuiteRuntimeClient will not attempt to check the contact file
     #       which would be unnecessary as we have already done so.
     # NOTE: This part of the scan *is* IO blocking.
-    client = SuiteRuntimeClient(reg, host=host, port=port,
-                                context=context, timeout=timeout)
+    client = SuiteRuntimeClient(reg, context=context, timeout=timeout)
     _, result = await workflow_request(client, 'identify')
     return (reg, host, port, pub_port, client, result)
 
