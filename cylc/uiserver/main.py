@@ -211,11 +211,11 @@ class CylcUIServer(object):
             partial(app.try_exit, uis=self), 100).start()
         # Discover workflows on initial start up.
         ioloop.IOLoop.current().add_callback(
-            self.workflows_mgr.gather_workflows)
+            self.workflows_mgr.update)
         # If the client is already established it's not overridden,
         # so the following callbacks can happen at the same time.
         ioloop.PeriodicCallback(
-            self.workflows_mgr.gather_workflows, 7000).start()
+            self.workflows_mgr.update, 1000).start()
         try:
             ioloop.IOLoop.current().start()
         except KeyboardInterrupt:

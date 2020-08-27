@@ -75,6 +75,7 @@ class DataStoreMgr:
         blocking the main loop.
 
         """
+        print(f'$ sync_workflow({w_id})')
         if self.loop is None:
             self.loop = asyncio.get_running_loop()
         if w_id in self.w_subs:
@@ -91,6 +92,7 @@ class DataStoreMgr:
         await self.entire_workflow_update(ids=[w_id])
 
     async def register_workflow(self, w_id, name, owner):
+        print(f'$ register_workflow({w_id})')
         data = deepcopy(DATA_TEMPLATE)
         flow = data[WORKFLOW]
         flow.id = w_id
@@ -99,8 +101,15 @@ class DataStoreMgr:
         flow.status = 'stopped'
         self.data[w_id] = data
 
+    def stop_workflow(self, w_id):
+        print(f'$ stop_workflow({w_id})')
+        self.data[w_id]['status'] = 'stopped'
+        self.data[w_id]['host'] = None
+        self.data[w_id]['port'] = None
+
     def purge_workflow(self, w_id):
         """Purge the manager of a workflow's subscription and data."""
+        print(f'$ purge_workflow({w_id})')
         if w_id in self.w_subs:
             self.w_subs[w_id].stop()
             del self.w_subs[w_id]
