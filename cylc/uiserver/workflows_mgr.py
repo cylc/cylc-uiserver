@@ -106,6 +106,7 @@ class WorkflowsManager:
             self.context = zmq.asyncio.Context()
         else:
             self.context = context
+        self.owner = getuser()
         self.active = {}
         self.stopping = set()
         self.inactive = set()
@@ -127,66 +128,159 @@ class WorkflowsManager:
         # TODO - Spawn workflows
         pass
 
-    async def gather_workflows(self):
-        """Scan, establish, and discard workflows."""
-        self.stopping.clear()
+    async def _workflow_state_changes(self):
+        """Scan workflows and yield state change events.
 
-        # keep track of what's changed since the last scan
-        active_before = set(self.active)
-        inactive_before = self.inactive
+        Yields:
+            tuple - (wid, before, after, flow)
+
+            wid (str):
+                The workflow ID.
+            before (str):
+                The state at the last scan ('active', 'inactive', None)
+            before (str):
+                The state at this scan ('active', 'inactive', None)
+            flow (dict):
+                The scan data (i.e. the contents of the contact file).
+
+        """
         owner = getuser()
 
-        # start scanning
+        active_before = set(self.active)
+        inactive_before = set(self.inactive)
+
+        active = set()
+        inactive = set()
+
         async for flow in self._scan_pipe:
-            name = flow['name']
             wid = f'{owner}{ID_DELIM}{flow["name"]}'
             flow['id'] = wid
 
             if not flow.get('contact'):
                 # this flow isn't running
+                inactive.add(wid)
                 if wid in active_before:
-                    self.active.pop(wid)
-                if wid not in inactive_before:
-                    await self.uiserver.data_store_mgr.register_workflow(
-                        wid, name, owner
-                    )
-                    self.inactive.add(wid)
-                continue
+                    yield (wid, 'active', 'inactive', flow)
+                elif wid in inactive_before:
+                    pass
+                else:
+                    yield (wid, None, 'inactive', flow)
 
-            # this workflow is running
-            if wid in self.inactive:
+            elif (
+                wid in self.active
+                and flow[CFF.UUID] != self.active[wid].get(CFF.UUID)
+            ):
+                # this flow is running but it's a different run
+                active.add(wid)
+                yield (wid, 'active', 'inactive', flow)
+                yield (wid, 'inactive', 'active', flow)
+
+            else:
+                # this flow is running
+                active.add(wid)
+                if wid in active_before:
+                    pass
+                elif wid in inactive_before:
+                    yield (wid, 'inactive', 'active', flow)
+                else:
+                    yield (wid, None, 'active', flow)
+
+        for wid in active_before - (active | inactive):
+            yield (wid, 'active', None, None)
+
+        for wid in inactive_before - (active | inactive):
+            yield (wid, 'inactive', None, None)
+
+        # return active, inactive
+
+    async def _register(self, wid, flow):
+        """Register a new workflow with the data store."""
+        print(f'_register({wid})')
+        await self.uiserver.data_store_mgr.register_workflow(
+            wid, flow['name'], self.owner
+        )
+
+    async def _connect(self, wid, flow):
+        """Open a connection to a running workflow."""
+        print(f'_connect({wid})')
+        self.active[wid] = flow
+        flow['req_client'] = SuiteRuntimeClient(flow['name'])
+        await self.uiserver.data_store_mgr.sync_workflow(
+            wid,
+            flow['name'],
+            flow[CFF.HOST],
+            flow[CFF.PUBLISH_PORT]
+        )
+
+    async def _disconnect(self, wid):
+        """Disconnect from a running workflow."""
+        print(f'_disconnect({wid})')
+        client = self.active[wid]['req_client']
+        with suppress(IOError):
+            client.stop(stop_loop=False)
+
+    async def _unregister(self, wid):
+        """Unregister a workflow from the data store."""
+        print(f'_unregister({wid})')
+        self.uiserver.data_store_mgr.purge_workflow(wid)
+
+    async def _stop(self, wid):
+        """Mark a workflow as stopped.
+
+        The workflow can't do this itself, because it's not running.
+        """
+        self.uiserver.data_store_mgr.stop_workflow(wid)
+
+    async def update(self):
+        """Scans for workflows, handles any state changes.
+
+        Possible workflow states:
+            active:
+                (i.e. running, held, stopping)
+            inactive:
+                (i.e. stopped or registered)
+            None:
+                (i.e. unregistered)
+
+        Between scans workflows can jump from any state to any other state.
+
+        """
+        self.stopping.clear()
+
+        async for wid, before, after, flow in self._workflow_state_changes():
+            print(f'# {wid} {before}->{after}')
+
+            # handle state changes
+            if before == 'active' and after == 'inactive':
+                await self._disconnect(wid)
+                await self._stop(wid)
+
+            elif before == 'active' and after is None:
+                await self._disconnect(wid)
+                await self._unregister(wid)
+
+            elif before is None and after == 'active':
+                await self._register(wid, flow)
+                await self._connect(wid, flow)
+
+            elif before is None and after == 'inactive':
+                await self._register(wid, flow)
+
+            elif before == 'inactive' and after == 'active':
+                await self._connect(wid, flow)
+
+            elif before == 'inactive' and after is None:
+                await self._unregister(wid)
+
+            # finally update the new states for internal purposes
+            if before == 'active':
+                self.active.pop(wid)
+            elif before == 'inactive':
                 self.inactive.remove(wid)
-
-            # if this workflow was present before, is it still the same run?
-            new_run = False
-            if wid in active_before:
-                if flow[CFF.UUID] != self.active[wid].get(CFF.UUID):
-                    new_run = True
-                    self.active.pop(wid)
-                    self.uiserver.data_store_mgr.purge_workflow(wid)
-
-            # is it a new run?
-            if new_run or wid not in active_before:
-                flow['req_client'] = SuiteRuntimeClient(name)
+            if after == 'active':
                 self.active[wid] = flow
-                await self.uiserver.data_store_mgr.sync_workflow(
-                    wid,
-                    name,
-                    flow[CFF.HOST],
-                    flow[CFF.PUBLISH_PORT]
-                )
-
-        # tidy up stopped flows
-        for wid in active_before - set(self.active):
-            client = self.active[wid]['req_client']
-            with suppress(IOError):
-                client.stop(stop_loop=False)
-            self.active.pop(wid)
-            self.uiserver.data_store_mgr.purge_workflow(wid)
-
-        # tidy up deleted / unregistered flows
-        for wid in inactive_before - self.inactive:
-            self.inactive.remove(wid)
+            elif after == 'inactive':
+                self.inactive.add(wid)
 
     async def multi_request(self, command, workflows, args=None,
                             multi_args=None, timeout=None):
