@@ -144,8 +144,6 @@ class WorkflowsManager:
                 The scan data (i.e. the contents of the contact file).
 
         """
-        owner = getuser()
-
         active_before = set(self.active)
         inactive_before = set(self.inactive)
 
@@ -153,7 +151,8 @@ class WorkflowsManager:
         inactive = set()
 
         async for flow in self._scan_pipe:
-            wid = f'{owner}{ID_DELIM}{flow["name"]}'
+            flow['owner'] = self.owner
+            wid = f'{flow["owner"]}{ID_DELIM}{flow["name"]}'
             flow['id'] = wid
 
             if not flow.get('contact'):
@@ -197,7 +196,7 @@ class WorkflowsManager:
         """Register a new workflow with the data store."""
         print(f'_register({wid})')
         await self.uiserver.data_store_mgr.register_workflow(
-            wid, flow['name'], self.owner
+            wid, flow['name'], flow['owner']
         )
 
     async def _connect(self, wid, flow):
@@ -207,9 +206,7 @@ class WorkflowsManager:
         flow['req_client'] = SuiteRuntimeClient(flow['name'])
         await self.uiserver.data_store_mgr.sync_workflow(
             wid,
-            flow['name'],
-            flow[CFF.HOST],
-            flow[CFF.PUBLISH_PORT]
+            flow
         )
 
     async def _disconnect(self, wid):
