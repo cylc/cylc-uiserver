@@ -39,6 +39,7 @@ from functools import partial
 import logging
 import time
 
+from cylc.flow import ID_DELIM
 from cylc.flow.network.server import PB_METHOD_MAP
 from cylc.flow.network import MSG_TIMEOUT
 from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
@@ -80,11 +81,14 @@ class DataStoreMgr:
             flow.owner = contact_data['owner']
             flow.host = contact_data[CFF.HOST]
             flow.port = int(contact_data[CFF.PORT])
+            # flow.pub_port = int(contact_data[CFF.PUBLISH_PORT])
             flow.api_version = int(contact_data[CFF.API])
         else:
             # wipe pre-existing contact-file data
+            flow.owner, flow.name = w_id.split(ID_DELIM)
             flow.host = ''
             flow.port = 0
+            # flow.pub_port = 0
             flow.api_version = 0
             flow.status = 'stopped'
 
@@ -104,16 +108,16 @@ class DataStoreMgr:
         blocking the main loop.
 
         """
-        print(f'$ sync_workflow({w_id})')
-
-        self.update_contact(w_id, contact_data)
-
+        logger.debug(f'sync_workflow({w_id})')
         if self.loop is None:
             self.loop = asyncio.get_running_loop()
+
+        # don't sync if subscription exists
         if w_id in self.w_subs:
             return
 
         self.delta_queues[w_id] = {}
+        self.update_contact(w_id, contact_data)
 
         # Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.
@@ -124,13 +128,13 @@ class DataStoreMgr:
                 w_id,
                 contact_data['name'],
                 contact_data[CFF.HOST],
-                contact_data[CFF.PORT]
+                contact_data[CFF.PUBLISH_PORT]
             )
         )
         await self.entire_workflow_update(ids=[w_id])
 
     async def register_workflow(self, w_id, name, owner):
-        print(f'$ register_workflow({w_id})')
+        logger.debug(f'register_workflow({w_id})')
         self.delta_queues[w_id] = {}
 
         # create new entry in the data store
@@ -141,21 +145,23 @@ class DataStoreMgr:
         self.update_contact(w_id)
 
     def stop_workflow(self, w_id):
-        print(f'$ stop_workflow({w_id})')
+        logger.debug(f'stop_workflow({w_id})')
         self.update_contact(w_id)
 
-    def purge_workflow(self, w_id):
+    def purge_workflow(self, w_id, data=True):
         """Purge the manager of a workflow's subscription and data."""
-        print(f'$ purge_workflow({w_id})')
+        logger.debug(f'purge_workflow({w_id})')
         if w_id in self.w_subs:
             self.w_subs[w_id].stop()
             del self.w_subs[w_id]
-        if w_id in self.data:
-            del self.data[w_id]
-        if w_id in self.delta_queues:
-            del self.delta_queues[w_id]
-        self.executors[w_id].shutdown(wait=True)
-        del self.executors[w_id]
+        if data:
+            if w_id in self.data:
+                del self.data[w_id]
+            if w_id in self.delta_queues:
+                del self.delta_queues[w_id]
+        if w_id in self.executors:
+            self.executors[w_id].shutdown(wait=True)
+            del self.executors[w_id]
 
     def start_subscription(self, w_id, reg, host, port):
         """Instantiate and run subscriber data-store sync.

@@ -98,9 +98,8 @@ async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
 
 
 class WorkflowsManager:
-    """Discover and Manage workflows."""
 
-    def __init__(self, uiserver, context=None):
+    def __init__(self, uiserver, context=None, run_dir=None):
         self.uiserver = uiserver
         if context is None:
             self.context = zmq.asyncio.Context()
@@ -112,7 +111,7 @@ class WorkflowsManager:
         self.inactive = set()
         self._scan_pipe = (
             # all flows on the filesystem
-            scan
+            scan(run_dir)
             # only flows which have a contact file
             # | is_active(True)
             # stop here is the flow is stopped, else...
@@ -171,7 +170,7 @@ class WorkflowsManager:
             ):
                 # this flow is running but it's a different run
                 active.add(wid)
-                yield (wid, 'active', 'inactive', flow)
+                yield (wid, 'active', 'inactive', self.active[wid])
                 yield (wid, 'inactive', 'active', flow)
 
             else:
@@ -190,18 +189,14 @@ class WorkflowsManager:
         for wid in inactive_before - (active | inactive):
             yield (wid, 'inactive', None, None)
 
-        # return active, inactive
-
     async def _register(self, wid, flow):
         """Register a new workflow with the data store."""
-        print(f'_register({wid})')
         await self.uiserver.data_store_mgr.register_workflow(
             wid, flow['name'], flow['owner']
         )
 
     async def _connect(self, wid, flow):
         """Open a connection to a running workflow."""
-        print(f'_connect({wid})')
         self.active[wid] = flow
         flow['req_client'] = SuiteRuntimeClient(flow['name'])
         await self.uiserver.data_store_mgr.sync_workflow(
@@ -211,14 +206,12 @@ class WorkflowsManager:
 
     async def _disconnect(self, wid):
         """Disconnect from a running workflow."""
-        print(f'_disconnect({wid})')
         client = self.active[wid]['req_client']
         with suppress(IOError):
             client.stop(stop_loop=False)
 
     async def _unregister(self, wid):
         """Unregister a workflow from the data store."""
-        print(f'_unregister({wid})')
         self.uiserver.data_store_mgr.purge_workflow(wid)
 
     async def _stop(self, wid):
@@ -226,6 +219,7 @@ class WorkflowsManager:
 
         The workflow can't do this itself, because it's not running.
         """
+        self.uiserver.data_store_mgr.purge_workflow(wid, data=False)
         self.uiserver.data_store_mgr.stop_workflow(wid)
 
     async def update(self):
@@ -245,8 +239,6 @@ class WorkflowsManager:
         self.stopping.clear()
 
         async for wid, before, after, flow in self._workflow_state_changes():
-            print(f'# {wid} {before}->{after}')
-
             # handle state changes
             if before == 'active' and after == 'inactive':
                 await self._disconnect(wid)
