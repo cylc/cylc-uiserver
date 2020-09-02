@@ -215,7 +215,7 @@ class CylcUIServer(object):
         # If the client is already established it's not overridden,
         # so the following callbacks can happen at the same time.
         ioloop.PeriodicCallback(
-            self.workflows_mgr.update, 1000).start()
+            self.workflows_mgr.update, 5000).start()
         try:
             ioloop.IOLoop.current().start()
         except KeyboardInterrupt:
