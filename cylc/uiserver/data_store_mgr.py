@@ -48,6 +48,7 @@ from cylc.flow.data_store_mgr import (
     apply_delta, generate_checksum, create_delta_store
 )
 from cylc.flow.suite_files import ContactFileFields as CFF
+from cylc.flow.suite_status import SuiteStatus
 
 from .workflows_mgr import workflow_request
 
@@ -90,7 +91,7 @@ class DataStoreMgr:
             flow.port = 0
             # flow.pub_port = 0
             flow.api_version = 0
-            flow.status = 'stopped'
+            flow.status = SuiteStatus.STOPPED.value
 
         # Apply to existing workflow data
         apply_delta(WORKFLOW, delta, self.data[w_id])
@@ -291,11 +292,6 @@ class DataStoreMgr:
         """
         if ids is None:
             ids = []
-
-        # Prune old data
-        # for w_id in list(self.data):
-        #     if w_id not in self.workflows_mgr.active:
-        #         del self.data[w_id]
 
         # Request new data
         req_method = 'pb_entire_workflow'
