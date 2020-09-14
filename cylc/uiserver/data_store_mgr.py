@@ -72,9 +72,9 @@ class DataStoreMgr:
         self.delta_queues = {}
 
     def update_contact(self, w_id, contact_data=None):
-        delta = DELTAS_MAP[WORKFLOW]()
-        delta.time = time.time()
-        flow = delta.updated
+        delta = DELTAS_MAP[ALL_DELTAS]()
+        delta.workflow.time = time.time()
+        flow = delta.workflow.updated
         flow.id = w_id
         if contact_data:
             # update with contact file data
@@ -94,10 +94,9 @@ class DataStoreMgr:
             flow.status = SuiteStatus.STOPPED.value
 
         # Apply to existing workflow data
-        apply_delta(WORKFLOW, delta, self.data[w_id])
         if 'delta_times' not in self.data[w_id]:
-            self.data[w_id]['delta_times'] = {}
-        self.data[w_id]['delta_times'][WORKFLOW] = delta.time
+            self.data[w_id]['delta_times'] = {WORKFLOW: 0.0}
+        self.apply_all_delta(w_id, delta)
         # Queue delta for subscription push
         self.delta_store_to_queues(w_id, ALL_DELTAS, delta)
 
@@ -209,6 +208,11 @@ class DataStoreMgr:
             self.delta_store_to_queues(w_id, topic, delta)
             self.workflows_mgr.stopping.add(w_id)
             return
+        self.apply_all_delta(w_id, delta)
+        self.delta_store_to_queues(w_id, topic, delta)
+
+    def apply_all_delta(self, w_id, delta):
+        """Apply the AllDeltas delta."""
         for field, sub_delta in delta.ListFields():
             delta_time = getattr(sub_delta, 'time', 0.0)
             # If the workflow has reloaded clear the data before
@@ -224,8 +228,6 @@ class DataStoreMgr:
                 apply_delta(field.name, sub_delta, self.data[w_id])
                 self.data[w_id]['delta_times'][field.name] = delta_time
                 self.reconcile_update(field.name, sub_delta, w_id)
-
-        self.delta_store_to_queues(w_id, topic, delta)
 
     def delta_store_to_queues(self, w_id, topic, delta):
         # Queue delta for graphql subscription resolving
