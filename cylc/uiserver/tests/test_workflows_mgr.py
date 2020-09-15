@@ -13,23 +13,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from itertools import product
-from pathlib import Path
-import pytest
 from random import random
 
-from pytest_mock import MockFixture
-
-from cylc.flow import ID_DELIM
-from cylc.flow.exceptions import ClientTimeout
-from cylc.flow.network import API
+import pytest
 from cylc.flow.suite_files import (
-    ContactFileFields as CFF,
     SuiteFiles
 )
+from itertools import product
+from pytest_mock import MockFixture
 
 from cylc.uiserver.workflows_mgr import *
-
 from .conftest import AsyncClientFixture
 
 
