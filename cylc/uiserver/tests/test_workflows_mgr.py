@@ -185,7 +185,7 @@ def mk_flow(path, reg, active=True):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    # generate all possile state changes
+    # generate all possible state changes
     'active_before,active_after',
     product(['active', 'inactive', None], repeat=2)
 )
@@ -243,7 +243,7 @@ async def test_workflow_state_change_restart(tmp_path):
     async for change in wfm._workflow_state_changes():
         changes.append(change)
 
-    # the flow should be marked as becomming inactive then active again
+    # the flow should be marked as becoming inactive then active again
     assert [change[:3] for change in changes] == [
         (wid, 'active', 'inactive'),
         (wid, 'inactive', 'active')

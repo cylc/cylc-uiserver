@@ -34,7 +34,7 @@ def authenticated(
     """
     A decorator based on the original by tornado.web.authenticated.
 
-    This decorator, different than the original, does not foward
+    This decorator, different than the original, does not forward
     the user to the log-in form. If the user is not present, it
     fails immediately.
 
