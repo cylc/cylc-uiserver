@@ -14,3 +14,47 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """Websockets and subscriptions related code."""
+
+from typing import (
+    Awaitable,
+    Callable,
+    Optional
+)
+import functools
+from tornado.web import RequestHandler, HTTPError
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
+def authenticated(
+    method: Callable[..., Optional[Awaitable[None]]]
+) -> Callable[..., Optional[Awaitable[None]]]:
+    """
+    A decorator based on the original by tornado.web.authenticated.
+
+    This decorator, different than the original, does not foward
+    the user to the log-in form. If the user is not present, it
+    fails immediately.
+
+    This is necessary, as when establishing a WebSockets connection,
+    the client may not be able to handle HTTP redirects.
+
+    Args:
+        method (Callable): The method to be decorated
+    Returns:
+        Callable: decorated method
+    """
+    @functools.wraps(method)
+    def wrapper(  # type: ignore
+            self: RequestHandler, *args, **kwargs
+    ) -> Optional[Awaitable[None]]:
+        if not self.current_user:
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug('Unauthenticated WebSocket request!')
+            raise HTTPError(403)
+
+        return method(self, *args, **kwargs)
+
+    return wrapper
