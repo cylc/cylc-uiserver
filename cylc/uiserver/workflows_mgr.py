@@ -206,9 +206,13 @@ class WorkflowsManager:
 
     async def _disconnect(self, wid):
         """Disconnect from a running workflow."""
-        client = self.active[wid]['req_client']
-        with suppress(IOError):
-            client.stop(stop_loop=False)
+        try:
+            client = self.active[wid]['req_client']
+        except KeyError:
+            pass
+        else:
+            with suppress(IOError):
+                client.stop(stop_loop=False)
 
     async def _unregister(self, wid):
         """Unregister a workflow from the data store."""
