@@ -282,15 +282,14 @@ class WorkflowsManager:
             args = {}
         if multi_args is None:
             multi_args = {}
-        req_args = {}
-        for w_id in workflows:
-            cmd_args = multi_args.get(w_id, args)
-            req_args[w_id] = (
+        req_args = {
+            w_id: (
                 self.active[w_id]['req_client'],
                 command,
-                cmd_args,
+                multi_args.get(w_id, args),
                 timeout,
-            )
+            ) for w_id in self.active
+        }
         gathers = [
             workflow_request(req_context=info, *request_args)
             for info, request_args in req_args.items()
