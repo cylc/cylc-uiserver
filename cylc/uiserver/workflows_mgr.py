@@ -282,25 +282,28 @@ class WorkflowsManager:
             args = {}
         if multi_args is None:
             multi_args = {}
-        req_args = {}
-        for w_id in workflows:
-            cmd_args = multi_args.get(w_id, args)
-            req_args[w_id] = (
+        req_args = {
+            w_id: (
                 self.active[w_id]['req_client'],
                 command,
-                cmd_args,
+                multi_args.get(w_id, args),
                 timeout,
-            )
-        gathers = ()
-        for info, request_args in req_args.items():
-            if request_args[0] is None:
-                continue
-            gathers += (workflow_request(req_context=info, *request_args),)
-        results = await asyncio.gather(*gathers)
+            ) for w_id in self.active
+        }
+        gathers = [
+            workflow_request(req_context=info, *request_args)
+            for info, request_args in req_args.items()
+        ]
+        results = await asyncio.gather(*gathers, return_exceptions=True)
         res = []
-        for _, val in results:
-            res.extend([
-                msg_core
-                for msg_core in list(val.values())[0].get('result')
-                if isinstance(val, dict) and list(val.values())])
+        for result in results:
+            if isinstance(result, Exception):
+                logger.exception('Failed to send requests to '
+                                 'multiple workflows', exc_info=result)
+            else:
+                _, val = result
+                res.extend([
+                    msg_core
+                    for msg_core in list(val.values())[0].get('result')
+                    if isinstance(val, dict) and list(val.values())])
         return res
