@@ -118,3 +118,16 @@ async def test_entire_workflow_update_gather_error(
     mocked_exception_function.assert_called_once()
     assert mocked_exception_function.call_args[1][
                'exc_info'].__class__ == error_type
+
+
+@pytest.mark.asyncio
+async def test_register_workflow(
+    data_store_mgr: DataStoreMgr
+):
+    """Passing a workflow ID through register_workflow creates
+    an entry for the workflow in the data store .data map, and another
+    entry in the data store .delta_queues map."""
+    w_id = 'user|workflow_id'
+    await data_store_mgr.register_workflow(w_id=w_id)
+    assert w_id in data_store_mgr.data
+    assert w_id in data_store_mgr.delta_queues
