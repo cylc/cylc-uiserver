@@ -133,7 +133,7 @@ class DataStoreMgr:
         )
         await self.entire_workflow_update(ids=[w_id])
 
-    async def register_workflow(self, w_id, name, owner):
+    async def register_workflow(self, w_id):
         logger.debug(f'register_workflow({w_id})')
         self.delta_queues[w_id] = {}
 
