@@ -165,3 +165,26 @@ async def test_update_contact_with_contact_data(
     }
     data_store_mgr.update_contact(w_id=w_id, contact_data=contact_data)
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
+
+
+@pytest.mark.asyncio
+async def test_stop_workflow(
+    data_store_mgr: DataStoreMgr
+):
+    """Telling a data store to stop a workflow, is the same as updating
+    contact with no contact data."""
+    w_id = 'user|workflow_id'
+    api_version = 1
+    await data_store_mgr.register_workflow(w_id=w_id)
+    contact_data = {
+        'name': 'workflow_id',
+        'owner': 'cylc',
+        CFF.HOST: 'localhost',
+        CFF.PORT: 40000,
+        CFF.API: api_version
+    }
+    data_store_mgr.update_contact(w_id=w_id, contact_data=contact_data)
+    assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
+
+    data_store_mgr.stop_workflow(w_id=w_id)
+    assert 0 == data_store_mgr.data[w_id]['workflow'].api_version
