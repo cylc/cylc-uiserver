@@ -19,6 +19,7 @@ import logging
 
 import pytest
 from cylc.flow.network import MSG_TIMEOUT
+from cylc.flow.suite_files import ContactFileFields as CFF
 
 import cylc.uiserver.data_store_mgr as data_store_mgr_module
 from cylc.uiserver.data_store_mgr import DataStoreMgr
@@ -131,3 +132,36 @@ async def test_register_workflow(
     await data_store_mgr.register_workflow(w_id=w_id)
     assert w_id in data_store_mgr.data
     assert w_id in data_store_mgr.delta_queues
+
+
+@pytest.mark.asyncio
+async def test_update_contact_no_contact_data(
+    data_store_mgr: DataStoreMgr
+):
+    """Updating contact with no contact data results in default values
+    for the workflow in the data store, like the API version set to zero."""
+    w_id = 'user|workflow_id'
+    api_version = 0
+    await data_store_mgr.register_workflow(w_id=w_id)
+    data_store_mgr.update_contact(w_id=w_id, contact_data=None)
+    assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
+
+
+@pytest.mark.asyncio
+async def test_update_contact_with_contact_data(
+    data_store_mgr: DataStoreMgr
+):
+    """Updating contact with contact data sets the values int he data store
+    for the workflow."""
+    w_id = 'user|workflow_id'
+    api_version = 1
+    await data_store_mgr.register_workflow(w_id=w_id)
+    contact_data = {
+        'name': 'workflow_id',
+        'owner': 'cylc',
+        CFF.HOST: 'localhost',
+        CFF.PORT: 40000,
+        CFF.API: api_version
+    }
+    data_store_mgr.update_contact(w_id=w_id, contact_data=contact_data)
+    assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
