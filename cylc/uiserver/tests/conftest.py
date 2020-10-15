@@ -19,11 +19,12 @@ import inspect
 
 import pytest
 import zmq
-from cylc.flow.data_messages_pb2 import PbEntireWorkflow, PbWorkflow,\
+from cylc.flow.data_messages_pb2 import PbEntireWorkflow, PbWorkflow, \
     PbFamilyProxy
 from cylc.flow.network import ZMQSocketBase
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
+from cylc.uiserver.main import CylcUIServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
@@ -71,6 +72,11 @@ def workflows_manager() -> WorkflowsManager:
 @pytest.fixture
 def data_store_mgr(workflows_manager: WorkflowsManager) -> DataStoreMgr:
     return DataStoreMgr(workflows_mgr=workflows_manager)
+
+
+@pytest.fixture
+def uiserver() -> CylcUIServer:
+    return CylcUIServer(0, '/mock', '')
 
 
 @pytest.fixture
