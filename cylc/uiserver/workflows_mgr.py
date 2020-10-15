@@ -137,7 +137,7 @@ class WorkflowsManager:
                 The workflow ID.
             before (str):
                 The state at the last scan ('active', 'inactive', None)
-            before (str):
+            after (str):
                 The state at this scan ('active', 'inactive', None)
             flow (dict):
                 The scan data (i.e. the contents of the contact file).
