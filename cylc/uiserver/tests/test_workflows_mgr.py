@@ -13,17 +13,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from itertools import product
 from random import random
 
 import pytest
+from cylc.flow.suite_files import ContactFileFields as CFF
 from cylc.flow.suite_files import (
     SuiteFiles
 )
-from itertools import product
 from pytest_mock import MockFixture
 
-from cylc.uiserver.workflows_mgr import *
 import cylc.uiserver.workflows_mgr as workflows_mgr_module
+from cylc.uiserver.main import CylcUIServer
+from cylc.uiserver.workflows_mgr import *
 from .conftest import AsyncClientFixture
 
 
@@ -300,5 +302,61 @@ async def test_multi_request_gather_errors(
     assert mocked_exception_function.call_args[1][
                'exc_info'].__class__ == error_type
 
+
+@pytest.mark.asyncio
+async def test_register(
+        uiserver: CylcUIServer,
+        mocker: MockFixture
+):
+    """Test the registration of a workflow.
+
+    It depends on the pipes returning a workflow with no
+    previous state, and the next state as 'active'."""
+    workflow_name = 'register-me'
+
+    # Remove the pipes so that only our active workflow stays.
+    class NoopIterator:
+        next = workflow_name
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            if self.next:
+                r = self.next
+                self.next = None
+                return {
+                    'name': r,
+                    'contact': True,
+                    CFF.HOST: 'localhost',
+                    CFF.PORT: 0,
+                    CFF.PUBLISH_PORT: 0,
+                    CFF.API: 1
+                }
+            raise StopAsyncIteration
+    uiserver.workflows_mgr._scan_pipe = NoopIterator()
+    # NOTE: here we will yield a workflow that is running, it has contact
+    #       data, is not active nor inactive (i.e. pending registration).
+    #       This is what forces the .update() to call register()!
+
+    # We don't have a real workflow, so we mock get_location.
+    mocker.patch(
+        'cylc.flow.network.client.get_location',
+        return_value=('localhost', 0, None)
+    )
+    # The following functions also depend on a running workflow
+    # with pyzmq socket, so we also mock them.
+    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.start')
+    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.get_header')
+    mocker.patch('cylc.uiserver.data_store_mgr.DataStoreMgr.'
+                 'start_subscription')
+
+    await uiserver.workflows_mgr.update()
+
+    workflow_id = f'{getuser()}|{workflow_name}'
+    # register must have created an entry in the data store
+    assert workflow_id in uiserver.data_store_mgr.data
+    # register must have created an entry in the workflow manager
+    assert workflow_id in uiserver.workflows_mgr.active
 
 # TODO: add tests for remaining methods in WorkflowsManager
