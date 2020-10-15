@@ -92,3 +92,27 @@ def make_entire_workflow():
         return entire_workflow
 
     return _make_entire_workflow
+
+
+@pytest.fixture
+def one_workflow_aiter():
+    """An async generator fixture that returns a single workflow.
+    """
+    async def _create_aiter(*args, **kwargs):
+        yield kwargs
+
+    return _create_aiter
+
+
+@pytest.fixture
+def empty_aiter():
+    """An async generator fixture that does not return anything."""
+    class NoopIterator:
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            raise StopAsyncIteration
+
+    return NoopIterator
