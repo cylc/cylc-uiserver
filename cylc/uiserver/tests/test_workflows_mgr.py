@@ -17,7 +17,6 @@ from itertools import product
 from random import random
 
 import pytest
-from cylc.flow.suite_files import ContactFileFields as CFF
 from cylc.flow.suite_files import (
     SuiteFiles
 )
@@ -306,35 +305,29 @@ async def test_multi_request_gather_errors(
 @pytest.mark.asyncio
 async def test_register(
         uiserver: CylcUIServer,
-        mocker: MockFixture
+        mocker: MockFixture,
+        one_workflow_aiter
 ):
     """Test the registration of a workflow.
 
     It depends on the pipes returning a workflow with no
     previous state, and the next state as 'active'."""
     workflow_name = 'register-me'
+    workflow_id = f'{getuser()}|{workflow_name}'
 
-    # Remove the pipes so that only our active workflow stays.
-    class NoopIterator:
-        next = workflow_name
+    assert workflow_id not in uiserver.data_store_mgr.data
+    assert workflow_id not in uiserver.workflows_mgr.active
 
-        def __aiter__(self):
-            return self
-
-        async def __anext__(self):
-            if self.next:
-                r = self.next
-                self.next = None
-                return {
-                    'name': r,
-                    'contact': True,
-                    CFF.HOST: 'localhost',
-                    CFF.PORT: 0,
-                    CFF.PUBLISH_PORT: 0,
-                    CFF.API: 1
-                }
-            raise StopAsyncIteration
-    uiserver.workflows_mgr._scan_pipe = NoopIterator()
+    uiserver.workflows_mgr._scan_pipe = one_workflow_aiter(
+        **{
+            'name': workflow_name,
+            'contact': True,
+            CFF.HOST: 'localhost',
+            CFF.PORT: 0,
+            CFF.PUBLISH_PORT: 0,
+            CFF.API: 1
+        }
+    )
     # NOTE: here we will yield a workflow that is running, it has contact
     #       data, is not active nor inactive (i.e. pending registration).
     #       This is what forces the .update() to call register()!
@@ -353,10 +346,33 @@ async def test_register(
 
     await uiserver.workflows_mgr.update()
 
-    workflow_id = f'{getuser()}|{workflow_name}'
-    # register must have created an entry in the data store
-    assert workflow_id in uiserver.data_store_mgr.data
     # register must have created an entry in the workflow manager
     assert workflow_id in uiserver.workflows_mgr.active
+
+
+@pytest.mark.asyncio
+async def test_unregister(
+        uiserver: CylcUIServer,
+        one_workflow_aiter,
+        empty_aiter
+):
+    """A workflow, once registered, can be unregistered in the
+    workflow manager.
+
+    It will delegate to the data store to properly remove the
+    workflow from the data store attributes, and call the necessary
+    functions."""
+    workflow_name = 'unregister-me'
+
+    uiserver.workflows_mgr._scan_pipe = empty_aiter()
+    uiserver.workflows_mgr.inactive.add(workflow_name)
+    # NOTE: here we will yield a workflow that is not running, it does
+    #       not have the contact data and is inactive.
+    #       This is what forces the .update() to call unregister()!
+
+    await uiserver.workflows_mgr.update()
+
+    # now the workflow is not active, nor inactive, it is unregistered
+    assert workflow_name not in uiserver.workflows_mgr.inactive
 
 # TODO: add tests for remaining methods in WorkflowsManager
