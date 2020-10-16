@@ -375,4 +375,83 @@ async def test_unregister(
     # now the workflow is not active, nor inactive, it is unregistered
     assert workflow_name not in uiserver.workflows_mgr.inactive
 
+
+@pytest.mark.asyncio
+async def test_unregister(
+        uiserver: CylcUIServer,
+        one_workflow_aiter,
+        empty_aiter
+):
+    """A workflow, once registered, can be unregistered in the
+    workflow manager.
+
+    It will delegate to the data store to properly remove the
+    workflow from the data store attributes, and call the necessary
+    functions."""
+    workflow_name = 'unregister-me'
+
+    uiserver.workflows_mgr._scan_pipe = empty_aiter()
+    uiserver.workflows_mgr.inactive.add(workflow_name)
+    # NOTE: here we will yield a workflow that is not running, it does
+    #       not have the contact data and is inactive.
+    #       This is what forces the .update() to call unregister()!
+
+    await uiserver.workflows_mgr.update()
+
+    # now the workflow is not active, nor inactive, it is unregistered
+    assert workflow_name not in uiserver.workflows_mgr.inactive
+
+
+@pytest.mark.asyncio
+async def test_connect(
+        uiserver: CylcUIServer,
+        mocker: MockFixture,
+        one_workflow_aiter
+):
+    """Test connecting to a workflow.
+
+    If a workflow is running, but in the inactive state,
+    then the connect method will be called."""
+    workflow_name = 'connect'
+    workflow_id = f'{getuser()}|{workflow_name}'
+    uiserver.workflows_mgr.inactive.add(workflow_id)
+
+    assert workflow_id not in uiserver.workflows_mgr.active
+    assert workflow_id in uiserver.workflows_mgr.inactive
+
+    uiserver.workflows_mgr._scan_pipe = one_workflow_aiter(
+        **{
+            'name': workflow_name,
+            'contact': True,
+            CFF.HOST: 'localhost',
+            CFF.PORT: 0,
+            CFF.PUBLISH_PORT: 0,
+            CFF.API: 1
+        }
+    )
+    # NOTE: here we will yield a workflow that is running, it has contact
+    #       data, is not active nor inactive (i.e. pending registration).
+    #       This is what forces the .update() to call register()!
+
+    # We don't have a real workflow, so we mock get_location.
+    mocker.patch(
+        'cylc.flow.network.client.get_location',
+        return_value=('localhost', 0, None)
+    )
+    # The following functions also depend on a running workflow
+    # with pyzmq socket, so we also mock them.
+    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.start')
+    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.get_header')
+    mocker.patch('cylc.uiserver.data_store_mgr.DataStoreMgr.'
+                 'start_subscription')
+    mocker.patch('cylc.uiserver.data_store_mgr.DataStoreMgr.sync_workflow')
+
+    await uiserver.workflows_mgr.update()
+
+    # connect must have created an active entry for the workflow,
+    # and the update method must have taken care to remove from inactive
+    assert workflow_id in uiserver.workflows_mgr.active
+    assert not uiserver.workflows_mgr.inactive
+
+
 # TODO: add tests for remaining methods in WorkflowsManager
