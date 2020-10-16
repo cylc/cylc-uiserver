@@ -444,7 +444,13 @@ async def test_connect(
     mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.get_header')
     mocker.patch('cylc.uiserver.data_store_mgr.DataStoreMgr.'
                  'start_subscription')
-    mocker.patch('cylc.uiserver.data_store_mgr.DataStoreMgr.sync_workflow')
+
+    async def my_sync_workflow(*args, **kwargs):
+        return True
+    mocker.patch(
+        'cylc.uiserver.data_store_mgr.DataStoreMgr.sync_workflow',
+        side_effect=my_sync_workflow
+    )
 
     await uiserver.workflows_mgr.update()
 
