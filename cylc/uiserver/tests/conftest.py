@@ -45,6 +45,9 @@ class AsyncClientFixture(ZMQSocketBase):
             raise self.returns
         return self.returns
 
+    def stop(self, *args, **kwargs):
+        pass
+
 
 @pytest.fixture
 def async_client():

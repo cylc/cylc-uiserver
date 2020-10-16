@@ -454,4 +454,59 @@ async def test_connect(
     assert not uiserver.workflows_mgr.inactive
 
 
+@pytest.mark.asyncio
+async def test_disconnect_and_stop(
+        uiserver: CylcUIServer,
+        mocker: MockFixture,
+        one_workflow_aiter,
+        async_client: AsyncClientFixture
+):
+    """Test disconnecting and stopping a workflow.
+
+    If a workflow is active, but the next state is inactive, the
+    workflow manager will take care to stop and disconnect the workflow."""
+    workflow_name = 'disconnect-stop'
+    workflow_id = f'{getuser()}|{workflow_name}'
+
+    flow = {
+            'name': workflow_name,
+            'contact': False,
+            CFF.HOST: 'localhost',
+            CFF.PORT: 0,
+            CFF.PUBLISH_PORT: 0,
+            CFF.API: 1,
+            'req_client': async_client
+        }
+    uiserver.workflows_mgr.active[workflow_id] = flow
+
+    assert workflow_id not in uiserver.workflows_mgr.inactive
+    assert workflow_id in uiserver.workflows_mgr.active
+
+    uiserver.workflows_mgr._scan_pipe = one_workflow_aiter(
+        **flow
+    )
+    # NOTE: here we will yield a workflow that is running, it has contact
+    #       data, is not active nor inactive (i.e. pending registration).
+    #       This is what forces the .update() to call register()!
+
+    # We don't have a real workflow, so we mock get_location.
+    mocker.patch(
+        'cylc.flow.network.client.get_location',
+        return_value=('localhost', 0, None)
+    )
+    # The following functions also depend on a running workflow
+    # with pyzmq socket, so we also mock them.
+    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.start')
+    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.get_header')
+    mocker.patch('cylc.uiserver.data_store_mgr.DataStoreMgr.'
+                 'start_subscription')
+    mocker.patch('cylc.uiserver.data_store_mgr.DataStoreMgr.update_contact')
+
+    await uiserver.workflows_mgr.update()
+
+    # connect must have created an active entry for the workflow,
+    # and the update method must have taken care to remove from inactive
+    assert workflow_id not in uiserver.workflows_mgr.active
+    assert workflow_id in uiserver.workflows_mgr.inactive
+
 # TODO: add tests for remaining methods in WorkflowsManager
