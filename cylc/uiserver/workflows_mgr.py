@@ -191,9 +191,7 @@ class WorkflowsManager:
 
     async def _register(self, wid, flow):
         """Register a new workflow with the data store."""
-        await self.uiserver.data_store_mgr.register_workflow(
-            wid, flow['name'], flow['owner']
-        )
+        await self.uiserver.data_store_mgr.register_workflow(wid)
 
     async def _connect(self, wid, flow):
         """Open a connection to a running workflow."""
