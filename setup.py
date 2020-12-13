@@ -46,7 +46,7 @@ install_requires = [
     ('cylc-flow @ https://github.com/cylc/cylc-flow'
      '/tarball/master#egg=cylc-8.0a3.dev'),
     'jupyterhub==1.3.*',
-    'tornado==6.0.*',
+    'tornado==6.1.*',
     'graphene-tornado==2.6.*',
     'graphql-ws>=0.3.1,<0.4'
 ]
