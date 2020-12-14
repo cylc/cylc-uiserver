@@ -16,6 +16,10 @@ None or N/A.
 
 ### Enhancements
 
+[#167](https://github.com/cylc/cylc-uiserver/pull/167) - Upgrade
+JupyterHub to 1.3.x, and Tornado to 6.1.x. Set auto spawn timeout
+to 1 second (effectively enabling it) in our demo configuration.
+
 [#125](https://github.com/cylc/cylc-uiserver/pull/125) - Use Tornado
 default WebSocket check_origin function.
 [#124](https://github.com/cylc/cylc-uiserver/pull/124) - Add decorator

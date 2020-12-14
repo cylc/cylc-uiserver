@@ -41,6 +41,7 @@ c.Spawner.cmd = ['cylc-uiserver']
 #  Should be a subclass of Spawner.
 c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
 
+c.JupyterHub.implicit_spawn_seconds = 0.01
 
 # --- Cylc-ise Jupyterhub
 
