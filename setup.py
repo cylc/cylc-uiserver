@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (C) NIWA & British Crown (Met Office) & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -43,8 +42,7 @@ def find_version(*file_paths):
 #     don't pin versions, we will get whatever cylc-flow needs, and not
 #     the bleeding-edge version.
 install_requires = [
-    ('cylc-flow @ https://github.com/cylc/cylc-flow'
-     '/tarball/master#egg=cylc-8.0a3.dev'),
+    'cylc-flow>=8.0a3.dev',
     'jupyterhub==1.3.*',
     'tornado==6.1.*',
     'graphene-tornado==2.6.*',
@@ -83,10 +81,5 @@ setup(
     install_requires=install_requires,
     setup_requires=setup_requires,
     tests_require=tests_require,
-    extras_require=extras_require,
-    entry_points={
-        'console_scripts': [
-            'cylc-uiserver=cylc.uiserver.main:main'
-        ]
-    }
+    extras_require=extras_require
 )

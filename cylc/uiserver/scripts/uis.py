@@ -12,23 +12,18 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""cylc uis
 
-[metadata]
-name = cylc-uiserver
-description = Cylc UI Server
-url = https://github.com/cylc/cylc-uiserver/
-license = GPL
-license_file = COPYING
-platforms = any
-python_requires = >=3.7
+Launch a Cylc UI Server.
 
-[aliases]
-test = pytest
+This is an internal command invoked by the Cylc Hub via the configured
+Jupyterhub spwaner.
+"""
 
-[tool:pytest]
-addopts = --verbose -s -v --cov
+from cylc.uiserver.main import main as uis_main
 
-[options.entry_points]
-cylc.command =
-    hub = cylc.uiserver.scripts.hub:main
-    uiserver = cylc.uiserver.scripts.uis:main
+INTERNAL = True
+
+
+def main(*_):
+    uis_main()

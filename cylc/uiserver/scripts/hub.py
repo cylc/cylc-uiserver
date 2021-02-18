@@ -12,23 +12,29 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""cylc hub
 
-[metadata]
-name = cylc-uiserver
-description = Cylc UI Server
-url = https://github.com/cylc/cylc-uiserver/
-license = GPL
-license_file = COPYING
-platforms = any
-python_requires = >=3.7
+Launch the Cylc hub for running the Cylc Web GUI.
+"""
 
-[aliases]
-test = pytest
+import os
+from pathlib import Path
 
-[tool:pytest]
-addopts = --verbose -s -v --cov
+from jupyterhub.app import main as hub_main
 
-[options.entry_points]
-cylc.command =
-    hub = cylc.uiserver.scripts.hub:main
-    uiserver = cylc.uiserver.scripts.uis:main
+from cylc.uiserver import __version__
+from cylc.uiserver.config import __file__ as config_file
+
+
+def main(*args):
+    for arg in args:
+        if arg.startswith('-f') or arg.startswith('--config'):
+            break
+    else:
+        args = (f'--config={config_file}',) + args
+    # set an env var flag to help load the config
+    os.environ['CYLC_HUB_VERSION'] = __version__
+    try:
+        hub_main(args)
+    finally:
+        del os.environ['CYLC_HUB_VERSION']

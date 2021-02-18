@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (C) NIWA & British Crown (Met Office) & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -19,8 +18,10 @@
 from pathlib import Path
 import pkg_resources
 
-HERE = Path(__file__).resolve().parent
-DIST = HERE.joinpath(Path('../cylc-ui/dist'))
+from cylc.uiserver import __file__ as uis_pkg
+
+
+DIST = Path(uis_pkg).parents[3] / 'cylc-ui/dist'
 
 
 # --- Extra arguments to be passed to the single-user server.
@@ -33,7 +34,7 @@ c.Spawner.args = ['-s', str(DIST)]
 #  Some spawners allow shell-style expansion here, allowing you to use
 #  environment variables. Most, including the default, do not. Consult the
 #  documentation for your spawner to verify!
-c.Spawner.cmd = ['cylc-uiserver']
+c.Spawner.cmd = ['cylc', 'uiserver']
 
 
 # --- The class to use for spawning single-user servers.

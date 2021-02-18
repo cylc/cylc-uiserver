@@ -12,23 +12,3 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-[metadata]
-name = cylc-uiserver
-description = Cylc UI Server
-url = https://github.com/cylc/cylc-uiserver/
-license = GPL
-license_file = COPYING
-platforms = any
-python_requires = >=3.7
-
-[aliases]
-test = pytest
-
-[tool:pytest]
-addopts = --verbose -s -v --cov
-
-[options.entry_points]
-cylc.command =
-    hub = cylc.uiserver.scripts.hub:main
-    uiserver = cylc.uiserver.scripts.uis:main

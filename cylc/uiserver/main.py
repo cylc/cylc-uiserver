@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-
-# -*- coding: utf-8 -*-
 # Copyright (C) NIWA & British Crown (Met Office) & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -257,10 +255,6 @@ def main():
 
     logger.info("Starting Cylc UI")
     ui_server.start(args.debug)
-
-
-if __name__ == "__main__":
-    main()
 
 
 __all__ = [
