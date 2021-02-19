@@ -37,7 +37,6 @@ from traitlets.config import (
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
 )
-from cylc.flow.network.schema import schema
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
@@ -52,6 +51,7 @@ from .handlers import (
     MainHandler, StaticHandler, SubscriptionHandler, UIServerGraphQLHandler,
     UserProfileHandler)
 from .resolvers import Resolvers
+from .schema import schema
 from .websockets.tornado import TornadoSubscriptionServer
 from .workflows_mgr import WorkflowsManager
 

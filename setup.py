@@ -56,8 +56,9 @@ else:
     setup_requires = []
 
 tests_require = [
-    'pytest',
     'coverage',
+    'mypy>=0.812',
+    'pytest',
     'pytest-cov',
     'pytest-asyncio',
     'pytest-mock'
