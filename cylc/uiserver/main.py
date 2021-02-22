@@ -48,8 +48,12 @@ from cylc.uiserver import (
 from cylc.uiserver.config import __file__ as CONFIG_FILE
 from .data_store_mgr import DataStoreMgr
 from .handlers import (
-    MainHandler, StaticHandler, SubscriptionHandler, UIServerGraphQLHandler,
-    UserProfileHandler)
+    MainHandler,
+    StaticHandler,
+    SubscriptionHandler,
+    UIServerGraphQLHandler,
+    UserProfileHandler,
+)
 from .resolvers import Resolvers
 from .schema import schema
 from .websockets.tornado import TornadoSubscriptionServer

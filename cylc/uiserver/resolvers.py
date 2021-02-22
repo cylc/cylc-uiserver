@@ -39,14 +39,15 @@ def snake_to_kebab(snake):
         >>> snake_to_kebab('')
         ''
         >>> snake_to_kebab(None)
-        TypeError: None type
+        Traceback (most recent call last):
+        TypeError: <class 'NoneType'>
 
     """
-    if isinstance(snake, str) and snake:
+    if isinstance(snake, str):
+        if not snake:
+            return ''
         return f'--{snake.replace("_", "-")}'
-    else:
-        raise TypeError(type(snake))
-    return ''
+    raise TypeError(type(snake))
 
 
 def check_cylc_version(version):
