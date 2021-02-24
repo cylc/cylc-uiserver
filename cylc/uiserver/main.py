@@ -22,9 +22,18 @@ import signal
 from functools import partial
 from logging.config import dictConfig
 from os.path import join, abspath, dirname
+from pathlib import Path
 from typing import Any, Tuple, Type
 
 from tornado import web, ioloop
+from traitlets import (
+    HasTraits,
+    Unicode,
+    default,
+)
+from traitlets.config import (
+    Application
+)
 
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
@@ -33,6 +42,12 @@ from cylc.flow.network.schema import schema
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from jupyterhub.services.auth import HubOAuthCallbackHandler
 from jupyterhub.utils import url_path_join
+
+from cylc.uiserver import (
+    __version__,
+    __file__ as uis_pkg
+)
+from cylc.uiserver.config import __file__ as CONFIG_FILE
 from .data_store_mgr import DataStoreMgr
 from .handlers import *
 from .resolvers import Resolvers
@@ -64,21 +79,53 @@ class MyApplication(web.Application):
             logger.info('exit success')
 
 
-class CylcUIServer(object):
+class CylcUIServer(Application):
 
-    def __init__(self, port, static, jupyter_hub_service_prefix):
+    ui_path = Unicode(config=True)
+
+    @default('ui_path')
+    def _dev_ui_path(self):
+        return str(Path(uis_pkg).parents[3] / 'cylc-ui/dist')
+
+    def __init__(self, port, jupyter_hub_service_prefix, static=None):
+        self._load_uis_config()
+        self._set_static_path(static)
         self._port = port
-        if os.path.isabs(static):
-            self._static = static
-        else:
-            script_dir = os.path.dirname(__file__)
-            self._static = os.path.abspath(os.path.join(script_dir, static))
         self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
         self.workflows_mgr = WorkflowsManager(self)
         self.data_store_mgr = DataStoreMgr(self.workflows_mgr)
         self.resolvers = Resolvers(
             self.data_store_mgr,
             workflows_mgr=self.workflows_mgr)
+
+    def _load_uis_config(self):
+        """Load the UIS config file."""
+        # this environment variable enables loading of the config
+        os.environ['CYLC_HUB_VERSION'] = __version__
+        try:
+            self.load_config_file(CONFIG_FILE)
+        finally:
+            del os.environ['CYLC_HUB_VERSION']
+        # set traitlets values from the config
+        for key, value in self.config.UIServer.items():
+            print(f'# {key}={value}')
+            setattr(self, key, value)
+
+    def _set_static_path(self, static):
+        """Set the path to static files.
+
+        Args:
+            static: Command line override of the ui_path traitlet.
+        """
+        if static:
+            if os.path.isabs(static):
+                self.ui_path = static
+            else:
+                script_dir = os.path.dirname(__file__)
+                self.ui_path = os.path.abspath(os.path.join(
+                    script_dir,
+                    static
+                ))
 
     def _create_static_handler(
             self,
@@ -95,7 +142,7 @@ class CylcUIServer(object):
         return (
             rf"{self._jupyter_hub_service_prefix}({path})",
             StaticHandler,
-            {"path": self._static}
+            {"path": self.ui_path}
         )
 
     def _create_handler(
@@ -152,7 +199,7 @@ class CylcUIServer(object):
         Args:
             debug (bool): flag to set debugging in the Tornado application
         """
-        logger.info(self._static)
+        logger.info(self.ui_path)
         # subscription/websockets server
         subscription_server = TornadoSubscriptionServer(
             schema,
@@ -160,7 +207,7 @@ class CylcUIServer(object):
             middleware=[IgnoreFieldMiddleware],
         )
         return MyApplication(
-            static_path=self._static,
+            static_path=self.ui_path,
             debug=debug,
             handlers=[
                 # static content
@@ -191,7 +238,7 @@ class CylcUIServer(object):
                 (
                     rf"{self._jupyter_hub_service_prefix}?",
                     MainHandler,
-                    {"path": self._static}
+                    {"path": self.ui_path}
                 )
             ],
             # always generate a new cookie secret on launch
@@ -226,8 +273,7 @@ def main():
     )
     parser.add_argument('-p', '--port', action="store", dest="port", type=int,
                         default=8888)
-    parser.add_argument('-s', '--static', action="store", dest="static",
-                        required=True)
+    parser.add_argument('-s', '--static', action="store", dest="static")
     parser.add_argument('--debug', action="store_true", dest="debug",
                         default=False)
     here = abspath(dirname(__file__))

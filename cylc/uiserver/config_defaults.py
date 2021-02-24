@@ -21,48 +21,22 @@ import pkg_resources
 from cylc.uiserver import __file__ as uis_pkg
 
 
-DIST = Path(uis_pkg).parents[3] / 'cylc-ui/dist'
-
-
-# --- Extra arguments to be passed to the single-user server.
-
-#  Some spawners allow shell-style expansion here, allowing you to use
-#  environment variables here. Most, including the default, do not. Consult the
-#  documentation for your spawner to verify!
-c.Spawner.args = ['-s', str(DIST)]
-
-#  Some spawners allow shell-style expansion here, allowing you to use
-#  environment variables. Most, including the default, do not. Consult the
-#  documentation for your spawner to verify!
+# the command the hub should spawn (i.e. the cylc uiserver itself)
 c.Spawner.cmd = ['cylc', 'uiserver']
 
-
-# --- The class to use for spawning single-user servers.
-
-#  Should be a subclass of Spawner.
+# the spawner to invoke this command
 c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
 
+# this auto-spawns uiservers without user interaction
 c.JupyterHub.implicit_spawn_seconds = 0.01
 
-# --- Cylc-ise Jupyterhub
-
-# TODO: move logo to a shared location
-# https://github.com/cylc/cylc-admin/issues/69
-c.JupyterHub.logo_file = str(DIST.joinpath(Path('img/logo.svg')))
-# use ISO8601 (expanded) date format for logging
-c.JupyterHub.log_datefmt = '%Y-%m-%dT%H:%M:%S'
-# specify custom HTML templates
+# apply cylc styling to jupyterhub
+c.JupyterHub.logo_file = str(Path(uis_pkg).parent / 'logo.svg')
+c.JupyterHub.log_datefmt = '%Y-%m-%dT%H:%M:%S'  # ISO8601 (expanded)
 c.JupyterHub.template_paths = [
+    # custom HTML templates
     pkg_resources.resource_filename(
         'cylc.uiserver',
         'templates'
     )
 ]
-c.JupyterHub.tornado_settings = {
-    'headers': {
-      # 'Access-Control-Allow-Origin': '*',
-      # 'Access-Control-Allow-Headers': '*',
-      # 'Access-Control-Allow-Methods': '*',
-      'Server': ''
-   },
-}
