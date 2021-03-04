@@ -19,29 +19,33 @@ Workflow Services (WFS).
 
 ## Installation
 
-To install the production version, run:
+For production:
 
-- `pip install cylc-uiserver`
+```console
+$ pip install cylc-uiserver
+```
 
-And for the development version, run the following from a clone of the project
-git repository.
+For development run the following from a clone of the project git repository:
 
-- `pip install -e .`
+```console
+$ pip install -e .
+```
 
-Once that is done, the Hub can be started with `jupyterhub`.
+## Running
+
+```console
+$ cylc hub
+```
+
 The default URL is [http://localhost:8000](http://localhost:8000).
 
-### Starting multiple instances of jupyterhub
+# Configuring
 
-If you need to run multiple instances of `jupyterhub`, you will have to follow
-the steps described below:
+The default "base" configuration is defined in
+`cylc.uiserver.config_defaults.py`, these values can be overridden by the
+user config in `~/.cylc/hub/config.py`.
 
-- copy `jupyterhub_config.py` to a different location
-- change the following settings (change the ports to your environment):
-    * `c.JupyterHub.bind_url = 'http://:7000'`
-    * `c.JupyterHub.hub_bind_url = 'http://127.0.0.1:7878'`
-    * `c.JupyterHub.proxy_api_port = 9001`
-- finally start `jupyterhub` using that configuration file
+See the Jupyterhub documentation for details on configuration options.
 
 ## Copyright and Terms of Use
 

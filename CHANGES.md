@@ -16,6 +16,9 @@ None or N/A.
 
 ### Enhancements
 
+[#173](https://github.com/cylc/cylc-uiserver/pull/173) - CLI changes
+`jupyterhub` -> `cylc hub`, `cylc-uiserver` -> `cylc uiserver`.
+
 [#167](https://github.com/cylc/cylc-uiserver/pull/167) - Upgrade
 JupyterHub to 1.3.x, and Tornado to 6.1.x. Set auto spawn timeout
 to 1 second (effectively enabling it) in our demo configuration.
