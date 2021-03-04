@@ -17,7 +17,7 @@
 Launch a Cylc UI Server.
 
 This is an internal command invoked by the Cylc Hub via the configured
-Jupyterhub spwaner.
+Jupyterhub spawner.
 """
 
 from cylc.uiserver.main import main as uis_main
