@@ -1,0 +1,47 @@
+name: Test
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        os: ['ubuntu-latest']
+        python: ['3.7', '3.8', '3.9']
+        include:
+          - os: 'macos-latest'
+            python: '3.7'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 2  # required by codecov
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install dependencies
+        run: pip install pycodestyle
+
+      - name: Style test
+        run: pycodestyle --exclude=".git,.tox,__pycache,venv,.eggs,build,jupyterhub_config.py,cylc/uiserver/websockets/"
+
+      - name: Install cylc-uiserver
+        run: pip install .[all]
+
+      - name: Test
+        run: python setup.py test
+
+      - name: Coverage
+        run: |
+          coverage xml --ignore-errors
+          bash <(curl -s https://codecov.io/bash)
