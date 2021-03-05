@@ -29,14 +29,16 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Install dependencies
+      - name: Install tools
         run: pip install pycodestyle
 
       - name: Style test
         run: pycodestyle --exclude=".git,.tox,__pycache,venv,.eggs,build,jupyterhub_config.py,cylc/uiserver/websockets/"
 
-      - name: Install cylc-uiserver
-        run: pip install .[all]
+      - name: Install cylc-uiserver & dependencies
+        run: |
+          pip install git+https://github.com/cylc/cylc-flow@master
+          pip install .[all]
 
       - name: Test
         run: python setup.py test
