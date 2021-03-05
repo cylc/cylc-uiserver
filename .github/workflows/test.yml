@@ -33,7 +33,7 @@ jobs:
         run: pip install pycodestyle
 
       - name: Style test
-        run: pycodestyle --exclude=".git,.tox,__pycache,venv,.eggs,build,jupyterhub_config.py,cylc/uiserver/websockets/"
+        run: pycodestyle -v cylc/uiserver/ --exclude="jupyterhub_config.py,cylc/uiserver/websockets/"
 
       - name: Install cylc-uiserver & dependencies
         run: |
@@ -41,7 +41,7 @@ jobs:
           pip install .[all]
 
       - name: Test
-        run: python setup.py test
+        run: pytest --cov cylc/uiserver/tests
 
       - name: Coverage
         run: |

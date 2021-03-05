@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from cylc.uiserver.main import *
+from cylc.uiserver.main import (CylcUIServer, MyApplication)
 from tornado.web import StaticFileHandler, RequestHandler
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 
