@@ -18,8 +18,6 @@ Launch the Cylc hub for running the Cylc Web GUI.
 """
 
 import os
-from pathlib import Path
-
 from jupyterhub.app import main as hub_main
 
 from cylc.uiserver import __version__

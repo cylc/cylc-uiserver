@@ -1,0 +1,49 @@
+name: Test
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        os: ['ubuntu-latest']
+        python: ['3.7', '3.8', '3.9']
+        include:
+          - os: 'macos-latest'
+            python: '3.7'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 2  # required by codecov
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install tools
+        run: pip install flake8
+
+      - name: Style test
+        run: flake8 cylc/uiserver/ --extend-exclude="config_defaults.py,cylc/uiserver/websockets/"
+
+      - name: Install cylc-uiserver & dependencies
+        run: |
+          pip install git+https://github.com/cylc/cylc-flow@master
+          pip install .[all]
+
+      - name: Test
+        run: pytest --cov cylc/uiserver/tests
+
+      - name: Coverage
+        run: |
+          coverage xml --ignore-errors
+          bash <(curl -s https://codecov.io/bash)
