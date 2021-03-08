@@ -15,16 +15,20 @@
 
 from itertools import product
 from random import random
-
+from getpass import getuser
+import logging
 import pytest
-from cylc.flow.suite_files import (
-    SuiteFiles
-)
+from cylc.flow import ID_DELIM
+from cylc.flow.exceptions import ClientError, ClientTimeout
+from cylc.flow.network import API
+from cylc.flow.suite_files import SuiteFiles
 from pytest_mock import MockFixture
+import socket
 
 import cylc.uiserver.workflows_mgr as workflows_mgr_module
 from cylc.uiserver.main import CylcUIServer
-from cylc.uiserver.workflows_mgr import *
+from cylc.uiserver.workflows_mgr import (
+    CFF, est_workflow, workflow_request, WorkflowsManager)
 from .conftest import AsyncClientFixture
 
 
@@ -131,7 +135,7 @@ async def test_est_workflow(
 
     mocked_get_host_ip_by_name = mocker.patch(
         'cylc.uiserver.workflows_mgr.get_host_ip_by_name')
-    mocked_get_host_ip_by_name.side_effect = lambda x: f'remote_host' \
+    mocked_get_host_ip_by_name.side_effect = lambda x: 'remote_host' \
         if x == 'remote' else x
 
     r_reg, r_host, r_port, r_pub_port, r_client, r_result = await est_workflow(
@@ -348,32 +352,6 @@ async def test_register(
 
     # register must have created an entry in the workflow manager
     assert workflow_id in uiserver.workflows_mgr.active
-
-
-@pytest.mark.asyncio
-async def test_unregister(
-        uiserver: CylcUIServer,
-        one_workflow_aiter,
-        empty_aiter
-):
-    """A workflow, once registered, can be unregistered in the
-    workflow manager.
-
-    It will delegate to the data store to properly remove the
-    workflow from the data store attributes, and call the necessary
-    functions."""
-    workflow_name = 'unregister-me'
-
-    uiserver.workflows_mgr._scan_pipe = empty_aiter()
-    uiserver.workflows_mgr.inactive.add(workflow_name)
-    # NOTE: here we will yield a workflow that is not running, it does
-    #       not have the contact data and is inactive.
-    #       This is what forces the .update() to call unregister()!
-
-    await uiserver.workflows_mgr.update()
-
-    # now the workflow is not active, nor inactive, it is unregistered
-    assert workflow_name not in uiserver.workflows_mgr.inactive
 
 
 @pytest.mark.asyncio

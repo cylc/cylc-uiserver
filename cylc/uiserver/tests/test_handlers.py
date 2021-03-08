@@ -25,8 +25,9 @@ from tornado.httputil import HTTPServerRequest
 from tornado.testing import AsyncHTTPTestCase, get_async_test_timeout
 from tornado.web import Application, HTTPError
 
-from cylc.uiserver.handlers import *
-from cylc.uiserver.main import *
+from cylc.uiserver.handlers import (
+    MainHandler, SubscriptionHandler, UserProfileHandler)
+from cylc.uiserver.main import MyApplication
 
 
 class MainHandlerTest(AsyncHTTPTestCase):
@@ -138,7 +139,7 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         handler = self._create_handler()
         host_header = 'ui.cylc'
         handler.request.headers['Host'] = host_header
-        assert not handler.check_origin(origin=f'http://ui.notcylc')
+        assert not handler.check_origin(origin='http://ui.notcylc')
 
     def test_websockets_context(self):
         handler = self._create_handler()

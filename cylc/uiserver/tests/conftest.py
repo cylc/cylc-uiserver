@@ -19,8 +19,8 @@ import inspect
 
 import pytest
 import zmq
-from cylc.flow.data_messages_pb2 import PbEntireWorkflow, PbWorkflow, \
-    PbFamilyProxy
+from cylc.flow.data_messages_pb2 import (
+    PbEntireWorkflow, PbWorkflow, PbFamilyProxy)
 from cylc.flow.network import ZMQSocketBase
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr

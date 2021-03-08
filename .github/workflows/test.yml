@@ -30,10 +30,10 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Install tools
-        run: pip install pycodestyle
+        run: pip install flake8
 
       - name: Style test
-        run: pycodestyle -v cylc/uiserver/ --exclude="jupyterhub_config.py,cylc/uiserver/websockets/"
+        run: flake8 cylc/uiserver/ --extend-exclude="config_defaults.py,cylc/uiserver/websockets/"
 
       - name: Install cylc-uiserver & dependencies
         run: |
