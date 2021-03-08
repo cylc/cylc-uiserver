@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from cylc.uiserver.main import (CylcUIServer, MyApplication)
+from cylc.uiserver.main import CylcUIServer, MyApplication
 from tornado.web import StaticFileHandler, RequestHandler
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 
@@ -28,24 +28,24 @@ def test_my_application():
 
 def test_cylcuiserver_absolute_path():
     """Test a Cylc UI server created with absolute path for static assets."""
-    cylc_uiserver = CylcUIServer(8000, '/static/path', '/users/test')
+    cylc_uiserver = CylcUIServer(8000, '/users/test', static='/static/path')
     assert cylc_uiserver._port == 8000
-    assert cylc_uiserver._static == '/static/path'
+    assert cylc_uiserver.ui_path == '/static/path'
     assert cylc_uiserver._jupyter_hub_service_prefix == '/users/test'
 
 
 def test_cylcuiserver_relative_path():
     """Test a Cylc UI server created with relative path for static assets."""
-    cylc_uiserver = CylcUIServer(8000, './', '/users/test')
+    cylc_uiserver = CylcUIServer(8000, '/users/test', static='./')
     assert cylc_uiserver._port == 8000
-    print(cylc_uiserver._static)
+    print(cylc_uiserver.ui_path)
     # the code is using the directory relative to the main script ATM
-    assert cylc_uiserver._static.endswith('cylc/uiserver')
+    assert cylc_uiserver.ui_path.endswith('cylc/uiserver')
     assert cylc_uiserver._jupyter_hub_service_prefix == '/users/test'
 
 
 def test_cylcuiserver_create_static_handler():
-    cylc_uiserver = CylcUIServer(8000, './static', '/prefix/')
+    cylc_uiserver = CylcUIServer(8000, '/prefix/', static='./static')
     handler = cylc_uiserver._create_static_handler('(imgs/*.png)')
     assert "/prefix/((imgs/*.png))" == handler[0]
     assert issubclass(handler[1], StaticFileHandler)
@@ -53,7 +53,7 @@ def test_cylcuiserver_create_static_handler():
 
 
 def test_cylcuiserver_create_handler():
-    cylc_uiserver = CylcUIServer(8000, './', '/prefix/')
+    cylc_uiserver = CylcUIServer(8000, '/prefix/', static='./')
     handler = cylc_uiserver._create_handler('tests', RequestHandler,
                                             schema=True, table=False,
                                             number=1)
@@ -65,7 +65,7 @@ def test_cylcuiserver_create_handler():
 
 
 def test_cylcuiserver_create_graphql_handler():
-    cylc_uiserver = CylcUIServer(8000, './', '/prefix/')
+    cylc_uiserver = CylcUIServer(8000, '/prefix/', static='./')
     handler = cylc_uiserver._create_graphql_handler(
         'tests', TornadoGraphQLHandler, graphiql=True)
     assert "/prefix/tests" == handler[0]
