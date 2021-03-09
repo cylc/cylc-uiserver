@@ -31,6 +31,9 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
+      # NOTE: We install in both editable, and non-editable mode. The former is
+      # necessary to produce coverage reports with the correct numbers.
+      # https://github.com/cylc/cylc-uiserver/issues/179
       - name: Install cylc-uiserver & dependencies
         run: |
           pip install git+https://github.com/cylc/cylc-flow@master
