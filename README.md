@@ -28,7 +28,7 @@ $ pip install cylc-uiserver
 For development run the following from a clone of the project git repository:
 
 ```console
-$ pip install -e .
+$ pip install -e .[all]
 ```
 
 ## Running

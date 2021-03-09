@@ -25,9 +25,12 @@ from tornado.httputil import HTTPServerRequest
 from tornado.testing import AsyncHTTPTestCase, get_async_test_timeout
 from tornado.web import Application, HTTPError
 
-from cylc.uiserver.handlers import (
-    MainHandler, SubscriptionHandler, UserProfileHandler)
-from cylc.uiserver.main import MyApplication
+from cylc.uiserver.main import (
+    MainHandler,
+    MyApplication,
+    SubscriptionHandler,
+    UserProfileHandler,
+)
 
 
 class MainHandlerTest(AsyncHTTPTestCase):

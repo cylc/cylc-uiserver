@@ -13,22 +13,31 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from itertools import product
-from random import random
 from getpass import getuser
+from itertools import product
 import logging
+from random import random
+import socket
+
 import pytest
+from pytest_mock import MockFixture
+
 from cylc.flow import ID_DELIM
 from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.network import API
-from cylc.flow.suite_files import SuiteFiles
-from pytest_mock import MockFixture
-import socket
+from cylc.flow.suite_files import (
+    SuiteFiles,
+    ContactFileFields as CFF,
+)
 
-import cylc.uiserver.workflows_mgr as workflows_mgr_module
 from cylc.uiserver.main import CylcUIServer
+import cylc.uiserver.workflows_mgr as workflows_mgr_module
 from cylc.uiserver.workflows_mgr import (
-    CFF, est_workflow, workflow_request, WorkflowsManager)
+    workflow_request,
+    WorkflowsManager,
+    est_workflow,
+)
+
 from .conftest import AsyncClientFixture
 
 

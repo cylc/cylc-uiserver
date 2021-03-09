@@ -56,11 +56,13 @@ else:
     setup_requires = []
 
 tests_require = [
-    'pytest',
-    'coverage',
-    'pytest-cov',
-    'pytest-asyncio',
-    'pytest-mock'
+    'coverage>=5.0.0',
+    'flake8>=3.0.0',
+    'mypy>=0.812',
+    'pytest>=6',
+    'pytest-asyncio>=0.14.0',
+    'pytest-cov>=2.8.0',
+    'pytest-mock',
 ]
 
 extras_require = {

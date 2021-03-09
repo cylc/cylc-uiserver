@@ -29,19 +29,19 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Install tools
-        run: pip install flake8
-
-      - name: Style test
-        run: flake8 cylc/uiserver/ --extend-exclude="config_defaults.py,cylc/uiserver/websockets/"
-
       - name: Install cylc-uiserver & dependencies
         run: |
           pip install git+https://github.com/cylc/cylc-flow@master
           pip install .[all]
 
+      - name: Style test
+        run: flake8
+
+      - name: mypy
+        run: mypy
+
       - name: Test
-        run: pytest --cov cylc/uiserver/tests
+        run: pytest --cov
 
       - name: Coverage
         run: |
