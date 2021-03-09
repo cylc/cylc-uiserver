@@ -34,7 +34,12 @@ jobs:
       - name: Install cylc-uiserver & dependencies
         run: |
           pip install git+https://github.com/cylc/cylc-flow@master
-          pip install .[all]
+          if [ "${{ matrix.python }}" == "${{ env.PYTHON_COVERAGE_ENABLED }}" ]; then
+            pip install -e .[all]
+          else
+            pip install .[all]
+          fi
+
 
       - name: Style test
         run: flake8
