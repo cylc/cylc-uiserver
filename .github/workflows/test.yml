@@ -10,6 +10,8 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    env:
+      PYTHON_COVERAGE_ENABLED: '3.8'
     strategy:
       matrix:
         os: ['ubuntu-latest']
@@ -44,6 +46,7 @@ jobs:
         run: pytest --cov
 
       - name: Coverage
+        if: ${{ success() &&  matrix.python == env.PYTHON_COVERAGE_ENABLED }}
         run: |
           coverage xml --ignore-errors
           bash <(curl -s https://codecov.io/bash)
