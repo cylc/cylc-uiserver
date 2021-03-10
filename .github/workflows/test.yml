@@ -10,6 +10,8 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    env:
+      PYTHON_COVERAGE_ENABLED: '3.8'
     strategy:
       matrix:
         os: ['ubuntu-latest']
@@ -29,10 +31,18 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
+      # NOTE: We install in both editable, and non-editable mode. The former is
+      # necessary to produce coverage reports with the correct numbers.
+      # https://github.com/cylc/cylc-uiserver/issues/179
       - name: Install cylc-uiserver & dependencies
         run: |
           pip install git+https://github.com/cylc/cylc-flow@master
-          pip install .[all]
+          if [ "${{ matrix.python }}" == "${{ env.PYTHON_COVERAGE_ENABLED }}" ]; then
+            pip install -e .[all]
+          else
+            pip install .[all]
+          fi
+
 
       - name: Style test
         run: flake8
@@ -44,6 +54,7 @@ jobs:
         run: pytest --cov
 
       - name: Coverage
+        if: ${{ success() &&  matrix.python == env.PYTHON_COVERAGE_ENABLED }}
         run: |
           coverage xml --ignore-errors
           bash <(curl -s https://codecov.io/bash)
