@@ -74,7 +74,23 @@ class Services:
     """Cylc services provided by the UI Server."""
 
     @staticmethod
-    async def play(workflows, args, workflows_mgr):
+    def _error(message):
+        """Format error case response."""
+        return [
+            False,
+            str(message)
+        ]
+
+    @staticmethod
+    def _return(message):
+        """Format success case response."""
+        return [
+            True,
+            message
+        ]
+
+    @classmethod
+    async def play(cls, workflows, args, workflows_mgr):
         """Calls `cylc play`."""
         response = []
 
@@ -85,9 +101,9 @@ class Services:
             if 'cylc_version' in args:
                 cylc_version = args['cylc_version']
                 if not check_cylc_version(cylc_version):
-                    return {'error': {'message': [
+                    return cls._error(
                         f'cylc version not available: {cylc_version}'
-                    ]}}
+                    )
                 args = dict(args)
                 args.pop('cylc_version')
 
@@ -108,22 +124,13 @@ class Services:
 
         except Exception as exc:
             # oh noes, something went wrong, send back confirmation
-            return response.append(
-                [
-                    {
-                        'error': {
-                            'message': str(exc)
-                        }
-                    }
-                ]
-            )
+            return cls._error(exc)
 
         # start each requested flow
         me = getpass.getuser()
         for user, flow, _ in workflows:
-            cmd_key = f'{user}|{flow}'
             try:
-                if user != me:
+                if user and user != me:
                     # TODO: multi-user support
                     # forward this request to the other users UIS
                     raise ValueError(f'Cannot start flow for user: {user}')
@@ -158,32 +165,12 @@ class Services:
 
             except Exception as exc:
                 # oh noes, something went wrong, send back confirmation
-                response.append(
-                    (
-                        cmd_key,
-                        [
-                            {
-                                'error': {
-                                    'message': str(exc)
-                                }
-                            }
-                        ]
-                    )
-                )
+                return cls._error(exc)
 
             else:
                 # send a success message
-                response.append(
-                    (
-                        cmd_key,
-                        [
-                            {
-                                'play': {
-                                    'result': f'succeeded: {cmd_repr}'
-                                }
-                            }
-                        ]
-                    )
+                return cls._return(
+                    'Workflow started'
                 )
 
         # trigger a re-scan
