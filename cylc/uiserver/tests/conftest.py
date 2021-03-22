@@ -16,11 +16,20 @@
 
 import asyncio
 import inspect
+from pathlib import Path
+from shutil import rmtree
+from tempfile import TemporaryDirectory
+from textwrap import dedent
 
 import pytest
 import zmq
-from cylc.flow.data_messages_pb2 import (
-    PbEntireWorkflow, PbWorkflow, PbFamilyProxy)
+
+
+from cylc.flow.data_messages_pb2 import (  # type: ignore
+    PbEntireWorkflow,
+    PbWorkflow,
+    PbFamilyProxy,
+)
 from cylc.flow.network import ZMQSocketBase
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
@@ -119,3 +128,57 @@ def empty_aiter():
             raise StopAsyncIteration
 
     return NoopIterator
+
+
+@pytest.fixture(scope='module')
+def mod_tmp_path():
+    """A tmp_path fixture with module-level scope."""
+    path = Path(TemporaryDirectory().name)
+    path.mkdir()
+    yield path
+    rmtree(path)
+
+
+@pytest.fixture(scope='module')
+def ui_build_dir(mod_tmp_path):
+    """A dummy UI build tree containing three versions '1.0', '2.0' & '3.0'."""
+    for version in range(1, 4):
+        path = mod_tmp_path / f'{version}.0'
+        path.mkdir()
+        (path / 'index.html').touch()
+    yield mod_tmp_path
+
+
+@pytest.fixture
+def mock_config(monkeypatch):
+    """Mock the UIServer/Hub configuration file.
+
+    This fixture auto-loads by setting a blank config.
+
+    Call the fixture with config code to override.
+
+    mock_config('''
+        c.UIServer.my_config = 'my_value'
+    ''')
+
+    Can be called multiple times.
+
+    Note the code you provide is exec'ed just like the real config file.
+
+    """
+    conf = ''
+
+    def _write(string=''):
+        nonlocal conf
+        conf = dedent(string)
+
+    def _read(obj, _):
+        nonlocal conf
+        exec(conf, {'c': obj.config})
+
+    monkeypatch.setattr(
+        'cylc.uiserver.main.CylcUIServer.load_config_file',
+        _read
+    )
+
+    yield _write

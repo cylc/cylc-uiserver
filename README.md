@@ -47,6 +47,26 @@ user config in `~/.cylc/hub/config.py`.
 
 See the Jupyterhub documentation for details on configuration options.
 
+The UI Server is (currently) also configured from this file using the
+`UIServer` namespace.
+
+Currently the UI Server accepts two configurations:
+
+* `c.UIServer.ui_build_dir`
+* `c.UIServer.ui_version`
+
+See `cylc.uiserver.main.UIServer` for details.
+
+# Developing
+
+For UI development set the following configuration to use your UI build
+(rather than the default bundled UI build):
+
+```
+# ~/.cylc/hub/config.py
+c.UIServer.ui_build_dir = '~/cylc-ui/dist'  # path to build
+```
+
 ## Copyright and Terms of Use
 
 Copyright (C) 2019-<span actions:bind='current-year'>2021</span> NIWA & British Crown (Met Office) & Contributors.
