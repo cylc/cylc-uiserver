@@ -150,9 +150,7 @@ class Play(Mutation):
                 this cycle point.
             ''')
         )
-        mode = RunMode(
-            default_value=RunMode.Live.value  # type: ignore
-        )
+        mode = RunMode()
         host = String(
             description=sstrip('''
                 Specify the host on which to start-up the suite. If not
