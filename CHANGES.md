@@ -16,6 +16,9 @@ None or N/A.
 
 ### Enhancements
 
+[#188](https://github.com/cylc/cylc-uiserver/pull/188) - UI: package
+0.3 prebuild.
+
 [#173](https://github.com/cylc/cylc-uiserver/pull/173) - CLI changes
 `jupyterhub` -> `cylc hub`, `cylc-uiserver` -> `cylc uiserver`.
 

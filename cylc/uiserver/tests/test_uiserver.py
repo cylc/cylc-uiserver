@@ -52,9 +52,10 @@ def test_cylcuiserver_create_graphql_handler():
     assert handler[2].get('graphiql') == 1
 
 
-# def test_ui_blank_config(mock_config, ui_build_dir):
-#     uis = CylcUIServer(8000, '/prefix/')
-#     assert uis.ui_path == ''
+def test_ui_blank_config(mock_config, ui_build_dir):
+    """It should serve the bundled UIS by default."""
+    uis = CylcUIServer(8000, '/prefix/')
+    assert uis.ui_path.parts[-4:-1] == ('cylc', 'uiserver', 'ui')
 
 
 def test_ui_version_unset(mock_config, ui_build_dir):
