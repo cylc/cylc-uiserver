@@ -1,0 +1,65 @@
+name: Update UI
+
+on:
+  workflow_dispatch:
+    inputs:
+      uninstall:
+        description: UI versions to uninstall (space delimited)
+        required: false
+      install:
+        description: UI versions to install (space delimited)
+        required: false
+
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BRANCH: update-ui-${{github.run_number}}
+
+    steps:
+      - name: checkout cylc-uiserver
+        uses: actions/checkout@v2
+
+      - name: Configure git
+        uses: cylc/release-actions/configure-git@v1
+
+      - name: Create Branch
+        run: |
+          git checkout -b "${BRANCH}"
+
+      - name: uninstall
+        run: |
+          for version in ${{ github.event.inputs.uninstall }}; do
+            git rm -rf "cylc/uiserver/ui/${version}"
+            git commit -m "ui: uninstall ${version}"
+          done
+
+      - name: install
+        env:
+          RELEASES: https://github.com/cylc/cylc-ui/releases/download
+        run: |
+          for version in ${{ github.event.inputs.install }}; do
+            wget \
+              "$RELEASES/${version}/cylc-ui-${version}-dist.zip" \
+              -O "${version}.zip"
+            mkdir -p "cylc/uiserver/ui/${version}/"
+            unzip "${version}.zip" -d "cylc/uiserver/ui/${version}/"
+            git add "cylc/uiserver/ui/${version}/"
+            git commit -m "ui: install ${version}"
+          done
+
+      - name: push
+        run: |
+          git push origin "$BRANCH"
+
+      - name: Create pull request
+        uses: cylc/release-actions/create-pr@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          head: ${{ env.BRANCH }}
+          title: 'Update UI'
+          body: |
+            uninstall: ${{ github.event.inputs.uninstall }}
+            install: ${{ github.event.inputs.install }}
