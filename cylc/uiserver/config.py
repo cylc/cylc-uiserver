@@ -20,23 +20,44 @@ Note: Jupyterhub configs cannot be imported directly due to the way Jupyterhub
 provides the configuration object to the file when it is loaded.
 
 """
+import logging
 import os
 from pathlib import Path
 
 from cylc.uiserver import __file__ as uis_pkg
 
+LOG = logging.getLogger(__name__)
 
-DEFAULT_CONF_PATH = Path(uis_pkg).parent / 'config_defaults.py'
-USER_CONF_PATH = Path('~/.cylc/hub/config.py').expanduser()
+# base configuration - always used
+DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / 'config_defaults.py'
+# site configuration
+SITE_CONF_PATH: Path = Path('/etc/cylc/hub/config.py')
+# user configuration
+USER_CONF_PATH: Path = Path('~/.cylc/hub/config.py').expanduser()
+
+
+def _load(path):
+    """Load a configuration file."""
+    if path.exists():
+        LOG.info(f'Loading config file: {path}')
+        exec(path.read_text())
 
 
 def load():
-    config_paths = [DEFAULT_CONF_PATH, USER_CONF_PATH]
+    """Load the relevant UIS/Hub configuration files."""
+    if os.getenv('CYLC_SITE_CONF_PATH'):
+        site_conf_path: Path = Path(
+            os.environ['CYLC_SITE_CONF_PATH'],
+            'hub/config.py'
+        )
+    else:
+        site_conf_path: Path = SITE_CONF_PATH
+    config_paths = [DEFAULT_CONF_PATH, site_conf_path, USER_CONF_PATH]
     for path in config_paths:
-        if path.exists():
-            exec(path.read_text())
+        _load(path)
 
 
 if 'CYLC_HUB_VERSION' in os.environ:
-    # prevent the config from being loaded on import
+    # auto-load the config (jupyterhub requirement)
+    # the env var prevents the config from being loaded on import
     load()
