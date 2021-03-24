@@ -26,8 +26,8 @@
         "handlers": ["console"],
         "propagate": false
       },
-      "cylc.flow": {
-        "level": "DEBUG",
+      "cylc": {
+        "level": "INFO",
         "handlers": ["console"],
         "propagate": false
       },

@@ -74,7 +74,7 @@ The Cylc Hub will load the following files in order:
 
 2) Site Config
 
-   This file confugures the Hub/UIS for all users. The default path can be
+   This file configures the Hub/UIS for all users. The default path can be
    changed by the ``CYLC_SITE_CONF_PATH`` environment variable.
 
    (`/etc/cylc/hub/config.py`)
@@ -104,10 +104,11 @@ The UI Server is (currently) also configured from the same configuration file(s)
 as the hub using the
 `UIServer` namespace.
 
-Currently the UI Server accepts two configurations:
+Currently the UI Server accepts three configurations:
 
 * `c.UIServer.ui_build_dir`
 * `c.UIServer.ui_version`
+* `c.UIServer.logging_config`
 
 See the `cylc.uiserver.main.UIServer` file for details.
 
