@@ -22,13 +22,18 @@ import signal
 from functools import partial
 from logging.config import dictConfig
 from os.path import join, abspath, dirname
-from pathlib import Path
-from typing import Any, Tuple, Type
+from pathlib import Path, PurePath
+from typing import Any, Tuple, Type, List
 
+from pkg_resources import parse_version
 from tornado import web, ioloop
 from traitlets import (
+    TraitError,
+    TraitType,
+    Undefined,
     Unicode,
     default,
+    validate,
 )
 from traitlets.config import (
     Application
@@ -84,17 +89,126 @@ class MyApplication(web.Application):
             logger.info('exit success')
 
 
+class PathType(TraitType):
+    """A pathlib traitlet type which allows string and undefined values."""
+
+    @property
+    def info_text(self):
+        return 'a pathlib.PurePath object'
+
+    def validate(self, obj, value):
+        if isinstance(value, str):
+            return Path(value)
+        if isinstance(value, PurePath):
+            return value
+        if value == Undefined:
+            return value
+        self.error(obj, value)
+
+
 class CylcUIServer(Application):
 
-    ui_path = Unicode(config=True)
+    ui_path = PathType(
+        config=False,
+        help='''
+            Path to the UI build to serve.
+
+            Internal config derived from ui_build_dir and ui_version.
+        '''
+    )
+    ui_build_dir = PathType(
+        config=True,
+        help='''
+            The directory containing the UI build.
+
+            This can be a directory containing a single UI build e.g::
+
+               dir/
+                   index.html
+
+            Or a tree of builds where each build has a version number e.g::
+
+               dir/
+                   1.0/
+                       index.html
+                   2.0/
+                       index.html
+
+            By default this points at the UI build tree which was bundled with
+            the UI Server. Change this if you want to pick up a different
+            build e.g. for development or evaluation purposes.
+
+            Takes effect on (re)start.
+        '''
+    )
+    ui_version = Unicode(
+        config=True,
+        help='''
+            Hardcodes the UI version to serve.
+
+            If the ``ui_build_dir`` is a tree of builds, this config can be
+            used to determine which UI build is used.
+
+            By default the highest version is chosen according to PEP440
+            version sorting rules.
+
+            Takes effect on (re)start.
+        '''
+    )
+
+    @validate('ui_build_dir')
+    def _check_ui_build_dir_exists(self, proposed):
+        if proposed['value'].exists():
+            return proposed['value']
+        raise TraitError(f'ui_build_dir does not exist: {proposed["value"]}')
+
+    @staticmethod
+    def _list_ui_versions(path: Path) -> List[str]:
+        """Return a list of UI build versions detected in self.ui_path."""
+        return list(
+            sorted(
+                (
+                    version.name
+                    for version in path.glob('[0-9][0-9.]*')
+                    if version
+                ),
+                key=parse_version
+            )
+        )
 
     @default('ui_path')
-    def _dev_ui_path(self):
-        return str(Path(uis_pkg).parents[3] / 'cylc-ui/dist')
+    def _get_ui_path(self):
+        build_dir = self.ui_build_dir
+        version = self.ui_version
 
-    def __init__(self, port, jupyter_hub_service_prefix, static=None):
+        if build_dir and build_dir != Undefined:
+            # ui path has been configured, check if the path is a build
+            # (rather than a dir of builds e.g. development build)
+            if (build_dir / 'index.html').exists():
+                return build_dir
+        else:
+            # default UI build base directory
+            build_dir = Path(uis_pkg).parent / 'ui'
+
+        if not version:
+            # pick the highest installed version by default
+            try:
+                version = self._list_ui_versions(build_dir)[-1]
+            except IndexError:
+                raise Exception(
+                    f'Could not find any UI builds in {build_dir}.'
+                )
+
+        ui_path = build_dir / version
+        if (ui_path / 'index.html').exists():
+            return ui_path
+
+        raise Exception(f'Could not find UI build in {ui_path}')
+
+    def __init__(self, port, jupyter_hub_service_prefix, ui_build_dir=None):
         self._load_uis_config()
-        self._set_static_path(static)
+        if ui_build_dir:
+            self.ui_build_dir = Path(ui_build_dir)
         self._port = port
         self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
         self.workflows_mgr = WorkflowsManager(self)
@@ -113,24 +227,7 @@ class CylcUIServer(Application):
             del os.environ['CYLC_HUB_VERSION']
         # set traitlets values from the config
         for key, value in self.config.UIServer.items():
-            print(f'# {key}={value}')
             setattr(self, key, value)
-
-    def _set_static_path(self, static):
-        """Set the path to static files.
-
-        Args:
-            static: Command line override of the ui_path traitlet.
-        """
-        if static:
-            if os.path.isabs(static):
-                self.ui_path = static
-            else:
-                script_dir = os.path.dirname(__file__)
-                self.ui_path = os.path.abspath(os.path.join(
-                    script_dir,
-                    static
-                ))
 
     def _create_static_handler(
             self,
@@ -278,7 +375,7 @@ def main():
     )
     parser.add_argument('-p', '--port', action="store", dest="port", type=int,
                         default=8888)
-    parser.add_argument('-s', '--static', action="store", dest="static")
+    parser.add_argument('--ui-build-dir', action="store")
     parser.add_argument('--debug', action="store_true", dest="debug",
                         default=False)
     here = abspath(dirname(__file__))
@@ -298,13 +395,12 @@ def main():
     logger.info(f"JupyterHub Service Prefix: {jupyterhub_service_prefix}")
     ui_server = CylcUIServer(
         port=args.port,
-        static=args.static,
+        ui_build_dir=args.ui_build_dir,
         jupyter_hub_service_prefix=jupyterhub_service_prefix
     )
-    logger.info(f"Listening on {args.port} and serving static content from "
-                f"{args.static}")
-
-    logger.info("Starting Cylc UI")
+    logger.info("Starting Cylc UI Server")
+    logger.info(f"Listening on port: {args.port}")
+    logger.info(f'Serving UI from: {ui_server.ui_path}')
     ui_server.start(args.debug)
 
 

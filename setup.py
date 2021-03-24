@@ -14,17 +14,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import codecs
+from pathlib import Path
 import re
 import sys
-from os.path import join, abspath, dirname
 
 from setuptools import setup, find_namespace_packages
 
-here = abspath(dirname(__file__))
+HERE = Path(__file__).parent
+UIS = Path(HERE, 'cylc', 'uiserver')
 
 
 def read(*parts):
-    with codecs.open(join(here, *parts), "r") as fp:
+    with codecs.open(Path(HERE, *parts), "r") as fp:
         return fp.read()
 
 
@@ -79,6 +80,10 @@ setup(
         'cylc.uiserver': [
             'logging_config.json',
             'logo.svg'
+        ] + [
+            # list all the UI files
+            str(path.relative_to(UIS))
+            for path in (UIS / 'ui').glob('**/*')
         ]
     },
     install_requires=install_requires,
