@@ -15,14 +15,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
+from contextlib import contextmanager
 import json
 import logging
 import os
 import signal
 from functools import partial
 from logging.config import dictConfig
-from os.path import join, abspath, dirname
 from pathlib import Path, PurePath
+import sys
 from typing import Any, Tuple, Type, List
 
 from pkg_resources import parse_version
@@ -155,6 +156,22 @@ class CylcUIServer(Application):
             Takes effect on (re)start.
         '''
     )
+    logging_config = PathType(
+        config=True,
+        help='''
+            Set the path to a logging config JSON file.
+
+            This configures what gets logged where.
+
+            For more information on logging configuration see:
+            https://docs.python.org/3/library/logging.config.html
+
+            Currently only JSON format is supported.
+
+            If unspecified the default config located in
+            ``cylc/uiserver/logging_config.json`` will apply.
+        '''
+    )
 
     @validate('ui_build_dir')
     def _check_ui_build_dir_exists(self, proposed):
@@ -205,17 +222,53 @@ class CylcUIServer(Application):
 
         raise Exception(f'Could not find UI build in {ui_path}')
 
-    def __init__(self, port, jupyter_hub_service_prefix, ui_build_dir=None):
-        self._load_uis_config()
+    @default('logging_config')
+    def _default_logging_config(self):
+        return Path(Path(uis_pkg).parent / 'logging_config.json')
+
+    def __init__(self, port, jupyterhub_service_prefix, ui_build_dir=None):
+        with self._interim_log():
+            self._load_uis_config()
+            self._open_log()
         if ui_build_dir:
             self.ui_build_dir = Path(ui_build_dir)
         self._port = port
-        self._jupyter_hub_service_prefix = jupyter_hub_service_prefix
+        self._jupyter_hub_service_prefix = jupyterhub_service_prefix
         self.workflows_mgr = WorkflowsManager(self)
         self.data_store_mgr = DataStoreMgr(self.workflows_mgr)
         self.resolvers = Resolvers(
             self.data_store_mgr,
             workflows_mgr=self.workflows_mgr)
+
+    @staticmethod
+    @contextmanager
+    def _interim_log():
+        """Capture log messages before the logging config has been processed.
+
+        The logging configuration is configured via the configuration file
+        which means we can't configure logging until we have loaded the
+        configuration. Any log output in the interim would be lost so we
+        use a temporary handler to record it to the console.
+        """
+        log = logging.getLogger()
+        handler = logging.StreamHandler(stream=sys.stdout)
+        log.setLevel(logging.DEBUG)
+        handler.setLevel(logging.DEBUG)
+        log.addHandler(handler)
+        yield
+        log.removeHandler(handler)
+
+    def _open_log(self):
+        """Configure logging and open log handler(s)."""
+        if self.logging_config:
+            if self.logging_config.exists():
+                with open(self.logging_config, 'r') as logging_config_json:
+                    config = json.load(logging_config_json)
+                    dictConfig(config["logging"])
+            else:
+                raise ValueError(
+                    f'Logging config file not found: {self.logging_config}'
+                )
 
     def _load_uis_config(self):
         """Load the UIS config file."""
@@ -301,7 +354,6 @@ class CylcUIServer(Application):
         Args:
             debug (bool): flag to set debugging in the Tornado application
         """
-        logger.info(self.ui_path)
         # subscription/websockets server
         subscription_server = TornadoSubscriptionServer(
             schema,
@@ -350,6 +402,12 @@ class CylcUIServer(Application):
         )
 
     def start(self, debug: bool):
+        logger.info("Starting Cylc UI Server")
+        logger.info(
+            f"JupyterHub Service Prefix: {self._jupyter_hub_service_prefix}"
+        )
+        logger.info(f"Listening on port: {self._port}")
+        logger.info(f'Serving UI from: {self.ui_path}')
         app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)
@@ -378,29 +436,17 @@ def main():
     parser.add_argument('--ui-build-dir', action="store")
     parser.add_argument('--debug', action="store_true", dest="debug",
                         default=False)
-    here = abspath(dirname(__file__))
-    parser.add_argument('--logging-config', type=argparse.FileType('r'),
-                        help='path to logging configuration file',
-                        action="store", dest="logging_config",
-                        default=join(here, 'logging_config.json'))
     args = parser.parse_known_args()[0]
-
-    # args.logging_config will be a io.TextIOWrapper resource
-    with args.logging_config as logging_config_json:
-        config = json.load(logging_config_json)
-        dictConfig(config["logging"])
 
     jupyterhub_service_prefix = os.environ.get(
         'JUPYTERHUB_SERVICE_PREFIX', '/')
-    logger.info(f"JupyterHub Service Prefix: {jupyterhub_service_prefix}")
+
     ui_server = CylcUIServer(
         port=args.port,
         ui_build_dir=args.ui_build_dir,
-        jupyter_hub_service_prefix=jupyterhub_service_prefix
+        jupyterhub_service_prefix=jupyterhub_service_prefix
     )
-    logger.info("Starting Cylc UI Server")
-    logger.info(f"Listening on port: {args.port}")
-    logger.info(f'Serving UI from: {ui_server.ui_path}')
+
     ui_server.start(args.debug)
 
 
