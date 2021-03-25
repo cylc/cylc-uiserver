@@ -127,7 +127,7 @@ See the `cylc.uiserver.main.UIServer` file for details.
    > **Note:**
    >
    > If you want to run with a development copy of Cylc Flow you must install
-   > it first else `pip` will dowload the latest version from PyPi.
+   > it first else `pip` will download the latest version from PyPi.
 
 4) For UI development set the following configuration to use your UI build
    (rather than the default bundled UI build):
