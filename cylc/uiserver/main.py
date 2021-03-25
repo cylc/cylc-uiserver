@@ -98,7 +98,7 @@ class PathType(TraitType):
 
     def validate(self, obj, value):
         if isinstance(value, str):
-            return Path(value)
+            return Path(value).expanduser()
         if isinstance(value, PurePath):
             return value
         if value == Undefined:
