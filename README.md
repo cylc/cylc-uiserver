@@ -18,7 +18,7 @@ used to serve the Cylc UI, and to communicate with running Cylc Schedulers.
 - [Introduction](#introduction)
 - [Copyright](#copyright-and-terms-of-use)
 
-## Introduction
+## Introduction
 
 The functionality in this repository is required to run the Cylc web user
 interface.
@@ -62,7 +62,7 @@ The default URL is [http://localhost:8000](http://localhost:8000).
 
 ## Configuring
 
-### Hub
+### Hub
 
 The Cylc Hub will load the following files in order:
 
