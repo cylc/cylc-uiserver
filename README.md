@@ -98,7 +98,7 @@ $ cylc hub --config
 
 See the Jupyterhub documentation for details on configuration options.
 
-### UI Server
+### UI Server
 
 The UI Server is (currently) also configured from the same configuration file(s)
 as the hub using the
