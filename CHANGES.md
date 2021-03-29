@@ -6,6 +6,14 @@ milestones](https://github.com/cylc/cylc-uiserver/milestones?state=closed) for
 each release.
 
 -------------------------------------------------------------------------------
+## __cylc-uiserver-0.4 (2020-??-??)__
+
+### Enhancements
+
+[#197](https://github.com/cylc/cylc-uiserver/pull/197) -
+Make the workflow scan interval configurable.
+
+-------------------------------------------------------------------------------
 ## __cylc-uiserver-0.3.0 (2021-03-29)__
 
 Release 0.3.0 of Cylc UI Server.

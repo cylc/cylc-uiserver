@@ -104,11 +104,12 @@ The UI Server is (currently) also configured from the same configuration file(s)
 as the hub using the
 `UIServer` namespace.
 
-Currently the UI Server accepts three configurations:
+Currently the UI Server accepts these configurations:
 
 * `c.UIServer.ui_build_dir`
 * `c.UIServer.ui_version`
 * `c.UIServer.logging_config`
+* `c.UIServer.scan_iterval`
 
 See the `cylc.uiserver.main.UIServer` file for details.
 
