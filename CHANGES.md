@@ -6,15 +6,17 @@ milestones](https://github.com/cylc/cylc-uiserver/milestones?state=closed) for
 each release.
 
 -------------------------------------------------------------------------------
-## __cylc-uiserver-0.3 (2020-??-??)__
+## __cylc-uiserver-0.3.0 (2021-03-29)__
 
-Release 0.3 of Cylc UI Server.
+Release 0.3.0 of Cylc UI Server.
 
 ### Backward incompatible changes
 
 None or N/A.
 
 ### Enhancements
+
+[#195](https://github.com/cylc/cylc-uiserver/pull/195) - UI: package 0.3.0
 
 [#188](https://github.com/cylc/cylc-uiserver/pull/188) - UI: package
 0.3 prebuild.
