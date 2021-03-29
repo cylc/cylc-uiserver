@@ -29,6 +29,7 @@ from typing import Any, Tuple, Type, List
 from pkg_resources import parse_version
 from tornado import web, ioloop
 from traitlets import (
+    Float,
     TraitError,
     TraitType,
     Undefined,
@@ -172,6 +173,22 @@ class CylcUIServer(Application):
             ``cylc/uiserver/logging_config.json`` will apply.
         '''
     )
+    scan_interval = Float(
+        config=True,
+        help='''
+            Set the interval between workflow scans in seconds.
+
+            Workflow scans allow a UI server to detect workflows which have
+            been started from the CLI since the last update.
+
+            This involves a number of filesystem operations, to reduce
+            system load set a higher value.
+        '''
+    )
+
+    @default('scan_interval')
+    def _default_scan_interval(self):
+        return 5
 
     @validate('ui_build_dir')
     def _check_ui_build_dir_exists(self, proposed):
@@ -420,7 +437,9 @@ class CylcUIServer(Application):
         # If the client is already established it's not overridden,
         # so the following callbacks can happen at the same time.
         ioloop.PeriodicCallback(
-            self.workflows_mgr.update, 5000).start()
+            self.workflows_mgr.update,
+            self.scan_interval * 1000
+        ).start()
         try:
             ioloop.IOLoop.current().start()
         except KeyboardInterrupt:
