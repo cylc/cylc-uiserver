@@ -42,14 +42,17 @@ def find_version(*file_paths):
 #     dependencies first. This way, if other dependencies (e.g. jupyterhub)
 #     don't pin versions, we will get whatever cylc-flow needs, and not
 #     the bleeding-edge version.
+# NB: no graphene version specified; we only make light use of it in our own
+#     code, so graphene-tornado's transitive version should do.
+#     Same for traitlets via jupyterhub transitive deps.
 install_requires = [
     'cylc-flow>=8.0b0',
     'jupyterhub==1.3.*',
     'tornado==6.1.*',
-    'traitlets>=5.0.5',
-    'graphene>=2.1.8',
     'graphene-tornado==2.6.*',
     'graphql-ws>=0.3.1,<0.4'
+    'traitlets',
+    'graphene',
 ]
 
 # Only include pytest-runner in setup_requires if we're invoking tests
