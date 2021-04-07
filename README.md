@@ -83,7 +83,7 @@ The Cylc Hub will load the following files in order:
 
    This file
 
-   (`~/.cylc/cylc/hub/config.py`)
+   (`~/.cylc/hub/config.py`)
 
 Alternatively a single config file can be provided on the command line.
 
