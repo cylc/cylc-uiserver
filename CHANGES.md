@@ -13,7 +13,7 @@ ones in. -->
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-0.4.0 (<span actions:bind='release-date'>2021-04-?</span>)__
 
-### Enhancements
+### Enhancements
 
 [#197](https://github.com/cylc/cylc-uiserver/pull/197) -
 Make the workflow scan interval configurable.
