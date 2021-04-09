@@ -65,7 +65,7 @@ def async_authorised(fun):
     return _inner
 
 
-class BaseHandler(web.RequestHandler):
+class BaseHandler(HubOAuthenticated, web.RequestHandler):
 
     def set_default_headers(self) -> None:
         self.set_header("X-JupyterHub-Version", jupyterhub_version)
@@ -80,7 +80,7 @@ class StaticHandler(BaseHandler, web.StaticFileHandler):
     """A static handler that extends BaseHandler (for headers)."""
 
 
-class MainHandler(HubOAuthenticated, BaseHandler):
+class MainHandler(BaseHandler):
 
     # hub_users = ["kinow"]
     # hub_groups = []
@@ -102,7 +102,7 @@ class MainHandler(HubOAuthenticated, BaseHandler):
         self.render(index, python_base_url=base_url)
 
 
-class UserProfileHandler(HubOAuthenticated, BaseHandler):
+class UserProfileHandler(BaseHandler):
 
     def set_default_headers(self) -> None:
         super().set_default_headers()
@@ -117,7 +117,7 @@ class UserProfileHandler(HubOAuthenticated, BaseHandler):
 # This is needed in order to pass the server context in addition to existing.
 # It's possible to just overwrite TornadoGraphQLHandler.context but we would
 # somehow need to pass the request info (headers, username ...etc) in also
-class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
+class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
 
     # Declare extra attributes
     resolvers = None
@@ -176,8 +176,7 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
         await TornadoGraphQLHandler.run(self, *args, **kwargs)
 
 
-class SubscriptionHandler(BaseHandler, HubOAuthenticated,
-                          websocket.WebSocketHandler):
+class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
 
     def initialize(self, sub_server, resolvers):
         self.queue = Queue(100)
