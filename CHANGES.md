@@ -8,7 +8,10 @@ each release.
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-0.4 (2020-??-??)__
 
-### Enhancements
+### Enhancements
+
+[#202](https://github.com/cylc/cylc-uiserver/pull/202) -
+Add authorisation for multi-user setups.
 
 [#197](https://github.com/cylc/cylc-uiserver/pull/197) -
 Make the workflow scan interval configurable.
