@@ -62,7 +62,7 @@ def authorised(fun):
     def _inner(self, *args, **kwargs):
         nonlocal fun
         if not _authorised(self):
-            raise web.HTTPError(403)
+            raise web.HTTPError(403, reason='authorisation insufficient')
         return fun(self, *args, **kwargs)
     return _inner
 
@@ -73,7 +73,7 @@ def async_authorised(fun):
     async def _inner(self, *args, **kwargs):
         nonlocal fun
         if not _authorised(self):
-            raise web.HTTPError(403)
+            raise web.HTTPError(403, reason='authorisation insufficient')
         return await fun(self, *args, **kwargs)
     return _inner
 

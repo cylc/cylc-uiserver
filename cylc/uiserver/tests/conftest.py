@@ -197,11 +197,13 @@ def authorisation_true(monkeypatch):
 @pytest.fixture
 def mock_authentication(monkeypatch):
 
-    def _mock_authentication(username=None, server=None):
+    def _mock_authentication(user=None, server=None, none=False):
         ret = {
-            'name': username or getuser(),
+            'name': user or getuser(),
             'server': server or gethostname()
         }
+        if none:
+            ret = None
         monkeypatch.setattr(
             'cylc.uiserver.handlers.BaseHandler.get_current_user',
             lambda x: ret
@@ -210,3 +212,13 @@ def mock_authentication(monkeypatch):
     _mock_authentication()
 
     return _mock_authentication
+
+
+@pytest.fixture
+def mock_authentication_yossarian(mock_authentication):
+    mock_authentication(user='yossarian')
+
+
+@pytest.fixture
+def mock_authentication_none(mock_authentication):
+    mock_authentication(none=True)
