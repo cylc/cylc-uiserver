@@ -36,15 +36,32 @@ logger = logging.getLogger(__name__)
 ME = getpass.getuser()
 
 
+def _authorised(req):
+    """Authorise a request.
+
+    Requires the request to be authenticated.
+
+    Currently returns True if the authenticated user is the same as the
+    user under which this UI Server is running.
+
+    Returns:
+        bool - True if the request passes authorisation, False if it fails.
+
+    """
+    user = req.get_current_user()
+    username = user.get('name', '?')
+    if username != ME:
+        logger.warn(f'Authorisation failed for {username}')
+        return False
+    return True
+
+
 def authorised(fun):
     """Provides Cylc authorisation for multi-user setups."""
 
     def _inner(self, *args, **kwargs):
         nonlocal fun
-        user = self.get_current_user()
-        username = user.get('name', '?')
-        if username != ME:
-            logger.warn(f'Authorisation failed for {username}')
+        if not _authorised(self):
             raise web.HTTPError(403)
         return fun(self, *args, **kwargs)
     return _inner
@@ -55,12 +72,8 @@ def async_authorised(fun):
 
     async def _inner(self, *args, **kwargs):
         nonlocal fun
-        user = self.get_current_user()
-        username = user.get('name', '?')
-        if username != ME:
-            logger.warn(f'Authorisation failed for {username}')
+        if not _authorised(self):
             raise web.HTTPError(403)
-            return
         return await fun(self, *args, **kwargs)
     return _inner
 

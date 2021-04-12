@@ -15,15 +15,16 @@
 """Test code and fixtures."""
 
 import asyncio
+from getpass import getuser
 import inspect
 from pathlib import Path
 from shutil import rmtree
+from socket import gethostname
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
 import pytest
 import zmq
-
 
 from cylc.flow.data_messages_pb2 import (  # type: ignore
     PbEntireWorkflow,
@@ -182,3 +183,30 @@ def mock_config(monkeypatch):
     )
 
     yield _write
+
+
+@pytest.fixture
+def authorisation_true(monkeypatch):
+    """Disabled request authorisation for test purposes."""
+    monkeypatch.setattr(
+        'cylc.uiserver.handlers._authorised',
+        lambda x: True
+    )
+
+
+@pytest.fixture
+def mock_authentication(monkeypatch):
+
+    def _mock_authentication(username=None, server=None):
+        ret = {
+            'name': username or getuser(),
+            'server': server or gethostname()
+        }
+        monkeypatch.setattr(
+            'cylc.uiserver.handlers.BaseHandler.get_current_user',
+            lambda x: ret
+        )
+
+    _mock_authentication()
+
+    return _mock_authentication

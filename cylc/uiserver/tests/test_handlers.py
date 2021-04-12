@@ -17,7 +17,8 @@ import os
 import shutil
 import tempfile
 from functools import partial
-from unittest.mock import patch, MagicMock
+from getpass import getuser
+from unittest.mock import MagicMock
 
 from graphql_ws.constants import GRAPHQL_WS
 from tornado.httpclient import HTTPResponse
@@ -32,6 +33,8 @@ from cylc.uiserver.main import (
     UserProfileHandler,
 )
 
+import pytest
+
 
 class MainHandlerTest(AsyncHTTPTestCase):
     """Test for the Main handler"""
@@ -44,18 +47,14 @@ class MainHandlerTest(AsyncHTTPTestCase):
             ]
         )
 
+    @pytest.mark.usefixtures("mock_authentication", autouse=True)
     def test_jupyterhub_version_returned(self):
-        with patch.object(MainHandler, 'get_current_user') as mocked:
-            mocked.return_value = {
-                'name': 'yossarian',
-                'server': 'catch:22'
-            }
-            with open(os.path.join(self.tempdir, "index.html"), "w+") as nf:
-                nf.write("TESTING!")
-                nf.flush()
-                response = self.fetch("/")  # type: HTTPResponse
-                assert response.body == b"TESTING!"
-                assert "X-JupyterHub-Version" in response.headers
+        with open(os.path.join(self.tempdir, "index.html"), "w+") as nf:
+            nf.write("TESTING!")
+            nf.flush()
+            response = self.fetch("/")  # type: HTTPResponse
+            assert response.body == b"TESTING!"
+            assert "X-JupyterHub-Version" in response.headers
 
     def tearDown(self) -> None:
         if self.tempdir:
@@ -72,18 +71,14 @@ class UserProfileHandlerTest(AsyncHTTPTestCase):
             ]
         )
 
+    @pytest.mark.usefixtures("mock_authentication", autouse=True)
     def test_user_profile_handler_cors_headers(self):
-        with patch.object(UserProfileHandler, 'get_current_user') as mocked:
-            mocked.return_value = {
-                'name': 'yossarian',
-                'server': 'catch:22'
-            }
-            response = self.fetch("/userprofile")  # type: HTTPResponse
-            assert "Access-Control-Allow-Origin" in response.headers
-            assert "Access-Control-Allow-Headers" in response.headers
-            assert "Access-Control-Allow-Methods" in response.headers
-            assert "Content-Type" in response.headers
-            assert b'yossarian' in response.body
+        response = self.fetch("/userprofile")  # type: HTTPResponse
+        assert "Access-Control-Allow-Origin" in response.headers
+        assert "Access-Control-Allow-Headers" in response.headers
+        assert "Access-Control-Allow-Methods" in response.headers
+        assert "Content-Type" in response.headers
+        assert getuser() in str(response.body)
 
 
 class SubscriptionHandlerTest(AsyncHTTPTestCase):
@@ -97,6 +92,7 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
             ]
         )
 
+    @pytest.mark.usefixtures("mock_authentication", autouse=True)
     def test_websockets_reject_get_requests(self):
         response = self.fetch('/subscriptions')
         assert 400 == response.code
@@ -109,7 +105,7 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         handler = SubscriptionHandler(application=app, request=request,
                                       sub_server=None, resolvers=None)
         if logged_in:
-            handler.get_current_user = lambda: {'name': 'yossarian'}
+            handler.get_current_user = lambda: {'name': getuser()}
         else:
             handler.get_current_user = lambda: None
         return handler
