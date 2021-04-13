@@ -45,10 +45,10 @@ This repository provides the following components of the Cylc system.
 For production:
 
 ```console
-# via conda (preferred)
+# via conda (preferred)
 $ conda install cylc-uiserver
 
-# via pip
+# via pip
 $ pip install cylc-uiserver
 ```
 
