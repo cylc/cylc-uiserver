@@ -44,14 +44,13 @@ def find_version(*file_paths):
 #     the bleeding-edge version.
 # NB: no graphene version specified; we only make light use of it in our own
 #     code, so graphene-tornado's transitive version should do.
-#     Same for traitlets via jupyterhub transitive deps.
 install_requires = [
     'cylc-flow>=8.0b0',
     'jupyterhub==1.3.*',
     'tornado==6.1.*',
     'graphene-tornado==2.6.*',
     'graphql-ws>=0.3.1,<0.4'
-    'traitlets',
+    'traitlets>5',
     'graphene',
 ]
 
