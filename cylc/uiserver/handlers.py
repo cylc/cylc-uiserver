@@ -51,7 +51,7 @@ def _authorised(req):
     user = req.get_current_user()
     username = user.get('name', '?')
     if username != ME:
-        logger.warn(f'Authorisation failed for {username}')
+        logger.warning(f'Authorisation failed for {username}')
         return False
     return True
 
