@@ -141,19 +141,19 @@ class Play(Mutation):
         )
         hold = Boolean(
             description=sstrip('''
-                Hold suite immediately on starting.
+                Hold workflow immediately on starting.
             ''')
         )
         hold_point = CyclePoint(
             description=sstrip('''
-                Set hold cycle point. Hold suite AFTER all tasks have PASSED
+                Set hold cycle point. Hold workflow AFTER all tasks have PASSED
                 this cycle point.
             ''')
         )
         mode = RunMode()
         host = String(
             description=sstrip('''
-                Specify the host on which to start-up the suite. If not
+                Specify the host on which to start-up the workflow. If not
                 specified, a host will be selected using the
                 `[scheduler]run hosts` global config.
             ''')
@@ -187,7 +187,7 @@ class Play(Mutation):
         set = List(
             String,
             description=sstrip('''
-                Set the value of a Jinja2 template variable in the suite
+                Set the value of a Jinja2 template variable in the workflow
                 definition. Values should be valid Python literals so strings
                 must be quoted e.g. `STR="string"`, `INT=43`, `BOOL=True`.
                 This option can be used multiple  times on the command line.
@@ -198,7 +198,7 @@ class Play(Mutation):
         )
         set_file = String(
             description=sstrip('''
-                Set the value of Jinja2 template variables in the suite
+                Set the value of Jinja2 template variables in the workflow
                 definition from a file containing NAME=VALUE pairs (one per
                 line). As with "set" values should be valid Python literals so
                 strings must be quoted e.g.  `STR='string'`. NOTE: these

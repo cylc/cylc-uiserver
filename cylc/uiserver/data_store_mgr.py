@@ -46,8 +46,8 @@ from cylc.flow.data_store_mgr import (
     EDGES, DATA_TEMPLATE, ALL_DELTAS, DELTAS_MAP, WORKFLOW,
     apply_delta, generate_checksum, create_delta_store
 )
-from cylc.flow.suite_files import ContactFileFields as CFF
-from cylc.flow.suite_status import SuiteStatus
+from cylc.flow.workflow_files import ContactFileFields as CFF
+from cylc.flow.workflow_status import WorkflowStatus
 
 from .workflows_mgr import workflow_request
 
@@ -90,7 +90,7 @@ class DataStoreMgr:
             flow.port = 0
             # flow.pub_port = 0
             flow.api_version = 0
-            flow.status = SuiteStatus.STOPPED.value
+            flow.status = WorkflowStatus.STOPPED.value
 
         # Apply to existing workflow data
         if 'delta_times' not in self.data[w_id]:
