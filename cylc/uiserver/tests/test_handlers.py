@@ -24,7 +24,7 @@ from graphql_ws.constants import GRAPHQL_WS
 from tornado.httpclient import HTTPResponse
 from tornado.httputil import HTTPServerRequest
 from tornado.testing import AsyncHTTPTestCase, get_async_test_timeout
-from tornado.web import Application, HTTPError
+from tornado.web import Application, RequestHandler
 
 from cylc.uiserver.main import (
     MainHandler,
@@ -36,6 +36,12 @@ from cylc.uiserver.main import (
 import pytest
 
 
+class NoOpHandler(RequestHandler):
+
+    def get(self):
+        pass
+
+
 class MainHandlerTest(AsyncHTTPTestCase):
     """Test for the Main handler"""
 
@@ -43,8 +49,10 @@ class MainHandlerTest(AsyncHTTPTestCase):
         self.tempdir = tempfile.mkdtemp(suffix='mainhandlertest')
         return MyApplication(
             handlers=[
-                ('/', MainHandler, {"path": self.tempdir})
-            ]
+                ('/', MainHandler, {"path": self.tempdir}),
+                ('/hub/api/oauth2/authorize.*', NoOpHandler)
+            ],
+            cookie_secret='MainHandlerTest'
         )
 
     @pytest.mark.usefixtures("mock_authentication")
@@ -62,13 +70,12 @@ class MainHandlerTest(AsyncHTTPTestCase):
         response = self.fetch('/')
         assert response.code == 500
 
-    # TODO: can't get this test to run due to handler setup?
-    # @pytest.mark.usefixtures("mock_authentication_none")
-    # def test_unauthenticated(self) -> None:
-    #     """Test 403 HTTP response (unauthenticated)."""
-    #     response = self.fetch('/')
-    #     assert response.code == 403
-    #     # assert response.reason == 'Forbidden'
+    @pytest.mark.usefixtures("mock_authentication_none")
+    def test_unauthenticated(self) -> None:
+        """Test login URL redirect response (unauthenticated)."""
+        response = self.fetch('/')
+        assert response.code == 200
+        assert response.effective_url.index('/hub/api/oauth2/authorize') > 0
 
     @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_unauthorised(self):
@@ -88,8 +95,10 @@ class UserProfileHandlerTest(AsyncHTTPTestCase):
     def get_app(self) -> Application:
         return MyApplication(
             handlers=[
-                ('/userprofile', UserProfileHandler)
-            ]
+                ('/userprofile', UserProfileHandler),
+                ('/hub/api/oauth2/authorize.*', NoOpHandler)
+            ],
+            cookie_secret='MainHandlerTest'
         )
 
     @pytest.mark.usefixtures("mock_authentication")
@@ -107,13 +116,12 @@ class UserProfileHandlerTest(AsyncHTTPTestCase):
         response = self.fetch('/userprofile')
         assert response.code == 200
 
-    # TODO: can't get this test to run due to handler setup?
-    # @pytest.mark.usefixtures("mock_authentication_none")
-    # def test_unauthenticated(self) -> None:
-    #     """Test 403 HTTP response (unauthenticated)."""
-    #     response = self.fetch('/userprofile')
-    #     assert response.code == 403
-    #     # assert response.reason == 'Forbidden'
+    @pytest.mark.usefixtures("mock_authentication_none")
+    def test_unauthenticated(self) -> None:
+        """Test login URL redirect (unauthenticated)."""
+        response = self.fetch('/userprofile')
+        assert response.code == 200
+        assert response.effective_url.index('/hub/api/oauth2/authorize') > 0
 
     @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_unauthorised(self):
