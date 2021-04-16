@@ -16,6 +16,8 @@
 import json
 import os
 from asyncio import Queue
+import logging
+import getpass
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
@@ -28,7 +30,55 @@ from tornado.ioloop import IOLoop
 from .websockets import authenticated as websockets_authenticated
 
 
-class BaseHandler(web.RequestHandler):
+logger = logging.getLogger(__name__)
+
+
+ME = getpass.getuser()
+
+
+def _authorised(req):
+    """Authorise a request.
+
+    Requires the request to be authenticated.
+
+    Currently returns True if the authenticated user is the same as the
+    user under which this UI Server is running.
+
+    Returns:
+        bool - True if the request passes authorisation, False if it fails.
+
+    """
+    user = req.get_current_user()
+    username = user.get('name', '?')
+    if username != ME:
+        logger.warning(f'Authorisation failed for {username}')
+        return False
+    return True
+
+
+def authorised(fun):
+    """Provides Cylc authorisation for multi-user setups."""
+
+    def _inner(self, *args, **kwargs):
+        nonlocal fun
+        if not _authorised(self):
+            raise web.HTTPError(403, reason='authorisation insufficient')
+        return fun(self, *args, **kwargs)
+    return _inner
+
+
+def async_authorised(fun):
+    """Provides Cylc authorisation for multi-user setups."""
+
+    async def _inner(self, *args, **kwargs):
+        nonlocal fun
+        if not _authorised(self):
+            raise web.HTTPError(403, reason='authorisation insufficient')
+        return await fun(self, *args, **kwargs)
+    return _inner
+
+
+class BaseHandler(HubOAuthenticated, web.RequestHandler):
 
     def set_default_headers(self) -> None:
         self.set_header("X-JupyterHub-Version", jupyterhub_version)
@@ -43,14 +93,7 @@ class StaticHandler(BaseHandler, web.StaticFileHandler):
     """A static handler that extends BaseHandler (for headers)."""
 
 
-class APIHandler(BaseHandler):
-
-    def set_default_headers(self) -> None:
-        super().set_default_headers()
-        self.set_header("Content-Type", 'application/json')
-
-
-class MainHandler(HubOAuthenticated, BaseHandler):
+class MainHandler(BaseHandler):
 
     # hub_users = ["kinow"]
     # hub_groups = []
@@ -61,6 +104,7 @@ class MainHandler(HubOAuthenticated, BaseHandler):
 
     @web.addslash
     @web.authenticated
+    @authorised
     def get(self):
         """Render the UI prototype."""
         index = os.path.join(self._static, "index.html")
@@ -71,13 +115,14 @@ class MainHandler(HubOAuthenticated, BaseHandler):
         self.render(index, python_base_url=base_url)
 
 
-class UserProfileHandler(HubOAuthenticated, APIHandler):
+class UserProfileHandler(BaseHandler):
 
     def set_default_headers(self) -> None:
         super().set_default_headers()
         self.set_header("Content-Type", 'application/json')
 
     @web.authenticated
+    @authorised
     def get(self):
         self.write(json.dumps(self.get_current_user()))
 
@@ -85,7 +130,7 @@ class UserProfileHandler(HubOAuthenticated, APIHandler):
 # This is needed in order to pass the server context in addition to existing.
 # It's possible to just overwrite TornadoGraphQLHandler.context but we would
 # somehow need to pass the request info (headers, username ...etc) in also
-class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
+class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
 
     # Declare extra attributes
     resolvers = None
@@ -122,9 +167,12 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
         return wider_context
 
     @web.authenticated
+    @authorised
     def prepare(self):
         super().prepare()
 
+    @web.authenticated
+    @async_authorised
     async def execute(self, *args, **kwargs):
         # Use own backend, and TornadoGraphQLHandler already does validation.
         return await self.schema.execute(
@@ -135,9 +183,13 @@ class UIServerGraphQLHandler(HubOAuthenticated, TornadoGraphQLHandler):
             **kwargs,
         )
 
+    @web.authenticated
+    @async_authorised
+    async def run(self, *args, **kwargs):
+        await TornadoGraphQLHandler.run(self, *args, **kwargs)
 
-class SubscriptionHandler(BaseHandler, HubOAuthenticated,
-                          websocket.WebSocketHandler):
+
+class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
 
     def initialize(self, sub_server, resolvers):
         self.queue = Queue(100)
@@ -148,6 +200,13 @@ class SubscriptionHandler(BaseHandler, HubOAuthenticated,
         return GRAPHQL_WS
 
     @websockets_authenticated
+    @authorised
+    def get(self, *args, **kwargs):
+        # forward this call so we can authenticate/authorise it
+        return websocket.WebSocketHandler.get(self, *args, **kwargs)
+
+    @websockets_authenticated
+    @authorised
     def open(self, *args, **kwargs):
         IOLoop.current().spawn_callback(self.subscription_server.handle, self,
                                         self.context)
