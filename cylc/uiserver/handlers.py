@@ -30,7 +30,6 @@ from functools import partial
 
 from .websockets import authenticated as websockets_authenticated
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -75,6 +74,18 @@ MEMBERTYPE_GROUP = "group"
 MEMBERTYPE_USERNAME = "username"
 
 # TODO Fake until we plumb in config
+# c.UIServer.authorisation = {
+#     "user_A": {
+#         "read": True,
+#        "write": [
+#             "pause"
+#         ]
+#     },
+#     "group:users": {
+#         "read": True
+#     }
+# }
+
 roles_dict = {CAN_READ: [{MEMBERTYPE_USERNAME: "mhall"}, {
     MEMBERTYPE_USERNAME: "testuser1"}, {
     MEMBERTYPE_GROUP: "users"}],
@@ -179,7 +190,7 @@ def authorise(*outer_args, **outer_kwargs):
         if iscoroutinefunction(fun):
             async def decorated_func(self, *args, **kwargs):
                 for function in outer_args:
-                    if function is callable():
+                    if callable(function):
                         allowed, username = function(handler=self)
                     if not allowed:
                         logger.warn(f'Authorisation failed for {username}')
@@ -190,7 +201,7 @@ def authorise(*outer_args, **outer_kwargs):
             def decorated_func(self):
                 for function in outer_args:
                     # todo raise / log
-                    if function is callable():
+                    if callable(function):
                         allowed, username = function(handler=self)
                     if not allowed:
                         logger.warn(f'Authorisation failed for {username}')
@@ -362,10 +373,11 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
 
 class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
 
-    def initialize(self, sub_server, resolvers):
+    def initialize(self, sub_server, resolvers, user_auth_config):
         self.queue = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
+        self.user_auth_config = user_auth_config
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS

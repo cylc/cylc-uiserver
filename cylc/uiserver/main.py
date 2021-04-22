@@ -24,7 +24,7 @@ from functools import partial
 from logging.config import dictConfig
 from pathlib import Path, PurePath
 import sys
-from typing import Any, Tuple, Type, List
+from typing import Any, Dict, Tuple, Type, List
 
 from pkg_resources import parse_version
 from tornado import web, ioloop
@@ -36,6 +36,7 @@ from traitlets import (
     Unicode,
     default,
     validate,
+    Dict
 )
 from traitlets.config import (
     Application
@@ -60,6 +61,7 @@ from .handlers import (
     SubscriptionHandler,
     UIServerGraphQLHandler,
     UserProfileHandler,
+    authorise,
 )
 from .resolvers import Resolvers
 from .schema import schema
@@ -109,6 +111,41 @@ class PathType(TraitType):
 
 
 class CylcUIServer(Application):
+
+    authorisation = Dict(
+        config=True,
+        help='''
+        Dictionary containing authorised users and permission levels
+        Should take the form:
+            {
+                "user-a": {
+                            read: True,
+                            write: [
+                                # restrict write access to only mutation1
+                                "mutation1"
+                            ]
+                },
+                "user-b": {
+                            read: True,
+                            write: True,
+                            execute: [
+                                # restrict write access to only play
+                                "play"
+                            ]
+                },
+                # groups can be configured with a prepending `group:`
+                "group:<group>": {
+                            read: True,
+                            write: [
+                                "mutation2", "mutation 3"
+                            ]
+                }
+            }
+
+            }
+
+        '''
+    )
 
     ui_path = PathType(
         config=False,
@@ -238,6 +275,11 @@ class CylcUIServer(Application):
             return ui_path
 
         raise Exception(f'Could not find UI build in {ui_path}')
+
+    # @default('authorisation')
+    # def _default_authorisation_config(self):
+    #         """Return none for default authorisation"""
+    #     return {}
 
     @default('logging_config')
     def _default_logging_config(self):
@@ -404,7 +446,8 @@ class CylcUIServer(Application):
                 self._create_handler("subscriptions",
                                      SubscriptionHandler,
                                      sub_server=subscription_server,
-                                     resolvers=self.resolvers),
+                                     resolvers=self.resolvers,
+                                     user_auth_config=self.authorisation),
                 # main handler
                 (
                     rf"{self._jupyter_hub_service_prefix}?",
@@ -440,6 +483,7 @@ class CylcUIServer(Application):
             self.workflows_mgr.update,
             self.scan_interval * 1000
         ).start()
+        #    letussee = self.authorisation
         try:
             ioloop.IOLoop.current().start()
         except KeyboardInterrupt:
