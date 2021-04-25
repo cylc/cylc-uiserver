@@ -376,9 +376,11 @@ async def test_unregister(
     workflow from the data store attributes, and call the necessary
     functions."""
     workflow_name = 'unregister-me'
+    workflow_id = f'{getuser()}{ID_DELIM}{workflow_name}'
+    await uiserver.workflows_mgr._register(workflow_id, None)
 
     uiserver.workflows_mgr._scan_pipe = empty_aiter()
-    uiserver.workflows_mgr.inactive.add(workflow_name)
+    uiserver.workflows_mgr.inactive.add(workflow_id)
     # NOTE: here we will yield a workflow that is not running, it does
     #       not have the contact data and is inactive.
     #       This is what forces the .update() to call unregister()!
@@ -386,7 +388,7 @@ async def test_unregister(
     await uiserver.workflows_mgr.update()
 
     # now the workflow is not active, nor inactive, it is unregistered
-    assert workflow_name not in uiserver.workflows_mgr.inactive
+    assert workflow_id not in uiserver.workflows_mgr.inactive
 
 
 @pytest.mark.asyncio
@@ -400,7 +402,7 @@ async def test_connect(
     If a workflow is running, but in the inactive state,
     then the connect method will be called."""
     workflow_name = 'connect'
-    workflow_id = f'{getuser()}|{workflow_name}'
+    workflow_id = f'{getuser()}{ID_DELIM}{workflow_name}'
     uiserver.workflows_mgr.inactive.add(workflow_id)
 
     assert workflow_id not in uiserver.workflows_mgr.active

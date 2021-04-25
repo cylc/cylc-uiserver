@@ -60,6 +60,7 @@ class DataStoreMgr:
     INIT_DATA_WAIT_TIME = 5.  # seconds
     INIT_DATA_RETRY_DELAY = 0.5  # seconds
     RECONCILE_TIMEOUT = 5.  # seconds
+    PENDING_DELTA_CHECK_INTERVAL = 0.5
 
     def __init__(self, workflows_mgr):
         self.workflows_mgr = workflows_mgr
@@ -70,11 +71,13 @@ class DataStoreMgr:
         self.executors = {}
         self.delta_queues = {}
 
-    def update_contact(self, w_id, contact_data=None):
+    def update_contact(
+            self, w_id, contact_data=None, status=None, pruned=False):
         delta = DELTAS_MAP[ALL_DELTAS]()
         delta.workflow.time = time.time()
         flow = delta.workflow.updated
         flow.id = w_id
+        flow.stamp = f'{w_id}@{delta.workflow.time}'
         if contact_data:
             # update with contact file data
             flow.name = contact_data['name']
@@ -90,7 +93,12 @@ class DataStoreMgr:
             flow.port = 0
             # flow.pub_port = 0
             flow.api_version = 0
-            flow.status = WorkflowStatus.STOPPED.value
+
+        if status is not None:
+            flow.status = status
+        if pruned:
+            flow.pruned = True
+            delta.workflow.pruned = w_id
 
         # Apply to existing workflow data
         if 'delta_times' not in self.data[w_id]:
@@ -141,11 +149,23 @@ class DataStoreMgr:
         self.data[w_id] = data
 
         # create new entry in the delta store
-        self.update_contact(w_id)
+        self.update_contact(w_id, status=WorkflowStatus.INSTALLED.value)
+
+    async def unregister_workflow(self, w_id):
+        logger.debug(f'unregister_workflow({w_id})')
+        self.update_contact(w_id, pruned=True)
+        if w_id in self.delta_queues:
+            while any(
+                not delta_queue.empty()
+                for delta_queue in self.delta_queues[w_id].values()
+            ):
+                await asyncio.sleep(self.PENDING_DELTA_CHECK_INTERVAL)
+        self.purge_workflow(w_id)
 
     def stop_workflow(self, w_id):
         logger.debug(f'stop_workflow({w_id})')
-        self.update_contact(w_id)
+        self.purge_workflow(w_id, data=False)
+        self.update_contact(w_id, status=WorkflowStatus.STOPPED.value)
 
     def purge_workflow(self, w_id, data=True):
         """Purge the manager of a workflow's subscription and data."""

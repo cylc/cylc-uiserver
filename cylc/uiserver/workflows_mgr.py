@@ -213,14 +213,13 @@ class WorkflowsManager:
 
     async def _unregister(self, wid):
         """Unregister a workflow from the data store."""
-        self.uiserver.data_store_mgr.purge_workflow(wid)
+        await self.uiserver.data_store_mgr.unregister_workflow(wid)
 
     async def _stop(self, wid):
         """Mark a workflow as stopped.
 
         The workflow can't do this itself, because it's not running.
         """
-        self.uiserver.data_store_mgr.purge_workflow(wid, data=False)
         self.uiserver.data_store_mgr.stop_workflow(wid)
 
     async def update(self):
@@ -266,7 +265,8 @@ class WorkflowsManager:
             if before == 'active':
                 self.active.pop(wid)
             elif before == 'inactive':
-                self.inactive.remove(wid)
+                if wid in self.inactive:
+                    self.inactive.remove(wid)
             if after == 'active':
                 self.active[wid] = flow
             elif after == 'inactive':
