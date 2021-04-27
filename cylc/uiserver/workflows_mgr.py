@@ -34,7 +34,7 @@ from cylc.flow import flags, ID_DELIM
 from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.hostuserutil import is_remote_host, get_host_ip_by_name
 from cylc.flow.network import API
-from cylc.flow.network.client import SuiteRuntimeClient
+from cylc.flow.network.client import WorkflowRuntimeClient
 from cylc.flow.network import MSG_TIMEOUT
 from cylc.flow.network.scan import (
     api_version,
@@ -42,7 +42,7 @@ from cylc.flow.network.scan import (
     is_active,
     scan
 )
-from cylc.flow.suite_files import ContactFileFields as CFF
+from cylc.flow.workflow_files import ContactFileFields as CFF
 
 logger = logging.getLogger(__name__)
 CLIENT_TIMEOUT = 2.0
@@ -53,7 +53,7 @@ async def workflow_request(client, command, args=None,
     """Workflow request command.
 
     Args:
-        client (SuiteRuntimeClient): Instantiated workflow client.
+        client (WorkflowRuntimeClient): Instantiated workflow client.
         command (str): Command/Endpoint name.
         args (dict): Endpoint arguments.
         timeout (float): Client request timeout (secs).
@@ -87,11 +87,11 @@ async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
             logger.error("ERROR: %s: %s\n", exc, host)
             return (reg, host, port, pub_port, None)
 
-    # NOTE: Connect to the suite by host:port. This way the
-    #       SuiteRuntimeClient will not attempt to check the contact file
+    # NOTE: Connect to the workflow by host:port. This way the
+    #       WorkflowRuntimeClient will not attempt to check the contact file
     #       which would be unnecessary as we have already done so.
     # NOTE: This part of the scan *is* IO blocking.
-    client = SuiteRuntimeClient(reg, context=context, timeout=timeout)
+    client = WorkflowRuntimeClient(reg, context=context, timeout=timeout)
     _, result = await workflow_request(client, 'identify')
     return (reg, host, port, pub_port, client, result)
 
@@ -195,7 +195,7 @@ class WorkflowsManager:
     async def _connect(self, wid, flow):
         """Open a connection to a running workflow."""
         self.active[wid] = flow
-        flow['req_client'] = SuiteRuntimeClient(flow['name'])
+        flow['req_client'] = WorkflowRuntimeClient(flow['name'])
         await self.uiserver.data_store_mgr.sync_workflow(
             wid,
             flow

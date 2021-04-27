@@ -25,8 +25,8 @@ from pytest_mock import MockFixture
 from cylc.flow import ID_DELIM
 from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.network import API
-from cylc.flow.suite_files import (
-    SuiteFiles,
+from cylc.flow.workflow_files import (
+    WorkflowFiles,
     ContactFileFields as CFF,
 )
 
@@ -139,7 +139,7 @@ async def test_est_workflow(
         if x == 'remote' else False
 
     mocked_client = mocker.patch(
-        'cylc.uiserver.workflows_mgr.SuiteRuntimeClient')
+        'cylc.uiserver.workflows_mgr.WorkflowRuntimeClient')
     mocked_client.return_value = async_client
 
     mocked_get_host_ip_by_name = mocker.patch(
@@ -179,9 +179,9 @@ def mk_flow(path, reg, active=True):
 
     """
     run_dir = path / reg
-    srv_dir = run_dir / SuiteFiles.Service.DIRNAME
-    contact = srv_dir / SuiteFiles.Service.CONTACT
-    fconfig = run_dir / SuiteFiles.FLOW_FILE
+    srv_dir = run_dir / WorkflowFiles.Service.DIRNAME
+    contact = srv_dir / WorkflowFiles.Service.CONTACT
+    fconfig = run_dir / WorkflowFiles.FLOW_FILE
     run_dir.mkdir()
     fconfig.touch()  # cylc uses this to identify a dir as a workflow
     srv_dir.mkdir()
@@ -352,8 +352,8 @@ async def test_register(
     )
     # The following functions also depend on a running workflow
     # with pyzmq socket, so we also mock them.
-    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.start')
-    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.get_header')
+    mocker.patch('cylc.flow.network.client.WorkflowRuntimeClient.start')
+    mocker.patch('cylc.flow.network.client.WorkflowRuntimeClient.get_header')
     mocker.patch('cylc.uiserver.data_store_mgr.DataStoreMgr.'
                  'start_subscription')
 
@@ -427,8 +427,8 @@ async def test_connect(
     )
     # The following functions also depend on a running workflow
     # with pyzmq socket, so we also mock them.
-    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.start')
-    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.get_header')
+    mocker.patch('cylc.flow.network.client.WorkflowRuntimeClient.start')
+    mocker.patch('cylc.flow.network.client.WorkflowRuntimeClient.get_header')
     mocker.patch('cylc.uiserver.data_store_mgr.DataStoreMgr.'
                  'start_subscription')
 
@@ -489,8 +489,8 @@ async def test_disconnect_and_stop(
     )
     # The following functions also depend on a running workflow
     # with pyzmq socket, so we also mock them.
-    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.start')
-    mocker.patch('cylc.flow.network.client.SuiteRuntimeClient.get_header')
+    mocker.patch('cylc.flow.network.client.WorkflowRuntimeClient.start')
+    mocker.patch('cylc.flow.network.client.WorkflowRuntimeClient.get_header')
     mocker.patch('cylc.uiserver.data_store_mgr.DataStoreMgr.'
                  'start_subscription')
     mocker.patch('cylc.uiserver.data_store_mgr.DataStoreMgr.update_contact')

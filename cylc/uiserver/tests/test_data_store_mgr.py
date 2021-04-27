@@ -19,7 +19,7 @@ import logging
 
 import pytest
 from cylc.flow.network import MSG_TIMEOUT
-from cylc.flow.suite_files import ContactFileFields as CFF
+from cylc.flow.workflow_files import ContactFileFields as CFF
 
 import cylc.uiserver.data_store_mgr as data_store_mgr_module
 from cylc.uiserver.data_store_mgr import DataStoreMgr
