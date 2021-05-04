@@ -40,6 +40,7 @@ below.
  - Tim Pillinger
  - Stephen McVeigh
  - Ronnie Dutta
+ - David Matthews
 
 (All contributors are identifiable with email addresses in the git version
 control logs or otherwise.)
