@@ -40,3 +40,9 @@ c.JupyterHub.template_paths = [
         'templates'
     )
 ]
+
+# store the JupyterHub runtime files in ~/.cylc/hub
+RUNTIME_PATH = Path('~/.cylc/hub').expanduser()
+c.JupyterHub.cookie_secret_file = f'{RUNTIME_PATH / "cookie_secret"}'
+c.JupyterHub.db_url = f'{RUNTIME_PATH / "jupyterhub.sqlite"}'
+c.ConfigurableHTTPProxy.pid_file = f'{RUNTIME_PATH / "jupyterhub-proxy.pid"}'
