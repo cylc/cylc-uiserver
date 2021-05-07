@@ -243,6 +243,40 @@ class CylcUIServer(Application):
     def _default_logging_config(self):
         return Path(Path(uis_pkg).parent / 'logging_config.json')
 
+    certfile = Unicode(
+        u'',
+        config=True,
+        help='''
+            The full path to an SSL/TLS certificate file.
+        ''')
+
+    keyfile = Unicode(
+        u'',
+        config=True,
+        help='''
+            The full path to a private key file for usage with SSL/TLS.
+        ''')
+
+    client_ca = Unicode(
+        u'',
+        config=True,
+        help='''
+            The full path to a certificate authority certificate for SSL/TLS
+            client authentication.
+        ''')
+
+    @default('keyfile')
+    def _keyfile_default(self):
+        return os.environ.get('JUPYTERHUB_SSL_KEYFILE') or ''
+
+    @default('certfile')
+    def _certfile_default(self):
+        return os.environ.get('JUPYTERHUB_SSL_CERTFILE') or ''
+
+    @default('client_ca')
+    def _client_ca_default(self):
+        return os.environ.get('JUPYTERHUB_SSL_CLIENT_CA') or ''
+
     def __init__(self, port, jupyterhub_service_prefix, ui_build_dir=None):
         with self._interim_log():
             self._load_uis_config()
@@ -427,7 +461,15 @@ class CylcUIServer(Application):
         logger.info(f'Serving UI from: {self.ui_path}')
         app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
-        app.listen(self._port)
+
+        http_server = web.HTTPServer(
+            app,
+            ssl_options={
+                "certfile": self.certfile,
+                "keyfile": self.keyfile
+            }
+        )
+        http_server.listen(self._port)
         # pass in server object for clean exit
         ioloop.PeriodicCallback(
             partial(app.try_exit, uis=self), 100).start()
