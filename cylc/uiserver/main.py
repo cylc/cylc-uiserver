@@ -462,12 +462,16 @@ class CylcUIServer(Application):
         app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
 
-        http_server = web.HTTPServer(
-            app,
-            ssl_options={
+        ssl_options = None
+        if self.certfile and self.keyfile:
+            ssl_options = {
                 "certfile": self.certfile,
                 "keyfile": self.keyfile
             }
+
+        http_server = web.HTTPServer(
+            app,
+            ssl_options=ssl_options
         )
         http_server.listen(self._port)
         # pass in server object for clean exit
