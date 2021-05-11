@@ -13,17 +13,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from asyncio import Queue
 import json
 import os
-from asyncio import Queue
 import logging
 import getpass
+import socket
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
 from graphql_ws.constants import GRAPHQL_WS
+from jupyter_server.base.handlers import JupyterHandler
 from jupyterhub import __version__ as jupyterhub_version
 from jupyterhub.services.auth import HubOAuthenticated
+from jupyterhub.utils import url_path_join
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
@@ -48,6 +51,7 @@ def _authorised(req):
         bool - True if the request passes authorisation, False if it fails.
 
     """
+    return True  # TODO
     user = req.get_current_user()
     username = user.get('name', '?')
     if username != ME:
@@ -78,15 +82,26 @@ def async_authorised(fun):
     return _inner
 
 
-class BaseHandler(HubOAuthenticated, web.RequestHandler):
+BaseHandler = JupyterHandler
 
-    def set_default_headers(self) -> None:
-        self.set_header("X-JupyterHub-Version", jupyterhub_version)
-        self.set_header("Access-Control-Allow-Origin", "*")
-        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
-        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
-        # prevent server fingerprinting
-        self.clear_header('Server')
+
+# class BaseHandler(HubOAuthenticated, web.RequestHandler):
+
+#     def set_default_headers(self) -> None:
+#         self.set_header("X-JupyterHub-Version", jupyterhub_version)
+#         self.set_header("Access-Control-Allow-Origin", "*")
+#         self.set_header("Access-Control-Allow-Headers", "x-requested-with")
+#         self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+#         # prevent server fingerprinting
+#         self.clear_header('Server')
+#         print(f'%%% {self.request}')
+
+class StaticHandler2(web.StaticFileHandler):
+
+    def get(self, *args, **kwargs):
+        # breakpoint()
+        # args = (args[0].replace('cylc/', ''),)
+        super().get(*args, **kwargs)
 
 
 class StaticHandler(BaseHandler, web.StaticFileHandler):
@@ -94,10 +109,6 @@ class StaticHandler(BaseHandler, web.StaticFileHandler):
 
 
 class MainHandler(BaseHandler):
-
-    # hub_users = ["kinow"]
-    # hub_groups = []
-    # allow_admin = True
 
     def initialize(self, path):
         self._static = path
@@ -112,6 +123,7 @@ class MainHandler(BaseHandler):
         protocol = self.request.protocol
         host = self.request.host
         base_url = f'{protocol}://{host}/{user["server"]}'
+        print(f'### {base_url}')
         self.render(index, python_base_url=base_url)
 
 
@@ -124,7 +136,19 @@ class UserProfileHandler(BaseHandler):
     @web.authenticated
     @authorised
     def get(self):
-        self.write(json.dumps(self.get_current_user()))
+        user_info = self.get_current_user()
+        if isinstance(user_info, dict):
+            # the server is running with authentication services provided
+            # by a hub
+            pass
+        else:
+            # the server is running using a token
+            user_info = {
+                    'username': ME,
+                    'server': socket.gethostname()
+            }
+
+        self.write(json.dumps(user_info))
 
 
 # This is needed in order to pass the server context in addition to existing.

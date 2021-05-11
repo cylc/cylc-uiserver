@@ -14,3 +14,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 __version__ = "0.5.0"
+
+from cylc.uiserver.main import CylcUIServer
+
+
+def _jupyter_server_extension_points():
+    """
+    Returns a list of dictionaries with metadata describing
+    where to find the `_load_jupyter_server_extension` function.
+    """
+    return [
+        {
+            "module": "cylc.uiserver",
+            'app': CylcUIServer
+        }
+    ]
