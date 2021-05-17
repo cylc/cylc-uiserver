@@ -22,7 +22,7 @@ from cylc.uiserver import __file__ as UIS_PKG
 from cylc.uiserver.config import load
 
 
-SYS_CONF = Path(UIS_PKG).parent / 'config_defaults.py'
+SYS_CONF = Path(UIS_PKG).parent / 'jupyterhub_config.py'
 USER_CONF = Path('~/.cylc/hub/config.py').expanduser()
 SITE_CONF = Path('/etc/cylc/hub/config.py')
 

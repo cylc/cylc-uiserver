@@ -54,7 +54,6 @@ from cylc.uiserver import (
     __version__,
     __file__ as uis_pkg
 )
-from cylc.uiserver.config import __file__ as CONFIG_FILE
 from .data_store_mgr import DataStoreMgr
 from .handlers import (
     MainHandler,
@@ -68,6 +67,8 @@ from .resolvers import Resolvers
 from .schema import schema
 from .websockets.tornado import TornadoSubscriptionServer
 from .workflows_mgr import WorkflowsManager
+
+from jupyter_server.extension.application import ExtensionApp
 
 logger = logging.getLogger(__name__)
 
@@ -87,28 +88,6 @@ class MyExtensionHandler(JupyterHandler):
         ...
 
 
-class MyApplication(web.Application):
-    is_closing = False
-
-    def signal_handler(self, signum, frame):
-        logger.info('exiting...')
-        self.is_closing = True
-
-    def try_exit(self, uis):
-        # clean up and stop in here
-        if self.is_closing:
-            # stop the subscribers running in the thread pool executor
-            for sub in uis.data_store_mgr.w_subs.values():
-                sub.stop()
-            # Shutdown the thread pool executor
-            for executor in uis.data_store_mgr.executors.values():
-                executor.shutdown(wait=False)
-            # Destroy ZeroMQ context of all sockets
-            uis.workflows_mgr.context.destroy()
-            ioloop.IOLoop.instance().stop()
-            logger.info('exit success')
-
-
 class PathType(TraitType):
     """A pathlib traitlet type which allows string and undefined values."""
 
@@ -126,16 +105,27 @@ class PathType(TraitType):
         self.error(obj, value)
 
 
-from jupyter_server.extension.application import ExtensionApp
-
-
 class CylcUIServer(ExtensionApp):
 
-    name = "cylc.uiserver"
-    app_name = 'CylcUIS'
+    # name = "cylc.uiserver"
+    name = 'cylc gui'
+    app_name = 'cylc-gui'
     default_url = "/cylc"
     load_other_extensions = True
     file_url_prefix = "/render"
+    config_file_paths = list(
+        map(
+            str,
+            [
+                # base configuration - always used
+                Path(uis_pkg).parent,
+                # site configuration
+                Path('/etc/cylc/hub'),
+                # user configuration
+                Path('~/.cylc/hub').expanduser()
+            ]
+        )
+    )
 
     # --- ExtensionApp traits you can configure ---
     # static_paths = ['/home/h06/osanders/cylc-uiserver/cylc/uiserver/ui/0.4.0/']
@@ -342,19 +332,6 @@ class CylcUIServer(ExtensionApp):
                     f'Logging config file not found: {self.logging_config}'
                 )
 
-    def _load_uis_config(self):
-        """Load the UIS config file."""
-        # this environment variable enables loading of the config
-        os.environ['CYLC_HUB_VERSION'] = __version__
-        try:
-            self.load_config_file(CONFIG_FILE)
-        finally:
-            del os.environ['CYLC_HUB_VERSION']
-        # set traitlets values from the config
-        for key, value in self.config.UIServer.items():
-            print(f'# CFG: {key} = {value}')
-            setattr(self, key, value)
-
     def _create_static_handler(
             self,
             path: str
@@ -427,7 +404,11 @@ class CylcUIServer(ExtensionApp):
         # settings to the underlying Tornado Web Application.
         # self.settings.update({'<trait>':...})
         super().initialize_settings()
-        self._load_uis_config()
+        # self._load_uis_config()
+        self.load_config_file()
+        for key, value in self.config.UIServer.items():
+            print(f'# CFG: {key} = {value}')
+            setattr(self, key, value)
         # recompute the default ui path (so that the config is respected)
         self.ui_path = self._get_ui_path()
         self.static_dir = [str(self.ui_path)]
@@ -482,12 +463,28 @@ class CylcUIServer(ExtensionApp):
                     #     self.static_url_prefix, 'index.html'
                     # )
                 }
+            ),
+            (
+                # redirect '/cylc' to '/cylc/'
+                'cylc',
+                RedirectHandler,
+                {
+                    'url': 'cylc/'
+                }
             )
         ])
 
     def initialize_templates(self):
         ...
         # Change the jinja templating environment
+
+    @classmethod
+    def launch_instance(cls, argv=None, **kwargs):
+        if argv is None:
+            # jupyter server isn't expecting to be launched by a Cylc command
+            # this patches some internal logic
+            argv = sys.argv[2:]
+        super().launch_instance(argv=argv, **kwargs)
 
     # def _make_app(self, debug: bool):
     #     """Crete a Tornado web application.

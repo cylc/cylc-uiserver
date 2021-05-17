@@ -70,7 +70,7 @@ The Cylc Hub will load the following files in order:
 
    These are the Cylc defaults which are hardcoded within the repository.
 
-   (`<python-installation>/cylc/uiserver/config_defaults.py`)
+   (`<python-installation>/cylc/uiserver/jupyterhub_config.py`)
 
 2) Site Config
 

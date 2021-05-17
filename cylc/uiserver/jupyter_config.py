@@ -22,7 +22,7 @@ from cylc.uiserver import __file__ as uis_pkg
 
 
 # the command the hub should spawn (i.e. the cylc uiserver itself)
-c.Spawner.cmd = ['cylc', 'uiserver']
+c.Spawner.cmd = ['cylc', 'hubapp']
 
 # the spawner to invoke this command
 c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
