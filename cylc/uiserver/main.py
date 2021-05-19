@@ -110,7 +110,7 @@ class CylcUIServer(ExtensionApp):
     # name = "cylc.uiserver"
     name = 'cylc gui'
     app_name = 'cylc-gui'
-    default_url = "/cylc"
+    default_url = "/cylc/"
     load_other_extensions = True
     file_url_prefix = "/render"
     config_file_paths = list(
