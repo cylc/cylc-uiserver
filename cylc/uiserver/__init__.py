@@ -25,7 +25,7 @@ def _jupyter_server_extension_points():
     """
     return [
         {
-            "module": "cylc_gui",
+            "module": "cylc.uiserver.app",
             'app': CylcUIServer
         }
     ]

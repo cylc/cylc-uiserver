@@ -51,8 +51,6 @@ from cylc.flow.workflow_status import WorkflowStatus
 
 from .workflows_mgr import workflow_request
 
-logger = logging.getLogger(__name__)
-
 
 class DataStoreMgr:
     """Manage the local data-store acquisition/updates for all workflows."""
@@ -62,8 +60,9 @@ class DataStoreMgr:
     RECONCILE_TIMEOUT = 5.  # seconds
     PENDING_DELTA_CHECK_INTERVAL = 0.5
 
-    def __init__(self, workflows_mgr):
+    def __init__(self, workflows_mgr, log):
         self.workflows_mgr = workflows_mgr
+        self.log = log
         self.data = {}
         self.w_subs = {}
         self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown'}
@@ -115,7 +114,7 @@ class DataStoreMgr:
         blocking the main loop.
 
         """
-        logger.debug(f'sync_workflow({w_id})')
+        self.log.debug(f'sync_workflow({w_id})')
         if self.loop is None:
             self.loop = asyncio.get_running_loop()
 
@@ -141,7 +140,7 @@ class DataStoreMgr:
         await self.entire_workflow_update(ids=[w_id])
 
     async def register_workflow(self, w_id):
-        logger.debug(f'register_workflow({w_id})')
+        self.log.debug(f'register_workflow({w_id})')
         self.delta_queues[w_id] = {}
 
         # create new entry in the data store
@@ -163,13 +162,13 @@ class DataStoreMgr:
         self.purge_workflow(w_id)
 
     def stop_workflow(self, w_id):
-        logger.debug(f'stop_workflow({w_id})')
+        self.log.debug(f'stop_workflow({w_id})')
         self.purge_workflow(w_id, data=False)
         self.update_contact(w_id, status=WorkflowStatus.STOPPED.value)
 
     def purge_workflow(self, w_id, data=True):
         """Purge the manager of a workflow's subscription and data."""
-        logger.debug(f'purge_workflow({w_id})')
+        self.log.debug(f'purge_workflow({w_id})')
         if w_id in self.w_subs:
             self.w_subs[w_id].stop()
             del self.w_subs[w_id]
@@ -289,14 +288,14 @@ class DataStoreMgr:
             try:
                 _, new_delta_msg = future.result(self.RECONCILE_TIMEOUT)
             except asyncio.TimeoutError:
-                logger.debug(
+                self.log.debug(
                     f'The reconcile update coroutine {w_id} {topic}'
                     f'took too long, cancelling the subscription/sync.'
                 )
                 future.cancel()
                 self.workflows_mgr.stopping.add(w_id)
             except Exception as exc:
-                logger.exception(exc)
+                self.log.exception(exc)
             else:
                 new_delta = DELTAS_MAP[topic]()
                 new_delta.ParseFromString(new_delta_msg)
@@ -330,7 +329,7 @@ class DataStoreMgr:
         items = await asyncio.gather(*gathers, return_exceptions=True)
         for item in items:
             if isinstance(item, Exception):
-                logger.exception('Failed to update entire local data-store '
+                self.log.exception('Failed to update entire local data-store '
                                  'of a workflow', exc_info=item)
             else:
                 w_id, result = item

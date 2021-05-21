@@ -25,9 +25,6 @@ from tornado.web import RequestHandler, HTTPError
 import logging
 
 
-logger = logging.getLogger(__name__)
-
-
 def authenticated(
     method: Callable[..., Optional[Awaitable[None]]]
 ) -> Callable[..., Optional[Awaitable[None]]]:
@@ -51,8 +48,7 @@ def authenticated(
             self: RequestHandler, *args, **kwargs
     ) -> Optional[Awaitable[None]]:
         if not self.current_user:
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug('Unauthenticated WebSocket request!')
+            self.log.debug('Unauthenticated WebSocket request!')
             raise HTTPError(403)
 
         return method(self, *args, **kwargs)

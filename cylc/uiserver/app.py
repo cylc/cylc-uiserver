@@ -70,7 +70,6 @@ from .workflows_mgr import WorkflowsManager
 
 from jupyter_server.extension.application import ExtensionApp
 
-logger = logging.getLogger(__name__)
 
 
 from jupyter_server.base.handlers import JupyterHandler
@@ -282,11 +281,12 @@ class CylcUIServer(ExtensionApp):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.workflows_mgr = WorkflowsManager(self)
-        self.data_store_mgr = DataStoreMgr(self.workflows_mgr)
+        self.workflows_mgr = WorkflowsManager(self, log=self.log)
+        self.data_store_mgr = DataStoreMgr(self.workflows_mgr, self.log)
         self.resolvers = Resolvers(
             self.data_store_mgr,
-            workflows_mgr=self.workflows_mgr
+            log=self.log,
+            workflows_mgr=self.workflows_mgr,
         )
         self.subscription_server = TornadoSubscriptionServer(
             schema,
@@ -407,15 +407,13 @@ class CylcUIServer(ExtensionApp):
         # self._load_uis_config()
         self.load_config_file()
         for key, value in self.config.UIServer.items():
-            print(f'# CFG: {key} = {value}')
             setattr(self, key, value)
         # recompute the default ui path (so that the config is respected)
         self.ui_path = self._get_ui_path()
         self.static_dir = [str(self.ui_path)]
         self.static_paths = [str(self.ui_path)]
-        print(f'# {self.static_dir}')
-        logger.info("Starting Cylc UI Server")
-        logger.info(f'Serving UI from: {self.ui_path}')
+        self.log.info("Starting Cylc UI Server")
+        self.log.info(f'Serving UI from: {self.ui_path}')
 
     def initialize_handlers(self):
         self.handlers.extend([
@@ -438,7 +436,7 @@ class CylcUIServer(ExtensionApp):
                     'resolvers': self.resolvers,
                     'backend': CylcGraphQLBackend(),
                     'middleware': [IgnoreFieldMiddleware],
-                    'batch': True
+                    'batch': True,
                 }
             ),
             (
@@ -451,7 +449,7 @@ class CylcUIServer(ExtensionApp):
             ),
             (
                 'cylc/userprofile',
-                UserProfileHandler
+                UserProfileHandler,
             ),
             (
                 'cylc/(.*)?',
@@ -495,7 +493,7 @@ class CylcUIServer(ExtensionApp):
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()
         ioloop.IOLoop.instance().stop()
-        logger.info('exit success')
+        self.log.info('exit success')
 
     # def _make_app(self, debug: bool):
     #     """Crete a Tornado web application.

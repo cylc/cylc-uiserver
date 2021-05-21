@@ -33,9 +33,6 @@ from tornado.ioloop import IOLoop
 from .websockets import authenticated as websockets_authenticated
 
 
-logger = logging.getLogger(__name__)
-
-
 ME = getpass.getuser()
 
 
@@ -131,10 +128,10 @@ class CylcAppHandler(JupyterHandler):
             raise web.HTTPError(403, reason='authorisation insufficient')
 
     def _authorise(self, user):
-        logger.critical(f'authorise {user} for {self.__class__}')
+        self.log.debug(f'authorise {user} for {self.__class__}')
         return True
         # if user != ME:
-        #     logger.warning(f'Authorisation failed for {user}')
+        #     self.log.warning(f'Authorisation failed for {user}')
         #     return False
         # return True
 
@@ -153,7 +150,6 @@ class CylcAppHandler(JupyterHandler):
 class StaticHandler2(web.StaticFileHandler):
 
     def get(self, *args, **kwargs):
-        # breakpoint()
         # args = (args[0].replace('cylc/', ''),)
         super().get(*args, **kwargs)
 
@@ -176,7 +172,6 @@ class MainHandler(CylcAppHandler):
         protocol = self.request.protocol
         host = self.request.host
         base_url = f'{protocol}://{host}/{user["server"]}'
-        print(f'### {base_url}')
         self.render(index, python_base_url=base_url)
 
 

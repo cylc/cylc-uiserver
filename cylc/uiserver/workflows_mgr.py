@@ -25,8 +25,8 @@ Includes:
 import asyncio
 from contextlib import suppress
 from getpass import getuser
-import logging
 import socket
+import sys
 
 import zmq.asyncio
 
@@ -44,12 +44,17 @@ from cylc.flow.network.scan import (
 )
 from cylc.flow.workflow_files import ContactFileFields as CFF
 
-logger = logging.getLogger(__name__)
 CLIENT_TIMEOUT = 2.0
 
 
-async def workflow_request(client, command, args=None,
-                           timeout=None, req_context=None):
+async def workflow_request(
+    client,
+    command,
+    log=None,
+    args=None,
+    timeout=None,
+    req_context=None
+):
     """Workflow request command.
 
     Args:
@@ -69,37 +74,44 @@ async def workflow_request(client, command, args=None,
         result = await client.async_request(command, args, timeout)
         return (req_context, result)
     except ClientTimeout as exc:
-        logger.exception(exc)
+        if log:
+            log.exception(exc)
+        else:
+            print(exc, file=sys.stderr)
         return (req_context, MSG_TIMEOUT)
     except ClientError as exc:
-        logger.exception(exc)
+        if log:
+            log.exception(exc)
+        else:
+            print(exc, file=sys.stderr)
         return (req_context, None)
 
 
-async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
-    """Establish communication with workflow, instantiating REQ client."""
-    if is_remote_host(host):
-        try:
-            host = get_host_ip_by_name(host)  # IP reduces DNS traffic
-        except socket.error as exc:
-            if flags.verbosity > 1:
-                raise
-            logger.error("ERROR: %s: %s\n", exc, host)
-            return (reg, host, port, pub_port, None)
-
-    # NOTE: Connect to the workflow by host:port. This way the
-    #       WorkflowRuntimeClient will not attempt to check the contact file
-    #       which would be unnecessary as we have already done so.
-    # NOTE: This part of the scan *is* IO blocking.
-    client = WorkflowRuntimeClient(reg, context=context, timeout=timeout)
-    _, result = await workflow_request(client, 'identify')
-    return (reg, host, port, pub_port, client, result)
+# async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
+#     """Establish communication with workflow, instantiating REQ client."""
+#     if is_remote_host(host):
+#         try:
+#             host = get_host_ip_by_name(host)  # IP reduces DNS traffic
+#         except socket.error as exc:
+#             if flags.verbosity > 1:
+#                 raise
+#             logger.error("ERROR: %s: %s\n", exc, host)
+#             return (reg, host, port, pub_port, None)
+# 
+#     # NOTE: Connect to the workflow by host:port. This way the
+#     #       WorkflowRuntimeClient will not attempt to check the contact file
+#     #       which would be unnecessary as we have already done so.
+#     # NOTE: This part of the scan *is* IO blocking.
+#     client = WorkflowRuntimeClient(reg, context=context, timeout=timeout)
+#     _, result = await workflow_request(client, 'identify')
+#     return (reg, host, port, pub_port, client, result)
 
 
 class WorkflowsManager:
 
-    def __init__(self, uiserver, context=None, run_dir=None):
+    def __init__(self, uiserver, log, context=None, run_dir=None):
         self.uiserver = uiserver
+        self.log = log
         if context is None:
             self.context = zmq.asyncio.Context()
         else:
@@ -288,14 +300,14 @@ class WorkflowsManager:
             ) for w_id in self.active
         }
         gathers = [
-            workflow_request(req_context=info, *request_args)
+            workflow_request(req_context=info, *request_args, log=self.log)
             for info, request_args in req_args.items()
         ]
         results = await asyncio.gather(*gathers, return_exceptions=True)
         res = []
         for result in results:
             if isinstance(result, Exception):
-                logger.exception('Failed to send requests to '
+                self.log.exception('Failed to send requests to '
                                  'multiple workflows', exc_info=result)
             else:
                 _, val = result
