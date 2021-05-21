@@ -189,16 +189,23 @@ class UserProfileHandler(CylcAppHandler):
     @web.authenticated
     def get(self):
         user_info = self.get_current_user()
+
         if isinstance(user_info, dict):
             # the server is running with authentication services provided
             # by a hub
             pass
         else:
             # the server is running using a token
+            # authentication is provided by jupyter server
             user_info = {
-                    'username': ME,
-                    'server': socket.gethostname()
+                'username': ME,
+                'server': socket.gethostname()
             }
+
+        # add an entry for the workflow owner
+        # NOTE: when running behind a hub this may be different from the
+        # authenticated user
+        user_info['owner'] = ME
 
         self.write(json.dumps(user_info))
 
