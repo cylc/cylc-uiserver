@@ -193,7 +193,8 @@ class UserProfileHandler(CylcAppHandler):
             # the server is running using a token
             # authentication is provided by jupyter server
             user_info = {
-                'username': ME,
+                'kind': 'user',
+                'name': ME,
                 'server': socket.gethostname()
             }
 
