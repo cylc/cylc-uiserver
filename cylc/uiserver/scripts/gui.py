@@ -23,5 +23,5 @@ For a multi-user system see `cylc hub`.
 from cylc.uiserver.app import CylcUIServer
 
 
-def main(*args):
-    return CylcUIServer.launch_instance()
+def main(*argv):
+    return CylcUIServer.launch_instance(argv or None)

@@ -14,18 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import argparse
-from contextlib import contextmanager
-import json
-import logging
-import os
-import signal
-from functools import partial
-from logging.config import dictConfig
 from pathlib import Path, PurePath
-from socket import gethostname
 import sys
-from typing import Any, Tuple, Type, List
+from typing import List
 
 from pkg_resources import parse_version
 from tornado import web, ioloop
@@ -39,41 +30,30 @@ from traitlets import (
     default,
     validate,
 )
-from traitlets.config import (
-    Application
-)
+
+from jupyter_server.base.handlers import JupyterHandler
+from jupyter_server.extension.application import ExtensionApp
+# from jupyterhub.utils import url_path_join
+import tornado
 
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
 )
-from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
-from jupyterhub.services.auth import HubOAuthCallbackHandler
-from jupyterhub.utils import url_path_join
 
 from cylc.uiserver import (
-    __version__,
     __file__ as uis_pkg
 )
-from .data_store_mgr import DataStoreMgr
-from .handlers import (
-    MainHandler,
-    StaticHandler,
-    StaticHandler2,
+from cylc.uiserver.data_store_mgr import DataStoreMgr
+from cylc.uiserver.handlers import (
     SubscriptionHandler,
     UIServerGraphQLHandler,
     UserProfileHandler,
+    CylcStaticHandler
 )
-from .resolvers import Resolvers
-from .schema import schema
-from .websockets.tornado import TornadoSubscriptionServer
-from .workflows_mgr import WorkflowsManager
-
-from jupyter_server.extension.application import ExtensionApp
-
-
-
-from jupyter_server.base.handlers import JupyterHandler
-import tornado
+from cylc.uiserver.resolvers import Resolvers
+from cylc.uiserver.schema import schema
+from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
+from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
 class MyExtensionHandler(JupyterHandler):
@@ -106,12 +86,17 @@ class PathType(TraitType):
 
 class CylcUIServer(ExtensionApp):
 
-    # name = "cylc.uiserver"
-    name = 'cylc gui'
+    name = 'cylc'
     app_name = 'cylc-gui'
-    default_url = "/cylc/"
+    default_url = "/cylc"
     load_other_extensions = True
-    file_url_prefix = "/render"
+    # file_url_prefix = "/render"
+    description = '''
+    Cylc - A user interface for monitoring and controlling Cylc workflows.
+    '''
+    examples = '''
+        cylc gui    # start the cylc GUI
+    '''
     config_file_paths = list(
         map(
             str,
@@ -125,12 +110,6 @@ class CylcUIServer(ExtensionApp):
             ]
         )
     )
-
-    # --- ExtensionApp traits you can configure ---
-    # static_paths = ['/home/h06/osanders/cylc-uiserver/cylc/uiserver/ui/0.4.0/']
-    # template_paths = [...]
-    # settings = {...}
-    # handlers = [...]
 
     ui_path = PathType(
         config=False,
@@ -265,19 +244,13 @@ class CylcUIServer(ExtensionApp):
     def _default_logging_config(self):
         return Path(Path(uis_pkg).parent / 'logging_config.json')
 
-    # def __init__(self, port, jupyterhub_service_prefix, ui_build_dir=None):
-    #     with self._interim_log():
-    #         self._load_uis_config()
-    #         self._open_log()
-    #     if ui_build_dir:
-    #         self.ui_build_dir = Path(ui_build_dir)
-    #     self._port = port
-    #     self._jupyter_hub_service_prefix = jupyterhub_service_prefix
-    #     self.workflows_mgr = WorkflowsManager(self)
-    #     self.data_store_mgr = DataStoreMgr(self.workflows_mgr)
-    #     self.resolvers = Resolvers(
-    #         self.data_store_mgr,
-    #         workflows_mgr=self.workflows_mgr)
+    @default('static_dir')
+    def _get_static_dir(self):
+        return str(self.ui_path)
+
+    @default('static_paths')
+    def _get_static_paths(self):
+        return [str(self.ui_path)]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -302,116 +275,15 @@ class CylcUIServer(ExtensionApp):
             self.scan_interval * 1000
         ).start()
 
-    @staticmethod
-    @contextmanager
-    def _interim_log():
-        """Capture log messages before the logging config has been processed.
-
-        The logging configuration is configured via the configuration file
-        which means we can't configure logging until we have loaded the
-        configuration. Any log output in the interim would be lost so we
-        use a temporary handler to record it to the console.
-        """
-        log = logging.getLogger()
-        handler = logging.StreamHandler(stream=sys.stdout)
-        log.setLevel(logging.DEBUG)
-        handler.setLevel(logging.DEBUG)
-        log.addHandler(handler)
-        yield
-        log.removeHandler(handler)
-
-    def _open_log(self):
-        """Configure logging and open log handler(s)."""
-        if self.logging_config:
-            if self.logging_config.exists():
-                with open(self.logging_config, 'r') as logging_config_json:
-                    config = json.load(logging_config_json)
-                    dictConfig(config["logging"])
-            else:
-                raise ValueError(
-                    f'Logging config file not found: {self.logging_config}'
-                )
-
-    def _create_static_handler(
-            self,
-            path: str
-    ) -> Tuple[str, Type[StaticHandler], dict]:
-        """
-        Create a static content handler.
-
-        Args:
-            path (str): handler path (supports regular expressions)
-        Returns:
-            Tornado handler tuple
-        """
-        return (
-            rf"{self._jupyter_hub_service_prefix}({path})",
-            StaticHandler,
-            {"path": self.ui_path}
-        )
-
-    def _create_handler(
-            self,
-            path: str,
-            clazz: Type[web.RequestHandler],
-            **kwargs: Any
-    ) -> Tuple[str, Type[web.RequestHandler], dict]:
-        """
-        Create a Tornado handler.
-
-        Args:
-            path (str): handler path
-            clazz (class): handler class
-            kwargs: extra params
-        Returns:
-            Tornado handler tuple
-        """
-        return (
-            url_path_join(self._jupyter_hub_service_prefix, path),
-            clazz,
-            kwargs
-        )
-
-    def _create_graphql_handler(
-            self,
-            path: str,
-            clazz: Type[TornadoGraphQLHandler],
-            **kwargs: Any
-    ) -> Tuple[str, Type[web.RequestHandler], dict]:
-        """
-        Create a GraphQL handler.
-
-        Args:
-            path (str): handler path
-            clazz (class): handler class
-            kwargs: extra params
-        Returns:
-            Tornado handler tuple
-        """
-        return self._create_handler(
-            path,
-            clazz,
-            schema=schema,
-            resolvers=self.resolvers,
-            backend=CylcGraphQLBackend(),
-            middleware=[IgnoreFieldMiddleware],
-            **kwargs
-        )
-
     def initialize_settings(self):
-        ...
-        # Update the self.settings trait to pass extra
-        # settings to the underlying Tornado Web Application.
-        # self.settings.update({'<trait>':...})
+        """Update extension settings.
+
+        Update the self.settings trait to pass extra settings to the underlying
+        Tornado Web Application.
+
+        self.settings.update({'<trait>':...})
+        """
         super().initialize_settings()
-        # self._load_uis_config()
-        self.load_config_file()
-        for key, value in self.config.UIServer.items():
-            setattr(self, key, value)
-        # recompute the default ui path (so that the config is respected)
-        self.ui_path = self._get_ui_path()
-        self.static_dir = [str(self.ui_path)]
-        self.static_paths = [str(self.ui_path)]
         self.log.info("Starting Cylc UI Server")
         self.log.info(f'Serving UI from: {self.ui_path}')
 
@@ -453,7 +325,8 @@ class CylcUIServer(ExtensionApp):
             ),
             (
                 'cylc/(.*)?',
-                web.StaticFileHandler,
+                # web.StaticFileHandler,
+                CylcStaticHandler,
                 {
                     'path': str(self.ui_path),
                     'default_filename': 'index.html'
@@ -473,8 +346,7 @@ class CylcUIServer(ExtensionApp):
         ])
 
     def initialize_templates(self):
-        ...
-        # Change the jinja templating environment
+        """Change the jinja templating environment."""
 
     @classmethod
     def launch_instance(cls, argv=None, **kwargs):
@@ -494,123 +366,3 @@ class CylcUIServer(ExtensionApp):
         self.workflows_mgr.context.destroy()
         ioloop.IOLoop.instance().stop()
         self.log.info('exit success')
-
-    # def _make_app(self, debug: bool):
-    #     """Crete a Tornado web application.
-
-    #     Args:
-    #         debug (bool): flag to set debugging in the Tornado application
-    #     """
-    #     # subscription/websockets server
-    #     subscription_server = TornadoSubscriptionServer(
-    #         schema,
-    #         backend=CylcGraphQLBackend(),
-    #         middleware=[IgnoreFieldMiddleware],
-    #     )
-    #     return MyApplication(
-    #         static_path=self.ui_path,
-    #         debug=debug,
-    #         handlers=[
-    #             # static content
-    #             self._create_static_handler(".*.(css|js)"),
-    #             self._create_static_handler("(fonts|img)/.*"),
-    #             self._create_static_handler("favicon.png"),
-    #             # normal handlers, with auth
-    #             self._create_handler("oauth_callback",
-    #                                  HubOAuthCallbackHandler),
-    #             self._create_handler("userprofile",
-    #                                  UserProfileHandler),
-    #             # graphql handlers
-    #             self._create_graphql_handler(
-    #                 "graphql",
-    #                 UIServerGraphQLHandler,
-    #             ),
-    #             self._create_graphql_handler(
-    #                 "graphql/batch",
-    #                 UIServerGraphQLHandler,
-    #                 batch=True
-    #             ),
-    #             # subscription/websockets handler
-    #             self._create_handler("subscriptions",
-    #                                  SubscriptionHandler,
-    #                                  sub_server=subscription_server,
-    #                                  resolvers=self.resolvers),
-    #             # main handler
-    #             (
-    #                 rf"{self._jupyter_hub_service_prefix}?",
-    #                 MainHandler,
-    #                 {"path": self.ui_path}
-    #             )
-    #         ],
-    #         # always generate a new cookie secret on launch
-    #         # ensures that each spawn clears any cookies from
-    #         # previous session, triggering OAuth again
-    #         cookie_secret=os.urandom(32)
-    #     )
-
-    # def start(self, debug: bool):
-    #     logger.info("Starting Cylc UI Server")
-    #     logger.info(f"Running on: {gethostname()}")
-    #     logger.info(f"Listening on port: {self._port}")
-    #     logger.info(f'Serving UI from: {self.ui_path}')
-    #     logger.info(
-    #         f"JupyterHub Service Prefix: {self._jupyter_hub_service_prefix}"
-    #     )
-
-    #     ioloop.IOLoop.current().add_callback(
-    #         self.workflows_mgr.update
-    #     )
-    #     ioloop.PeriodicCallback(
-    #         self.workflows_mgr.update,
-    #         self.scan_interval * 1000
-    #     ).start()
-
-    #     app = self._make_app(debug)
-    #     signal.signal(signal.SIGINT, app.signal_handler)
-    #     app.listen(self._port)
-    #     # pass in server object for clean exit
-    #     ioloop.PeriodicCallback(
-    #         partial(app.try_exit, uis=self), 100).start()
-    #     # Discover workflows on initial start up.
-    #     ioloop.IOLoop.current().add_callback(
-    #         self.workflows_mgr.update)
-    #     # If the client is already established it's not overridden,
-    #     # so the following callbacks can happen at the same time.
-    #     ioloop.PeriodicCallback(
-    #         self.workflows_mgr.update,
-    #         self.scan_interval * 1000
-    #     ).start()
-    #     try:
-    #         ioloop.IOLoop.current().start()
-    #     except KeyboardInterrupt:
-    #         ioloop.IOLoop.instance().stop()
-
-
-# def main():
-#     parser = argparse.ArgumentParser(
-#         description="Start Cylc UI"
-#     )
-#     parser.add_argument('-p', '--port', action="store", dest="port", type=int,
-#                         default=8888)
-#     parser.add_argument('--ui-build-dir', action="store")
-#     parser.add_argument('--debug', action="store_true", dest="debug",
-#                         default=False)
-#     args = parser.parse_known_args()[0]
-
-#     jupyterhub_service_prefix = os.environ.get(
-#         'JUPYTERHUB_SERVICE_PREFIX', '/')
-
-#     ui_server = CylcUIServer(
-#         port=args.port,
-#         ui_build_dir=args.ui_build_dir,
-#         jupyterhub_service_prefix=jupyterhub_service_prefix
-#     )
-
-#     ui_server.start(args.debug)
-
-
-# __all__ = [
-#     'MyApplication',
-#     'CylcUIServer',
-#     'main'
-# ]

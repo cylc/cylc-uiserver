@@ -80,7 +80,7 @@ setup(
     version=find_version("cylc", "uiserver", "__init__.py"),
     long_description=read("README.md"),
     long_description_content_type='text/markdown',
-    packages=find_namespace_packages(include=["cylc.*"]) + ['cylc_gui'],
+    packages=find_namespace_packages(include=["cylc.*"]),
     package_data={
         'cylc.uiserver': [
             'logging_config.json',

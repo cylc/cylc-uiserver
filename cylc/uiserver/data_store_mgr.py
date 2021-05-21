@@ -35,7 +35,6 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from functools import partial
-import logging
 import time
 
 from cylc.flow import ID_DELIM
@@ -329,8 +328,10 @@ class DataStoreMgr:
         items = await asyncio.gather(*gathers, return_exceptions=True)
         for item in items:
             if isinstance(item, Exception):
-                self.log.exception('Failed to update entire local data-store '
-                                 'of a workflow', exc_info=item)
+                self.log.exception(
+                    'Failed to update entire local data-store '
+                    'of a workflow', exc_info=item
+                )
             else:
                 w_id, result = item
                 if result is not None and result != MSG_TIMEOUT:

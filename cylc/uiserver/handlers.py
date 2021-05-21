@@ -15,8 +15,6 @@
 
 from asyncio import Queue
 import json
-import os
-import logging
 import getpass
 import socket
 
@@ -24,9 +22,6 @@ from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
 from graphql_ws.constants import GRAPHQL_WS
 from jupyter_server.base.handlers import JupyterHandler
-from jupyterhub import __version__ as jupyterhub_version
-from jupyterhub.services.auth import HubOAuthenticated
-from jupyterhub.utils import url_path_join
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
@@ -36,60 +31,12 @@ from .websockets import authenticated as websockets_authenticated
 ME = getpass.getuser()
 
 
-# def _authorised(req):
-#     """Authorise a request.
-
-#     Requires the request to be authenticated.
-
-#     Currently returns True if the authenticated user is the same as the
-#     user under which this UI Server is running.
-
-#     Returns:
-#         bool - True if the request passes authorisation, False if it fails.
-
-#     """
-#     return True  # TODO
-#     # jupyter server has a method to get the user from a token
-#     # https://github.com/jupyter-server/jupyter_server/blob/ca5622a0706f60f299881adc45e2f7e94045ca22/jupyter_server/auth/login.py#L197
-#     user = req.get_current_user()
-#     username = user.get('name', '?')
-#     if username != ME:
-#         logger.warning(f'Authorisation failed for {username}')
-#         return False
-#     return True
-
-
-# def authorised(fun):
-#     """Provides Cylc authorisation for multi-user setups."""
-
-#     def _inner(self, *args, **kwargs):
-#         nonlocal fun
-#         if not _authorised(self):
-#             raise web.HTTPError(403, reason='authorisation insufficient')
-#         return fun(self, *args, **kwargs)
-#     return _inner
-
-
-# def async_authorised(fun):
-#     """Provides Cylc authorisation for multi-user setups."""
-
-#     async def _inner(self, *args, **kwargs):
-#         nonlocal fun
-#         if not _authorised(self):
-#             raise web.HTTPError(403, reason='authorisation insufficient')
-#         return await fun(self, *args, **kwargs)
-#     return _inner
-
-
-# CylcAppHandler = JupyterHandler
-
-
-
 class CylcAppHandler(JupyterHandler):
     """Base handler for Cylc endpoints.
 
     This handler adds the Cylc authorisation layer which is triggered by
-    calling CylcAppHandler.get_current_user which is called by web.authenticated.
+    calling CylcAppHandler.get_current_user which is called by
+    web.authenticated.
 
     When running as a Hub application the make_singleuser_app method patches
     this handler to insert the HubOAuthenticated bases class high up
@@ -136,43 +83,8 @@ class CylcAppHandler(JupyterHandler):
         # return True
 
 
-# class CylcAppHandler(HubOAuthenticated, web.RequestHandler):
-
-#     def set_default_headers(self) -> None:
-#         self.set_header("X-JupyterHub-Version", jupyterhub_version)
-#         self.set_header("Access-Control-Allow-Origin", "*")
-#         self.set_header("Access-Control-Allow-Headers", "x-requested-with")
-#         self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
-#         # prevent server fingerprinting
-#         self.clear_header('Server')
-#         print(f'%%% {self.request}')
-
-class StaticHandler2(web.StaticFileHandler):
-
-    def get(self, *args, **kwargs):
-        # args = (args[0].replace('cylc/', ''),)
-        super().get(*args, **kwargs)
-
-
-class StaticHandler(CylcAppHandler, web.StaticFileHandler):
-    """A static handler that extends CylcAppHandler (for headers)."""
-
-
-class MainHandler(CylcAppHandler):
-
-    def initialize(self, path):
-        self._static = path
-
-    @web.addslash
-    @web.authenticated
-    def get(self):
-        """Render the UI prototype."""
-        index = os.path.join(self._static, "index.html")
-        user = self.get_current_user()
-        protocol = self.request.protocol
-        host = self.request.host
-        base_url = f'{protocol}://{host}/{user["server"]}'
-        self.render(index, python_base_url=base_url)
+class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
+    pass
 
 
 class UserProfileHandler(CylcAppHandler):
@@ -304,8 +216,6 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
 
 
 __all__ = [
-    "MainHandler",
-    "StaticHandler",
     "UserProfileHandler",
     "UIServerGraphQLHandler",
     "SubscriptionHandler"
