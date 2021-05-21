@@ -486,6 +486,17 @@ class CylcUIServer(ExtensionApp):
             argv = sys.argv[2:]
         super().launch_instance(argv=argv, **kwargs)
 
+    def stop_extension(self):
+        for sub in self.data_store_mgr.w_subs.values():
+            sub.stop()
+        # Shutdown the thread pool executor
+        for executor in self.data_store_mgr.executors.values():
+            executor.shutdown(wait=False)
+        # Destroy ZeroMQ context of all sockets
+        self.workflows_mgr.context.destroy()
+        ioloop.IOLoop.instance().stop()
+        logger.info('exit success')
+
     # def _make_app(self, debug: bool):
     #     """Crete a Tornado web application.
 
