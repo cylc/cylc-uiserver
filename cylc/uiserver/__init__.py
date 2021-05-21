@@ -15,7 +15,7 @@
 
 __version__ = "0.5.0"
 
-from cylc.uiserver.main import CylcUIServer
+from cylc.uiserver.app import CylcUIServer
 
 
 def _jupyter_server_extension_points():

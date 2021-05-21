@@ -34,7 +34,7 @@ from cylc.flow.data_messages_pb2 import (  # type: ignore
 from cylc.flow.network import ZMQSocketBase
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
-from cylc.uiserver.main import CylcUIServer
+from cylc.uiserver.app import CylcUIServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
@@ -178,7 +178,7 @@ def mock_config(monkeypatch):
         exec(conf, {'c': obj.config})
 
     monkeypatch.setattr(
-        'cylc.uiserver.main.CylcUIServer.load_config_file',
+        'cylc.uiserver.app.CylcUIServer.load_config_file',
         _read
     )
 

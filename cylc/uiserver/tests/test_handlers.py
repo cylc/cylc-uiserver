@@ -26,7 +26,7 @@ from tornado.httputil import HTTPServerRequest
 from tornado.testing import AsyncHTTPTestCase, get_async_test_timeout
 from tornado.web import Application, RequestHandler
 
-from cylc.uiserver.main import (
+from cylc.uiserver.app import (
     MainHandler,
     MyApplication,
     SubscriptionHandler,

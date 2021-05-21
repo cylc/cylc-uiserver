@@ -18,7 +18,7 @@ import pytest
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from tornado.web import RequestHandler
 
-from cylc.uiserver.main import CylcUIServer, MyApplication
+from cylc.uiserver.app import CylcUIServer, MyApplication
 
 
 def test_my_application():

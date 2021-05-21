@@ -111,7 +111,7 @@ Currently the UI Server accepts these configurations:
 * `c.UIServer.logging_config`
 * `c.UIServer.scan_iterval`
 
-See the `cylc.uiserver.main.UIServer` file for details.
+See the `cylc.uiserver.app.UIServer` file for details.
 
 ## Developing
 

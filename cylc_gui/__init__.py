@@ -15,7 +15,7 @@
 
 __version__ = "0.4.0"
 
-from cylc.uiserver.main import CylcUIServer
+from cylc.uiserver.app import CylcUIServer
 
 
 class CylcGUI(CylcUIServer):

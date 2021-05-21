@@ -30,7 +30,7 @@ from cylc.flow.workflow_files import (
     ContactFileFields as CFF,
 )
 
-from cylc.uiserver.main import CylcUIServer
+from cylc.uiserver.app import CylcUIServer
 import cylc.uiserver.workflows_mgr as workflows_mgr_module
 from cylc.uiserver.workflows_mgr import (
     workflow_request,
