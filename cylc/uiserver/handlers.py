@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import grp
 import json
 import os
 from asyncio import Queue, iscoroutinefunction
@@ -37,35 +38,6 @@ ME = getpass.getuser()
 
 # TODO: Remove this auth code into an authorise.py file for tidiness.
 
-
-def _authorised(req):
-    """Authorise a request.
-
-    Requires the request to be authenticated.
-
-    Currently returns True if the authenticated user is the same as the
-    user under which this UI Server is running.
-
-    Returns:
-        bool - True if the request passes authorisation, False if it fails.
-"""
-# 1. Send roles and/or claims/actions (see oauth/jwt for 'claims' concept)
-# 2. Lookup roles and/or actions in cylc config get all USERS and GROUPS
-# 3. Get groups for current user
-# 4. See if username or groups for current user are in those returned in (2)
-#
-# e.g.
-#
-# @authorise(roles="users,admins", claims="can_load_ui")
-#
-# Eventually you can nest i.e. add one role to another
-#
-# e.g.
-#
-# admins group could be a member of users group to INHERIT perms.
-# and save repeating
-
-
 CAN_READ = "readers"
 CAN_WRITE = "writers"
 CAN_EXECUTE = "executers"
@@ -74,18 +46,6 @@ MEMBERTYPE_GROUP = "group"
 MEMBERTYPE_USERNAME = "username"
 
 # TODO Fake until we plumb in config
-# c.UIServer.authorisation = {
-#     "user_A": {
-#         "read": True,
-#        "write": [
-#             "pause"
-#         ]
-#     },
-#     "group:users": {
-#         "read": True
-#     }
-# }
-
 roles_dict = {CAN_READ: [{MEMBERTYPE_USERNAME: "mhall"}, {
     MEMBERTYPE_USERNAME: "testuser1"}, {
     MEMBERTYPE_GROUP: "users"}],
@@ -93,42 +53,6 @@ roles_dict = {CAN_READ: [{MEMBERTYPE_USERNAME: "mhall"}, {
         MEMBERTYPE_GROUP: "users"}],
     CAN_EXECUTE: [{MEMBERTYPE_USERNAME: "mhall"}, {
                   MEMBERTYPE_GROUP: "users"}]}
-
-
-def _authorised(req):
-    """Authorise a request.
-    Requires the request to be authenticated.
-    Currently returns True if the authenticated user is the same as the
-    user under which this UI Server is running.
-    Returns:
-        bool - True if the request passes authorisation, False if it fails.
-    """
-    user = req.get_current_user()
-    username = user.get('name', '?')
-    if username != ME:
-        logger.warning(f'Authorisation failed for {username}')
-        return False
-    return True
-
-
-def authorised(fun):
-    """Provides Cylc authorisation for multi-user setups."""
-    def _inner(self, *args, **kwargs):
-        nonlocal fun
-        if not _authorised(self):
-            raise web.HTTPError(403, reason='authorisation insufficient')
-        return fun(self, *args, **kwargs)
-    return _inner
-
-
-def async_authorised(fun):
-    """Provides Cylc authorisation for multi-user setups."""
-    async def _inner(self, *args, **kwargs):
-        nonlocal fun
-        if not _authorised(self):
-            raise web.HTTPError(403, reason='authorisation insufficient')
-        return await fun(self, *args, **kwargs)
-    return _inner
 
 
 def _user_action_allowed(username, action):
@@ -148,42 +72,6 @@ def _user_action_allowed(username, action):
         if rolegroup and rolegroup in users_groups:
             return True
 
-# TODO look to refactor can_* into a single function
-#
-# e.g.
-#
-# back to authorise decorator function that takes:
-# authorise(can_read)
-# which can be the function needed to do the checks
-
-
-def can_read(fun):
-    if iscoroutinefunction(fun):
-        async def _inner(self, *args, **kwargs):
-            allowed, username = _can_read(self)
-            if not allowed:
-                logger.warn(f'Authorisation failed for {username}')
-                raise web.HTTPError(403)
-            return await fun(self, *args, **kwargs)
-        return _inner
-    else:
-        def _inner(self, *args, **kwargs):
-            allowed, username = _can_read(self)
-            if not allowed:
-                logger.warn(f'Authorisation failed for {username}')
-                raise web.HTTPError(403)
-            return fun(self, *args, **kwargs)
-        return _inner
-
-
-# TUESDAY TODO: fish the mutation operation_name out of args to make this work
-def can_execute(fun):
-    """Provides Cylc authorisation for multi-user setups."""
-    if asyncio.iscoroutinefunction(fun):
-
-
-def _can_read(self):
-    user = self.get_current_user()
 
 def authorise(*outer_args, **outer_kwargs):
     def authorise_inner(fun):
@@ -261,8 +149,13 @@ def can_execute(**kwargs):
 
 
 def _get_graphql_operation(req):
+    from graphql.language.parser import parse
     data = req.parse_body()
-    query, _, operation_name, _ = req.get_graphql_params(
+    # continue here tomorrow to look at how to parse 
+    # multiple mutations.
+    parsed = parse(data["query"])
+    parsed.definitions[0].selection_set.selections[0].name
+    query, temp, operation_name, _ = req.get_graphql_params(
                 req.request, data)
     return operation_name, query
 
@@ -312,6 +205,20 @@ class UserProfileHandler(BaseHandler):
         self.write(json.dumps(self.get_current_user()))
 
 
+def authmoo(self, next, root, info, **args):
+
+    if info.field_name == 'user':
+        return None
+    return next(root, info, **args)
+
+class AuthorizationMiddleware(object):
+
+    def resolve(self, next, root, info, **args):
+
+        if info.field_name == 'user':
+            return None
+        return next(root, info, **args)
+
 # This is needed in order to pass the server context in addition to existing.
 # It's possible to just overwrite TornadoGraphQLHandler.context but we would
 # somehow need to pass the request info (headers, username ...etc) in also
@@ -350,7 +257,7 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
             'resolvers': self.resolvers,
         }
         return wider_context
-
+  
     async def execute(self, *args, **kwargs):
         # Use own backend, and TornadoGraphQLHandler already does validation.
         return await self.schema.execute(
@@ -369,7 +276,6 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
             await super().run("post")
         except Exception as ex:
             self.handle_error(ex)
-
 
 class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
 

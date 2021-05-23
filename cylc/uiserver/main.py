@@ -71,6 +71,16 @@ from .workflows_mgr import WorkflowsManager
 logger = logging.getLogger(__name__)
 
 
+class AutorizationMiddleware:
+
+    def resolve(self, next, root, info, **args):
+       # v = info.context.get_current_user()
+        # import mdb
+        # mdb.debug()
+        result = next(root, info, **args)
+
+
+
 class MyApplication(web.Application):
     is_closing = False
 
@@ -403,7 +413,7 @@ class CylcUIServer(Application):
             schema=schema,
             resolvers=self.resolvers,
             backend=CylcGraphQLBackend(),
-            middleware=[IgnoreFieldMiddleware],
+            middleware=[IgnoreFieldMiddleware, AutorizationMiddleware],
             **kwargs
         )
 
@@ -417,7 +427,7 @@ class CylcUIServer(Application):
         subscription_server = TornadoSubscriptionServer(
             schema,
             backend=CylcGraphQLBackend(),
-            middleware=[IgnoreFieldMiddleware],
+            middleware=[IgnoreFieldMiddleware, AutorizationMiddleware],
         )
         return MyApplication(
             static_path=self.ui_path,
