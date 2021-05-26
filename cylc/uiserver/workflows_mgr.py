@@ -82,7 +82,7 @@ async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
         try:
             host = get_host_ip_by_name(host)  # IP reduces DNS traffic
         except socket.error as exc:
-            if flags.debug:
+            if flags.verbosity > 1:
                 raise
             logger.error("ERROR: %s: %s\n", exc, host)
             return (reg, host, port, pub_port, None)
