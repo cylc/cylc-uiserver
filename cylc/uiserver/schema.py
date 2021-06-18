@@ -97,6 +97,7 @@ class Play(Mutation):
             Start, resume or un-pause a workflow run.
         ''')
         resolver = partial(mutator, command='play')
+        auth = 'MOOOOOOO'
 
     class Arguments:
         workflows = List(WorkflowID, required=True)
@@ -168,19 +169,7 @@ class Play(Mutation):
         )
         abort_if_any_task_fails = Boolean(
             default_value=False,
-            description=sstrip('''
-                If set workflow will abort with status 1 if any task fails.
-            ''')
-        )
-        debug = Boolean(
-            default_value=False,
-            description=sstrip('''
-                Output developer information and show exception tracebacks.
-            ''')
-        )
-        no_timestamp = Boolean(
-            default_value=False,
-            description=sstrip('''
+            description=sstrip('''result
                 Don't timestamp logged messages.
             ''')
         )

@@ -17,6 +17,7 @@
 import argparse
 from contextlib import contextmanager
 import json
+import getpass
 import logging
 import os
 import signal
@@ -24,7 +25,7 @@ from functools import partial
 from logging.config import dictConfig
 from pathlib import Path, PurePath
 import sys
-from typing import Any, Dict, Tuple, Type, List
+from typing import Any, Dict, Tuple, Type, List, no_type_check_decorator
 
 from pkg_resources import parse_version
 from tornado import web, ioloop
@@ -60,24 +61,15 @@ from .handlers import (
     StaticHandler,
     SubscriptionHandler,
     UIServerGraphQLHandler,
-    UserProfileHandler,
-    authorise,
+    UserProfileHandler
 )
 from .resolvers import Resolvers
 from .schema import schema
 from .websockets.tornado import TornadoSubscriptionServer
 from .workflows_mgr import WorkflowsManager
+from .authorise import Authorization, AuthorizationMiddleware
 
 logger = logging.getLogger(__name__)
-
-
-class AutorizationMiddleware:
-
-    def resolve(self, next, root, info, **args):
-       # v = info.context.get_current_user()
-        # import mdb
-        # mdb.debug()
-        result = next(root, info, **args)
 
 
 
@@ -122,36 +114,25 @@ class PathType(TraitType):
 
 class CylcUIServer(Application):
 
-    authorisation = Dict(
+    site_authorization = Dict(
+        config=True,
+        help= '''
+        Dictionary containing limits and defaults for authorisation.
+    ''')
+
+    user_authorization = Dict(
         config=True,
         help='''
         Dictionary containing authorised users and permission levels
         Should take the form:
-            {
-                "user-a": {
-                            read: True,
-                            write: [
-                                # restrict write access to only mutation1
-                                "mutation1"
-                            ]
-                },
-                "user-b": {
-                            read: True,
-                            write: True,
-                            execute: [
-                                # restrict write access to only play
-                                "play"
-                            ]
-                },
-                # groups can be configured with a prepending `group:`
-                "group:<group>": {
-                            read: True,
-                            write: [
-                                "mutation2", "mutation 3"
-                            ]
-                }
-            }
 
+{
+                '*': ["READ", "!kill"],
+                "testuser1": ["READ", "pause", "!trigger", "message"],
+                "group:group2": ["CONTROL"],
+                "<user2>": ["CONTROL", "!trigger", "!edit"],
+                "<user3>": "!CONTROL",
+                "<user4>": ["!READ", "!CONTROL"]
             }
 
         '''
@@ -233,6 +214,10 @@ class CylcUIServer(Application):
         '''
     )
 
+    # @default('user_authorization')
+    # def _default_user_authorization(self):
+    #     return {}
+
     @default('scan_interval')
     def _default_scan_interval(self):
         return 5
@@ -286,10 +271,6 @@ class CylcUIServer(Application):
 
         raise Exception(f'Could not find UI build in {ui_path}')
 
-    # @default('authorisation')
-    # def _default_authorisation_config(self):
-    #         """Return none for default authorisation"""
-    #     return {}
 
     @default('logging_config')
     def _default_logging_config(self):
@@ -308,6 +289,14 @@ class CylcUIServer(Application):
         self.resolvers = Resolvers(
             self.data_store_mgr,
             workflows_mgr=self.workflows_mgr)
+        self.authobj = Authorization(getpass.getuser(),
+                      self.config.UIServer.user_authorization,
+                      self.config.UIServer.site_authorization)
+
+        
+
+        # more upfront processing of i.e. what user is permitted to permit
+        # into own function?
 
     @staticmethod
     @contextmanager
@@ -413,7 +402,8 @@ class CylcUIServer(Application):
             schema=schema,
             resolvers=self.resolvers,
             backend=CylcGraphQLBackend(),
-            middleware=[IgnoreFieldMiddleware, AutorizationMiddleware],
+            # Auth should be the first middleware run
+            middleware=[AuthorizationMiddleware, IgnoreFieldMiddleware],
             **kwargs
         )
 
@@ -427,8 +417,11 @@ class CylcUIServer(Application):
         subscription_server = TornadoSubscriptionServer(
             schema,
             backend=CylcGraphQLBackend(),
-            middleware=[IgnoreFieldMiddleware, AutorizationMiddleware],
+            # Auth should be the first middleware run
+            middleware=[AuthorizationMiddleware, IgnoreFieldMiddleware],
+            auth = self.authobj
         )
+
         return MyApplication(
             static_path=self.ui_path,
             debug=debug,
@@ -446,18 +439,19 @@ class CylcUIServer(Application):
                 self._create_graphql_handler(
                     "graphql",
                     UIServerGraphQLHandler,
+                    auth = self.authobj
                 ),
                 self._create_graphql_handler(
                     "graphql/batch",
                     UIServerGraphQLHandler,
-                    batch=True
+                    batch=True,
+                    auth = self.authobj
                 ),
                 # subscription/websockets handler
                 self._create_handler("subscriptions",
                                      SubscriptionHandler,
                                      sub_server=subscription_server,
-                                     resolvers=self.resolvers,
-                                     user_auth_config=self.authorisation),
+                                     resolvers=self.resolvers),
                 # main handler
                 (
                     rf"{self._jupyter_hub_service_prefix}?",
@@ -478,9 +472,14 @@ class CylcUIServer(Application):
         )
         logger.info(f"Listening on port: {self._port}")
         logger.info(f'Serving UI from: {self.ui_path}')
+
         app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)
+
+        import mdb
+        mdb.debug()
+
         # pass in server object for clean exit
         ioloop.PeriodicCallback(
             partial(app.try_exit, uis=self), 100).start()
@@ -493,7 +492,6 @@ class CylcUIServer(Application):
             self.workflows_mgr.update,
             self.scan_interval * 1000
         ).start()
-        #    letussee = self.authorisation
         try:
             ioloop.IOLoop.current().start()
         except KeyboardInterrupt:

@@ -20,6 +20,7 @@ from graphql_ws.constants import (
 )
 
 from typing import Union, Awaitable, Any, List, Tuple, Dict, Optional
+from ..authorise import AuthorizationMiddleware
 
 setup_observable_extension()
 
@@ -47,10 +48,14 @@ class TornadoConnectionContext(BaseConnectionContext):
 
 
 class TornadoSubscriptionServer(BaseSubscriptionServer):
-    def __init__(self, schema, keep_alive=True, loop=None, backend=None, middleware=None):
+    def __init__(self, schema, keep_alive=True, loop=None, backend=None, 
+                 middleware=None, auth=None):
         self.loop = loop
         self.backend = backend or None
         self.middleware = middleware
+        self.user_auth_config = None
+        self.current_user = None
+        self.auth = auth
         super().__init__(schema, keep_alive)
 
     @staticmethod
@@ -64,6 +69,9 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
     def get_graphql_params(self, *args, **kwargs):
         params = super(TornadoSubscriptionServer,
                        self).get_graphql_params(*args, **kwargs)
+
+        # TODO if user or auth config null, raise and log
+
         # If middleware get instantiated here (optional), they will
         # be local/private to each subscription.
         if self.middleware is not None:
@@ -72,11 +80,17 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
             )
         else:
             middleware = self.middleware
+        
+        for mw in middleware:
+            if isinstance(mw, AuthorizationMiddleware):
+                mw.current_user = self.current_user
+                mw.auth = self.auth 
+
         return dict(
             params,
             return_promise=True,
             executor=AsyncioExecutor(loop=self.loop),
-            backend=self.backend,
+            backend=self.backend            ,
             middleware=MiddlewareManager(
                 *middleware,
                 wrap_in_promise=False

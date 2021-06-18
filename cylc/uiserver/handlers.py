@@ -13,10 +13,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import grp
 import json
 import os
-from asyncio import Queue, iscoroutinefunction
+from asyncio import Queue
 import logging
 import getpass
 
@@ -30,135 +29,11 @@ from tornado.ioloop import IOLoop
 from functools import partial
 
 from .websockets import authenticated as websockets_authenticated
+from .authorise import AuthorizationMiddleware
 
 logger = logging.getLogger(__name__)
 
-
 ME = getpass.getuser()
-
-# TODO: Remove this auth code into an authorise.py file for tidiness.
-
-CAN_READ = "readers"
-CAN_WRITE = "writers"
-CAN_EXECUTE = "executers"
-
-MEMBERTYPE_GROUP = "group"
-MEMBERTYPE_USERNAME = "username"
-
-# TODO Fake until we plumb in config
-roles_dict = {CAN_READ: [{MEMBERTYPE_USERNAME: "mhall"}, {
-    MEMBERTYPE_USERNAME: "testuser1"}, {
-    MEMBERTYPE_GROUP: "users"}],
-    CAN_WRITE: [{MEMBERTYPE_USERNAME: "mhall"}, {
-        MEMBERTYPE_GROUP: "users"}],
-    CAN_EXECUTE: [{MEMBERTYPE_USERNAME: "mhall"}, {
-                  MEMBERTYPE_GROUP: "users"}]}
-
-
-def _user_action_allowed(username, action):
-    for role in roles_dict[action]:
-        roleuser = role.get(MEMBERTYPE_USERNAME)
-        if roleuser and roleuser == username:
-            return True
-    # There's a number of ways to find groups but this is the only way
-    # to include non-local-machine groups while targeting a specific user.
-    # Requires a gid so supply 0 or some 'max integer' and remove from result
-    # see https://www.geeksforgeeks.org/python-os-getgrouplist-method/
-    group_ids = os.getgrouplist(username, 0)
-    group_ids.remove(0)
-    users_groups = list(map(lambda x: grp.getgrgid(x).gr_name, group_ids))
-    for role in roles_dict[action]:
-        rolegroup = role.get(MEMBERTYPE_GROUP)
-        if rolegroup and rolegroup in users_groups:
-            return True
-
-
-def authorise(*outer_args, **outer_kwargs):
-    def authorise_inner(fun):
-        if iscoroutinefunction(fun):
-            async def decorated_func(self, *args, **kwargs):
-                for function in outer_args:
-                    if callable(function):
-                        allowed, username = function(handler=self)
-                    if not allowed:
-                        logger.warn(f'Authorisation failed for {username}')
-                        raise web.HTTPError(403)
-                return await fun(self, *args, **kwargs)
-            return decorated_func
-        else:
-            def decorated_func(self):
-                for function in outer_args:
-                    # todo raise / log
-                    if callable(function):
-                        allowed, username = function(handler=self)
-                    if not allowed:
-                        logger.warn(f'Authorisation failed for {username}')
-                        raise web.HTTPError(403)
-                return fun(self)
-            return decorated_func
-    return authorise_inner
-
-
-def can_read(**kwargs):
-    if "handler" not in kwargs:
-        return
-    user = kwargs["handler"].get_current_user()
-    username = user.get('name', '?')
-    if username == ME or _user_action_allowed(username, "readers"):
-        return True, username
-    return False, username
-
-
-def can_write(**kwargs):
-    if "handler" not in kwargs:
-        return
-    user = kwargs["handler"].get_current_user()
-    username = user.get('name', '?')
-    if username == ME or _user_action_allowed(username, "writers"):
-        return True, username
-    return False, username
-
-
-def can_execute(**kwargs):
-    if "handler" not in kwargs or "mutators" not in kwargs:
-        return
-    handler = kwargs["handler"]
-    mutators = kwargs["mutators"]
-    user = handler.get_current_user()
-    username = user.get('name', '?')
-
-    if username == ME:
-        return True, username
-
-    # TODO Should also check the query e.g. it starts with 'mutation pause'
-    # For security in case an operation name is sent different to the query
-    # Hence fetching below
-
-    # TODO decide on behaviour where @can_execute without any mutators
-    # Probably will mean all mutators needs execute?
-    # Same goes for where operation_name is missing as per first call
-    # Currently treating as if present below
-    # Main aim = fail secure
-
-    if isinstance(handler, TornadoGraphQLHandler) and mutators is not None:
-        operation_name, query = _get_graphql_operation(handler)
-        if operation_name in mutators or operation_name is None:
-            if _user_action_allowed(username, CAN_EXECUTE):
-                return True, username
-    return False, username
-
-
-def _get_graphql_operation(req):
-    from graphql.language.parser import parse
-    data = req.parse_body()
-    # continue here tomorrow to look at how to parse 
-    # multiple mutations.
-    parsed = parse(data["query"])
-    parsed.definitions[0].selection_set.selections[0].name
-    query, temp, operation_name, _ = req.get_graphql_params(
-                req.request, data)
-    return operation_name, query
-
 
 class BaseHandler(HubOAuthenticated, web.RequestHandler):
 
@@ -182,7 +57,6 @@ class MainHandler(BaseHandler):
 
     @web.addslash
     @web.authenticated
-    @authorise(can_read)
     def get(self):
         """Render the UI prototype."""
         index = os.path.join(self._static, "index.html")
@@ -200,24 +74,9 @@ class UserProfileHandler(BaseHandler):
         self.set_header("Content-Type", 'application/json')
 
     @web.authenticated
-    @authorise(can_read)
     def get(self):
         self.write(json.dumps(self.get_current_user()))
 
-
-def authmoo(self, next, root, info, **args):
-
-    if info.field_name == 'user':
-        return None
-    return next(root, info, **args)
-
-class AuthorizationMiddleware(object):
-
-    def resolve(self, next, root, info, **args):
-
-        if info.field_name == 'user':
-            return None
-        return next(root, info, **args)
 
 # This is needed in order to pass the server context in addition to existing.
 # It's possible to just overwrite TornadoGraphQLHandler.context but we would
@@ -235,9 +94,16 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
                    batch=False, backend=None, **kwargs):
         super(TornadoGraphQLHandler, self).initialize()
 
+        self.auth = kwargs['auth']
+
         self.schema = schema
         if middleware is not None:
             self.middleware = list(self.instantiate_middleware(middleware))
+        # Make authorization available to auth middleware
+        for mw in self.middleware:
+            if isinstance(mw, AuthorizationMiddleware):
+                mw.current_user = self.current_user['name']
+                mw.auth = self.auth
         self.executor = executor
         self.root_value = root_value
         self.pretty = pretty
@@ -257,9 +123,8 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
             'resolvers': self.resolvers,
         }
         return wider_context
-  
+
     async def execute(self, *args, **kwargs):
-        # Use own backend, and TornadoGraphQLHandler already does validation.
         return await self.schema.execute(
             *args,
             backend=self.backend,
@@ -269,8 +134,6 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
         )
 
     @web.authenticated
-    @authorise(can_write,
-               partial(can_execute, mutators=["play", "stop"]))
     async def post(self) -> None:
         try:
             await super().run("post")
@@ -279,24 +142,22 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
 
 class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
 
-    def initialize(self, sub_server, resolvers, user_auth_config):
+    def initialize(self, sub_server, resolvers, user_auth_config=None):
         self.queue = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
-        self.user_auth_config = user_auth_config
+        self.subscription_server.user_auth_config = user_auth_config
+        self.subscription_server.current_user = self.current_user
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
 
     @websockets_authenticated
-    @authorise(can_read)
-    def get(self, *args, **kwargs):
-        # forward this call so we can authenticate/authorise it
+    def get(self, *args, **kwargs):          
         return websocket.WebSocketHandler.get(self, *args, **kwargs)
 
     @websockets_authenticated
-    @authorise(can_read)
-    def open(self, *args, **kwargs):
+    def open(self, *args, **kwargs):        
         IOLoop.current().spawn_callback(self.subscription_server.handle, self,
                                         self.context)
 
