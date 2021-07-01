@@ -80,17 +80,16 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
             )
         else:
             middleware = self.middleware
-        
         for mw in middleware:
             if isinstance(mw, AuthorizationMiddleware):
                 mw.current_user = self.current_user
-                mw.auth = self.auth 
+                mw.auth = self.auth
 
         return dict(
             params,
             return_promise=True,
             executor=AsyncioExecutor(loop=self.loop),
-            backend=self.backend            ,
+            backend=self.backend,
             middleware=MiddlewareManager(
                 *middleware,
                 wrap_in_promise=False

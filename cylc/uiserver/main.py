@@ -25,7 +25,7 @@ from functools import partial
 from logging.config import dictConfig
 from pathlib import Path, PurePath
 import sys
-from typing import Any, Dict, Tuple, Type, List, no_type_check_decorator
+from typing import (Any, Dict, Tuple, Type, List, Union)
 
 from pkg_resources import parse_version
 from tornado import web, ioloop
@@ -117,24 +117,13 @@ class CylcUIServer(Application):
     site_authorization = Dict(
         config=True,
         help= '''
-        Dictionary containing limits and defaults for authorisation.
+            Dictionary containing site limits and defaults for authorisation.
     ''')
 
     user_authorization = Dict(
         config=True,
         help='''
-        Dictionary containing authorised users and permission levels
-        Should take the form:
-
-{
-                '*': ["READ", "!kill"],
-                "testuser1": ["READ", "pause", "!trigger", "message"],
-                "group:group2": ["CONTROL"],
-                "<user2>": ["CONTROL", "!trigger", "!edit"],
-                "<user3>": "!CONTROL",
-                "<user4>": ["!READ", "!CONTROL"]
-            }
-
+            Dictionary containing authorised users and permission levels
         '''
     )
 
@@ -227,6 +216,12 @@ class CylcUIServer(Application):
         if proposed['value'].exists():
             return proposed['value']
         raise TraitError(f'ui_build_dir does not exist: {proposed["value"]}')
+
+    @validate('site_authorization')
+    def _check_site_auth_dict_correct_format(self, proposed):
+        if isinstance(proposed['value'], dict):
+            return proposed['value']
+        raise TraitError(f'Error in site authorization config: {proposed["value"]}')
 
     @staticmethod
     def _list_ui_versions(path: Path) -> List[str]:
@@ -403,6 +398,7 @@ class CylcUIServer(Application):
             resolvers=self.resolvers,
             backend=CylcGraphQLBackend(),
             # Auth should be the first middleware run
+           # middleware=[IgnoreFieldMiddleware],
             middleware=[AuthorizationMiddleware, IgnoreFieldMiddleware],
             **kwargs
         )
@@ -418,6 +414,7 @@ class CylcUIServer(Application):
             schema,
             backend=CylcGraphQLBackend(),
             # Auth should be the first middleware run
+            #middleware=[IgnoreFieldMiddleware],
             middleware=[AuthorizationMiddleware, IgnoreFieldMiddleware],
             auth = self.authobj
         )

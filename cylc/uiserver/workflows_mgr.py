@@ -195,7 +195,11 @@ class WorkflowsManager:
     async def _connect(self, wid, flow):
         """Open a connection to a running workflow."""
         self.active[wid] = flow
-        flow['req_client'] = WorkflowRuntimeClient(flow['name'])
+        try:
+            flow['req_client'] = WorkflowRuntimeClient(flow['name'])
+        except ClientError as exc:
+            logger.debug(f"Failed to connect to {flow['name']}."
+                        "Check workflow logs.")
         await self.uiserver.data_store_mgr.sync_workflow(
             wid,
             flow
