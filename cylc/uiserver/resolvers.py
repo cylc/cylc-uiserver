@@ -204,7 +204,8 @@ class Resolvers(BaseResolvers):
             'request_string': req_str,
             'variables': variables,
         }
-        return self.workflows_mgr.multi_request('graphql', w_ids, graphql_args)
+        return await self.workflows_mgr.multi_request(
+            'graphql', w_ids, graphql_args)
 
     async def service(self, info, *m_args):
         return await Services.play(

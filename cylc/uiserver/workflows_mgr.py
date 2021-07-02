@@ -197,9 +197,9 @@ class WorkflowsManager:
         self.active[wid] = flow
         try:
             flow['req_client'] = WorkflowRuntimeClient(flow['name'])
-        except ClientError as exc:
+        except ClientError:
             logger.debug(f"Failed to connect to {flow['name']}."
-                        "Check workflow logs.")
+                         "Check workflow logs.")
         await self.uiserver.data_store_mgr.sync_workflow(
             wid,
             flow
@@ -268,9 +268,8 @@ class WorkflowsManager:
             # finally update the new states for internal purposes
             if before == 'active':
                 self.active.pop(wid)
-            elif before == 'inactive':
-                if wid in self.inactive:
-                    self.inactive.remove(wid)
+            elif before == 'inactive' and wid in self.inactive:
+                self.inactive.remove(wid)
             if after == 'active':
                 self.active[wid] = flow
             elif after == 'inactive':

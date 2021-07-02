@@ -25,7 +25,7 @@ from functools import partial
 from logging.config import dictConfig
 from pathlib import Path, PurePath
 import sys
-from typing import (Any, Dict, Tuple, Type, List, Union)
+from typing import (Any, Tuple, Type, List)
 
 from pkg_resources import parse_version
 from tornado import web, ioloop
@@ -72,7 +72,6 @@ from .authorise import Authorization, AuthorizationMiddleware
 logger = logging.getLogger(__name__)
 
 
-
 class MyApplication(web.Application):
     is_closing = False
 
@@ -116,14 +115,15 @@ class CylcUIServer(Application):
 
     site_authorization = Dict(
         config=True,
-        help= '''
+        help='''
             Dictionary containing site limits and defaults for authorisation.
     ''')
 
     user_authorization = Dict(
         config=True,
         help='''
-            Dictionary containing authorised users and permission levels
+            Dictionary containing authorised users and permission levels for
+            authorisation.
         '''
     )
 
@@ -203,8 +203,8 @@ class CylcUIServer(Application):
         '''
     )
 
-    # @default('user_authorization')
-    # def _default_user_authorization(self):
+    # @default('site_authorization')
+    # def _default_site_authorization(self):
     #     return {}
 
     @default('scan_interval')
@@ -219,22 +219,22 @@ class CylcUIServer(Application):
 
     @validate('site_authorization')
     def _check_site_auth_dict_correct_format(self, proposed):
+        # TODO: More advanced auth dict validating
         if isinstance(proposed['value'], dict):
             return proposed['value']
-        raise TraitError(f'Error in site authorization config: {proposed["value"]}')
+        raise TraitError(
+            f'Error in site authorization config: {proposed["value"]}')
 
     @staticmethod
     def _list_ui_versions(path: Path) -> List[str]:
         """Return a list of UI build versions detected in self.ui_path."""
-        return list(
-            sorted(
+        return sorted(
                 (
                     version.name
                     for version in path.glob('[0-9][0-9.]*')
                     if version
                 ),
                 key=parse_version
-            )
         )
 
     @default('ui_path')
@@ -266,7 +266,6 @@ class CylcUIServer(Application):
 
         raise Exception(f'Could not find UI build in {ui_path}')
 
-
     @default('logging_config')
     def _default_logging_config(self):
         return Path(Path(uis_pkg).parent / 'logging_config.json')
@@ -285,13 +284,8 @@ class CylcUIServer(Application):
             self.data_store_mgr,
             workflows_mgr=self.workflows_mgr)
         self.authobj = Authorization(getpass.getuser(),
-                      self.config.UIServer.user_authorization,
-                      self.config.UIServer.site_authorization)
-
-        
-
-        # more upfront processing of i.e. what user is permitted to permit
-        # into own function?
+                                     self.config.UIServer.user_authorization,
+                                     self.config.UIServer.site_authorization)
 
     @staticmethod
     @contextmanager
@@ -314,14 +308,13 @@ class CylcUIServer(Application):
     def _open_log(self):
         """Configure logging and open log handler(s)."""
         if self.logging_config:
-            if self.logging_config.exists():
-                with open(self.logging_config, 'r') as logging_config_json:
-                    config = json.load(logging_config_json)
-                    dictConfig(config["logging"])
-            else:
+            if not self.logging_config.exists():
                 raise ValueError(
                     f'Logging config file not found: {self.logging_config}'
                 )
+            with open(self.logging_config, 'r') as logging_config_json:
+                config = json.load(logging_config_json)
+                dictConfig(config["logging"])
 
     def _load_uis_config(self):
         """Load the UIS config file."""
@@ -397,8 +390,6 @@ class CylcUIServer(Application):
             schema=schema,
             resolvers=self.resolvers,
             backend=CylcGraphQLBackend(),
-            # Auth should be the first middleware run
-           # middleware=[IgnoreFieldMiddleware],
             middleware=[AuthorizationMiddleware, IgnoreFieldMiddleware],
             **kwargs
         )
@@ -413,10 +404,8 @@ class CylcUIServer(Application):
         subscription_server = TornadoSubscriptionServer(
             schema,
             backend=CylcGraphQLBackend(),
-            # Auth should be the first middleware run
-            #middleware=[IgnoreFieldMiddleware],
             middleware=[AuthorizationMiddleware, IgnoreFieldMiddleware],
-            auth = self.authobj
+            auth=self.authobj
         )
 
         return MyApplication(
@@ -436,13 +425,13 @@ class CylcUIServer(Application):
                 self._create_graphql_handler(
                     "graphql",
                     UIServerGraphQLHandler,
-                    auth = self.authobj
+                    auth=self.authobj
                 ),
                 self._create_graphql_handler(
                     "graphql/batch",
                     UIServerGraphQLHandler,
                     batch=True,
-                    auth = self.authobj
+                    auth=self.authobj
                 ),
                 # subscription/websockets handler
                 self._create_handler("subscriptions",
@@ -473,10 +462,6 @@ class CylcUIServer(Application):
         app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)
-
-        import mdb
-        mdb.debug()
-
         # pass in server object for clean exit
         ioloop.PeriodicCallback(
             partial(app.try_exit, uis=self), 100).start()
@@ -485,6 +470,8 @@ class CylcUIServer(Application):
             self.workflows_mgr.update)
         # If the client is already established it's not overridden,
         # so the following callbacks can happen at the same time.
+        # import mdb
+        # mdb.debug()
         ioloop.PeriodicCallback(
             self.workflows_mgr.update,
             self.scan_interval * 1000

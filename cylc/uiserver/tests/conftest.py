@@ -37,7 +37,6 @@ from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.main import CylcUIServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
 
-
 class AsyncClientFixture(ZMQSocketBase):
     pattern = zmq.REQ
     host = ''
@@ -189,7 +188,7 @@ def mock_config(monkeypatch):
 def authorisation_true(monkeypatch):
     """Disabled request authorisation for test purposes."""
     monkeypatch.setattr(
-        'cylc.uiserver.handlers._authorised',
+        'cylc.uiserver.',
         lambda x: True
     )
 
@@ -222,3 +221,5 @@ def mock_authentication_yossarian(mock_authentication):
 @pytest.fixture
 def mock_authentication_none(mock_authentication):
     mock_authentication(none=True)
+
+

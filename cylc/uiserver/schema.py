@@ -97,7 +97,6 @@ class Play(Mutation):
             Start, resume or un-pause a workflow run.
         ''')
         resolver = partial(mutator, command='play')
-        auth = 'MOOOOOOO'
 
     class Arguments:
         workflows = List(WorkflowID, required=True)
@@ -173,7 +172,7 @@ class Play(Mutation):
                 Don't timestamp logged messages.
             ''')
         )
-        set = List(
+        set = List(  # noqa: A003 (required for schema definition)
             String,
             description=sstrip('''
                 Set the value of a Jinja2 template variable in the workflow

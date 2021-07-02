@@ -31,10 +31,10 @@ LOG = logging.getLogger(__name__)
 # base configuration - always used
 DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / 'config_defaults.py'
 # site configuration
-# TODO: !!!!!!!!!!!!!!!!!!!!!!!undo this... just for dev purposes
-SITE_CONF_PATH: Path = Path('~/etc/cylc/hub/config.py').expanduser()
+SITE_CONF_PATH: Path = Path('/etc/cylc/hub/config.py')
 # user configuration
 USER_CONF_PATH: Path = Path('~/.cylc/hub/config.py').expanduser()
+
 
 def _load(path):
     """Load a configuration file."""
@@ -45,14 +45,15 @@ def _load(path):
 
 def load():
     """Load the relevant UIS/Hub configuration files."""
-    # if os.getenv('CYLC_SITE_CONF_PATH'):
-    #     site_conf_path: Path = Path(
-    #         os.environ['CYLC_SITE_CONF_PATH'],
-    #         'hub/config.py'
-    #     )
-    # else:
-    #     site_conf_path: Path = SITE_CONF_PATH
-    config_paths = [SITE_CONF_PATH, DEFAULT_CONF_PATH, USER_CONF_PATH]
+    if os.getenv('CYLC_SITE_CONF_PATH'):
+        site_conf_path: Path = Path(
+            os.environ['CYLC_SITE_CONF_PATH'],
+            'hub/config.py'
+        )
+    else:
+        site_conf_path: Path = SITE_CONF_PATH
+
+    config_paths = [DEFAULT_CONF_PATH, site_conf_path, USER_CONF_PATH]
     for path in config_paths:
         _load(path)
 

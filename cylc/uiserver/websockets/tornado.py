@@ -48,7 +48,7 @@ class TornadoConnectionContext(BaseConnectionContext):
 
 
 class TornadoSubscriptionServer(BaseSubscriptionServer):
-    def __init__(self, schema, keep_alive=True, loop=None, backend=None, 
+    def __init__(self, schema, keep_alive=True, loop=None, backend=None,
                  middleware=None, auth=None):
         self.loop = loop
         self.backend = backend or None
@@ -82,7 +82,7 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
             middleware = self.middleware
         for mw in middleware:
             if isinstance(mw, AuthorizationMiddleware):
-                mw.current_user = self.current_user
+                mw.current_user = self.current_user['name']
                 mw.auth = self.auth
 
         return dict(

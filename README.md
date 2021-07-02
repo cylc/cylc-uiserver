@@ -14,9 +14,16 @@ used to serve the Cylc UI, and to communicate with running Cylc Schedulers.
 
 ## Contents
 
-- [Installation](#installation)
-- [Introduction](#introduction)
-- [Copyright](#copyright-and-terms-of-use)
+- [Cylc UI Server](#cylc-ui-server)
+  - [Contents](#contents)
+  - [Introduction](#introduction)
+  - [Installation](#installation)
+  - [Running](#running)
+  - [Configuring](#configuring)
+    - [Hub](#hub)
+    - [UI Server](#ui-server)
+  - [Developing](#developing)
+  - [Copyright and Terms of Use](#copyright-and-terms-of-use)
 
 ## Introduction
 
@@ -110,6 +117,8 @@ Currently the UI Server accepts these configurations:
 * `c.UIServer.ui_version`
 * `c.UIServer.logging_config`
 * `c.UIServer.scan_iterval`
+* `c.UIServer.site_authorization`
+* `c.UIServer.user_authorization`
 
 See the `cylc.uiserver.main.UIServer` file for details.
 

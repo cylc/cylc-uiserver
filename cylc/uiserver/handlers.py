@@ -26,7 +26,6 @@ from jupyterhub import __version__ as jupyterhub_version
 from jupyterhub.services.auth import HubOAuthenticated
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
-from functools import partial
 
 from .websockets import authenticated as websockets_authenticated
 from .authorise import AuthorizationMiddleware
@@ -34,6 +33,7 @@ from .authorise import AuthorizationMiddleware
 logger = logging.getLogger(__name__)
 
 ME = getpass.getuser()
+
 
 class BaseHandler(HubOAuthenticated, web.RequestHandler):
 
@@ -99,7 +99,7 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
         self.schema = schema
         if middleware is not None:
             self.middleware = list(self.instantiate_middleware(middleware))
-        # Make authorization available to auth middleware
+        # Make authorization info available to auth middleware
         for mw in self.middleware:
             if isinstance(mw, AuthorizationMiddleware):
                 mw.current_user = self.current_user['name']
@@ -140,24 +140,28 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
         except Exception as ex:
             self.handle_error(ex)
 
+
 class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
 
     def initialize(self, sub_server, resolvers, user_auth_config=None):
+        if user_auth_config is None:
+            user_auth_config = {}
         self.queue = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
-        self.subscription_server.user_auth_config = user_auth_config
-        self.subscription_server.current_user = self.current_user
+        if sub_server:
+            self.subscription_server.user_auth_config = user_auth_config
+            self.subscription_server.current_user = self.current_user
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
 
     @websockets_authenticated
-    def get(self, *args, **kwargs):          
+    def get(self, *args, **kwargs):
         return websocket.WebSocketHandler.get(self, *args, **kwargs)
 
-    @websockets_authenticated
-    def open(self, *args, **kwargs):        
+    @websockets_authenticated  # noqa: A003 (open required)
+    def open(self, *args, **kwargs):
         IOLoop.current().spawn_callback(self.subscription_server.handle, self,
                                         self.context)
 
