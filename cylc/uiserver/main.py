@@ -116,14 +116,14 @@ class CylcUIServer(Application):
     site_authorization = Dict(
         config=True,
         help='''
-            Dictionary containing site limits and defaults for authorisation.
+            Dictionary containing site limits and defaults for authorization.
     ''')
 
     user_authorization = Dict(
         config=True,
         help='''
             Dictionary containing authorised users and permission levels for
-            authorisation.
+            authorization.
         '''
     )
 
@@ -202,10 +202,6 @@ class CylcUIServer(Application):
             system load set a higher value.
         '''
     )
-
-    # @default('site_authorization')
-    # def _default_site_authorization(self):
-    #     return {}
 
     @default('scan_interval')
     def _default_scan_interval(self):
@@ -470,8 +466,6 @@ class CylcUIServer(Application):
             self.workflows_mgr.update)
         # If the client is already established it's not overridden,
         # so the following callbacks can happen at the same time.
-        # import mdb
-        # mdb.debug()
         ioloop.PeriodicCallback(
             self.workflows_mgr.update,
             self.scan_interval * 1000

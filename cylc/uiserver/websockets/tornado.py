@@ -53,7 +53,6 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
         self.loop = loop
         self.backend = backend or None
         self.middleware = middleware
-        self.user_auth_config = None
         self.current_user = None
         self.auth = auth
         super().__init__(schema, keep_alive)
@@ -69,9 +68,6 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
     def get_graphql_params(self, *args, **kwargs):
         params = super(TornadoSubscriptionServer,
                        self).get_graphql_params(*args, **kwargs)
-
-        # TODO if user or auth config null, raise and log
-
         # If middleware get instantiated here (optional), they will
         # be local/private to each subscription.
         if self.middleware is not None:

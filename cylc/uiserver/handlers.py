@@ -143,14 +143,11 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
 
 class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
 
-    def initialize(self, sub_server, resolvers, user_auth_config=None):
-        if user_auth_config is None:
-            user_auth_config = {}
+    def initialize(self, sub_server, resolvers):
         self.queue = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
         if sub_server:
-            self.subscription_server.user_auth_config = user_auth_config
             self.subscription_server.current_user = self.current_user
 
     def select_subprotocol(self, subprotocols):

@@ -23,6 +23,9 @@ Store the JupyterHub runtime files in ~/.cylc/hub.
 
 ### Enhancements
 
+[#204](https://github.com/cylc/cylc-uiserver/pull/**204**) -
+Implementation of configurable multi user authorisation.
+
 [#202](https://github.com/cylc/cylc-uiserver/pull/202) -
 Add authorisation for multi-user setups.
 

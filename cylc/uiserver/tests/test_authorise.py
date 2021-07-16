@@ -14,6 +14,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from getpass import getuser
 from os import path
 from graphql.execution.base import ResolveInfo
 
@@ -23,7 +24,11 @@ from tornado import web
 from unittest.mock import MagicMock, patch
 
 from cylc.uiserver.authorise import (
-    Authorization, AuthorizationMiddleware, expand_and_process_access_groups)
+    Authorization,
+    AuthorizationMiddleware,
+    expand_and_process_access_groups,
+    get_groups
+)
 from cylc.uiserver.schema import schema
 
 FAKE_SITE_CONF = {
@@ -74,7 +79,7 @@ FAKE_USER_CONF = {
     # All READ and CONTROL, except trigger and edit
     "user2": ["READ", "CONTROL", "!trigger", "!edit"],
     # granted to user2
-    "user3": ["READ"],                                     # READ only access
+    "user3": ["READ"],
     "user4": ["!ALL"],
     "user5": ["play", "pause", "!ping"],
     "group:group2": ["READ", "CONTROL", "!reload"]
@@ -90,9 +95,9 @@ FAKE_USER_CONF = {
                       'remove', 'setholdpoint', 'releaseholdpoint',
                       'ext-trigger', 'pause', 'hold', 'setoutputs', 'release'},
                      'server_owner_2',
-                     ['grp_of_svr_owners'],
+                     ['group:grp_of_svr_owners'],
                      'user7',
-                     ['group2'],
+                     ['group:group2'],
                      id="user in * and groups, owner in * and groups"
                      ),
         pytest.param({'read', 'ping'},
@@ -104,9 +109,9 @@ FAKE_USER_CONF = {
                      ),
         pytest.param({'read', 'ping'},
                      'server_owner_2',
-                     ['grp_of_svr_owners'],
+                     ['group:grp_of_svr_owners'],
                      'user-not-in-user-conf',
-                     ['non-existent-group'],
+                     ['group:non-existent-group'],
                      id="user only in group and *"
                      ),
         pytest.param(set(),
@@ -118,11 +123,11 @@ FAKE_USER_CONF = {
                      ),
         pytest.param(set(),
                      'server_owner_2',
-                     ['grp_of_svr_owners'],
+                     ['group:grp_of_svr_owners'],
                      'user4',
-                     ['group2'],
+                     ['group:group2'],
                      id="owner only in group and *"
-                     ),
+                     )
     ])
 @patch('cylc.uiserver.authorise.get_groups')
 def test_get_permitted_operations(mocked_get_groups,
@@ -133,7 +138,6 @@ def test_get_permitted_operations(mocked_get_groups,
     auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF)
     actual_operations = auth_obj.get_permitted_operations(
         access_user=user_name)
-    print(actual_operations)
     assert actual_operations == expected_operations
 
 
@@ -142,45 +146,43 @@ def test_get_permitted_operations(mocked_get_groups,
     [
         pytest.param({'!kill', 'READ', 'kill', '!stop', 'pause', 'play'},
                      {'access_username': 'access_user_1',
-                      'access_user_groups': ['group1', 'group2']},
+                      'access_user_groups': ['group:group1', 'group:group2']},
                      {'*': ['READ', '!kill'],
                       'access_user_1': [
                           'READ', 'pause', 'kill', 'play', '!stop']},
                      id="Check username in user conf and in *"),
         pytest.param({'!ping', 'READ'},
                      {'access_username': 'access_user_2',
-                      'access_user_groups': ['group1', 'group2']},
+                      'access_user_groups': ['group:group1', 'group:group2']},
                      {'*': ['READ', '!ping'],
                       'access_user_1': [
                          'READ', 'pause', 'kill', 'play', '!stop']},
                      id="Check user just in *"),
         pytest.param({'!ping', 'pause', 'kill', '!stop', 'READ', 'CONTROL'},
                      {'access_username': 'access_user_1',
-                      'access_user_groups': ['group1', 'group2']},
+                      'access_user_groups': ['group:group1', 'group:group2'
+                     ]},
                      {'*': ['READ', '!ping'],
                       'access_user_1': [
                          'READ', 'pause', 'kill', '!stop'],
                       'group:group1': ['CONTROL'],
-                      }, id="Check group access permissions are added"),
+                      }, id="Check group access permissions are added")
     ]
 )
-@patch('cylc.uiserver.authorise.get_groups')
 def test_get_access_user_permissions_from_owner_conf(
-    mocked_get_groups,
     expected_operations,
     access_user_dict,
     owner_auth_conf
 ):
     """Test the un-processed permissions of owner conf.
     """
-    mocked_get_groups.return_value = 'whatever'
     authobj = Authorization('some_user', owner_auth_conf, {'fake': 'config'})
     permitted_operations = authobj.get_access_user_permissions_from_owner_conf(
         access_user_dict)
     assert permitted_operations == expected_operations
 
 
-@pytest.mark.parametrize('permission_set, output', [
+@pytest.mark.parametrize('permission_set, expected', [
     pytest.param({'!kill', 'READ', 'kill', '!stop', '!ping', 'play'},
                  {'play', 'read'},
                  id="Expansion with additions and negations"),
@@ -189,62 +191,66 @@ def test_get_access_user_permissions_from_owner_conf(
                  id="Check expansion and negation"),
     pytest.param({'READ', '!ALL', 'broadcast', 'CONTROL'},
                  set(),
-                 id="Check expansion for !ALL with additions"),
+                 id="Check expansion for !ALL with additions")
 ])
-def test_expand_and_process_access_groups(permission_set, output):
-    expected = expand_and_process_access_groups(permission_set)
-    assert expected == output
+def test_expand_and_process_access_groups(permission_set, expected):
+    actual = expand_and_process_access_groups(permission_set)
+    assert actual == expected
 
 
-# @pytest.mark.parametrize(
-#     'owner_name, owner_groups, user_name, user_groups', 'info_op_op'
-#     [
-#         pytest.param('server_owner_2',
-#                      ['grp_of_svr_owners'],
-#                      'user7',
-#                      ['group2'], 'query',
-#                      id="user in * and groups, owner in * and groups"
-#                      ),
-#         pytest.param('server_owner_3',
-#                      [''],
-#                      'user6',
-#                      [''], 'mutation',
-#                      id="user only in *, owner only in *"
-#                      ),
-#         pytest.param('server_owner_2',
-#                      ['grp_of_svr_owners'],
-#                      'user-not-in-user-conf',
-#                      ['non-existent-group'], 'subscription',
-#                      id="user only in group and *"
-#                      ),
-#         pytest.param('server_owner_1',
-#                      [''],
-#                      'user1',
-#                      [''],
-#                      id="user1 forbidden in site conf"
-#                      ),
-#         pytest.param('server_owner_2',
-#                      ['grp_of_svr_owners'],
-#                      'user4',
-#                      ['group2'],
-#                      id="owner only in group and *"),
-#     ]
-# )
-# @patch('cylc.uiserver.authorise.get_groups')
-# def test_resolve(mocked_get_groups,
-#                  owner_name, owner_groups,
-#                  user_name, user_groups,
-#                  expected_authorised, info_op_op,
-#                  expected_op_name):
-#     mocked_get_groups.side_effect = [owner_groups, user_groups]
-#     auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF)
-#     authmw = AuthorizationMiddleware()
-#     authmw.auth = auth_obj
-#     authmw.current_user = user_name
+@pytest.mark.parametrize('mut_field_name, operation, expected_op_name', [
+    pytest.param('play',
+                 'mutation',
+                 'play',
+                 id="Muation operation, play field, returns play"),
+    pytest.param('_schema',
+                 'subscription',
+                 'read',
+                 id="Subsciption operation, _schema field, returns read"),
+    pytest.param('blah',
+                 'mutation',
+                 None,
+                 id="Mutation operation, invalid field, returns None"),
+    pytest.param('workflows',
+                 'query',
+                 'read',
+                 id="Query operation, workflows field, returns read")
+])
+def test_get_op_name(mut_field_name, operation, expected_op_name):
+    actual_op_name = AuthorizationMiddleware.get_op_name(
+        mut_field_name, operation)
+    assert actual_op_name == expected_op_name
 
-#     info_obj = ResolveInfo(
-#         '__schema', 'None', 'None', 'None', schema, 'None', 'None',
-#         MagicMock(), 'None', MagicMock(), 'None')
-#     info_obj.operation.operation = info_op_op
-#     authorised, op_name = authmw.process_auth(info_obj)
-#     assert authorised == expected_authorised
+
+@pytest.mark.parametrize(
+    'owner_name,  user_name, get_permitted_operations_is_called, expected',
+    [
+        pytest.param('mel',
+                     'mel',
+                     False,
+                     True,
+                     id="Owner user always permitted"
+                     ),
+        pytest.param('mel',
+                     'tim',
+                     True,
+                     True,
+                     id="User is not owner calls get_permitted_operations"
+                     )
+    ])
+@patch('cylc.uiserver.authorise.Authorization._get_permitted_operations')
+@patch('cylc.uiserver.authorise.get_groups')
+def test_is_permitted(mocked_get_groups,
+                      mocked_get_permitted_operations,
+                      owner_name,
+                      user_name,
+                      get_permitted_operations_is_called,
+                      expected):
+    mocked_get_groups.side_effect = [[''], ['']]
+    mocked_get_permitted_operations.return_value = ['fake_operation']
+    auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF)
+    actual = auth_obj.is_permitted(
+        access_user=user_name, operation="fake_operation")
+    if get_permitted_operations_is_called:
+        mocked_get_permitted_operations.assert_called_with(user_name)
+    assert actual == expected
