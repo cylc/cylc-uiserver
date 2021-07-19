@@ -113,17 +113,97 @@ class PathType(TraitType):
 
 class CylcUIServer(Application):
 
+    # TODO: Add a link to the access group table mappings in cylc documentation
+    AUTH_DESCRIPTION = '''
+            Authorization can be granted at operation (mutation) level, i.e.
+            specifically grant user access to execute Cylc commands, e.g.
+            `play`, `pause`, `edit`, `trigger` etc. For your convenience,
+            these operations have been mapped to access groups `READ`,
+            `CONTROL` and `ALL`.
+
+            To remove permissions, prepend the access group or operation with
+            `!`.
+
+            Permissions are additive but negated permissions take precedence
+            above additions.
+
+            .. note::
+
+            Any authorization permissions granted to a user will be
+            applied to all workflows.
+    '''
+
     site_authorization = Dict(
         config=True,
         help='''
             Dictionary containing site limits and defaults for authorization.
-    ''')
+            This configuration should be placed only in the site set
+            configuration file and not the user configuration file (use
+            ``c.UIServer.user_authorization`` for user defined authorization).
+
+            If this configuration is empty, site authorization defaults to no
+            configuarble authorization and users will be unable to set any
+            authorization.
+        ''' + AUTH_DESCRIPTION + '''
+        Example Configuration:
+
+        .. code-block:: python
+
+        c.UIServer.site_authorisation = {
+    "*": {                              # For all ui-server owners,
+        "*": {                          # Any authenticated user
+            "default": "READ",          # Will have default read-only access
+        }
+        "user1": {                      # user1
+            "default": ["!ALL"],        # No privileges for all ui-server
+                                        # owners.
+        },                              # No limit set, so all ui-server owners
+    },                                  # limit is also "!ALL" for user1
+    "server_owner_1": {                 # For specific UI Server owner,
+        "group:group_a": {              # Any user who is a member of group_a
+            "default": "READ",          # Will have default read-only access
+            "limit": ["ALL", "!play"],  # server_owner_1 is able to give away
+        },                              # All privileges, except play.
+    },
+    "group:grp_of_svr_owners": {        # Group of users who own UI Servers
+        "group:group_b": {
+            "limit": [                  # can grant groupB users up to READ and
+                "READ",                 # CONTROL privileges, without stop and
+                "CONTROL",              # kill
+                "!stop",
+                "!kill",                # No default, so default is no access
+            ],
+        },
+    },
+}
+
+        ''')
 
     user_authorization = Dict(
         config=True,
         help='''
-            Dictionary containing authorised users and permission levels for
-            authorization.
+            Dictionary containing authorized users and permission levels for
+            authorization. Use this setting to share control of your workflows
+            with other users.
+
+            Note that you are only permitted to give away permissions up to
+            your limit for each user, as defined in the site_authorization
+            configuration.
+
+            ''' + AUTH_DESCRIPTION + '''
+            Example configuaration, residing in `~/.cylc/hub/config.py`:
+
+        .. code-block:: python
+
+         c.UIServer.user_authorization = {
+            "*": ["READ"],            # any authenticated user has READ access
+            "group:group2": ["ALL"],  # Any user in system group2 has access to
+                                      # all operations
+            "userA": [
+                "ALL", "!stop"
+            ],                        # userA has ALL operations, but not stop
+}
+
         '''
     )
 

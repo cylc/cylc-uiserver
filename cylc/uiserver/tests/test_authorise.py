@@ -17,6 +17,8 @@
 from getpass import getuser
 from os import path
 from graphql.execution.base import ResolveInfo
+from subprocess import Popen, PIPE
+
 
 import pytest
 from tornado import web
@@ -160,8 +162,8 @@ def test_get_permitted_operations(mocked_get_groups,
                      id="Check user just in *"),
         pytest.param({'!ping', 'pause', 'kill', '!stop', 'READ', 'CONTROL'},
                      {'access_username': 'access_user_1',
-                      'access_user_groups': ['group:group1', 'group:group2'
-                     ]},
+                      'access_user_groups': ['group:group1', 'group:group2']
+                      },
                      {'*': ['READ', '!ping'],
                       'access_user_1': [
                          'READ', 'pause', 'kill', '!stop'],
@@ -169,13 +171,16 @@ def test_get_permitted_operations(mocked_get_groups,
                       }, id="Check group access permissions are added")
     ]
 )
+@patch('cylc.uiserver.authorise.get_groups')
 def test_get_access_user_permissions_from_owner_conf(
+    mocked_get_groups,
     expected_operations,
     access_user_dict,
     owner_auth_conf
 ):
     """Test the un-processed permissions of owner conf.
     """
+    mocked_get_groups.return_value = ['group:blah']
     authobj = Authorization('some_user', owner_auth_conf, {'fake': 'config'})
     permitted_operations = authobj.get_access_user_permissions_from_owner_conf(
         access_user_dict)

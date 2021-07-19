@@ -50,8 +50,8 @@ class Authorization:
     #   Beware of changing these permission groups. Users may be relying on  #
     #   these settings. Changes should be widely publicised to users.        #
     #                                                                        #
-    #   If adding/removing operations, ensure both the Access Group and its  #
-    #   associated negation group is updated.                                #
+    #   If adding/removing operations, ensure documentation is updated.      #
+    #                                                                        #
     ##########################################################################
 
     READ_OPERATION = "read"
@@ -423,13 +423,14 @@ def get_groups(username: str) -> List[str]:
     Returns:
         list: system groups for username given
     """
-    group_ids = os.getgrouplist(username, 99999)
-    group_ids.remove(99999)
+    groupmax = (os.NGROUPS_MAX)  # type: ignore
+    group_ids = os.getgrouplist(username, groupmax)
+    group_ids.remove(groupmax)
     # turn list of group_ids into group names with group identifier prepended
     return list(map(
         lambda x: f'{Authorization.GRP_IDENTIFIER}{grp.getgrgid(x).gr_name}',
         group_ids
-    )
+        )
     )
 
 

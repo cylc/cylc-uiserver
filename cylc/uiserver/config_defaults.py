@@ -51,6 +51,3 @@ c.ConfigurableHTTPProxy.pid_file = f'{RUNTIME_PATH / "jupyterhub-proxy.pid"}'
 # Ensure env variable CYLC_SITE_CONF_PATH is passed to UI Server environment
 c.Spawner.environment = {
     'CYLC_SITE_CONF_PATH': f'{os.getenv("CYLC_SITE_CONF_PATH")}'}
-
-# remove this before auth goes in...
-c.Spawner.http_timeout = 3000

@@ -52,6 +52,10 @@ class StaticHandler(BaseHandler, web.StaticFileHandler):
 
 class MainHandler(BaseHandler):
 
+    # hub_users = ["kinow"]
+    # hub_groups = []
+    # allow_admin = True
+
     def initialize(self, path):
         self._static = path
 
