@@ -142,14 +142,14 @@ class CylcUIServer(Application):
             ``c.UIServer.user_authorization`` for user defined authorization).
 
             If this configuration is empty, site authorization defaults to no
-            configuarble authorization and users will be unable to set any
+            configurable authorization and users will be unable to set any
             authorization.
         ''' + AUTH_DESCRIPTION + '''
         Example Configuration:
 
         .. code-block:: python
 
-        c.UIServer.site_authorisation = {
+        c.UIServer.site_authorization = {
     "*": {                              # For all ui-server owners,
         "*": {                          # Any authenticated user
             "default": "READ",          # Will have default read-only access
@@ -191,7 +191,7 @@ class CylcUIServer(Application):
             configuration.
 
             ''' + AUTH_DESCRIPTION + '''
-            Example configuaration, residing in `~/.cylc/hub/config.py`:
+            Example configuration, residing in `~/.cylc/hub/config.py`:
 
         .. code-block:: python
 
