@@ -150,7 +150,7 @@ class DataStoreMgr:
         self.update_contact(w_id, status=WorkflowStatus.INSTALLED.value)
 
     async def unregister_workflow(self, w_id):
-        logger.debug(f'unregister_workflow({w_id})')
+        self.log.debug(f'unregister_workflow({w_id})')
         self.update_contact(w_id, pruned=True)
         if w_id in self.delta_queues:
             while any(

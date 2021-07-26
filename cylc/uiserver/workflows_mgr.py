@@ -95,7 +95,7 @@ async def workflow_request(
 #         except socket.error as exc:
 #             if flags.verbosity > 1:
 #                 raise
-#             logger.error("ERROR: %s: %s\n", exc, host)
+#             self.log.error("ERROR: %s: %s\n", exc, host)
 #             return (reg, host, port, pub_port, None)
 # 
 #     # NOTE: Connect to the workflow by host:port. This way the
