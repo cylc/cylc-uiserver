@@ -50,10 +50,11 @@ CLIENT_TIMEOUT = 2.0
 async def workflow_request(
     client,
     command,
-    log=None,
     args=None,
     timeout=None,
-    req_context=None
+    req_context=None,
+    *,
+    log=None,
 ):
     """Workflow request command.
 
@@ -284,8 +285,14 @@ class WorkflowsManager:
             elif after == 'inactive':
                 self.inactive.add(wid)
 
-    async def multi_request(self, command, workflows, args=None,
-                            multi_args=None, timeout=None):
+    async def multi_request(
+        self,
+        command,
+        workflows,
+        args=None,
+        multi_args=None,
+        timeout=None
+    ):
         """Send requests to multiple workflows."""
         if args is None:
             args = {}
@@ -307,12 +314,16 @@ class WorkflowsManager:
         res = []
         for result in results:
             if isinstance(result, Exception):
-                self.log.exception('Failed to send requests to '
-                                 'multiple workflows', exc_info=result)
+                self.log.exception(
+                    'Failed to send requests to multiple workflows',
+                    exc_info=result
+                )
             else:
                 _, val = result
                 res.extend([
                     msg_core
                     for msg_core in list(val.values())[0].get('result')
-                    if isinstance(val, dict) and list(val.values())])
+                    if isinstance(val, dict)
+                    and list(val.values())
+                ])
         return res

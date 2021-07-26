@@ -19,12 +19,12 @@ from pathlib import Path
 import pytest
 
 from cylc.uiserver import __file__ as UIS_PKG
-from cylc.uiserver.config import load
+from cylc.uiserver.jupyterhub_config import load
 
 
-SYS_CONF = Path(UIS_PKG).parent / 'jupyterhub_config.py'
-USER_CONF = Path('~/.cylc/hub/config.py').expanduser()
-SITE_CONF = Path('/etc/cylc/hub/config.py')
+SYS_CONF = Path(UIS_PKG).parent / 'jupyter_config.py'
+USER_CONF = Path('~/.cylc/hub/jupyter_config.py').expanduser()
+SITE_CONF = Path('/etc/cylc/hub/jupyter_config.py')
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def capload(monkeypatch):
     empty config files.
     """
     files = []
-    monkeypatch.setattr('cylc.uiserver.config._load', files.append)
+    monkeypatch.setattr('cylc.uiserver.jupyterhub_config._load', files.append)
     return files
 
 

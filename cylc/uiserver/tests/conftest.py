@@ -17,13 +17,14 @@
 import asyncio
 from getpass import getuser
 import inspect
+import logging
 from pathlib import Path
 from shutil import rmtree
 from socket import gethostname
 from tempfile import TemporaryDirectory
-from textwrap import dedent
 
 import pytest
+from traitlets.config import Config
 import zmq
 
 from cylc.flow.data_messages_pb2 import (  # type: ignore
@@ -34,7 +35,6 @@ from cylc.flow.data_messages_pb2 import (  # type: ignore
 from cylc.flow.network import ZMQSocketBase
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
-from cylc.uiserver.app import CylcUIServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
@@ -50,9 +50,11 @@ class AsyncClientFixture(ZMQSocketBase):
         self.returns = returns
 
     async def async_request(self, command, args=None, timeout=None):
-        if inspect.isclass(self.returns) and \
-                issubclass(self.returns, Exception):
-            raise self.returns
+        if (
+            inspect.isclass(self.returns)
+            and issubclass(self.returns, Exception)
+        ):
+            raise self.returns('x')
         return self.returns
 
     def stop(self, *args, **kwargs):
@@ -79,17 +81,15 @@ def event_loop():
 
 @pytest.fixture
 def workflows_manager() -> WorkflowsManager:
-    return WorkflowsManager(None)
+    return WorkflowsManager(None, logging.getLogger('cylc'))
 
 
 @pytest.fixture
 def data_store_mgr(workflows_manager: WorkflowsManager) -> DataStoreMgr:
-    return DataStoreMgr(workflows_mgr=workflows_manager)
-
-
-@pytest.fixture
-def uiserver() -> CylcUIServer:
-    return CylcUIServer(0, '/mock', '')
+    return DataStoreMgr(
+        workflows_mgr=workflows_manager,
+        log=logging.getLogger('cylc')
+    )
 
 
 @pytest.fixture
@@ -152,33 +152,33 @@ def ui_build_dir(mod_tmp_path):
 
 @pytest.fixture
 def mock_config(monkeypatch):
-    """Mock the UIServer/Hub configuration file.
+    """Mock the UIServer/Hub configuration.
 
     This fixture auto-loads by setting a blank config.
 
     Call the fixture with config code to override.
 
-    mock_config('''
-        c.UIServer.my_config = 'my_value'
-    ''')
+    mock_config(
+        CylcUIServer={
+            'trait': 42
+        }
+    )
 
     Can be called multiple times.
 
-    Note the code you provide is exec'ed just like the real config file.
-
     """
-    conf = ''
+    conf = {}
 
-    def _write(string=''):
+    def _write(**kwargs):
         nonlocal conf
-        conf = dedent(string)
+        conf = kwargs
 
-    def _read(obj, _):
+    def _read(self):
         nonlocal conf
-        exec(conf, {'c': obj.config})
+        self.config = Config(conf)
 
     monkeypatch.setattr(
-        'cylc.uiserver.app.CylcUIServer.load_config_file',
+        'cylc.uiserver.app.CylcUIServer.initialize_settings',
         _read
     )
 
@@ -205,7 +205,7 @@ def mock_authentication(monkeypatch):
         if none:
             ret = None
         monkeypatch.setattr(
-            'cylc.uiserver.handlers.BaseHandler.get_current_user',
+            'cylc.uiserver.handlers.CylcAppHandler.get_current_user',
             lambda x: ret
         )
 

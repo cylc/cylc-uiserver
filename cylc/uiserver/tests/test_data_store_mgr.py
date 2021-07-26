@@ -28,9 +28,9 @@ from .conftest import AsyncClientFixture
 
 @pytest.mark.asyncio
 async def test_entire_workflow_update(
-        async_client: AsyncClientFixture,
-        data_store_mgr: DataStoreMgr,
-        make_entire_workflow
+    async_client: AsyncClientFixture,
+    data_store_mgr: DataStoreMgr,
+    make_entire_workflow
 ):
     """Test that ``entire_workflow_update`` is executed successfully."""
     w_id = 'workflow_id'
@@ -60,8 +60,8 @@ async def test_entire_workflow_update(
 
 @pytest.mark.asyncio
 async def test_entire_workflow_update_ignores_timeout_message(
-        async_client: AsyncClientFixture,
-        data_store_mgr: DataStoreMgr
+    async_client: AsyncClientFixture,
+    data_store_mgr: DataStoreMgr
 ):
     """
     Test that ``entire_workflow_update`` ignores if the client
@@ -88,9 +88,10 @@ async def test_entire_workflow_update_ignores_timeout_message(
 
 @pytest.mark.asyncio
 async def test_entire_workflow_update_gather_error(
-        async_client: AsyncClientFixture,
-        data_store_mgr: DataStoreMgr,
-        mocker
+    async_client: AsyncClientFixture,
+    data_store_mgr: DataStoreMgr,
+    mocker,
+    caplog,
 ):
     """
     Test that if ``asyncio.gather`` in ``entire_workflow_update``
@@ -113,12 +114,16 @@ async def test_entire_workflow_update_gather_error(
     # Call the entire_workflow_update function.
     # This should use the client defined above (``async_client``) when
     # calling ``workflow_request``.
-    logger = logging.getLogger(data_store_mgr_module.__name__)
-    mocked_exception_function = mocker.patch.object(logger, 'exception')
+    caplog.clear()
     await data_store_mgr.entire_workflow_update()
-    mocked_exception_function.assert_called_once()
-    assert mocked_exception_function.call_args[1][
-               'exc_info'].__class__ == error_type
+    assert caplog.record_tuples == [
+        (
+            'cylc',
+            40,
+            'Failed to update entire local data-store of a workflow'
+        )
+    ]
+    assert caplog.records[0].exc_info[0] == error_type
 
 
 @pytest.mark.asyncio

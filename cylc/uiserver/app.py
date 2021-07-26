@@ -19,9 +19,10 @@ import sys
 from typing import List
 
 from pkg_resources import parse_version
-from tornado import web, ioloop
+from tornado import ioloop
 from tornado.web import RedirectHandler
 from traitlets import (
+    Dict,
     Float,
     TraitError,
     TraitType,
@@ -356,7 +357,7 @@ class CylcUIServer(ExtensionApp):
             argv = sys.argv[2:]
         super().launch_instance(argv=argv, **kwargs)
 
-    def stop_extension(self):
+    async def stop_extension(self):
         for sub in self.data_store_mgr.w_subs.values():
             sub.stop()
         # Shutdown the thread pool executor
@@ -364,5 +365,5 @@ class CylcUIServer(ExtensionApp):
             executor.shutdown(wait=False)
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()
-        ioloop.IOLoop.instance().stop()
-        self.log.info('exit success')
+        #ioloop.IOLoop.instance().stop()
+        #self.log.info('exit success')
