@@ -10,3 +10,6 @@ testpaths = [
 collect_ignore = [
     'cylc/uiserver/jupyter_config.py'
 ]
+markers = [
+    'integration: tests which run servers and try to connect to them'
+]

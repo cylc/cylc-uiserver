@@ -203,7 +203,7 @@ def mock_authentication(monkeypatch):
             'server': server or gethostname()
         }
         if none:
-            ret = None
+            ret = 'anonymous'
         monkeypatch.setattr(
             'cylc.uiserver.handlers.CylcAppHandler.get_current_user',
             lambda x: ret

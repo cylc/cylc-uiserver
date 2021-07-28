@@ -104,13 +104,13 @@ async def test_authorised_and_authenticated(
 @pytest.mark.parametrize(
     'endpoint,code,message,body',
     [
-        # pytest.param(
-        #     ('cylc', 'graphql'),
-        #     403,
-        #     'Forbidden',
-        #     None,
-        #     id='cylc/graphql',
-        # ),
+        pytest.param(
+            ('cylc', 'graphql'),
+            403,
+            'Forbidden',
+            None,
+            id='cylc/graphql',
+        ),
         pytest.param(
             ('cylc', 'subscriptions'),
             403,
@@ -118,13 +118,13 @@ async def test_authorised_and_authenticated(
             None,
             id='cylc/subscriptions',
         ),
-        # pytest.param(
-        #     ('cylc', 'userprofile'),
-        #     403,
-        #     'Forbidden',
-        #     None,
-        #     id='cylc/userprofile',
-        # )
+        pytest.param(
+            ('cylc', 'userprofile'),
+            403,
+            'Forbidden',
+            None,
+            id='cylc/userprofile',
+        )
     ]
 )
 async def test_unauthenticated(
@@ -143,27 +143,27 @@ async def test_unauthenticated(
 @pytest.mark.parametrize(
     'endpoint,code,message,body',
     [
-        # pytest.param(
-        #     ('cylc', 'graphql'),
-        #     403,
-        #     'authorisation insufficient',
-        #     None,
-        #     id='cylc/graphql',
-        # ),
-        # pytest.param(
-        #     ('cylc', 'subscriptions'),
-        #     403,
-        #     'authorisation insufficient',
-        #     None,
-        #     id='cylc/subscriptions',
-        # ),
-        # pytest.param(
-        #     ('cylc', 'userprofile'),
-        #     403,
-        #     'authorisation insufficient',
-        #     None,
-        #     id='cylc/userprofile',
-        # )
+        pytest.param(
+            ('cylc', 'graphql'),
+            403,
+            'authorisation insufficient',
+            None,
+            id='cylc/graphql',
+        ),
+        pytest.param(
+            ('cylc', 'subscriptions'),
+            403,
+            'authorisation insufficient',
+            None,
+            id='cylc/subscriptions',
+        ),
+        pytest.param(
+            ('cylc', 'userprofile'),
+            403,
+            'authorisation insufficient',
+            None,
+            id='cylc/userprofile',
+        )
     ]
 )
 async def test_unauthorised(
