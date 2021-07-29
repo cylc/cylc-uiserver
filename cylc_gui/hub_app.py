@@ -24,14 +24,19 @@ from cylc_gui import CylcGUI
 
 
 if not os.environ.get("JUPYTERHUB_SINGLEUSER_APP"):
-    # setting this env prior to import of jupyterhub.singleuser avoids unnecessary import of notebook
-    os.environ["JUPYTERHUB_SINGLEUSER_APP"] = "jupyter_server.serverapp.ServerApp"
+    # setting this env prior to import of jupyterhub.singleuser
+    # avoids unnecessary import of notebook
+    os.environ["JUPYTERHUB_SINGLEUSER_APP"] = (
+        "jupyter_server.serverapp.ServerApp"
+    )
 
 try:
     from jupyterhub.singleuser.mixins import make_singleuser_app
 except ImportError:
     # backward-compat with jupyterhub < 1.3
-    from jupyterhub.singleuser import SingleUserNotebookApp as SingleUserServerApp
+    from jupyterhub.singleuser import (
+        SingleUserNotebookApp as SingleUserServerApp
+    )
 else:
     SingleUserServerApp = make_singleuser_app(ServerApp)
 

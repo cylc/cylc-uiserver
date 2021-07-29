@@ -25,14 +25,12 @@ Includes:
 import asyncio
 from contextlib import suppress
 from getpass import getuser
-import socket
 import sys
 
 import zmq.asyncio
 
-from cylc.flow import flags, ID_DELIM
+from cylc.flow import ID_DELIM
 from cylc.flow.exceptions import ClientError, ClientTimeout
-from cylc.flow.hostuserutil import is_remote_host, get_host_ip_by_name
 from cylc.flow.network import API
 from cylc.flow.network.client import WorkflowRuntimeClient
 from cylc.flow.network import MSG_TIMEOUT
@@ -86,26 +84,6 @@ async def workflow_request(
         else:
             print(exc, file=sys.stderr)
         return (req_context, None)
-
-
-# async def est_workflow(reg, host, port, pub_port, context=None, timeout=None):
-#     """Establish communication with workflow, instantiating REQ client."""
-#     if is_remote_host(host):
-#         try:
-#             host = get_host_ip_by_name(host)  # IP reduces DNS traffic
-#         except socket.error as exc:
-#             if flags.verbosity > 1:
-#                 raise
-#             self.log.error("ERROR: %s: %s\n", exc, host)
-#             return (reg, host, port, pub_port, None)
-# 
-#     # NOTE: Connect to the workflow by host:port. This way the
-#     #       WorkflowRuntimeClient will not attempt to check the contact file
-#     #       which would be unnecessary as we have already done so.
-#     # NOTE: This part of the scan *is* IO blocking.
-#     client = WorkflowRuntimeClient(reg, context=context, timeout=timeout)
-#     _, result = await workflow_request(client, 'identify')
-#     return (reg, host, port, pub_port, client, result)
 
 
 class WorkflowsManager:
@@ -277,9 +255,11 @@ class WorkflowsManager:
             # finally update the new states for internal purposes
             if before == 'active':
                 self.active.pop(wid)
-            elif before == 'inactive':
-                if wid in self.inactive:
-                    self.inactive.remove(wid)
+            elif (
+                before == 'inactive'
+                and wid in self.inactive
+            ):
+                self.inactive.remove(wid)
             if after == 'active':
                 self.active[wid] = flow
             elif after == 'inactive':

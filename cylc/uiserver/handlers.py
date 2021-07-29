@@ -27,7 +27,7 @@ from jupyter_server.base.handlers import JupyterHandler
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
-from .websockets import authenticated as websockets_authenticated
+from cylc.uiserver.websockets import authenticated as websockets_authenticated
 
 
 ME = getpass.getuser()
@@ -269,11 +269,14 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         # forward this call so we can authenticate/authorise it
         return websocket.WebSocketHandler.get(self, *args, **kwargs)
 
-    @websockets_authenticated
+    @websockets_authenticated  # noqa: A003
     @authorised
-    def open(self, *args, **kwargs):
-        IOLoop.current().spawn_callback(self.subscription_server.handle, self,
-                                        self.context)
+    def open(self, *args, **kwargs):  # noqa: A003
+        IOLoop.current().spawn_callback(
+            self.subscription_server.handle,
+            self,
+            self.context,
+        )
 
     async def on_message(self, message):
         await self.queue.put(message)

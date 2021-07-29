@@ -184,7 +184,7 @@ class Play(Mutation):
                 Don't timestamp logged messages.
             ''')
         )
-        set = List(
+        set = List(  # noqa: A003 (graphql field name)
             String,
             description=sstrip('''
                 Set the value of a Jinja2 template variable in the workflow

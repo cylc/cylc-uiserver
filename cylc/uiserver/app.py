@@ -22,7 +22,6 @@ from pkg_resources import parse_version
 from tornado import ioloop
 from tornado.web import RedirectHandler
 from traitlets import (
-    Dict,
     Float,
     TraitError,
     TraitType,
@@ -201,15 +200,13 @@ class CylcUIServer(ExtensionApp):
     @staticmethod
     def _list_ui_versions(path: Path) -> List[str]:
         """Return a list of UI build versions detected in self.ui_path."""
-        return list(
-            sorted(
-                (
-                    version.name
-                    for version in path.glob('[0-9][0-9.]*')
-                    if version
-                ),
-                key=parse_version
-            )
+        return sorted(
+            (
+                version.name
+                for version in path.glob('[0-9][0-9.]*')
+                if version
+            ),
+            key=parse_version
         )
 
     @default('ui_path')
@@ -365,5 +362,3 @@ class CylcUIServer(ExtensionApp):
             executor.shutdown(wait=False)
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()
-        #ioloop.IOLoop.instance().stop()
-        #self.log.info('exit success')

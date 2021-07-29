@@ -18,12 +18,14 @@
 from typing import (
     Awaitable,
     Callable,
-    Optional
+    Optional,
+    TYPE_CHECKING,
 )
 import functools
 from tornado.web import HTTPError
 
-from cylc.uiserver.handlers import CylcAppHandler
+if TYPE_CHECKING:
+    from cylc.uiserver.handlers import CylcAppHandler
 
 
 def authenticated(
@@ -46,7 +48,7 @@ def authenticated(
     """
     @functools.wraps(method)
     def wrapper(  # type: ignore
-            self: CylcAppHandler, *args, **kwargs
+            self: 'CylcAppHandler', *args, **kwargs
     ) -> Optional[Awaitable[None]]:
         if not self.current_user:
             self.log.debug('Unauthenticated WebSocket request!')
