@@ -19,7 +19,7 @@ from graphql_ws.constants import (
     GQL_COMPLETE
 )
 
-from typing import Union, Awaitable, Any, List, Tuple, Dict
+from typing import Union, Awaitable, Any, List, Tuple, Dict, Optional
 
 setup_observable_extension()
 
@@ -153,14 +153,14 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
         """
         resolving_items: List[Awaitable[Any]] = []
 
-        queue: List[Tuple[Union[List[Any], Dict[Union[int, str], Any]], Union[
-            int, str], Any]] = [
+        queue: List[Tuple[Any, Optional[Union[int, str]], Any]] = [
             (
                 None,
                 None,
                 execution_result.data,
             ),
         ]
+
         while queue:
             container, key, item = queue.pop(0)
 
@@ -172,7 +172,7 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
 
             elif isawaitable(item):
                 container = container if container is not None else queue
-                key = key if key is not None else 0
+                key: Union[int, str] = key if key is not None else 0
 
                 resolving_items.append(
                     self.__resolve_container_item(container, key, item))
@@ -191,7 +191,7 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
 
     async def __resolve_container_item(
             self,
-            container: Union[List[Any], Dict[Union[int, str], Any]],
+            container: Any,
             key: Union[int, str],
             item: Awaitable[Any],
     ) -> None:

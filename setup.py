@@ -45,7 +45,7 @@ def find_version(*file_paths):
 # NB: no graphene version specified; we only make light use of it in our own
 #     code, so graphene-tornado's transitive version should do.
 install_requires = [
-    'cylc-flow>=8.0b0',
+    'cylc-flow>=8.0b2',
     'jupyterhub==1.4.*',
     'tornado==6.1.*',
     'graphene-tornado==2.6.*',
@@ -63,11 +63,12 @@ else:
 tests_require = [
     'coverage>=5.0.0',
     'flake8>=3.0.0',
-    'mypy>=0.812',
-    'pytest>=6',
+    'mypy>=0.900',
     'pytest-asyncio>=0.14.0',
     'pytest-cov>=2.8.0',
     'pytest-mock',
+    'pytest>=6',
+    'types-pkg_resources>=0.1.2',
 ]
 
 extras_require = {
