@@ -45,15 +45,9 @@ def patch_conf_files(monkeypatch):
 
 
 @pytest.mark.integration
-async def test_jp_handler(patch_conf_files, jp_fetch):
-    resp = await jp_fetch(
-        '/', method='GET'
-    )
-    assert resp.code == 200
-
-
-@pytest.mark.integration
+@pytest.mark.usefixtures("mock_authentication")
 async def test_cylc_handler(patch_conf_files, jp_fetch):
+    """The Cylc endpoints have been added and work."""
     resp = await jp_fetch(
         'cylc', 'userprofile', method='GET'
     )
@@ -181,6 +175,7 @@ async def _test(jp_fetch, endpoint, code, message, body):
     """Test 400 HTTP response (upgrade to websocket)."""
     fetch = partial(jp_fetch, *endpoint)
     if code != 200:
+        # failure cases, test the exception
         with pytest.raises(HTTPClientError) as exc_ctx:
             await fetch()
         exc = exc_ctx.value
@@ -190,6 +185,7 @@ async def _test(jp_fetch, endpoint, code, message, body):
         if body:
             assert body in exc.response.body
     else:
+        # succees cases, test the response
         response = await fetch()
         assert code == response.code
         if message:

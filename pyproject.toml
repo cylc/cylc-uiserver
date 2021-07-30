@@ -3,12 +3,16 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
-# addopts = "--doctest-modules"
+addopts = """
+    --doctest-modules
+    --doctest-continue-on-failure
+"""
+doctest_optionflags = """
+    NORMALIZE_WHITESPACE
+    IGNORE_EXCEPTION_DETAIL
+"""
 testpaths = [
-    'cylc/'
-]
-collect_ignore = [
-    'cylc/uiserver/jupyter_config.py'
+    'cylc/uiserver'
 ]
 markers = [
     'integration: tests which run servers and try to connect to them'
