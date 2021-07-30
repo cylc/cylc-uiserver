@@ -10,6 +10,17 @@ creating a new release entry be sure to copy & paste the span tag with the
 `actions:bind` attribute, which is used by a regex to find the text to be
 updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-0.6.0 (<span actions:bind='release-date'>Released 2021-??-??</span>)__
+
+Multi-user functionality implented.
+
+### Enhancements
+
+[#230](https://github.com/cylc/cylc-uiserver/pull/230) -
+Convert the UI Server to a jupyter_server extension
+
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-0.5.0 (<span actions:bind='release-date'>Released 2021-07-28</span>)__
 
