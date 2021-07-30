@@ -45,7 +45,7 @@ import sys
 from jupyter_server.serverapp import ServerApp
 from traitlets import default
 
-from cylc_gui import CylcGUI
+from cylc.uiserver.app import CylcUIServer
 
 
 if not os.environ.get("JUPYTERHUB_SINGLEUSER_APP"):
@@ -80,7 +80,7 @@ class CylcHubApp(SingleUserServerApp):
         Never called if using legacy SingleUserNotebookApp.
         """
         super().find_server_extensions()
-        self.jpserver_extensions[CylcGUI.get_extension_package()] = True
+        self.jpserver_extensions[CylcUIServer.get_extension_package()] = True
 
     @classmethod
     def launch_instance(cls, argv=None, **kwargs):
