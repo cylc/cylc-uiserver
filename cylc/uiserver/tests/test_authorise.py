@@ -13,25 +13,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
-from getpass import getuser
-from os import path
-from graphql.execution.base import ResolveInfo
-from subprocess import Popen, PIPE
-
-
 import pytest
-from tornado import web
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from cylc.uiserver.authorise import (
     Authorization,
     AuthorizationMiddleware,
-    expand_and_process_access_groups,
-    get_groups
+    expand_and_process_access_groups
 )
-from cylc.uiserver.schema import schema
 
 FAKE_SITE_CONF = {
     "*": {
@@ -207,11 +197,11 @@ def test_expand_and_process_access_groups(permission_set, expected):
     pytest.param('play',
                  'mutation',
                  'play',
-                 id="Muation operation, play field, returns play"),
+                 id="Mutation operation, play field, returns play"),
     pytest.param('_schema',
                  'subscription',
                  'read',
-                 id="Subsciption operation, _schema field, returns read"),
+                 id="Subscription operation, _schema field, returns read"),
     pytest.param('blah',
                  'mutation',
                  None,

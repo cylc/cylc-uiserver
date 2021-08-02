@@ -385,7 +385,7 @@ class AuthorizationMiddleware:
                        f":requested to {op_name}.")
         if message:
             log_message = log_message + " " + message
-        logger.warn(log_message)
+        logger.warning(log_message)
         raise web.HTTPError(http_code)
 
     @staticmethod
@@ -404,7 +404,7 @@ class AuthorizationMiddleware:
             return Authorization.READ_OPERATION
         else:
             # Check it is a mutation in our schema
-            if (field_name in Authorization.ALL_OPS):
+            if field_name in Authorization.ALL_OPS:
                 return field_name
         return None
 
@@ -422,7 +422,7 @@ def get_groups(username: str) -> List[str]:
     Returns:
         list: system groups for username given
     """
-    groupmax = (os.NGROUPS_MAX)  # type: ignore
+    groupmax = os.NGROUPS_MAX  # type: ignore
     group_ids = os.getgrouplist(username, groupmax)
     group_ids.remove(groupmax)
     # turn list of group_ids into group names with group identifier prepended
