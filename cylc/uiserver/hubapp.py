@@ -1,51 +1,33 @@
-# Copyright (c) 2015 Project Jupyter Contributors
-# All rights reserved.
+# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-# 1. Redistributions of source code must retain the above copyright notice,
-#    this list of conditions and the following disclaimer.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-# 2. Redistributions in binary form must reproduce the above copyright notice,
-#    this list of conditions and the following disclaimer in the documentation
-#    and/or other materials provided with the distribution.
-#
-# 3. Neither the name of the copyright holder nor the names of its
-#    contributors may be used to endorse or promote products derived from
-#    this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-# POSSIBILITY OF SUCH DAMAGE.
-#
-# Semver File License
-# ===================
-#
-# The semver.py file is from https://github.com/podhmo/python-semver
-# which is licensed under the "MIT" license.  See the semver.py file for
-# details.
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Launch the Cylc GUI.
 
-Acknowledgment derived from the Jupyter Lab source code:
-https://github.com/jupyterlab/jupyterlab/blob/v3.0.16/jupyterlab/labhubapp.py
+This code packages the CylcUIServer to hook it into JupyterHub:
+
+Acknowledgment:
+    Code derived from the Jupyter Lab source (BSD).
+
+    Copyright (c) 2015 Project Jupyter Contributors
+    All rights reserved.
+
+    https://github.com/jupyterlab/jupyterlab/blob/v3.0.16/jupyterlab/
+        labhubapp.py
 """
 
 import os
 import sys
-
-from jupyter_server.serverapp import ServerApp
-from traitlets import default
-
-from cylc.uiserver.app import CylcUIServer
 
 
 if not os.environ.get("JUPYTERHUB_SINGLEUSER_APP"):
@@ -55,18 +37,19 @@ if not os.environ.get("JUPYTERHUB_SINGLEUSER_APP"):
         "jupyter_server.serverapp.ServerApp"
     )
 
-try:
-    from jupyterhub.singleuser.mixins import make_singleuser_app
-except ImportError:
-    # backward-compat with jupyterhub < 1.3
-    from jupyterhub.singleuser import (
-        SingleUserNotebookApp as SingleUserServerApp
-    )
-else:
-    SingleUserServerApp = make_singleuser_app(ServerApp)
+
+# NOTE: import after setting JUPYTERHUB_SINGLEUSER_APP
+from jupyter_server.serverapp import ServerApp
+from jupyterhub.singleuser.mixins import make_singleuser_app
+from traitlets import default
+
+from cylc.uiserver.app import CylcUIServer
 
 
-class CylcHubApp(SingleUserServerApp):
+SingleUserServerApp = make_singleuser_app(ServerApp)  # type: ignore
+
+
+class CylcHubApp(SingleUserServerApp):  # type: ignore
     """The CylcUIServer app configured for use with JupyterHub."""
 
     @default("default_url")
