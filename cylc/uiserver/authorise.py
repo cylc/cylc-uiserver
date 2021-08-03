@@ -386,7 +386,7 @@ class AuthorizationMiddleware:
         if message:
             log_message = log_message + " " + message
         logger.warning(log_message)
-        raise web.HTTPError(http_code)
+        raise web.HTTPError(http_code, reason=message)
 
     @staticmethod
     def get_op_name(field_name: str, operation: str) -> Union[None, str]:

@@ -186,9 +186,33 @@ def mock_config(monkeypatch):
 
 
 @pytest.fixture
-def mock_authentication(monkeypatch):
+def _mock_authorization(monkeypatch):
+    """Authorized for GET on handlers for test purposes."""
+    def _mock_authorized(user=None, authorized=False):
+        monkeypatch.setattr(
+            'cylc.uiserver.handlers.can_read',
+            lambda handler: (authorized, user or getuser())
+        )
 
-    def _mock_authentication(user=None, server=None, none=False):
+    _mock_authorized()
+
+    return _mock_authorized
+
+
+@pytest.fixture
+def mock_unauthorized_as_yossarian(_mock_authorization):
+    _mock_authorization(user='yossarian', authorized=False)
+
+
+@pytest.fixture
+def mock_authorized_as_getuser(_mock_authorization):
+    _mock_authorization(authorized=True)
+
+
+@pytest.fixture
+def _mock_authentication(monkeypatch):
+
+    def _mock_authenticated(user=None, server=None, none=False):
         ret = {
             'name': user or getuser(),
             'server': server or gethostname()
@@ -200,16 +224,21 @@ def mock_authentication(monkeypatch):
             lambda x: ret
         )
 
+    _mock_authenticated()
+
+    return _mock_authenticated
+
+
+@pytest.fixture
+def mock_authenticated_as_getuser(_mock_authentication):
     _mock_authentication()
 
-    return _mock_authentication
+
+@pytest.fixture
+def mock_authenticated_as_yossarian(_mock_authentication):
+    _mock_authentication(user='yossarian')
 
 
 @pytest.fixture
-def mock_authentication_yossarian(mock_authentication):
-    mock_authentication(user='yossarian')
-
-
-@pytest.fixture
-def mock_authentication_none(mock_authentication):
-    mock_authentication(none=True)
+def mock_unauthenticated(_mock_authentication):
+    _mock_authentication(none=True)

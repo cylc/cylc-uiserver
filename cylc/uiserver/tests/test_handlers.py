@@ -47,15 +47,18 @@ class MainHandlerTest(AsyncHTTPTestCase):
 
     def get_app(self) -> Application:
         self.tempdir = tempfile.mkdtemp(suffix='mainhandlertest')
+        mocked_auth_obj = MagicMock()
         return MyApplication(
             handlers=[
-                ('/', MainHandler, {"path": self.tempdir}),
+                ('/', MainHandler,
+                 {"path": self.tempdir,
+                  "auth": mocked_auth_obj}),
                 ('/hub/api/oauth2/authorize.*', NoOpHandler)
             ],
             cookie_secret='MainHandlerTest'
         )
 
-    @pytest.mark.usefixtures("mock_authentication")
+    @pytest.mark.usefixtures("mock_authenticated_as_getuser")
     def test_jupyterhub_version_returned(self):
         with open(os.path.join(self.tempdir, "index.html"), "w+") as nf:
             nf.write("TESTING!")
@@ -64,18 +67,34 @@ class MainHandlerTest(AsyncHTTPTestCase):
             assert response.body == b"TESTING!"
             assert "X-JupyterHub-Version" in response.headers
 
-    @pytest.mark.usefixtures("mock_authentication")
-    def test_authenticated(self):
+    @pytest.mark.usefixtures("mock_authenticated_as_getuser")
+    @pytest.mark.usefixtures("mock_unauthorized_as_yossarian")
+    def test_authenticated_and_unauthorised(self):
+        """Test 403 HTTP response for unauthorized."""
+        response = self.fetch('/')
+        assert response.code == 403
+        assert response.reason == 'authorization insufficient'
+
+    @pytest.mark.usefixtures("mock_authenticated_as_getuser")
+    @pytest.mark.usefixtures("mock_authorized_as_getuser")
+    def test_authenticated_and_authorized(self):
         """Test 500 HTTP response (because index.html missing)."""
         response = self.fetch('/')
         assert response.code == 500
 
-    @pytest.mark.usefixtures("mock_authentication_none")
+    @pytest.mark.usefixtures("mock_unauthenticated")
     def test_unauthenticated(self) -> None:
-        """Test login URL redirect response (unauthenticated)."""
+        """Test login URL redirect response for unauthenticated."""
         response = self.fetch('/')
         assert response.code == 200
-        assert response.effective_url.index('/hub/api/oauth2/authorize') > 0
+        assert '/hub/api/oauth2/authorize' in response.effective_url
+
+    @pytest.mark.usefixtures("mock_unauthenticated")
+    @pytest.mark.usefixtures("mock_unauthorized_as_yossarian")
+    def test_decorator_order_authenticate_first(self) -> None:
+        """Test the order of decorators, authenciation before authorization"""
+        response = self.fetch('/')
+        assert response.code != 403
 
     def tearDown(self) -> None:
         if self.tempdir:
@@ -86,15 +105,20 @@ class UserProfileHandlerTest(AsyncHTTPTestCase):
     """Test for UserProfile handler"""
 
     def get_app(self) -> Application:
+        mocked_auth_obj = MagicMock()
+
         return MyApplication(
             handlers=[
-                ('/userprofile', UserProfileHandler),
+                ('/userprofile',
+                 UserProfileHandler,
+                 {"auth": mocked_auth_obj}
+                 ),
                 ('/hub/api/oauth2/authorize.*', NoOpHandler)
             ],
             cookie_secret='MainHandlerTest'
         )
 
-    @pytest.mark.usefixtures("mock_authentication")
+    @pytest.mark.usefixtures("mock_authenticated_as_getuser")
     def test_user_profile_handler_cors_headers(self):
         response = self.fetch("/userprofile")  # type: HTTPResponse
         assert "Access-Control-Allow-Origin" in response.headers
@@ -103,18 +127,35 @@ class UserProfileHandlerTest(AsyncHTTPTestCase):
         assert "Content-Type" in response.headers
         assert getuser() in str(response.body)
 
-    @pytest.mark.usefixtures("mock_authentication")
-    def test_authenticated(self):
-        """Test 200 HTTP response."""
+    @pytest.mark.usefixtures("mock_authenticated_as_getuser")
+    @pytest.mark.usefixtures("mock_unauthorized_as_yossarian")
+    def test_authenticated_and_unauthorised(self):
+        """Test 403 HTTP response for unauthorized."""
         response = self.fetch('/userprofile')
-        assert response.code == 200
+        assert response.code == 403
+        assert response.reason == 'authorization insufficient'
 
-    @pytest.mark.usefixtures("mock_authentication_none")
-    def test_unauthenticated(self) -> None:
-        """Test login URL redirect (unauthenticated)."""
+    @pytest.mark.usefixtures("mock_authenticated_as_getuser")
+    @pytest.mark.usefixtures("mock_authorized_as_getuser")
+    def test_authenticated_and_authorized(self):
+        """Test 200 HTTP response for authenticated and authorized."""
         response = self.fetch('/userprofile')
         assert response.code == 200
-        assert response.effective_url.index('/hub/api/oauth2/authorize') > 0
+        assert '/hub/api/oauth2/authorize' not in response.effective_url
+
+    @pytest.mark.usefixtures("mock_unauthenticated")
+    def test_unauthenticated(self) -> None:
+        """Test login URL redirect for unauthenticated."""
+        response = self.fetch('/userprofile')
+        assert response.code == 200
+        assert '/hub/api/oauth2/authorize' in response.effective_url
+
+    @pytest.mark.usefixtures("mock_unauthenticated")
+    @pytest.mark.usefixtures("mock_unauthorized_as_yossarian")
+    def test_decorator_order_authenticate_first(self) -> None:
+        """Test the order of decorators, authenciation before authorization"""
+        response = self.fetch('/userprofile')
+        assert response.code != 403
 
 
 class SubscriptionHandlerTest(AsyncHTTPTestCase):
@@ -195,7 +236,7 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
                               get_async_test_timeout())
         handler.subscription_server.handle.assert_called_once()
 
-    @pytest.mark.usefixtures("mock_authentication")
+    @pytest.mark.usefixtures("mock_authenticated_as_getuser")
     def test_authenticated(self):
         """Test 400 HTTP response (upgrade to websocket)."""
 
@@ -203,7 +244,7 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         assert response.code == 400
         assert b"WebSocket" in response.body
 
-    @pytest.mark.usefixtures("mock_authentication_none")
+    @pytest.mark.usefixtures("mock_unauthenticated")
     def test_unauthenticated(self) -> None:
         """Test 403 HTTP response (unauthenticated)."""
 

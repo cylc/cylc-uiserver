@@ -496,7 +496,7 @@ class CylcUIServer(Application):
                 self._create_handler("oauth_callback",
                                      HubOAuthCallbackHandler),
                 self._create_handler("userprofile",
-                                     UserProfileHandler),
+                                     UserProfileHandler, auth=self.authobj),
                 # graphql handlers
                 self._create_graphql_handler(
                     "graphql",
@@ -518,7 +518,8 @@ class CylcUIServer(Application):
                 (
                     rf"{self._jupyter_hub_service_prefix}?",
                     MainHandler,
-                    {"path": self.ui_path}
+                    {"path": self.ui_path,
+                     "auth": self.authobj}
                 )
             ],
             # always generate a new cookie secret on launch
@@ -534,7 +535,6 @@ class CylcUIServer(Application):
         )
         logger.info(f"Listening on port: {self._port}")
         logger.info(f'Serving UI from: {self.ui_path}')
-
         app = self._make_app(debug)
         signal.signal(signal.SIGINT, app.signal_handler)
         app.listen(self._port)

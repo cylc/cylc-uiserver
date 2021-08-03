@@ -15,7 +15,7 @@
 
 import json
 import os
-from asyncio import Queue
+from asyncio import Queue, iscoroutinefunction
 import logging
 import getpass
 
@@ -28,11 +28,48 @@ from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
 from .websockets import authenticated as websockets_authenticated
-from .authorise import AuthorizationMiddleware
+from .authorise import AuthorizationMiddleware, Authorization
 
 logger = logging.getLogger(__name__)
 
 ME = getpass.getuser()
+
+
+def read_authorised():
+    def authorise_inner(fun):
+        if iscoroutinefunction(fun):
+            async def decorated_func(self, *args, **kwargs):
+                allowed, username = can_read(handler=self)
+                if not allowed:
+                    logger.warn(f'Authorization failed for {username}')
+                    raise web.HTTPError(
+                        403, reason='authorization insufficient')
+                return await fun(self, *args, **kwargs)
+            return decorated_func
+        else:
+            def decorated_func(self, *args, **kwargs):
+                allowed, username = can_read(handler=self)
+                if not allowed:
+                    logger.warn(f'Authorization failed for {username}')
+                    raise web.HTTPError(
+                        403, reason='authorization insufficient')
+                return fun(self, *args, **kwargs)
+            return decorated_func
+    return authorise_inner
+
+
+def can_read(**kwargs):
+    """Checks if the user has permitted operation `read`
+    """
+    if "handler" not in kwargs:
+        return
+    user = kwargs["handler"].get_current_user()
+    username = user.get('name', '?')
+    if kwargs["handler"].auth.is_permitted(
+        username, Authorization.READ_OPERATION
+    ):
+        return True, username
+    return False, username
 
 
 class BaseHandler(HubOAuthenticated, web.RequestHandler):
@@ -56,11 +93,13 @@ class MainHandler(BaseHandler):
     # hub_groups = []
     # allow_admin = True
 
-    def initialize(self, path):
+    def initialize(self, path, auth):
         self._static = path
+        self.auth = auth
 
     @web.addslash
     @web.authenticated
+    @read_authorised()
     def get(self):
         """Render the UI prototype."""
         index = os.path.join(self._static, "index.html")
@@ -73,11 +112,15 @@ class MainHandler(BaseHandler):
 
 class UserProfileHandler(BaseHandler):
 
+    def initialize(self, auth):
+        self.auth = auth
+
     def set_default_headers(self) -> None:
         super().set_default_headers()
         self.set_header("Content-Type", 'application/json')
 
     @web.authenticated
+    @read_authorised()
     def get(self):
         self.write(json.dumps(self.get_current_user()))
 
@@ -86,6 +129,8 @@ class UserProfileHandler(BaseHandler):
 # It's possible to just overwrite TornadoGraphQLHandler.context but we would
 # somehow need to pass the request info (headers, username ...etc) in also
 class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
+
+    # No authorization decorators here, auth handled in AuthorizationMiddleware
 
     # Declare extra attributes
     resolvers = None
@@ -147,6 +192,7 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
 
 class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
 
+    # No authorization decorators here, auth handled in AuthorizationMiddleware
     def initialize(self, sub_server, resolvers):
         self.queue = Queue(100)
         self.subscription_server = sub_server
