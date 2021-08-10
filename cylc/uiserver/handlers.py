@@ -122,7 +122,9 @@ class UserProfileHandler(BaseHandler):
     @web.authenticated
     @read_authorised()
     def get(self):
-        self.write(json.dumps(self.get_current_user()))
+        user = self.get_current_user()
+        user['perms'] = list(self.auth.get_permitted_operations(user['name']))
+        self.write(json.dumps(user))
 
 
 # This is needed in order to pass the server context in addition to existing.
