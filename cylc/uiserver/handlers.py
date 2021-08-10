@@ -123,7 +123,9 @@ class UserProfileHandler(BaseHandler):
     @read_authorised()
     def get(self):
         user = self.get_current_user()
-        user['perms'] = list(self.auth.get_permitted_operations(user['name']))
+        user['permissions'] = list(
+            self.auth.get_permitted_operations(user['name'])
+        )
         self.write(json.dumps(user))
 
 
