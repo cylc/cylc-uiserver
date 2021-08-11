@@ -228,6 +228,12 @@ class DataStoreMgr:
         self.apply_all_delta(w_id, delta)
         self.delta_store_to_queues(w_id, topic, delta)
 
+    def clear_data_field(self, w_id, field_name):
+        if field_name == WORKFLOW:
+            self.data[w_id][field_name].Clear()
+        else:
+            self.data[w_id][field_name].clear()
+
     def apply_all_delta(self, w_id, delta):
         """Apply the AllDeltas delta."""
         for field, sub_delta in delta.ListFields():
@@ -235,16 +241,18 @@ class DataStoreMgr:
             # If the workflow has reloaded clear the data before
             # delta application.
             if sub_delta.reloaded:
-                if field.name == WORKFLOW:
-                    self.data[w_id][field.name].Clear()
-                else:
-                    self.data[w_id][field.name].clear()
+                self.clear_data_field(w_id, field.name)
                 self.data[w_id]['delta_times'][field.name] = 0.0
-            # Apply the delta if newer than the previously applied.
-            if delta_time >= self.data[w_id]['delta_times'][field.name]:
-                apply_delta(field.name, sub_delta, self.data[w_id])
-                self.data[w_id]['delta_times'][field.name] = delta_time
-                self.reconcile_update(field.name, sub_delta, w_id)
+            # hard to catch errors in a threaded async app, so use try-except.
+            try:
+                # Apply the delta if newer than the previously applied.
+                if delta_time >= self.data[w_id]['delta_times'][field.name]:
+                    apply_delta(field.name, sub_delta, self.data[w_id])
+                    self.data[w_id]['delta_times'][field.name] = delta_time
+                    if not sub_delta.reloaded:
+                        self.reconcile_update(field.name, sub_delta, w_id)
+            except Exception as exc:
+                self.log.exception(exc)
 
     def delta_store_to_queues(self, w_id, topic, delta):
         # Queue delta for graphql subscription resolving
@@ -275,17 +283,24 @@ class DataStoreMgr:
             [getattr(e, s_att)
              for e in self.data[w_id][topic].values()])
         if local_checksum != delta.checksum:
-            # use threadsafe as client socket is in main loop thread.
-            future = asyncio.run_coroutine_threadsafe(
-                workflow_request(
-                    self.workflows_mgr.workflows[w_id]['req_client'],
-                    'pb_data_elements',
-                    args={'element_type': topic}
-                ),
-                self.loop
-            )
+            self.log.debug(
+                f'Out of sync with {topic} of {w_id}... Reconciling.')
             try:
+                # use threadsafe as client socket is in main loop thread.
+                future = asyncio.run_coroutine_threadsafe(
+                    workflow_request(
+                        self.workflows_mgr.active[w_id]['req_client'],
+                        'pb_data_elements',
+                        args={'element_type': topic}
+                    ),
+                    self.loop
+                )
                 _, new_delta_msg = future.result(self.RECONCILE_TIMEOUT)
+                new_delta = DELTAS_MAP[topic]()
+                new_delta.ParseFromString(new_delta_msg)
+                self.clear_data_field(w_id, topic)
+                apply_delta(topic, new_delta, self.data[w_id])
+                self.data[w_id]['delta_times'][topic] = new_delta.time
             except asyncio.TimeoutError:
                 self.log.debug(
                     f'The reconcile update coroutine {w_id} {topic}'
@@ -295,11 +310,6 @@ class DataStoreMgr:
                 self.workflows_mgr.stopping.add(w_id)
             except Exception as exc:
                 self.log.exception(exc)
-            else:
-                new_delta = DELTAS_MAP[topic]()
-                new_delta.ParseFromString(new_delta_msg)
-                apply_delta(topic, new_delta, self.data[w_id])
-                self.data[w_id]['delta_times'][topic] = new_delta.time
 
     async def entire_workflow_update(self, ids=None):
         """Update entire local data-store of workflow(s).
