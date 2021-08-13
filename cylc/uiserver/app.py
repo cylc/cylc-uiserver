@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from pathlib import Path, PurePath
 import sys
 from typing import List
@@ -36,6 +37,7 @@ from jupyter_server.extension.application import ExtensionApp
 # from jupyterhub.utils import url_path_join
 import tornado
 
+from cylc.flow.cfgspec.globalcfg import GlobalConfig
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
 )
@@ -104,7 +106,10 @@ class CylcUIServer(ExtensionApp):
                 # base configuration - always used
                 Path(uis_pkg).parent,
                 # site configuration
-                Path('/etc/cylc/hub'),
+                Path(
+                    os.getenv('CYLC_SITE_CONF_PATH')
+                    or Path(GlobalConfig.DEFAULT_SITE_CONF_PATH, 'hub')
+                ),
                 # user configuration
                 Path('~/.cylc/hub').expanduser()
             ]
