@@ -1,5 +1,9 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+# NOTE: `pip install build` to build with `python -m build`
+requires = [
+  "setuptools >= 40.9.0",
+  "wheel"
+]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
