@@ -30,7 +30,6 @@ from cylc.flow.workflow_files import (
 )
 
 from cylc.uiserver.app import CylcUIServer
-import cylc.uiserver.workflows_mgr as workflows_mgr_module
 from cylc.uiserver.workflows_mgr import (
     workflow_request,
     WorkflowsManager,
@@ -228,7 +227,7 @@ async def test_multi_request(
 
     response = await workflows_manager.multi_request(
         '', [workflow_id], None, multi_args)
-    assert 1 == len(response)
+    assert len(response) == 1
     assert value == response[0]
 
 

@@ -58,15 +58,11 @@ def authorised(fun: Callable) -> Callable:
 
         ] = handler.get_current_user()
         if user is None or user == 'anonymous':
-            # user is not authenticated - additional protection incase the
+            # user is not authenticated - additional protection in case the
             # endpoint is not authenticate protected by mistake
             # NOTE: Auth tests will hit this line unless mocked authentication
             # is provided.
             raise web.HTTPError(403, reason='Forbidden')
-        handler.log.critical(
-            f'authorise {user} '  # type: ignore
-            f'for {handler.__class__.__name__}'
-        )
         if not (
             is_token_authenticated(handler, user)
             or (
@@ -93,7 +89,7 @@ def is_token_authenticated(
     if isinstance(user, bytes):
         # Cookie authentication:
         # * The URL token is added to a secure cookie, it can then be
-        #   removed rrom the URL for subsequent requests, the cookie is
+        #   removed from the URL for subsequent requests, the cookie is
         #   used in its place.
         # * If the token was used token_authenticated is True.
         # * If the cookie was used it is False (despite the cookie auth
@@ -106,7 +102,7 @@ def is_token_authenticated(
         return True
     elif handler.token_authenticated:
         # standalone UIS, the bearer of the token is the owner
-        # (no multi-user functionality so no futher auth required)
+        # (no multi-user functionality so no further auth required)
         return True
     return False
 

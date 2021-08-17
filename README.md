@@ -102,7 +102,7 @@ $ jupyter cylc
 ### For Multi-User Setups
 
 Run a central [JupyterHub](https://github.com/jupyterhub/jupyterhub) server
-under a user account with the privilages required to spawn `cylc` processes as
+under a user account with the privileges required to spawn `cylc` processes as
 other users.
 
 ```bash

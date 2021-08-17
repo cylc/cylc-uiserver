@@ -15,13 +15,10 @@
 
 """Tests for the ``data_store_mgr`` module and its objects and functions."""
 
-import logging
-
 import pytest
 from cylc.flow.network import MSG_TIMEOUT
 from cylc.flow.workflow_files import ContactFileFields as CFF
 
-import cylc.uiserver.data_store_mgr as data_store_mgr_module
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from .conftest import AsyncClientFixture
 
@@ -192,4 +189,4 @@ async def test_stop_workflow(
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
 
     data_store_mgr.stop_workflow(w_id=w_id)
-    assert 0 == data_store_mgr.data[w_id]['workflow'].api_version
+    assert data_store_mgr.data[w_id]['workflow'].api_version == 0

@@ -97,7 +97,7 @@ class CylcUIServer(ExtensionApp):
     Cylc - A user interface for monitoring and controlling Cylc workflows.
     '''
     examples = '''
-        cylc gui    # start the cylc GUI
+        cylc gui    # start the cylc GUI
     '''
     config_file_paths = list(
         map(

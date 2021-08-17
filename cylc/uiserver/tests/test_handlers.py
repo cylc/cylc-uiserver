@@ -13,9 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
-import shutil
-import tempfile
 from functools import partial
 from getpass import getuser
 from unittest.mock import MagicMock
@@ -23,14 +20,13 @@ from unittest.mock import MagicMock
 from graphql_ws.constants import GRAPHQL_WS
 from tornado.httputil import HTTPServerRequest
 from tornado.testing import AsyncHTTPTestCase, get_async_test_timeout
-from tornado.web import Application, RequestHandler
+from tornado.web import Application
 
 from cylc.uiserver.handlers import SubscriptionHandler
 
-import pytest
 
-
-class MyApplication(Application): ...
+class MyApplication(Application):
+    ...
 
 
 class SubscriptionHandlerTest(AsyncHTTPTestCase):
