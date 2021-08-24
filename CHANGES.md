@@ -14,7 +14,7 @@ ones in. -->
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-0.6.0 (<span actions:bind='release-date'>Released 2021-??-??</span>)__
 
-Multi-user functionality implented.
+Multi-user functionality implemented.
 
 ### Enhancements
 

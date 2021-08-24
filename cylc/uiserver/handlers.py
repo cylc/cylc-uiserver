@@ -342,10 +342,3 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
             'resolvers': self.resolvers,
         }
         return wider_context
-
-
-__all__ = [
-    "UserProfileHandler",
-    "UIServerGraphQLHandler",
-    "SubscriptionHandler"
-]

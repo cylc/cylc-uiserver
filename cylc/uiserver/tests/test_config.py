@@ -62,6 +62,6 @@ def test_cylc_site_conf_path(clear_env, capload, monkeypatch):
     load()
     assert capload == [
         SYS_CONF,
-        Path('elephant/hub/config.py'),
+        Path('elephant/hub/jupyter_config.py'),
         USER_CONF,
     ]

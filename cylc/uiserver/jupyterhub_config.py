@@ -48,7 +48,7 @@ def load():
     if os.getenv('CYLC_SITE_CONF_PATH'):
         site_conf_path: Path = Path(
             os.environ['CYLC_SITE_CONF_PATH'],
-            'hub/config.py'
+            'hub/jupyter_config.py'
         )
     else:
         site_conf_path: Path = SITE_CONF_PATH
