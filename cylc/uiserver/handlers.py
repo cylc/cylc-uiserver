@@ -52,19 +52,18 @@ def authorised(fun: Callable) -> Callable:
         nonlocal fun
         user: Union[
             None,   # unauthenticated
-            bytes,  # token auth (bug in jupyter_server)
             dict,   # hub auth
-            str,    # token auth
+            str,    # token auth or anonymous
 
         ] = handler.get_current_user()
         if user is None or user == 'anonymous':
-            # user is not authenticated - additional protection in case the
-            # endpoint is not authenticate protected by mistake
+            # user is not authenticated - calls should not get this far
+            # but the extra safety doesn't hurt
             # NOTE: Auth tests will hit this line unless mocked authentication
             # is provided.
             raise web.HTTPError(403, reason='Forbidden')
         if not (
-            is_token_authenticated(handler, user)
+            isinstance(user, str)  # token authenticated
             or (
                 isinstance(user, dict)
                 and _authorise(handler, user['name'], '')
@@ -169,7 +168,7 @@ class UserProfileHandler(CylcAppHandler):
         if isinstance(user_info, dict):
             # the server is running with authentication services provided
             # by a hub
-            pass
+            user_info = dict(user_info)  # make a copy for safety
         else:
             # the server is running using a token
             # authentication is provided by jupyter server
