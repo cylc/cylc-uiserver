@@ -151,7 +151,12 @@ class CylcAppHandler(JupyterHandler):
 
 
 class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
-    pass
+
+    @web.authenticated
+    def get(self, path):
+        # authenticate the static handler
+        # this provides us with login redirection and token cashing
+        return web.StaticFileHandler.get(self, path)
 
 
 class UserProfileHandler(CylcAppHandler):

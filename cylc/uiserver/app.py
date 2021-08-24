@@ -247,14 +247,6 @@ class CylcUIServer(ExtensionApp):
     def _default_logging_config(self):
         return Path(Path(uis_pkg).parent / 'logging_config.json')
 
-    @default('static_dir')
-    def _get_static_dir(self):
-        return str(self.ui_path)
-
-    @default('static_paths')
-    def _get_static_paths(self):
-        return [str(self.ui_path)]
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.workflows_mgr = WorkflowsManager(self, log=self.log)
@@ -328,14 +320,10 @@ class CylcUIServer(ExtensionApp):
             ),
             (
                 'cylc/(.*)?',
-                # web.StaticFileHandler,
                 CylcStaticHandler,
                 {
                     'path': str(self.ui_path),
                     'default_filename': 'index.html'
-                    # 'url': url_path_join(
-                    #     self.static_url_prefix, 'index.html'
-                    # )
                 }
             ),
             (
