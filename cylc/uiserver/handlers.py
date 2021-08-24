@@ -27,6 +27,11 @@ from jupyter_server.base.handlers import JupyterHandler
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
+from cylc.flow.scripts.cylc import (
+    get_version as get_cylc_version,
+    list_plugins as list_cylc_plugins,
+)
+
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
 
 
@@ -134,7 +139,9 @@ class CylcAppHandler(JupyterHandler):
     this handler to insert the HubOAuthenticated bases class high up
     in the inheritance order.
 
-    https://github.com/jupyterhub/jupyterhub/blob/3800ceaf9edf33a0171922b93ea3d94f87aa8d91/jupyterhub/singleuser/mixins.py#L826
+    https://github.com/jupyterhub/jupyterhub/blob/
+    3800ceaf9edf33a0171922b93ea3d94f87aa8d91/jupyterhub/
+    singleuser/mixins.py#L826
     """
 
     auth_level = None
@@ -151,6 +158,18 @@ class CylcAppHandler(JupyterHandler):
 
 
 class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
+    """Serves the Cylc UI static files.
+
+    Jupyter Server provides a way of serving Jinja2 templates / static files,
+    however, this does not work for us because:
+
+    * Our static files live in subdirectories which Jupyter Server does not
+      support.
+    * Our UI expects to find its resources under the same URL, i.e. we
+      aren't using Jinja2 to inject the static path.
+    * We need to push requests through CylcAppHandler in order to allow
+      multi-user access.
+    """
 
     @web.authenticated
     def get(self, path):
@@ -159,7 +178,32 @@ class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
         return web.StaticFileHandler.get(self, path)
 
 
+class CylcVersionHandler(CylcAppHandler):
+    """Renders information about the Cylc environment.
+
+    Equivalent to running `cylc version --long` in the UIS environment.
+    """
+
+    @web.authenticated
+    @authorised
+    def get(self):
+        self.write(
+            '<pre>'
+            + get_cylc_version(long=True)
+            + '\n'
+            + list_cylc_plugins()
+            + '</pre>'
+        )
+
+
 class UserProfileHandler(CylcAppHandler):
+    """Provides information about the user in JSON format.
+
+    When running via the hub this returns the hub user information.
+
+    When running standalone we provide something similar to what the hub
+    would have returned.
+    """
 
     def set_default_headers(self) -> None:
         super().set_default_headers()
@@ -191,10 +235,13 @@ class UserProfileHandler(CylcAppHandler):
         self.write(json.dumps(user_info))
 
 
-# This is needed in order to pass the server context in addition to existing.
-# It's possible to just overwrite TornadoGraphQLHandler.context but we would
-# somehow need to pass the request info (headers, username ...etc) in also
 class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
+    """Endpoint for performing GraphQL queries.
+
+    This is needed in order to pass the server context in addition to existing.
+    It's possible to just overwrite TornadoGraphQLHandler.context but we would
+    somehow need to pass the request info (headers, username ...etc) in also
+    """
 
     # Declare extra attributes
     resolvers = None
@@ -254,6 +301,7 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 
 
 class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
+    """Endpoint for performing GraphQL subscriptions."""
 
     def initialize(self, sub_server, resolvers):
         self.queue = Queue(100)

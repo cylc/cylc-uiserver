@@ -32,10 +32,7 @@ from traitlets import (
     validate,
 )
 
-from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.extension.application import ExtensionApp
-# from jupyterhub.utils import url_path_join
-import tornado
 
 from cylc.flow.cfgspec.globalcfg import GlobalConfig
 from cylc.flow.network.graphql import (
@@ -47,26 +44,16 @@ from cylc.uiserver import (
 )
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.handlers import (
+    CylcStaticHandler,
+    CylcVersionHandler,
     SubscriptionHandler,
     UIServerGraphQLHandler,
     UserProfileHandler,
-    CylcStaticHandler
 )
 from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
 from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
-
-
-class MyExtensionHandler(JupyterHandler):
-
-    @tornado.web.authenticated
-    def get(self):
-        self.write('hello cylc')
-
-    @tornado.web.authenticated
-    def post(self):
-        ...
 
 
 class PathType(TraitType):
@@ -92,7 +79,6 @@ class CylcUIServer(ExtensionApp):
     app_name = 'cylc-gui'
     default_url = "/cylc"
     load_other_extensions = True
-    # file_url_prefix = "/render"
     description = '''
     Cylc - A user interface for monitoring and controlling Cylc workflows.
     '''
@@ -284,7 +270,7 @@ class CylcUIServer(ExtensionApp):
 
     def initialize_handlers(self):
         self.handlers.extend([
-            ('cylc/hello', MyExtensionHandler),
+            ('cylc/version', CylcVersionHandler),
             (
                 'cylc/graphql',
                 UIServerGraphQLHandler,
