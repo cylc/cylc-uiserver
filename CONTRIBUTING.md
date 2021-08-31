@@ -42,6 +42,7 @@ below.
  - Stephen McVeigh
  - Ronnie Dutta
  - David Matthews
+ - Mel Hall
  <!-- end-shortlog -->
 
 (All contributors are identifiable with email addresses in the git version
