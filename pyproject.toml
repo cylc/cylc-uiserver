@@ -1,0 +1,23 @@
+[build-system]
+# NOTE: `pip install build` to build with `python -m build`
+requires = [
+  "setuptools >= 40.9.0",
+  "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+addopts = """
+    --doctest-modules
+    --doctest-continue-on-failure
+"""
+doctest_optionflags = """
+    NORMALIZE_WHITESPACE
+    IGNORE_EXCEPTION_DETAIL
+"""
+testpaths = [
+    'cylc/uiserver'
+]
+markers = [
+    'integration: tests which run servers and try to connect to them'
+]

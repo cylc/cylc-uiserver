@@ -17,7 +17,6 @@ from getpass import getuser
 from itertools import product
 import logging
 from random import random
-import socket
 
 import pytest
 from pytest_mock import MockFixture
@@ -30,15 +29,15 @@ from cylc.flow.workflow_files import (
     ContactFileFields as CFF,
 )
 
-from cylc.uiserver.main import CylcUIServer
-import cylc.uiserver.workflows_mgr as workflows_mgr_module
+from cylc.uiserver.app import CylcUIServer
 from cylc.uiserver.workflows_mgr import (
     workflow_request,
     WorkflowsManager,
-    est_workflow,
 )
 
 from .conftest import AsyncClientFixture
+
+LOG = logging.getLogger('cylc')
 
 
 # --- workflow_request
@@ -89,71 +88,6 @@ async def test_workflow_request(
         client=async_client, command=command, req_context=req_context)
     assert expected_ctx == ctx
     assert expected_msg == msg
-
-
-# --- est_workflow
-
-
-@pytest.mark.asyncio
-async def test_est_workflow_socket_error(
-    mocker: MockFixture,
-):
-    mocked_is_remote_host = mocker.patch(
-        'cylc.uiserver.workflows_mgr.is_remote_host')
-    mocked_is_remote_host.return_value = True
-
-    mocked_get_host_ip_by_name = mocker.patch(
-        'cylc.uiserver.workflows_mgr.get_host_ip_by_name')
-
-    def side_effect(*_, **__):
-        raise socket.error
-    mocked_get_host_ip_by_name.side_effect = side_effect
-    reg, host, port, pub_port, client = await est_workflow(
-        '', '', 0, 0)
-    assert not any([reg, host, port, pub_port, client])
-    assert client is None
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize('reg,host,port,pub_port,timeout,expected_host', [
-        pytest.param(
-            'remote', 'remote', 8000, 8002, 1, 'remote_host'
-        ),
-        pytest.param(
-            'local', 'localhost', 4000, 4001, 2, 'localhost'
-        )
-    ])
-async def test_est_workflow(
-        async_client: AsyncClientFixture,
-        mocker: MockFixture,
-        reg,
-        host,
-        port,
-        pub_port,
-        timeout,
-        expected_host
-):
-    mocked_is_remote_host = mocker.patch(
-        'cylc.uiserver.workflows_mgr.is_remote_host')
-    mocked_is_remote_host.side_effect = lambda x: True \
-        if x == 'remote' else False
-
-    mocked_client = mocker.patch(
-        'cylc.uiserver.workflows_mgr.WorkflowRuntimeClient')
-    mocked_client.return_value = async_client
-
-    mocked_get_host_ip_by_name = mocker.patch(
-        'cylc.uiserver.workflows_mgr.get_host_ip_by_name')
-    mocked_get_host_ip_by_name.side_effect = lambda x: 'remote_host' \
-        if x == 'remote' else x
-
-    r_reg, r_host, r_port, r_pub_port, r_client, r_result = await est_workflow(
-        reg, host, port, pub_port, timeout)
-    assert reg == r_reg
-    assert expected_host == r_host
-    assert port == r_port
-    assert pub_port == r_pub_port
-    assert r_client.__class__ == AsyncClientFixture
 
 
 # --- WorkflowsManager
@@ -209,7 +143,7 @@ async def test_workflow_state_changes(tmp_path, active_before, active_after):
     tmp_path.mkdir()
 
     # mock the results of the previous scan
-    wfm = WorkflowsManager(None, context=None, run_dir=tmp_path)
+    wfm = WorkflowsManager(None, LOG, context=None, run_dir=tmp_path)
     wid = f'{wfm.owner}{ID_DELIM}a'
     if active_before == 'active':
         wfm.active[wid] = {
@@ -242,7 +176,7 @@ async def test_workflow_state_changes(tmp_path, active_before, active_after):
 async def test_workflow_state_change_restart(tmp_path):
     """It identifies workflows which have restarted between scans."""
     # mock the result of the previous scan
-    wfm = WorkflowsManager(None, context=None, run_dir=tmp_path)
+    wfm = WorkflowsManager(None, LOG, context=None, run_dir=tmp_path)
     wid = f'{wfm.owner}{ID_DELIM}a'
     wfm.active[wid] = {
             CFF.API: API,
@@ -269,7 +203,9 @@ async def test_workflow_state_change_restart(tmp_path):
 
 @pytest.mark.asyncio
 async def test_multi_request(
-        workflows_manager, async_client: AsyncClientFixture):
+    workflows_manager,
+    async_client: AsyncClientFixture
+):
     workflow_id = 'multi-request-workflow'
     # The response for a workflow multi-request.
     value = 42
@@ -291,14 +227,17 @@ async def test_multi_request(
 
     response = await workflows_manager.multi_request(
         '', [workflow_id], None, multi_args)
-    assert 1 == len(response)
+    assert len(response) == 1
     assert value == response[0]
 
 
 @pytest.mark.asyncio
 async def test_multi_request_gather_errors(
-        workflows_manager, async_client: AsyncClientFixture,
-        mocker: MockFixture):
+    workflows_manager,
+    async_client: AsyncClientFixture,
+    mocker: MockFixture,
+    caplog
+):
     workflow_id = 'gather-error-workflow'
     error_type = ValueError
     async_client.will_return(error_type)
@@ -307,19 +246,19 @@ async def test_multi_request_gather_errors(
         'req_client': async_client
     }
 
-    logger = logging.getLogger(workflows_mgr_module.__name__)
-    mocked_exception_function = mocker.patch.object(logger, 'exception')
+    caplog.clear()
     await workflows_manager.multi_request('', [workflow_id], None, None)
-    mocked_exception_function.assert_called_once()
-    assert mocked_exception_function.call_args[1][
-               'exc_info'].__class__ == error_type
+    # assert caplog.record_tuples == []
+    assert caplog.record_tuples == [
+        ('cylc', 40, 'Failed to send requests to multiple workflows')
+    ]
+    assert caplog.records[0].exc_info[0] == error_type
 
 
 @pytest.mark.asyncio
 async def test_register(
-        uiserver: CylcUIServer,
-        mocker: MockFixture,
-        one_workflow_aiter
+    mocker: MockFixture,
+    one_workflow_aiter,
 ):
     """Test the registration of a workflow.
 
@@ -327,6 +266,7 @@ async def test_register(
     previous state, and the next state as 'active'."""
     workflow_name = 'register-me'
     workflow_id = f'{getuser()}|{workflow_name}'
+    uiserver = CylcUIServer()
 
     assert workflow_id not in uiserver.data_store_mgr.data
     assert workflow_id not in uiserver.workflows_mgr.active
@@ -365,9 +305,8 @@ async def test_register(
 
 @pytest.mark.asyncio
 async def test_unregister(
-        uiserver: CylcUIServer,
-        one_workflow_aiter,
-        empty_aiter
+    one_workflow_aiter,
+    empty_aiter
 ):
     """A workflow, once registered, can be unregistered in the
     workflow manager.
@@ -377,6 +316,7 @@ async def test_unregister(
     functions."""
     workflow_name = 'unregister-me'
     workflow_id = f'{getuser()}{ID_DELIM}{workflow_name}'
+    uiserver = CylcUIServer()
     await uiserver.workflows_mgr._register(workflow_id, None)
 
     uiserver.workflows_mgr._scan_pipe = empty_aiter()
@@ -393,9 +333,8 @@ async def test_unregister(
 
 @pytest.mark.asyncio
 async def test_connect(
-        uiserver: CylcUIServer,
-        mocker: MockFixture,
-        one_workflow_aiter
+    mocker: MockFixture,
+    one_workflow_aiter
 ):
     """Test connecting to a workflow.
 
@@ -403,6 +342,7 @@ async def test_connect(
     then the connect method will be called."""
     workflow_name = 'connect'
     workflow_id = f'{getuser()}{ID_DELIM}{workflow_name}'
+    uiserver = CylcUIServer()
     uiserver.workflows_mgr.inactive.add(workflow_id)
 
     assert workflow_id not in uiserver.workflows_mgr.active
@@ -451,10 +391,9 @@ async def test_connect(
 
 @pytest.mark.asyncio
 async def test_disconnect_and_stop(
-        uiserver: CylcUIServer,
-        mocker: MockFixture,
-        one_workflow_aiter,
-        async_client: AsyncClientFixture
+    mocker: MockFixture,
+    one_workflow_aiter,
+    async_client: AsyncClientFixture
 ):
     """Test disconnecting and stopping a workflow.
 
@@ -462,6 +401,7 @@ async def test_disconnect_and_stop(
     workflow manager will take care to stop and disconnect the workflow."""
     workflow_name = 'disconnect-stop'
     workflow_id = f'{getuser()}|{workflow_name}'
+    uiserver = CylcUIServer()
 
     flow = {
             'name': workflow_name,

@@ -1,4 +1,3 @@
-# THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
 # Copyright (C) NIWA & British Crown (Met Office) & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -14,9 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-[pytest]
-addopts =
-    --doctest-modules
-    --ignore cylc/uiserver/config_defaults.py
-testpaths =
-    cylc/uiserver
+pytest_plugins = [
+    'jupyter_server.pytest_plugin'
+]
+
+
+def pytest_ignore_collect(path):
+    # --doctest-modules seems to ignore the value if configured in pyproject
+    if 'jupyter_config.py' in str(path):
+        return True

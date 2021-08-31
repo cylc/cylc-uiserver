@@ -16,7 +16,6 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 import getpass
-import logging
 import os
 from subprocess import Popen, PIPE, DEVNULL
 
@@ -26,8 +25,6 @@ from cylc.flow.data_store_mgr import WORKFLOW
 
 # show traceback from cylc commands
 DEBUG = True
-
-logger = logging.getLogger(__name__)
 
 
 def snake_to_kebab(snake):
@@ -90,7 +87,7 @@ class Services:
         ]
 
     @classmethod
-    async def play(cls, workflows, args, workflows_mgr):
+    async def play(cls, workflows, args, workflows_mgr, log):
         """Calls `cylc play`."""
         response = []
 
@@ -142,7 +139,7 @@ class Services:
                 cmd_repr = ' '.join(cmd)
                 if cylc_version:
                     cmd_repr = f'CYLC_VERSION={cylc_version} {cmd_repr}'
-                logger.info(f'$ {cmd_repr}')
+                log.info(f'$ {cmd_repr}')
 
                 # run cylc run
                 proc = Popen(
@@ -183,8 +180,9 @@ class Resolvers(BaseResolvers):
 
     workflows_mgr = None
 
-    def __init__(self, data, **kwargs):
+    def __init__(self, data, log, **kwargs):
         super().__init__(data)
+        self.log = log
 
         # Set extra attributes
         for key, value in kwargs.items():
@@ -210,7 +208,8 @@ class Resolvers(BaseResolvers):
         return await Services.play(
             m_args[1]['workflows'],
             m_args[2],
-            self.workflows_mgr
+            self.workflows_mgr,
+            log=self.log
         )
 
     async def nodes_mutator(self, info, *m_args):

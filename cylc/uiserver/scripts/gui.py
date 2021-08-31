@@ -12,32 +12,16 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""cylc hub
 
-Launch the Cylc hub for running the Cylc Web GUI.
+"""cylc gui [OPTIONS]
+
+Launch the Cylc GUI as a standalone web app for local use.
+
+For a multi-user system see `cylc hub`.
 """
 
-import os
-from pathlib import Path
-
-from jupyterhub.app import main as hub_main
-
-from cylc.uiserver import (
-    __version__,
-    __file__ as uis_pkg
-)
+from cylc.uiserver.app import CylcUIServer
 
 
-def main(*args):
-    for arg in args:
-        if arg.startswith('-f') or arg.startswith('--config'):
-            break
-    else:
-        config_file = Path(uis_pkg).parent / 'jupyterhub_config.py'
-        args = (f'--config={config_file}',) + args
-    # set an env var flag to help load the config
-    os.environ['CYLC_HUB_VERSION'] = __version__
-    try:
-        hub_main(args)
-    finally:
-        del os.environ['CYLC_HUB_VERSION']
+def main(*argv):
+    return CylcUIServer.launch_instance(argv or None)

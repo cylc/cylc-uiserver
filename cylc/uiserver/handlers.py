@@ -13,109 +13,197 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import json
-import os
 from asyncio import Queue
-import logging
+from functools import wraps
+import json
 import getpass
+import socket
+from typing import Callable, Union
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
 from graphql_ws.constants import GRAPHQL_WS
-from jupyterhub import __version__ as jupyterhub_version
-from jupyterhub.services.auth import HubOAuthenticated
+from jupyter_server.base.handlers import JupyterHandler
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
-from .websockets import authenticated as websockets_authenticated
+from cylc.flow.scripts.cylc import (
+    get_version as get_cylc_version,
+    list_plugins as list_cylc_plugins,
+)
 
-
-logger = logging.getLogger(__name__)
+from cylc.uiserver.websockets import authenticated as websockets_authenticated
 
 
 ME = getpass.getuser()
 
 
-def _authorised(req):
-    """Authorise a request.
+def authorised(fun: Callable) -> Callable:
+    """Provides Cylc authorisation.
 
-    Requires the request to be authenticated.
+    When the UIS is run standalone (token-authenticated) application,
+    authorisation is deactivated, the bearer of the token has full privileges.
 
-    Currently returns True if the authenticated user is the same as the
-    user under which this UI Server is running.
-
-    Returns:
-        bool - True if the request passes authorisation, False if it fails.
-
+    When the UIS is spawned by Jupyter Hub (hub authenticated), multi-user
+    access is permitted. Users are authorised by _authorise.
     """
-    user = req.get_current_user()
-    username = user.get('name', '?')
+
+    @wraps(fun)
+    def _inner(
+        handler: 'CylcAppHandler',
+        *args,
+        **kwargs,
+    ):
+        nonlocal fun
+        user: Union[
+            None,   # unauthenticated
+            dict,   # hub auth
+            str,    # token auth or anonymous
+
+        ] = handler.get_current_user()
+        if user is None or user == 'anonymous':
+            # user is not authenticated - calls should not get this far
+            # but the extra safety doesn't hurt
+            # NOTE: Auth tests will hit this line unless mocked authentication
+            # is provided.
+            raise web.HTTPError(403, reason='Forbidden')
+        if not (
+            isinstance(user, str)  # token authenticated
+            or (
+                isinstance(user, dict)
+                and _authorise(handler, user['name'], '')
+            )
+        ):
+            raise web.HTTPError(403, reason='authorisation insufficient')
+        return fun(handler, *args, **kwargs)
+    return _inner
+
+
+def is_token_authenticated(
+    handler: JupyterHandler,
+    user: Union[bytes, dict, str],
+) -> bool:
+    """Returns True if the UIS is running "standalone".
+
+    At present we cannot use handler.is_token_authenticated because it
+    returns False when the token is cached in a cookie.
+
+    https://github.com/jupyter-server/jupyter_server/pull/562
+    """
+    if isinstance(user, bytes):
+        # Cookie authentication:
+        # * The URL token is added to a secure cookie, it can then be
+        #   removed from the URL for subsequent requests, the cookie is
+        #   used in its place.
+        # * If the token was used token_authenticated is True.
+        # * If the cookie was used it is False (despite the cookie auth
+        #   being derived from token auth).
+        # * Due to a bug in jupyter_server the user is returned as bytes
+        #   when cookie auth is used so at present we can use this to
+        #   tell.
+        #   https://github.com/jupyter-server/jupyter_server/pull/562
+        # TODO: this hack is obviously not suitable for production!
+        return True
+    elif handler.token_authenticated:
+        # standalone UIS, the bearer of the token is the owner
+        # (no multi-user functionality so no further auth required)
+        return True
+    return False
+
+
+def _authorise(
+    handler: 'CylcAppHandler',
+    username: str,
+    action: str = 'READ'
+) -> bool:
+    """Authorises a user to perform an action.
+
+    Currently this returns False unless the authenticated user is the same
+    as the user this server is running under.
+    """
     if username != ME:
-        logger.warning(f'Authorisation failed for {username}')
+        # auth provided by the hub, check the user name
+        handler.log.warning(f'Authorisation failed for {username}')
         return False
     return True
 
 
-def authorised(fun):
-    """Provides Cylc authorisation for multi-user setups."""
+class CylcAppHandler(JupyterHandler):
+    """Base handler for Cylc endpoints.
 
-    def _inner(self, *args, **kwargs):
-        nonlocal fun
-        if not _authorised(self):
-            raise web.HTTPError(403, reason='authorisation insufficient')
-        return fun(self, *args, **kwargs)
-    return _inner
+    This handler adds the Cylc authorisation layer which is triggered by
+    calling CylcAppHandler.get_current_user which is called by
+    web.authenticated.
 
+    When running as a Hub application the make_singleuser_app method patches
+    this handler to insert the HubOAuthenticated bases class high up
+    in the inheritance order.
 
-def async_authorised(fun):
-    """Provides Cylc authorisation for multi-user setups."""
+    https://github.com/jupyterhub/jupyterhub/blob/
+    3800ceaf9edf33a0171922b93ea3d94f87aa8d91/jupyterhub/
+    singleuser/mixins.py#L826
+    """
 
-    async def _inner(self, *args, **kwargs):
-        nonlocal fun
-        if not _authorised(self):
-            raise web.HTTPError(403, reason='authorisation insufficient')
-        return await fun(self, *args, **kwargs)
-    return _inner
+    auth_level = None
 
+    @property
+    def hub_users(self):
+        # allow all users (handled by Cylc authorisation decorator)
+        return None
 
-class BaseHandler(HubOAuthenticated, web.RequestHandler):
-
-    def set_default_headers(self) -> None:
-        self.set_header("X-JupyterHub-Version", jupyterhub_version)
-        self.set_header("Access-Control-Allow-Origin", "*")
-        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
-        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
-        # prevent server fingerprinting
-        self.clear_header('Server')
+    @property
+    def hub_groups(self):
+        # allow all groups (handled by Cylc authorisation decorator)
+        return None
 
 
-class StaticHandler(BaseHandler, web.StaticFileHandler):
-    """A static handler that extends BaseHandler (for headers)."""
+class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
+    """Serves the Cylc UI static files.
+
+    Jupyter Server provides a way of serving Jinja2 templates / static files,
+    however, this does not work for us because:
+
+    * Our static files live in subdirectories which Jupyter Server does not
+      support.
+    * Our UI expects to find its resources under the same URL, i.e. we
+      aren't using Jinja2 to inject the static path.
+    * We need to push requests through CylcAppHandler in order to allow
+      multi-user access.
+    """
+
+    @web.authenticated
+    def get(self, path):
+        # authenticate the static handler
+        # this provides us with login redirection and token cashing
+        return web.StaticFileHandler.get(self, path)
 
 
-class MainHandler(BaseHandler):
+class CylcVersionHandler(CylcAppHandler):
+    """Renders information about the Cylc environment.
 
-    # hub_users = ["kinow"]
-    # hub_groups = []
-    # allow_admin = True
+    Equivalent to running `cylc version --long` in the UIS environment.
+    """
 
-    def initialize(self, path):
-        self._static = path
-
-    @web.addslash
     @web.authenticated
     @authorised
     def get(self):
-        """Render the UI prototype."""
-        index = os.path.join(self._static, "index.html")
-        user = self.get_current_user()
-        protocol = self.request.protocol
-        host = self.request.host
-        base_url = f'{protocol}://{host}/{user["server"]}'
-        self.render(index, python_base_url=base_url)
+        self.write(
+            '<pre>'
+            + get_cylc_version(long=True)
+            + '\n'
+            + list_cylc_plugins()
+            + '</pre>'
+        )
 
 
-class UserProfileHandler(BaseHandler):
+class UserProfileHandler(CylcAppHandler):
+    """Provides information about the user in JSON format.
+
+    When running via the hub this returns the hub user information.
+
+    When running standalone we provide something similar to what the hub
+    would have returned.
+    """
 
     def set_default_headers(self) -> None:
         super().set_default_headers()
@@ -124,13 +212,36 @@ class UserProfileHandler(BaseHandler):
     @web.authenticated
     @authorised
     def get(self):
-        self.write(json.dumps(self.get_current_user()))
+        user_info = self.get_current_user()
+
+        if isinstance(user_info, dict):
+            # the server is running with authentication services provided
+            # by a hub
+            user_info = dict(user_info)  # make a copy for safety
+        else:
+            # the server is running using a token
+            # authentication is provided by jupyter server
+            user_info = {
+                'kind': 'user',
+                'name': ME,
+                'server': socket.gethostname()
+            }
+
+        # add an entry for the workflow owner
+        # NOTE: when running behind a hub this may be different from the
+        # authenticated user
+        user_info['owner'] = ME
+
+        self.write(json.dumps(user_info))
 
 
-# This is needed in order to pass the server context in addition to existing.
-# It's possible to just overwrite TornadoGraphQLHandler.context but we would
-# somehow need to pass the request info (headers, username ...etc) in also
-class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
+class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
+    """Endpoint for performing GraphQL queries.
+
+    This is needed in order to pass the server context in addition to existing.
+    It's possible to just overwrite TornadoGraphQLHandler.context but we would
+    somehow need to pass the request info (headers, username ...etc) in also
+    """
 
     # Declare extra attributes
     resolvers = None
@@ -172,7 +283,7 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
         super().prepare()
 
     @web.authenticated
-    @async_authorised
+    @authorised
     async def execute(self, *args, **kwargs):
         # Use own backend, and TornadoGraphQLHandler already does validation.
         return await self.schema.execute(
@@ -184,12 +295,13 @@ class UIServerGraphQLHandler(BaseHandler, TornadoGraphQLHandler):
         )
 
     @web.authenticated
-    @async_authorised
+    @authorised
     async def run(self, *args, **kwargs):
         await TornadoGraphQLHandler.run(self, *args, **kwargs)
 
 
-class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
+class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
+    """Endpoint for performing GraphQL subscriptions."""
 
     def initialize(self, sub_server, resolvers):
         self.queue = Queue(100)
@@ -205,11 +317,14 @@ class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
         # forward this call so we can authenticate/authorise it
         return websocket.WebSocketHandler.get(self, *args, **kwargs)
 
-    @websockets_authenticated
+    @websockets_authenticated  # noqa: A003
     @authorised
-    def open(self, *args, **kwargs):
-        IOLoop.current().spawn_callback(self.subscription_server.handle, self,
-                                        self.context)
+    def open(self, *args, **kwargs):  # noqa: A003
+        IOLoop.current().spawn_callback(
+            self.subscription_server.handle,
+            self,
+            self.context,
+        )
 
     async def on_message(self, message):
         await self.queue.put(message)
@@ -227,12 +342,3 @@ class SubscriptionHandler(BaseHandler, websocket.WebSocketHandler):
             'resolvers': self.resolvers,
         }
         return wider_context
-
-
-__all__ = [
-    "MainHandler",
-    "StaticHandler",
-    "UserProfileHandler",
-    "UIServerGraphQLHandler",
-    "SubscriptionHandler"
-]

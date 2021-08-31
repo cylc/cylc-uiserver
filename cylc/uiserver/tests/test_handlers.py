@@ -13,122 +13,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
-import shutil
-import tempfile
 from functools import partial
 from getpass import getuser
 from unittest.mock import MagicMock
 
 from graphql_ws.constants import GRAPHQL_WS
-from tornado.httpclient import HTTPResponse
 from tornado.httputil import HTTPServerRequest
 from tornado.testing import AsyncHTTPTestCase, get_async_test_timeout
-from tornado.web import Application, RequestHandler
+from tornado.web import Application
 
-from cylc.uiserver.main import (
-    MainHandler,
-    MyApplication,
-    SubscriptionHandler,
-    UserProfileHandler,
-)
-
-import pytest
+from cylc.uiserver.handlers import SubscriptionHandler
 
 
-class NoOpHandler(RequestHandler):
-
-    def get(self):
-        pass
-
-
-class MainHandlerTest(AsyncHTTPTestCase):
-    """Test for the Main handler"""
-
-    def get_app(self) -> Application:
-        self.tempdir = tempfile.mkdtemp(suffix='mainhandlertest')
-        return MyApplication(
-            handlers=[
-                ('/', MainHandler, {"path": self.tempdir}),
-                ('/hub/api/oauth2/authorize.*', NoOpHandler)
-            ],
-            cookie_secret='MainHandlerTest'
-        )
-
-    @pytest.mark.usefixtures("mock_authentication")
-    def test_jupyterhub_version_returned(self):
-        with open(os.path.join(self.tempdir, "index.html"), "w+") as nf:
-            nf.write("TESTING!")
-            nf.flush()
-            response = self.fetch("/")  # type: HTTPResponse
-            assert response.body == b"TESTING!"
-            assert "X-JupyterHub-Version" in response.headers
-
-    @pytest.mark.usefixtures("mock_authentication")
-    def test_authorised_and_authenticated(self):
-        """Test 500 HTTP response (because index.html missing)."""
-        response = self.fetch('/')
-        assert response.code == 500
-
-    @pytest.mark.usefixtures("mock_authentication_none")
-    def test_unauthenticated(self) -> None:
-        """Test login URL redirect response (unauthenticated)."""
-        response = self.fetch('/')
-        assert response.code == 200
-        assert response.effective_url.index('/hub/api/oauth2/authorize') > 0
-
-    @pytest.mark.usefixtures("mock_authentication_yossarian")
-    def test_unauthorised(self):
-        """Test 403 HTTP response (unauthorised)."""
-        response = self.fetch('/')
-        assert response.code == 403
-        assert response.reason == 'authorisation insufficient'
-
-    def tearDown(self) -> None:
-        if self.tempdir:
-            shutil.rmtree(self.tempdir, ignore_errors=True)
-
-
-class UserProfileHandlerTest(AsyncHTTPTestCase):
-    """Test for UserProfile handler"""
-
-    def get_app(self) -> Application:
-        return MyApplication(
-            handlers=[
-                ('/userprofile', UserProfileHandler),
-                ('/hub/api/oauth2/authorize.*', NoOpHandler)
-            ],
-            cookie_secret='MainHandlerTest'
-        )
-
-    @pytest.mark.usefixtures("mock_authentication")
-    def test_user_profile_handler_cors_headers(self):
-        response = self.fetch("/userprofile")  # type: HTTPResponse
-        assert "Access-Control-Allow-Origin" in response.headers
-        assert "Access-Control-Allow-Headers" in response.headers
-        assert "Access-Control-Allow-Methods" in response.headers
-        assert "Content-Type" in response.headers
-        assert getuser() in str(response.body)
-
-    @pytest.mark.usefixtures("mock_authentication")
-    def test_authorised_and_authenticated(self):
-        """Test 200 HTTP response."""
-        response = self.fetch('/userprofile')
-        assert response.code == 200
-
-    @pytest.mark.usefixtures("mock_authentication_none")
-    def test_unauthenticated(self) -> None:
-        """Test login URL redirect (unauthenticated)."""
-        response = self.fetch('/userprofile')
-        assert response.code == 200
-        assert response.effective_url.index('/hub/api/oauth2/authorize') > 0
-
-    @pytest.mark.usefixtures("mock_authentication_yossarian")
-    def test_unauthorised(self):
-        """Test 403 HTTP response (unauthorised)."""
-        response = self.fetch('/userprofile')
-        assert response.code == 403
-        assert response.reason == 'authorisation insufficient'
+class MyApplication(Application):
+    ...
 
 
 class SubscriptionHandlerTest(AsyncHTTPTestCase):
@@ -137,8 +35,11 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
     def get_app(self) -> Application:
         return MyApplication(
             handlers=[
-                ('/subscriptions', SubscriptionHandler,
-                 dict(sub_server=None, resolvers=None))
+                (
+                    '/subscriptions',
+                    SubscriptionHandler,
+                    {'sub_server': None, 'resolvers': None}
+                )
             ]
         )
 
@@ -170,7 +71,7 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         handler = self._create_handler()
         host_header = 'ui.cylc'
         handler.request.headers['Host'] = host_header
-        assert handler.check_origin(origin=f'http://{host_header}')
+        assert handler.check_origin(f'http://{host_header}')
 
     def test_websockets_check_origin_rejects_different_origin(self):
         """A request from a different Host MUST be blocked to prevent
@@ -182,7 +83,8 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         handler = self._create_handler()
         host_header = 'ui.cylc'
         handler.request.headers['Host'] = host_header
-        assert not handler.check_origin(origin='http://ui.notcylc')
+        handler.request.headers['Origin'] = 'ui.notcylc'
+        assert not handler.check_origin('http://ui.notcylc')
 
     def test_websockets_context(self):
         handler = self._create_handler()
@@ -208,24 +110,3 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         self.io_loop.run_sync(handler.open,
                               get_async_test_timeout())
         handler.subscription_server.handle.assert_called_once()
-
-    @pytest.mark.usefixtures("mock_authentication")
-    def test_authorised_and_authenticated(self):
-        """Test 400 HTTP response (upgrade to websocket)."""
-        response = self.fetch('/subscriptions')
-        assert response.code == 400
-        assert b"WebSocket" in response.body
-
-    @pytest.mark.usefixtures("mock_authentication_none")
-    def test_unauthenticated(self) -> None:
-        """Test 403 HTTP response (unauthenticated)."""
-        response = self.fetch('/subscriptions')
-        assert response.code == 403
-        assert response.reason == 'Forbidden'
-
-    @pytest.mark.usefixtures("mock_authentication_yossarian")
-    def test_unauthorised(self):
-        """Test 403 HTTP response (unauthorised)."""
-        response = self.fetch('/subscriptions')
-        assert response.code == 403
-        assert response.reason == 'authorisation insufficient'

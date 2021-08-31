@@ -29,8 +29,7 @@ omit =
     venv/*
     cylc/uiserver/tests/*
     cylc/uiserver/websockets/*
-    cylc/uiserver/config_defaults.py
-    setup.py
+    cylc/uiserver/jupyter*_config.py
 parallel = True
 plugins=
 include=
@@ -53,8 +52,7 @@ omit =
     venv/*
     cylc/uiserver/tests/*
     cylc/uiserver/websockets/*
-    cylc/uiserver/config_defaults.py
-    setup.py
+    cylc/uiserver/jupyter*_config.py
 precision=2
 show_missing=False
 skip_covered=False

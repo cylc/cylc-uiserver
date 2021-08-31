@@ -29,11 +29,11 @@ from cylc.uiserver import __file__ as uis_pkg
 LOG = logging.getLogger(__name__)
 
 # base configuration - always used
-DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / 'config_defaults.py'
+DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / 'jupyter_config.py'
 # site configuration
-SITE_CONF_PATH: Path = Path('/etc/cylc/hub/config.py')
+SITE_CONF_PATH: Path = Path('/etc/cylc/hub/jupyter_config.py')
 # user configuration
-USER_CONF_PATH: Path = Path('~/.cylc/hub/config.py').expanduser()
+USER_CONF_PATH: Path = Path('~/.cylc/hub/jupyter_config.py').expanduser()
 
 
 def _load(path):
@@ -48,7 +48,7 @@ def load():
     if os.getenv('CYLC_SITE_CONF_PATH'):
         site_conf_path: Path = Path(
             os.environ['CYLC_SITE_CONF_PATH'],
-            'hub/config.py'
+            'hub/jupyter_config.py'
         )
     else:
         site_conf_path: Path = SITE_CONF_PATH

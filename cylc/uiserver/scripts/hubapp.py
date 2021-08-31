@@ -12,18 +12,16 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""cylc uis
+"""Command for launching the Cylc GUI in its JupyterHub configuration.
 
-Launch a Cylc UI Server.
-
-This is an internal command invoked by the Cylc Hub via the configured
-Jupyterhub spawner.
+This should be the command JupyterHub is configured to spawn e.g:
+  c.Spawner.cmd = ['cylc', 'hubapp']
 """
 
-from cylc.uiserver.main import main as uis_main
+from cylc.uiserver.hubapp import CylcHubApp
 
 INTERNAL = True
 
 
-def main(*_):
-    uis_main()
+def main(*argv):
+    return CylcHubApp.launch_instance(argv or None)

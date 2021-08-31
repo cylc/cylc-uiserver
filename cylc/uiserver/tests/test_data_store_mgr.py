@@ -15,22 +15,19 @@
 
 """Tests for the ``data_store_mgr`` module and its objects and functions."""
 
-import logging
-
 import pytest
 from cylc.flow.network import MSG_TIMEOUT
 from cylc.flow.workflow_files import ContactFileFields as CFF
 
-import cylc.uiserver.data_store_mgr as data_store_mgr_module
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from .conftest import AsyncClientFixture
 
 
 @pytest.mark.asyncio
 async def test_entire_workflow_update(
-        async_client: AsyncClientFixture,
-        data_store_mgr: DataStoreMgr,
-        make_entire_workflow
+    async_client: AsyncClientFixture,
+    data_store_mgr: DataStoreMgr,
+    make_entire_workflow
 ):
     """Test that ``entire_workflow_update`` is executed successfully."""
     w_id = 'workflow_id'
@@ -60,8 +57,8 @@ async def test_entire_workflow_update(
 
 @pytest.mark.asyncio
 async def test_entire_workflow_update_ignores_timeout_message(
-        async_client: AsyncClientFixture,
-        data_store_mgr: DataStoreMgr
+    async_client: AsyncClientFixture,
+    data_store_mgr: DataStoreMgr
 ):
     """
     Test that ``entire_workflow_update`` ignores if the client
@@ -88,9 +85,10 @@ async def test_entire_workflow_update_ignores_timeout_message(
 
 @pytest.mark.asyncio
 async def test_entire_workflow_update_gather_error(
-        async_client: AsyncClientFixture,
-        data_store_mgr: DataStoreMgr,
-        mocker
+    async_client: AsyncClientFixture,
+    data_store_mgr: DataStoreMgr,
+    mocker,
+    caplog,
 ):
     """
     Test that if ``asyncio.gather`` in ``entire_workflow_update``
@@ -113,12 +111,16 @@ async def test_entire_workflow_update_gather_error(
     # Call the entire_workflow_update function.
     # This should use the client defined above (``async_client``) when
     # calling ``workflow_request``.
-    logger = logging.getLogger(data_store_mgr_module.__name__)
-    mocked_exception_function = mocker.patch.object(logger, 'exception')
+    caplog.clear()
     await data_store_mgr.entire_workflow_update()
-    mocked_exception_function.assert_called_once()
-    assert mocked_exception_function.call_args[1][
-               'exc_info'].__class__ == error_type
+    assert caplog.record_tuples == [
+        (
+            'cylc',
+            40,
+            'Failed to update entire local data-store of a workflow'
+        )
+    ]
+    assert caplog.records[0].exc_info[0] == error_type
 
 
 @pytest.mark.asyncio
@@ -187,4 +189,4 @@ async def test_stop_workflow(
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
 
     data_store_mgr.stop_workflow(w_id=w_id)
-    assert 0 == data_store_mgr.data[w_id]['workflow'].api_version
+    assert data_store_mgr.data[w_id]['workflow'].api_version == 0
