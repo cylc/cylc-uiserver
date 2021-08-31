@@ -32,10 +32,13 @@ from cylc.flow.scripts.cylc import (
     list_plugins as list_cylc_plugins,
 )
 
+from cylc.uiserver.authorise import AuthorizationMiddleware
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
 
 
 ME = getpass.getuser()
+
+
 
 
 def authorised(fun: Callable) -> Callable:
@@ -243,6 +246,8 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
     somehow need to pass the request info (headers, username ...etc) in also
     """
 
+    # No authorization decorators here, auth handled in AuthorizationMiddleware
+
     # Declare extra attributes
     resolvers = None
 
@@ -253,10 +258,15 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
                    root_value=None, graphiql=False, pretty=False,
                    batch=False, backend=None, **kwargs):
         super(TornadoGraphQLHandler, self).initialize()
-
+        self.auth = kwargs['auth']
         self.schema = schema
         if middleware is not None:
             self.middleware = list(self.instantiate_middleware(middleware))
+        # Make authorization info available to auth middleware
+        for mw in self.middleware:
+            if isinstance(mw, AuthorizationMiddleware):
+                mw.current_user = self.current_user['name']
+                mw.auth = self.auth
         self.executor = executor
         self.root_value = root_value
         self.pretty = pretty

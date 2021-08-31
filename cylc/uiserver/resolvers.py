@@ -124,14 +124,9 @@ class Services:
             return cls._error(exc)
 
         # start each requested flow
-        me = getpass.getuser()
-        for user, flow, _ in workflows:
+        for _user, flow, _ in workflows:
             try:
-                if user and user != me:
-                    # TODO: multi-user support
-                    # forward this request to the other users UIS
-                    raise ValueError(f'Cannot start flow for user: {user}')
-
+                # Note: authorisation has already taken place.
                 # add the workflow to the command
                 cmd = [*cmd, flow]
 

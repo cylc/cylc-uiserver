@@ -168,6 +168,8 @@ Currently the UI Server accepts these configurations:
 * `c.CylcUIServer.ui_build_dir`
 * `c.CylcUIServer.ui_version`
 * `c.CylcUIServer.scan_iterval`
+* `c.CylcUIServer.site_authorization`
+* `c.CylcUIServer.user_authorization`
 
 See the `cylc.uiserver.app.UIServer` file for details.
 
