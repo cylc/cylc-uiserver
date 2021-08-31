@@ -213,7 +213,6 @@ class UserProfileHandler(CylcAppHandler):
         self.set_header("Content-Type", 'application/json')
 
     @web.authenticated
-    @authorised
     def get(self):
         user_info = self.get_current_user()
 
@@ -260,12 +259,26 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
         super(TornadoGraphQLHandler, self).initialize()
         self.auth = kwargs['auth']
         self.schema = schema
+        current_user = self.get_current_user()
+        if isinstance(current_user, dict):
+            # the server is running with authentication services provided
+            # by a hub
+            current_user = dict(current_user)  # make a copy for safety
+        else:
+            # the server is running using a token
+            # authentication is provided by jupyter server
+            current_user = {
+                'kind': 'user',
+                'name': ME,
+                'server': socket.gethostname()
+            }
+
         if middleware is not None:
             self.middleware = list(self.instantiate_middleware(middleware))
         # Make authorization info available to auth middleware
         for mw in self.middleware:
             if isinstance(mw, AuthorizationMiddleware):
-                mw.current_user = self.current_user['name']
+                mw.current_user = current_user['name']
                 mw.auth = self.auth
         self.executor = executor
         self.root_value = root_value
@@ -288,12 +301,10 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
         return wider_context
 
     @web.authenticated
-    @authorised
     def prepare(self):
         super().prepare()
 
     @web.authenticated
-    @authorised
     async def execute(self, *args, **kwargs):
         # Use own backend, and TornadoGraphQLHandler already does validation.
         return await self.schema.execute(
@@ -305,30 +316,29 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
         )
 
     @web.authenticated
-    @authorised
     async def run(self, *args, **kwargs):
         await TornadoGraphQLHandler.run(self, *args, **kwargs)
 
 
 class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     """Endpoint for performing GraphQL subscriptions."""
-
+    # No authorization decorators here, auth handled in AuthorizationMiddleware
     def initialize(self, sub_server, resolvers):
         self.queue = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
+        if sub_server:
+            self.subscription_server.current_user = self.current_user
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
 
     @websockets_authenticated
-    @authorised
     def get(self, *args, **kwargs):
         # forward this call so we can authenticate/authorise it
         return websocket.WebSocketHandler.get(self, *args, **kwargs)
 
     @websockets_authenticated  # noqa: A003
-    @authorised
     def open(self, *args, **kwargs):  # noqa: A003
         IOLoop.current().spawn_callback(
             self.subscription_server.handle,

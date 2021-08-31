@@ -40,6 +40,7 @@ from cylc.flow.cfgspec.globalcfg import GlobalConfig
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
 )
+from cylc import uiserver
 
 from cylc.uiserver import (
     __file__ as uis_pkg
@@ -274,7 +275,7 @@ class CylcUIServer(ExtensionApp):
         if proposed['value'].exists():
             return proposed['value']
         raise TraitError(f'ui_build_dir does not exist: {proposed["value"]}')
-    
+
     @validate('site_authorization')
     def _check_site_auth_dict_correct_format(self, proposed):
         # TODO: More advanced auth dict validating
@@ -339,11 +340,16 @@ class CylcUIServer(ExtensionApp):
         )
         self.authobj = Authorization(getpass.getuser(),
                                      self.config.UIServer.user_authorization,
-                                     self.config.UIServer.site_authorization)
+                                     self.config.UIServer.site_authorization
+                                     )
         self.subscription_server = TornadoSubscriptionServer(
             schema,
             backend=CylcGraphQLBackend(),
-            middleware=[AuthorizationMiddleware, IgnoreFieldMiddleware],
+            middleware=[
+                IgnoreFieldMiddleware,
+                AuthorizationMiddleware,
+            ],
+            auth=self.authobj
         )
 
         ioloop.IOLoop.current().add_callback(
@@ -383,7 +389,10 @@ class CylcUIServer(ExtensionApp):
                     'schema': schema,
                     'resolvers': self.resolvers,
                     'backend': CylcGraphQLBackend(),
-                    'middleware': [IgnoreFieldMiddleware],
+                    'middleware': [
+                        AuthorizationMiddleware,
+                        IgnoreFieldMiddleware
+                    ],
                     'auth': self.authobj,
                 }
             ),
@@ -394,7 +403,10 @@ class CylcUIServer(ExtensionApp):
                     'schema': schema,
                     'resolvers': self.resolvers,
                     'backend': CylcGraphQLBackend(),
-                    'middleware': [IgnoreFieldMiddleware],
+                    'middleware': [
+                        AuthorizationMiddleware,
+                        IgnoreFieldMiddleware
+                    ],
                     'batch': True,
                     'auth': self.authobj,
                 }
@@ -434,6 +446,8 @@ class CylcUIServer(ExtensionApp):
 
     @classmethod
     def launch_instance(cls, argv=None, **kwargs):
+        import mdb
+        mdb.debug(ui_server=True)
         if argv is None:
             # jupyter server isn't expecting to be launched by a Cylc command
             # this patches some internal logic
