@@ -189,10 +189,17 @@ def mock_config(monkeypatch):
 def authorisation_true(monkeypatch):
     """Disabled request authorisation for test purposes."""
     monkeypatch.setattr(
-        'cylc.uiserver.handlers._authorised',
+        'cylc.uiserver.handlers._authorise',
         lambda x: True
     )
 
+@pytest.fixture
+def authorisation_false(monkeypatch):
+    """Disabled request authorisation for test purposes."""
+    monkeypatch.setattr(
+        'cylc.uiserver.handlers._authorise',
+        lambda x: False
+    )
 
 @pytest.fixture
 def mock_authentication(monkeypatch):

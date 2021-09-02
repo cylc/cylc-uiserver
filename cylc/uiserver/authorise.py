@@ -351,6 +351,7 @@ class AuthorizationMiddleware:
     current_user = None
 
     def resolve(self, next_, root, info, **args):
+        set_auth= set()
         # We won't be re-checking auth for return variables
         if len(info.path) > 1:
             return next_(root, info, **args)

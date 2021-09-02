@@ -131,14 +131,15 @@ class CylcUIServer(ExtensionApp):
             Dictionary containing site limits and defaults for authorization.
             This configuration should be placed only in the site set
             configuration file and not the user configuration file (use
-            ``c.UIServer.user_authorization`` for user defined authorization).
+            ``c.CylcUIServer.user_authorization`` for user defined
+            authorization).
             If this configuration is empty, site authorization defaults to no
             configurable authorization and users will be unable to set any
             authorization.
         ''' + AUTH_DESCRIPTION + '''
         Example Configuration:
         .. code-block:: python
-        c.UIServer.site_authorization = {
+        c.CylcUIServer.site_authorization = {
     "*": {                              # For all ui-server owners,
         "*": {                          # Any authenticated user
             "default": "READ",          # Will have default read-only access
@@ -179,7 +180,7 @@ class CylcUIServer(ExtensionApp):
             ''' + AUTH_DESCRIPTION + '''
             Example configuration, residing in `~/.cylc/hub/config.py`:
         .. code-block:: python
-         c.UIServer.user_authorization = {
+         c.CylcUIServer.user_authorization = {
             "*": ["READ"],            # any authenticated user has READ access
             "group:group2": ["ALL"],  # Any user in system group2 has access to
                                       # all operations
@@ -329,6 +330,7 @@ class CylcUIServer(ExtensionApp):
     def _default_logging_config(self):
         return Path(Path(uis_pkg).parent / 'logging_config.json')
 
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.workflows_mgr = WorkflowsManager(self, log=self.log)
@@ -338,20 +340,6 @@ class CylcUIServer(ExtensionApp):
             log=self.log,
             workflows_mgr=self.workflows_mgr,
         )
-        self.authobj = Authorization(getpass.getuser(),
-                                     self.config.UIServer.user_authorization,
-                                     self.config.UIServer.site_authorization
-                                     )
-        self.subscription_server = TornadoSubscriptionServer(
-            schema,
-            backend=CylcGraphQLBackend(),
-            middleware=[
-                IgnoreFieldMiddleware,
-                AuthorizationMiddleware,
-            ],
-            auth=self.authobj
-        )
-
         ioloop.IOLoop.current().add_callback(
             self.workflows_mgr.update
         )
@@ -380,6 +368,9 @@ class CylcUIServer(ExtensionApp):
         ).start()
 
     def initialize_handlers(self):
+        self.set_auth()
+        self.set_sub_server()
+
         self.handlers.extend([
             ('cylc/version', CylcVersionHandler),
             (
@@ -441,13 +432,29 @@ class CylcUIServer(ExtensionApp):
             )
         ])
 
+    def set_sub_server(self):
+        self.subscription_server = TornadoSubscriptionServer(
+            schema,
+            backend=CylcGraphQLBackend(),
+            middleware=[
+                IgnoreFieldMiddleware,
+                AuthorizationMiddleware,
+            ],
+            auth=self.authobj
+        )
+
+    def set_auth(self):
+        self.authobj = Authorization(
+            getpass.getuser(),
+            self.config.CylcUIServer.user_authorization,
+            self.config.CylcUIServer.site_authorization
+        )
+
     def initialize_templates(self):
         """Change the jinja templating environment."""
 
     @classmethod
     def launch_instance(cls, argv=None, **kwargs):
-        import mdb
-        mdb.debug(ui_server=True)
         if argv is None:
             # jupyter server isn't expecting to be launched by a Cylc command
             # this patches some internal logic

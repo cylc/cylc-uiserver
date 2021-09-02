@@ -187,8 +187,8 @@ class CylcVersionHandler(CylcAppHandler):
     Equivalent to running `cylc version --long` in the UIS environment.
     """
 
-    @web.authenticated
     @authorised
+    @web.authenticated
     def get(self):
         self.write(
             '<pre>'
@@ -212,7 +212,7 @@ class UserProfileHandler(CylcAppHandler):
         super().set_default_headers()
         self.set_header("Content-Type", 'application/json')
 
-    @web.authenticated
+    @authorised
     def get(self):
         user_info = self.get_current_user()
 
@@ -328,7 +328,7 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         self.subscription_server = sub_server
         self.resolvers = resolvers
         if sub_server:
-            self.subscription_server.current_user = self.current_user
+            self.subscription_server.current_user = self.get_current_user()
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
