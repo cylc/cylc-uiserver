@@ -139,15 +139,14 @@ class Play(Mutation):
                 option `[scheduling]stop after cycle point`.
             ''')
         )
-        hold = Boolean(
+        pause = Boolean(
             description=sstrip('''
-                Hold workflow immediately on starting.
+                Pause workflow immediately on starting.
             ''')
         )
-        hold_point = CyclePoint(
+        hold_cycle_point = CyclePoint(
             description=sstrip('''
-                Set hold cycle point. Hold workflow AFTER all tasks have PASSED
-                this cycle point.
+                Hold all tasks after this cycle point.
             ''')
         )
         mode = RunMode()
