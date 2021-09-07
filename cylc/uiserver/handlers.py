@@ -75,7 +75,7 @@ def authorised(fun: Callable) -> Callable:
                 and _authorise(handler, user['name'], '')
             )
         ):
-            raise web.HTTPError(403, reason='authorisation insufficient')
+            raise web.HTTPError(403, reason='authorization insufficient')
         return fun(handler, *args, **kwargs)
     return _inner
 
@@ -125,7 +125,7 @@ def _authorise(
     if username == ME or can_read(handler=handler):
         return True
     else:
-        handler.log.warning(f'Authorisation failed for {username}')
+        handler.log.warning(f'Authorization failed for {username}')
         return False
 
 
@@ -141,6 +141,23 @@ def can_read(handler):
     ):
         return True
     return False
+
+
+def parse_current_user(current_user):
+    """Standardises and returns the current user."""
+    if isinstance(current_user, dict):
+        # the server is running with authentication services provided
+        # by a hub
+        current_user = dict(current_user)  # make a copy for safety
+        return current_user
+    else:
+        # the server is running using a token
+        # authentication is provided by jupyter server
+        return {
+            'kind': 'user',
+            'name': ME,
+            'server': socket.gethostname()
+        }
 
 
 class CylcAppHandler(JupyterHandler):
@@ -234,18 +251,7 @@ class UserProfileHandler(CylcAppHandler):
     def get(self):
         user_info = self.get_current_user()
 
-        if isinstance(user_info, dict):
-            # the server is running with authentication services provided
-            # by a hub
-            user_info = dict(user_info)  # make a copy for safety
-        else:
-            # the server is running using a token
-            # authentication is provided by jupyter server
-            user_info = {
-                'kind': 'user',
-                'name': ME,
-                'server': socket.gethostname()
-            }
+        user_info = parse_current_user(user_info)
 
         # add an entry for the workflow owner
         # NOTE: when running behind a hub this may be different from the
@@ -281,26 +287,14 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
         super(TornadoGraphQLHandler, self).initialize()
         self.auth = kwargs['auth']
         self.schema = schema
-        current_user = self.get_current_user()
-        if isinstance(current_user, dict):
-            # the server is running with authentication services provided
-            # by a hub
-            current_user = dict(current_user)  # make a copy for safety
-        else:
-            # the server is running using a token
-            # authentication is provided by jupyter server
-            current_user = {
-                'kind': 'user',
-                'name': ME,
-                'server': socket.gethostname()
-            }
+        self.current_user = parse_current_user(self.get_current_user())['name']
 
         if middleware is not None:
             self.middleware = list(self.instantiate_middleware(middleware))
         # Make authorization info available to auth middleware
         for mw in self.middleware:
             if isinstance(mw, AuthorizationMiddleware):
-                mw.current_user = current_user['name']
+                mw.current_user = self.current_user
                 mw.auth = self.auth
         self.executor = executor
         self.root_value = root_value
@@ -349,6 +343,7 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         self.queue = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
+        self.current_user = parse_current_user(self.get_current_user())
         if sub_server:
             self.subscription_server.current_user = self.get_current_user()
 

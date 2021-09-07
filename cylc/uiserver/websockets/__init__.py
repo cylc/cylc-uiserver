@@ -50,7 +50,7 @@ def authenticated(
     def wrapper(  # type: ignore
             self: 'CylcAppHandler', *args, **kwargs
     ) -> Optional[Awaitable[None]]:
-        if not self.current_user:
+        if not self.current_user['name']:
             self.log.debug('Unauthenticated WebSocket request!')
             raise HTTPError(403)
 

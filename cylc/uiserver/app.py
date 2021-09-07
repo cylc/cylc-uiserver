@@ -111,16 +111,20 @@ class CylcUIServer(ExtensionApp):
     AUTH_DESCRIPTION = '''
             Authorization can be granted at operation (mutation) level, i.e.
             specifically grant user access to execute Cylc commands, e.g.
-            `play`, `pause`, `edit`, `trigger` etc. For your convenience,
-            these operations have been mapped to access groups `READ`,
-            `CONTROL` and `ALL`.
+            ``play``, ``pause``, ``edit``, ``trigger`` etc. For your
+            convenience, these operations have been mapped to access groups
+            ``READ``, ``CONTROL`` and ``ALL``.
+
             To remove permissions, prepend the access group or operation with
-            `!`.
+            ``!``.
+
             Permissions are additive but negated permissions take precedence
             above additions.
+
             .. note::
-            Any authorization permissions granted to a user will be
-            applied to all workflows.
+
+               Any authorization permissions granted to a user will be
+               applied to all workflows.
     '''
 
     site_authorization = Dict(
@@ -131,13 +135,18 @@ class CylcUIServer(ExtensionApp):
             configuration file and not the user configuration file (use
             ``c.CylcUIServer.user_authorization`` for user defined
             authorization).
+
             If this configuration is empty, site authorization defaults to no
             configurable authorization and users will be unable to set any
             authorization.
-        ''' + AUTH_DESCRIPTION + '''
-        Example Configuration:
+
+            ''' + AUTH_DESCRIPTION + '''
+
+        .. rubric:: Example Configuration:
+
         .. code-block:: python
-        c.CylcUIServer.site_authorization = {
+
+           c.CylcUIServer.site_authorization = {
     "*": {                              # For all ui-server owners,
         "*": {                          # Any authenticated user
             "default": "READ",          # Will have default read-only access
@@ -176,7 +185,7 @@ class CylcUIServer(ExtensionApp):
             your limit for each user, as defined in the site_authorization
             configuration.
             ''' + AUTH_DESCRIPTION + '''
-            Example configuration, residing in `~/.cylc/hub/config.py`:
+            Example configuration, residing in `~/.cylc/hub/jupyter_config.py`:
         .. code-block:: python
          c.CylcUIServer.user_authorization = {
             "*": ["READ"],            # any authenticated user has READ access

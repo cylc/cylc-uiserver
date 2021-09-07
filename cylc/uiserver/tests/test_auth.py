@@ -16,6 +16,7 @@
 """Test authorisation and authentication HTTP response codes."""
 
 from functools import partial
+from uuid import uuid1
 
 import pytest
 
@@ -156,7 +157,7 @@ async def test_unauthenticated(
         pytest.param(
             ('cylc', 'userprofile'),
             403,
-            'authorisation insufficient',
+            'authorization insufficient',
             None,
             id='cylc/userprofile',
         )
@@ -171,6 +172,64 @@ async def test_unauthorised(
     body
 ):
     await _test(jp_fetch, endpoint, code, message, body)
+
+
+@pytest.fixture
+def authorisation_middleware_instances(monkeypatch):
+    """Captures instances of the AuthorizationMiddleware class.
+
+    Returns a list which is updated with instances of AuthorizationMiddleware
+    created within the lifetime of the test function.
+    """
+    instances = []
+
+    def _init(self):
+        nonlocal instances
+        instances.append(self)
+
+    monkeypatch.setattr(
+        'cylc.uiserver.authorise.AuthorizationMiddleware.__init__',
+        _init
+    )
+
+    return instances
+
+
+@pytest.mark.integration
+@pytest.mark.usefixtures("mock_authentication_yossarian")
+async def test_authorisation_middleware_instances(
+    patch_conf_files,
+    jp_fetch,
+    mock_authentication,
+    authorisation_middleware_instances
+):
+    """Test the AuthorizationMiddleware lifecycle.
+
+    Ensure that one AuthorizationMiddleware instance is created for each
+    request and that it is configured for the authenticated used.`
+    """
+    query = 'workflows { id }'
+    for item in range(5):
+        # perform a graphql request as a fake user
+        user = str(uuid1())
+        mock_authentication(user=user)
+        with pytest.raises(HTTPClientError) as error:
+            await jp_fetch('cylc', 'graphql', method='POST', body=query)
+        # this request should fail for authorisation reasons
+        assert error.value.code == 403
+        # a new AuthorizationMiddleware instance should be created for
+        # this request
+        assert len(authorisation_middleware_instances) == item + 1
+        # this AuthorizationMiddleware instance should be configured for the
+        # authenticated user
+        assert authorisation_middleware_instances[-1].current_user == user
+
+    # finally repeat the last graphql request
+    with pytest.raises(HTTPClientError) as error:
+        await jp_fetch('cylc', 'graphql', method='POST', body=query)
+    # we should have a new AuthorizationMiddleware instance
+    assert len(authorisation_middleware_instances) == item + 2
+    assert authorisation_middleware_instances[-1].current_user == user
 
 
 async def _test(jp_fetch, endpoint, code, message, body):

@@ -23,6 +23,8 @@ from graphql_ws.constants import (
 
 from typing import Union, Awaitable, Any, List, Tuple, Dict, Optional
 
+from cylc.uiserver.handlers import parse_current_user
+
 setup_observable_extension()
 
 NO_MSG_DELAY = 1.0
@@ -85,15 +87,7 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
             middleware = self.middleware
         for mw in self.middleware:
             if hasattr(mw, "auth"):
-                if not isinstance(self.current_user, dict):
-                    # the server is running using a token
-                    # authentication is provided by jupyter server
-                    self.current_user = {
-                        'kind': 'user',
-                        'name': getpass.getuser(),
-                        'server': socket.gethostname()
-                    }
-            # if isinstance(mw, AuthorizationMiddleware):
+                self.current_user = parse_current_user(self.current_user)
                 mw.current_user = self.current_user['name']
                 mw.auth = self.auth
         return dict(

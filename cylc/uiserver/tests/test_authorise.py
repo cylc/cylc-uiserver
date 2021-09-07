@@ -20,7 +20,8 @@ from unittest.mock import patch
 from cylc.uiserver.authorise import (
     Authorization,
     AuthorizationMiddleware,
-    expand_and_process_access_groups
+    expand_and_process_access_groups,
+    parse_group_ids
 )
 
 FAKE_SITE_CONF = {
@@ -83,9 +84,9 @@ FAKE_USER_CONF = {
     'expected_operations, owner_name, owner_groups, user_name, user_groups',
     [
         pytest.param({'message', 'play', 'trigger', 'resume', 'setverbosity',
-                      'setgraphwindowextent', 'ping', 'read', 'poll',
+                      'setgraphwindowextent', 'ping', 'read', 'poll', 'hold',
                       'remove', 'setholdpoint', 'releaseholdpoint',
-                      'ext-trigger', 'pause', 'pause', 'setoutputs', 'release'},
+                      'extTrigger', 'pause', 'pause', 'setoutputs', 'release'},
                      'server_owner_2',
                      ['group:grp_of_svr_owners'],
                      'user7',

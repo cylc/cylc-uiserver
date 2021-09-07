@@ -24,7 +24,7 @@ from tornado import web
 from traitlets.config.loader import LazyConfigValue
 from traitlets.traitlets import Bool
 
-logger = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
 class Authorization:
@@ -73,11 +73,11 @@ class Authorization:
     ]
 
     CONTROL_OPS = [
-        "ext-trigger",
+        "extTrigger",
         "pause",
         "kill",
         "message",
-        "pause",
+        "hold",
         "play",
         "poll",
         "release",
@@ -97,11 +97,11 @@ class Authorization:
         "ping",
         "read",
         "broadcast",
-        "ext-trigger",
+        "extTrigger",
         "pause",
         "kill",
         "message",
-        "pause",
+        "hold",
         "play",
         "poll",
         "release",
@@ -136,7 +136,7 @@ class Authorization:
         """Resolve lazy config where empty
 
         Args:
-            auth_conf: Authorization configuration from a config.py
+            auth_conf: Authorization configuration from a jupyter_config.py
 
         Returns:
             Valid configuration dictionary
@@ -243,6 +243,10 @@ class Authorization:
             limits_owner_can_give)
         allowed_operations = limits_owner_can_give.intersection(
             user_conf_permitted_ops)
+        LOG.info(
+            f"User {access_user} authorized permissions: "
+            f"{sorted(allowed_operations)}"
+        )
         return allowed_operations
 
     def is_permitted(
@@ -259,11 +263,11 @@ class Authorization:
         """
         if access_user == self.owner_user_info['user']:
             return True
-        logger.info(f'{access_user}: requested {operation}')
+        LOG.info(f'{access_user}: requested {operation}')
         if str(operation) in self.get_permitted_operations(access_user):
-            logger.info(f'{access_user}: authorised to {operation}')
+            LOG.info(f'{access_user}: authorized to {operation}')
             return True
-        logger.info(f'{access_user}: not authorised to {operation}')
+        LOG.info(f'{access_user}: not authorized to {operation}')
 
         return False
 
@@ -346,6 +350,11 @@ class Authorization:
             else:
                 defaults.update(permission)
         defaults.discard('')
+        LOG.info(
+            f"User {access_user['access_username']} authorization not present "
+            "in user config. Implementing site authorization defaults. "
+            f"Authorized permissions: {sorted(defaults)}"
+        )
         return defaults
 
 
@@ -394,7 +403,7 @@ class AuthorizationMiddleware:
                        f":requested to {op_name}.")
         if message:
             log_message = log_message + " " + message
-        logger.warning(log_message)
+        LOG.warning(log_message)
         raise web.HTTPError(http_code, reason=message)
 
     @staticmethod
@@ -435,11 +444,27 @@ def get_groups(username: str) -> List[str]:
     group_ids = os.getgrouplist(username, groupmax)
     group_ids.remove(groupmax)
     # turn list of group_ids into group names with group identifier prepended
-    return list(map(
-        lambda x: f'{Authorization.GRP_IDENTIFIER}{grp.getgrgid(x).gr_name}',
-        group_ids
-        )
-    )
+    return parse_group_ids(group_ids)
+
+
+def parse_group_ids(group_ids: List) -> List:
+    """Returns list of groups in the correct format for authorisation.
+
+    Args:
+        group_ids: List of users groups, in number format
+
+    Returns:
+        List: List of users groups, in id format with group identifier
+        prepended.
+    """
+    group_list = []
+    for x in group_ids:
+        try:
+            group_list.append(
+                f'{Authorization.GRP_IDENTIFIER}{grp.getgrgid(x).gr_name}')
+        except OverflowError:
+            continue
+    return group_list
 
 
 def expand_and_process_access_groups(permission_set: set) -> set:
