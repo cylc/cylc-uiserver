@@ -39,8 +39,6 @@ from cylc.uiserver.websockets import authenticated as websockets_authenticated
 ME = getpass.getuser()
 
 
-
-
 def authorised(fun: Callable) -> Callable:
     """Provides Cylc authorisation.
 

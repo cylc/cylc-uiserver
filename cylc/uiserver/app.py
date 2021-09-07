@@ -40,8 +40,6 @@ from cylc.flow.cfgspec.globalcfg import GlobalConfig
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
 )
-from cylc import uiserver
-
 from cylc.uiserver import (
     __file__ as uis_pkg
 )
@@ -329,7 +327,6 @@ class CylcUIServer(ExtensionApp):
     @default('logging_config')
     def _default_logging_config(self):
         return Path(Path(uis_pkg).parent / 'logging_config.json')
-
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

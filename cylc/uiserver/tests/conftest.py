@@ -24,6 +24,7 @@ from socket import gethostname
 from tempfile import TemporaryDirectory
 
 import pytest
+from tornado.web import HTTPError
 from traitlets.config import Config
 import zmq
 
@@ -193,6 +194,7 @@ def authorisation_true(monkeypatch):
         lambda x: True
     )
 
+
 @pytest.fixture
 def authorisation_false(monkeypatch):
     """Disabled request authorisation for test purposes."""
@@ -200,6 +202,7 @@ def authorisation_false(monkeypatch):
         'cylc.uiserver.handlers._authorise',
         lambda x: False
     )
+
 
 @pytest.fixture
 def mock_authentication(monkeypatch):
@@ -210,7 +213,22 @@ def mock_authentication(monkeypatch):
             'server': server or gethostname()
         }
         if none:
-            ret = 'anonymous'
+            ret = None
+
+            def mock_redirect(*args):
+                # normally tornado would attempt to redirect us to the login
+                # page - for testing purposes we will skip this and raise
+                # a 403 with an explanatory reason
+                raise HTTPError(
+                    403,
+                    reason='login redirect replaced by 403 for test purposes'
+                )
+
+            monkeypatch.setattr(
+                'cylc.uiserver.handlers.CylcAppHandler.redirect',
+                mock_redirect
+            )
+
         monkeypatch.setattr(
             'cylc.uiserver.handlers.CylcAppHandler.get_current_user',
             lambda x: ret

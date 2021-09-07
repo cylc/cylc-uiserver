@@ -4,7 +4,9 @@
 # The file was copied from this revision:
 # https://github.com/graphql-python/graphql-ws/blob/cf560b9a5d18d4a3908dc2cfe2199766cc988fef/graphql_ws/tornado.py
 
+import getpass
 from inspect import isawaitable, isclass
+import socket
 
 from asyncio import create_task, gather, wait, shield, sleep
 from asyncio.queues import QueueEmpty
@@ -83,6 +85,14 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
             middleware = self.middleware
         for mw in self.middleware:
             if hasattr(mw, "auth"):
+                if not isinstance(mw.current_user, dict):
+                    # the server is running using a token
+                    # authentication is provided by jupyter server
+                    self.current_user = {
+                        'kind': 'user',
+                        'name': getpass.getuser(),
+                        'server': socket.gethostname()
+                    }
             # if isinstance(mw, AuthorizationMiddleware):
                 mw.current_user = self.current_user['name']
                 mw.auth = self.auth

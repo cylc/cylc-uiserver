@@ -15,7 +15,6 @@
 
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
-import getpass
 import os
 from subprocess import Popen, PIPE, DEVNULL
 

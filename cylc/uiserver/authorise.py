@@ -351,7 +351,6 @@ class AuthorizationMiddleware:
     current_user = None
 
     def resolve(self, next_, root, info, **args):
-        set_auth= set()
         # We won't be re-checking auth for return variables
         if len(info.path) > 1:
             return next_(root, info, **args)
@@ -362,7 +361,8 @@ class AuthorizationMiddleware:
                              "Operation not in schema.")
         try:
             authorised = self.auth.is_permitted(self.current_user, op_name)
-        except Exception as ex:
+        except Exception:
+            # Fail secure
             authorised = False
         if not authorised:
             self.auth_failed(self.current_user, op_name, 403)
