@@ -74,7 +74,7 @@ class Authorization:
 
     CONTROL_OPS = [
         "ext-trigger",
-        "hold",
+        "pause",
         "kill",
         "message",
         "pause",
@@ -98,7 +98,7 @@ class Authorization:
         "read",
         "broadcast",
         "ext-trigger",
-        "hold",
+        "pause",
         "kill",
         "message",
         "pause",
@@ -217,6 +217,11 @@ class Authorization:
         Returns:
             Set of operations permitted by given access user for this UI Server
         """
+        # For use in the ui, owner permissions (ALL operations) are set
+        if access_user == self.owner:
+            return expand_and_process_access_groups(set(self.ALL_OPS))
+        # Otherwise process permissions for (non-uiserver owner) access_user
+
         access_user_dict = {'access_username': access_user,
                             'access_user_groups': get_groups(access_user)
                             }

@@ -85,7 +85,7 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
             middleware = self.middleware
         for mw in self.middleware:
             if hasattr(mw, "auth"):
-                if not isinstance(mw.current_user, dict):
+                if not isinstance(self.current_user, dict):
                     # the server is running using a token
                     # authentication is provided by jupyter server
                     self.current_user = {

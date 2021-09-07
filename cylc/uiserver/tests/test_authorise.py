@@ -85,7 +85,7 @@ FAKE_USER_CONF = {
         pytest.param({'message', 'play', 'trigger', 'resume', 'setverbosity',
                       'setgraphwindowextent', 'ping', 'read', 'poll',
                       'remove', 'setholdpoint', 'releaseholdpoint',
-                      'ext-trigger', 'pause', 'hold', 'setoutputs', 'release'},
+                      'ext-trigger', 'pause', 'pause', 'setoutputs', 'release'},
                      'server_owner_2',
                      ['group:grp_of_svr_owners'],
                      'user7',

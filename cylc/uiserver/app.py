@@ -369,7 +369,11 @@ class CylcUIServer(ExtensionApp):
         self.set_sub_server()
 
         self.handlers.extend([
-            ('cylc/version', CylcVersionHandler),
+            (
+                'cylc/version',
+                CylcVersionHandler,
+                {'auth': self.authobj}
+            ),
             (
                 'cylc/graphql',
                 UIServerGraphQLHandler,
@@ -410,6 +414,7 @@ class CylcUIServer(ExtensionApp):
             (
                 'cylc/userprofile',
                 UserProfileHandler,
+                {'auth': self.authobj}
             ),
             (
                 'cylc/(.*)?',

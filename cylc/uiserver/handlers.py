@@ -32,7 +32,7 @@ from cylc.flow.scripts.cylc import (
     list_plugins as list_cylc_plugins,
 )
 
-from cylc.uiserver.authorise import AuthorizationMiddleware
+from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
 
 
@@ -122,11 +122,25 @@ def _authorise(
     Currently this returns False unless the authenticated user is the same
     as the user this server is running under.
     """
-    if username != ME:
-        # auth provided by the hub, check the user name
+    if username == ME or can_read(handler=handler):
+        return True
+    else:
         handler.log.warning(f'Authorisation failed for {username}')
         return False
-    return True
+
+
+def can_read(handler):
+    """Checks if the user has permitted operation `read`
+    """
+    if not handler:
+        return False
+    user = handler.get_current_user()
+    username = user.get('name', '?')
+    if handler.auth.is_permitted(
+        username, Authorization.READ_OPERATION
+    ):
+        return True
+    return False
 
 
 class CylcAppHandler(JupyterHandler):
@@ -185,6 +199,9 @@ class CylcVersionHandler(CylcAppHandler):
     Equivalent to running `cylc version --long` in the UIS environment.
     """
 
+    def initialize(self, auth):
+        self.auth = auth
+
     @authorised
     @web.authenticated
     def get(self):
@@ -205,6 +222,9 @@ class UserProfileHandler(CylcAppHandler):
     When running standalone we provide something similar to what the hub
     would have returned.
     """
+
+    def initialize(self, auth):
+        self.auth = auth
 
     def set_default_headers(self) -> None:
         super().set_default_headers()
@@ -231,6 +251,10 @@ class UserProfileHandler(CylcAppHandler):
         # NOTE: when running behind a hub this may be different from the
         # authenticated user
         user_info['owner'] = ME
+
+        # Make user permissions available to the ui
+        user_info['permissions'] = list(
+            self.auth.get_permitted_operations(user_info['name']))
 
         self.write(json.dumps(user_info))
 
@@ -358,5 +382,6 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         wider_context = {
             'request': self.request,
             'resolvers': self.resolvers,
+            'user': self.current_user
         }
         return wider_context
