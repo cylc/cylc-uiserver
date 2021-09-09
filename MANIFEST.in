@@ -1,3 +1,4 @@
+include py.typed
 include logging_config.json
 include logo.svg
 recursive-include cylc/uiserver/ui
