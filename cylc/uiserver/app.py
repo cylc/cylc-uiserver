@@ -45,7 +45,8 @@ from cylc.uiserver import (
 )
 from cylc.uiserver.authorise import (
     Authorization,
-    AuthorizationMiddleware
+    AuthorizationMiddleware,
+    get_list_of_mutations
 )
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.handlers import (
@@ -147,32 +148,33 @@ class CylcUIServer(ExtensionApp):
         .. code-block:: python
 
            c.CylcUIServer.site_authorization = {
-    "*": {                              # For all ui-server owners,
-        "*": {                          # Any authenticated user
-            "default": "READ",          # Will have default read-only access
-        }
-        "user1": {                      # user1
-            "default": ["!ALL"],        # No privileges for all ui-server
-                                        # owners.
-        },                              # No limit set, so all ui-server owners
-    },                                  # limit is also "!ALL" for user1
-    "server_owner_1": {                 # For specific UI Server owner,
-        "group:group_a": {              # Any user who is a member of group_a
-            "default": "READ",          # Will have default read-only access
-            "limit": ["ALL", "!play"],  # server_owner_1 is able to give away
-        },                              # All privileges, except play.
-    },
-    "group:grp_of_svr_owners": {        # Group of users who own UI Servers
-        "group:group_b": {
-            "limit": [                  # can grant groupB users up to READ and
-                "READ",                 # CONTROL privileges, without stop and
-                "CONTROL",              # kill
-                "!stop",
-                "!kill",                # No default, so default is no access
-            ],
-        },
-    },
-}
+               "*": {  # For all ui-server owners,
+                   "*": {  # Any authenticated user
+                       "default": "READ",  # Will have default read-only access
+                   },
+                   "user1": {  # user1
+                       "default": ["!ALL"],  # No privileges for all ui-server
+                       # owners.
+                   },  # No limit set, so all ui-server owners
+               },  # limit is also "!ALL" for user1
+               "server_owner_1": {  # For specific UI Server owner,
+                   "group:group_a": {  # Any user who is a member of group_a
+                       "default": "READ",  # Will have default read-only access
+                       "limit": ["ALL", "!play"],  # server_owner_1 is able to
+                   },  # grant All privileges, except play.
+               },
+               "group:grp_of_svr_owners": {  # Group of owners of UI Servers
+                   "group:group_b": {
+                       "limit": [  # can grant groupB users up to READ and
+                           "READ",  # CONTROL privileges, without stop and
+                           "CONTROL",  # kill
+                           "!stop",
+                           "!kill",  # No default, so default is no access
+                       ],
+                   },
+               },
+           }
+
         ''')
 
     user_authorization = Dict(
@@ -186,15 +188,16 @@ class CylcUIServer(ExtensionApp):
             configuration.
             ''' + AUTH_DESCRIPTION + '''
             Example configuration, residing in `~/.cylc/hub/jupyter_config.py`:
+
         .. code-block:: python
-         c.CylcUIServer.user_authorization = {
-            "*": ["READ"],            # any authenticated user has READ access
-            "group:group2": ["ALL"],  # Any user in system group2 has access to
-                                      # all operations
-            "userA": [
-                "ALL", "!stop"
-            ],                        # userA has ALL operations, but not stop
-}
+
+           c.CylcUIServer.user_authorization = {
+               "*": ["READ"],  # any authenticated user has READ access
+               "group:group2": ["ALL"],  # Any user in system group2 has access
+                                         # to all operations
+               "userA": ["ALL", "!stop"],  # userA has ALL operations, not stop
+           }
+
         '''
     )
 
@@ -374,7 +377,7 @@ class CylcUIServer(ExtensionApp):
         ).start()
 
     def initialize_handlers(self):
-        self.set_auth()
+        self.authobj = self.set_auth()
         self.set_sub_server()
 
         self.handlers.extend([
@@ -455,10 +458,15 @@ class CylcUIServer(ExtensionApp):
         )
 
     def set_auth(self):
-        self.authobj = Authorization(
+        """Create authorization object.
+        One for the lifetime of the UIServer.
+        """
+        return Authorization(
             getpass.getuser(),
             self.config.CylcUIServer.user_authorization,
-            self.config.CylcUIServer.site_authorization
+            self.config.CylcUIServer.site_authorization,
+            get_list_of_mutations(control=True),
+            get_list_of_mutations()
         )
 
     def initialize_templates(self):

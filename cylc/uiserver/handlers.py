@@ -345,7 +345,7 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         self.resolvers = resolvers
         self.current_user = parse_current_user(self.get_current_user())
         if sub_server:
-            self.subscription_server.current_user = self.get_current_user()
+            self.subscription_server.current_user = self.current_user['name']
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
@@ -377,6 +377,5 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         wider_context = {
             'request': self.request,
             'resolvers': self.resolvers,
-            'user': self.current_user
         }
         return wider_context

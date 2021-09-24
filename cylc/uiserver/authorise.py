@@ -23,6 +23,8 @@ import os
 from tornado import web
 from traitlets.config.loader import LazyConfigValue
 from traitlets.traitlets import Bool
+import graphene
+from cylc.uiserver.schema import UISMutations
 
 LOG = logging.getLogger(__name__)
 
@@ -69,58 +71,22 @@ class Authorization:
 
     READ_OPS = [
         "ping",
-        "read",
-    ]
-
-    CONTROL_OPS = [
-        "extTrigger",
-        "pause",
-        "kill",
-        "message",
-        "hold",
-        "play",
-        "poll",
-        "release",
-        "releaseholdpoint",
-        "reload",
-        "remove",
-        "resume",
-        "setgraphwindowextent",
-        "setholdpoint",
-        "setoutputs",
-        "setverbosity",
-        "stop",
-        "trigger",
-    ]
-
-    ALL_OPS = [
-        "ping",
-        "read",
-        "broadcast",
-        "extTrigger",
-        "pause",
-        "kill",
-        "message",
-        "hold",
-        "play",
-        "poll",
-        "release",
-        "releaseholdpoint",
-        "reload",
-        "remove",
-        "resume",
-        "setgraphwindowextent",
-        "setholdpoint",
-        "setoutputs",
-        "setverbosity",
-        "stop",
-        "trigger",
+        READ_OPERATION,
     ]
 
     ASYNC_OPS = {'query', 'mutation'}
     READ_AUTH_OPS = {'query', 'subscription'}
 
-    def __init__(self, owner, owner_auth_conf, site_auth_conf) -> None:
+    def __init__(
+        self,
+        owner,
+        owner_auth_conf,
+        site_auth_conf,
+        control_ops,
+        all_ops
+    ) -> None:
+        self.control_ops = control_ops
+        self.all_ops = all_ops
         self.owner = owner
         self.owner_auth_conf = self.set_auth_conf(owner_auth_conf)
         self.site_auth_config = self.set_auth_conf(site_auth_conf)
@@ -130,6 +96,48 @@ class Authorization:
         self.owner_dict = self.build_owner_site_auth_conf()
         self.get_permitted_operations = (
             lru_cache(maxsize=128)(self._get_permitted_operations))
+
+    def expand_and_process_access_groups(self, permission_set: set) -> set:
+        """Process a permission set.
+
+        Takes a permission set, e.g. limits, defaults.
+        Expands the access groups and removes negated operations.
+
+        Args:
+            permission_set: set of permissions
+
+        Returns:
+            permission_set: processed permission set.
+        """
+        for action_group, expansion in {
+            Authorization.CONTROL: self.control_ops,
+            Authorization.ALL: self.all_ops,
+                Authorization.READ: Authorization.READ_OPS}.items():
+            if action_group in permission_set:
+                permission_set.remove(action_group)
+                permission_set.update(expansion)
+        # Expand negated permissions
+        for action_group, expansion in {
+                Authorization.NOT_CONTROL: list(
+                    map((lambda x: '!' + x), self.control_ops)),
+                Authorization.NOT_ALL: list(
+                    map((lambda x: '!' + x), self.all_ops)),
+                Authorization.NOT_READ: list(
+                    map((lambda x: '!' + x), Authorization.READ_OPS))}.items():
+            if action_group in permission_set:
+                permission_set.remove(action_group)
+                permission_set.update(expansion)
+        # Remove negated permissions
+        remove = set()
+
+        for perm in permission_set:
+            if perm.startswith("!"):
+                with suppress(KeyError):
+                    remove.add(perm.lstrip("!"))
+                    remove.add(perm)
+        permission_set.difference_update(remove)
+        permission_set.discard('')
+        return permission_set
 
     @staticmethod
     def set_auth_conf(auth_conf: Union[LazyConfigValue, dict]) -> dict:
@@ -219,7 +227,7 @@ class Authorization:
         """
         # For use in the ui, owner permissions (ALL operations) are set
         if access_user == self.owner:
-            return expand_and_process_access_groups(set(self.ALL_OPS))
+            return self.expand_and_process_access_groups(set(self.all_ops))
         # Otherwise process permissions for (non-uiserver owner) access_user
 
         access_user_dict = {'access_username': access_user,
@@ -237,9 +245,9 @@ class Authorization:
             user_conf_permitted_ops = (
                 self.return_site_auth_defaults_for_access_user(
                     access_user=access_user_dict))
-        user_conf_permitted_ops = expand_and_process_access_groups(
+        user_conf_permitted_ops = self.expand_and_process_access_groups(
             user_conf_permitted_ops)
-        limits_owner_can_give = expand_and_process_access_groups(
+        limits_owner_can_give = self.expand_and_process_access_groups(
             limits_owner_can_give)
         allowed_operations = limits_owner_can_give.intersection(
             user_conf_permitted_ops)
@@ -406,8 +414,7 @@ class AuthorizationMiddleware:
         LOG.warning(log_message)
         raise web.HTTPError(http_code, reason=message)
 
-    @staticmethod
-    def get_op_name(field_name: str, operation: str) -> Union[None, str]:
+    def get_op_name(self, field_name: str, operation: str) -> Union[None, str]:
         """
         Returns operation name required for authorization.
         Converts queries and subscriptions to read operations.
@@ -422,7 +429,7 @@ class AuthorizationMiddleware:
             return Authorization.READ_OPERATION
         else:
             # Check it is a mutation in our schema
-            if field_name in Authorization.ALL_OPS:
+            if self.auth and field_name in self.auth.all_ops:
                 return field_name
         return None
 
@@ -467,44 +474,19 @@ def parse_group_ids(group_ids: List) -> List:
     return group_list
 
 
-def expand_and_process_access_groups(permission_set: set) -> set:
-    """Process a permission set.
-
-    Takes a permission set, e.g. limits, defaults.
-    Expands the access groups and removes negated operations.
-
-    Args:
-        permission_set: set of permissions
-
-    Returns:
-        permission_set: processed permission set.
-    """
-    for action_group, expansion in {
-        Authorization.CONTROL: Authorization.CONTROL_OPS,
-        Authorization.ALL: Authorization.ALL_OPS,
-            Authorization.READ: Authorization.READ_OPS}.items():
-        if action_group in permission_set:
-            permission_set.remove(action_group)
-            permission_set.update(expansion)
-    # Expand negated permissions
-    for action_group, expansion in {
-            Authorization.NOT_CONTROL: list(
-                map((lambda x: '!' + x), Authorization.CONTROL_OPS)),
-            Authorization.NOT_ALL: list(
-                map((lambda x: '!' + x), Authorization.ALL_OPS)),
-            Authorization.NOT_READ: list(
-                map((lambda x: '!' + x), Authorization.READ_OPS))}.items():
-        if action_group in permission_set:
-            permission_set.remove(action_group)
-            permission_set.update(expansion)
-    # Remove negated permissions
-    remove = set()
-
-    for perm in permission_set:
-        if perm.startswith("!"):
-            with suppress(KeyError):
-                remove.add(perm.lstrip("!"))
-                remove.add(perm)
-    permission_set.difference_update(remove)
-    permission_set.discard('')
-    return permission_set
+def get_list_of_mutations(control=False) -> List[str]:
+    """Gets list of mutations"""
+    list_of_mutations = [
+        attr.replace('_', '') for attr in dir(UISMutations)
+        if isinstance(getattr(UISMutations, attr), graphene.Field)
+    ]
+    if control:
+        # Ping is a READ mutation
+        list_of_mutations.remove('ping')
+        # Broadcast is an ALL mutation
+        list_of_mutations.remove('broadcast')
+        return list_of_mutations
+    else:
+        # 'read' is used soley for authorization and is not a UISMutation
+        list_of_mutations.append(Authorization.READ_OPERATION)
+        return list_of_mutations

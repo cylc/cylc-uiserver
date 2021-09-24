@@ -14,15 +14,59 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
-
+from pytest import MonkeyPatch
 from unittest.mock import patch
 
 from cylc.uiserver.authorise import (
     Authorization,
     AuthorizationMiddleware,
-    expand_and_process_access_groups,
-    parse_group_ids
+    get_list_of_mutations
 )
+
+CONTROL_OPS = [
+    "exttrigger",
+    "pause",
+    "kill",
+    "message",
+    "hold",
+    "play",
+    "poll",
+    "release",
+    "releaseholdpoint",
+    "reload",
+    "remove",
+    "resume",
+    "setgraphwindowextent",
+    "setholdpoint",
+    "setoutputs",
+    "setverbosity",
+    "stop",
+    "trigger",
+    ]
+
+ALL_OPS = [
+    "ping",
+    "read",
+    "broadcast",
+    "exttrigger",
+    "pause",
+    "kill",
+    "message",
+    "hold",
+    "play",
+    "poll",
+    "release",
+    "releaseholdpoint",
+    "reload",
+    "remove",
+    "resume",
+    "setgraphwindowextent",
+    "setholdpoint",
+    "setoutputs",
+    "setverbosity",
+    "stop",
+    "trigger",
+]
 
 FAKE_SITE_CONF = {
     "*": {
@@ -86,7 +130,7 @@ FAKE_USER_CONF = {
         pytest.param({'message', 'play', 'trigger', 'resume', 'setverbosity',
                       'setgraphwindowextent', 'ping', 'read', 'poll', 'hold',
                       'remove', 'setholdpoint', 'releaseholdpoint',
-                      'extTrigger', 'pause', 'pause', 'setoutputs', 'release'},
+                      'exttrigger', 'pause', 'pause', 'setoutputs', 'release'},
                      'server_owner_2',
                      ['group:grp_of_svr_owners'],
                      'user7',
@@ -128,7 +172,13 @@ def test_get_permitted_operations(mocked_get_groups,
                                   owner_name, owner_groups,
                                   user_name, user_groups):
     mocked_get_groups.side_effect = [owner_groups, user_groups]
-    auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF)
+    auth_obj = Authorization(
+        owner_name,
+        FAKE_USER_CONF,
+        FAKE_SITE_CONF,
+        CONTROL_OPS,
+        ALL_OPS
+    )
     actual_operations = auth_obj.get_permitted_operations(
         access_user=user_name)
     assert actual_operations == expected_operations
@@ -172,7 +222,13 @@ def test_get_access_user_permissions_from_owner_conf(
     """Test the un-processed permissions of owner conf.
     """
     mocked_get_groups.return_value = ['group:blah']
-    authobj = Authorization('some_user', owner_auth_conf, {'fake': 'config'})
+    authobj = Authorization(
+        'some_user',
+        owner_auth_conf,
+        {'fake': 'config'},
+        CONTROL_OPS,
+        ALL_OPS
+    )
     permitted_operations = authobj.get_access_user_permissions_from_owner_conf(
         access_user_dict)
     assert permitted_operations == expected_operations
@@ -190,7 +246,14 @@ def test_get_access_user_permissions_from_owner_conf(
                  id="Check expansion for !ALL with additions")
 ])
 def test_expand_and_process_access_groups(permission_set, expected):
-    actual = expand_and_process_access_groups(permission_set)
+    authobj = Authorization(
+        'some_user',
+        {'fake': 'config'},
+        {'fake': 'config'},
+        CONTROL_OPS,
+        ALL_OPS
+    )
+    actual = authobj.expand_and_process_access_groups(permission_set)
     assert actual == expected
 
 
@@ -213,8 +276,20 @@ def test_expand_and_process_access_groups(permission_set, expected):
                  id="Query operation, workflows field, returns read")
 ])
 def test_get_op_name(mut_field_name, operation, expected_op_name):
-    actual_op_name = AuthorizationMiddleware.get_op_name(
-        mut_field_name, operation)
+    mock_authobj = Authorization(
+        'some_user',
+        {'fake': 'config'},
+        {'fake': 'config'},
+        CONTROL_OPS,
+        ALL_OPS
+    )
+    auth_middleware = AuthorizationMiddleware
+    auth_middleware.auth = mock_authobj
+    actual_op_name = auth_middleware.get_op_name(
+        auth_middleware,
+        mut_field_name,
+        operation
+    )
     assert actual_op_name == expected_op_name
 
 
@@ -244,9 +319,33 @@ def test_is_permitted(mocked_get_groups,
                       expected):
     mocked_get_groups.side_effect = [[''], ['']]
     mocked_get_permitted_operations.return_value = ['fake_operation']
-    auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF)
+    auth_obj = Authorization(
+        owner_name,
+        FAKE_USER_CONF,
+        FAKE_SITE_CONF,
+        CONTROL_OPS,
+        ALL_OPS
+    )
     actual = auth_obj.is_permitted(
         access_user=user_name, operation="fake_operation")
     if get_permitted_operations_is_called:
         mocked_get_permitted_operations.assert_called_with(user_name)
     assert actual == expected
+
+
+@pytest.mark.parametrize('control, expected',
+    [
+        pytest.param(False,
+                     ALL_OPS,
+                     id="All ops returned"
+                     ),
+        pytest.param(True,
+                     CONTROL_OPS,
+                     id="Control ops returned"
+                     ),
+    ]
+)
+def test_get_list_of_mutations(control, expected):
+    """Test ALL_OPS are returned"""
+    actual = get_list_of_mutations(control=control)
+    assert set(actual) == set(expected)
