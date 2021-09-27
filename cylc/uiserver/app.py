@@ -89,15 +89,16 @@ class CylcUIServer(ExtensionApp):
         map(
             str,
             [
-                # base configuration - always used
-                Path(uis_pkg).parent,
+                # user configuration
+                Path('~/.cylc/hub').expanduser(),
                 # site configuration
                 Path(
                     os.getenv('CYLC_SITE_CONF_PATH')
-                    or Path(GlobalConfig.DEFAULT_SITE_CONF_PATH, 'hub')
+                    or GlobalConfig.DEFAULT_SITE_CONF_PATH,
+                    'hub'
                 ),
-                # user configuration
-                Path('~/.cylc/hub').expanduser()
+                # base configuration - always used
+                Path(uis_pkg).parent,
             ]
         )
     )
