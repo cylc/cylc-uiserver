@@ -252,10 +252,6 @@ class CylcUIServer(ExtensionApp):
         ioloop.IOLoop.current().add_callback(
             self.workflows_mgr.update
         )
-        ioloop.PeriodicCallback(
-            self.workflows_mgr.update,
-            self.scan_interval * 1000
-        ).start()
 
     def initialize_settings(self):
         """Update extension settings.
@@ -274,6 +270,11 @@ class CylcUIServer(ExtensionApp):
                 for key, value in self.config['CylcUIServer'].items()
             )
         )
+        # configure the scan
+        ioloop.PeriodicCallback(
+            self.workflows_mgr.update,
+            self.scan_interval * 1000
+        ).start()
 
     def initialize_handlers(self):
         self.handlers.extend([
