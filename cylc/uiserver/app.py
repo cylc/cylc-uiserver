@@ -268,6 +268,12 @@ class CylcUIServer(ExtensionApp):
         super().initialize_settings()
         self.log.info("Starting Cylc UI Server")
         self.log.info(f'Serving UI from: {self.ui_path}')
+        self.log.debug(
+            'CylcUIServer config:\n' + '\n'.join(
+                f'  * {key} = {repr(value)}'
+                for key, value in self.config['CylcUIServer'].items()
+            )
+        )
 
     def initialize_handlers(self):
         self.handlers.extend([

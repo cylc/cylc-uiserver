@@ -15,10 +15,14 @@
 
 # Configuration file for jupyterhub.
 
+import os
 from pathlib import Path
 import pkg_resources
 
-from cylc.uiserver import __file__ as uis_pkg
+from cylc.uiserver import (
+    __file__ as uis_pkg,
+    getenv,
+)
 
 
 # the command the hub should spawn (i.e. the cylc uiserver itself)
@@ -26,6 +30,17 @@ c.Spawner.cmd = ['cylc', 'hubapp']
 
 # the spawner to invoke this command
 c.JupyterHub.spawner_class = 'jupyterhub.spawner.LocalProcessSpawner'
+
+# environment variables to pass to the spawner (if defined)
+c.Spawner.environment = getenv(
+    # site config path override
+    'CYLC_SITE_CONF_PATH',
+    # used to specify the Cylc version if using a wrapper script
+    'CYLC_VERSION',
+    'CYLC_ENV_NAME',
+    # may be used by Cylc UI developers to use a development UI build
+    'CYLC_DEV',
+)
 
 # this auto-spawns uiservers without user interaction
 c.JupyterHub.implicit_spawn_seconds = 0.01
