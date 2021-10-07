@@ -31,6 +31,7 @@ The following people have contributed to this code under the terms of
 the Contributor Licence Agreement and Certificate of Origin detailed
 below.
 
+<!-- start-shortlog -->
  - Hilary Oliver
  - Matt Shin
  - Oliver Sanders
@@ -41,6 +42,7 @@ below.
  - Stephen McVeigh
  - Ronnie Dutta
  - David Matthews
+ <!-- end-shortlog -->
 
 (All contributors are identifiable with email addresses in the git version
 control logs or otherwise.)
