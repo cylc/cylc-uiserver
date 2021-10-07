@@ -15,6 +15,9 @@
 
 __version__ = "0.5.0"
 
+import os
+from typing import Dict
+
 from cylc.uiserver.app import CylcUIServer
 
 
@@ -29,3 +32,21 @@ def _jupyter_server_extension_points():
             'app': CylcUIServer
         }
     ]
+
+
+def getenv(*env_vars: str) -> Dict[str, str]:
+    """Extract env vars if set.
+
+    Returns a dict containing key:value pairs of environment variables
+    defined in env_vars providing they are present in the environment.
+
+    Examples:
+        >>> getenv('HOME', 'NOT_AN_ENVIRONMENT_VARIABLE')
+        {'HOME': ...}
+
+    """
+    env: Dict[str, str] = {}
+    for env_var in env_vars:
+        if env_var in os.environ:
+            env[env_var] = os.environ[env_var]
+    return env

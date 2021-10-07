@@ -89,15 +89,16 @@ class CylcUIServer(ExtensionApp):
         map(
             str,
             [
-                # base configuration - always used
-                Path(uis_pkg).parent,
+                # user configuration
+                Path('~/.cylc/hub').expanduser(),
                 # site configuration
                 Path(
                     os.getenv('CYLC_SITE_CONF_PATH')
-                    or Path(GlobalConfig.DEFAULT_SITE_CONF_PATH, 'hub')
+                    or GlobalConfig.DEFAULT_SITE_CONF_PATH,
+                    'hub'
                 ),
-                # user configuration
-                Path('~/.cylc/hub').expanduser()
+                # base configuration - always used
+                Path(uis_pkg).parent,
             ]
         )
     )
@@ -251,10 +252,6 @@ class CylcUIServer(ExtensionApp):
         ioloop.IOLoop.current().add_callback(
             self.workflows_mgr.update
         )
-        ioloop.PeriodicCallback(
-            self.workflows_mgr.update,
-            self.scan_interval * 1000
-        ).start()
 
     def initialize_settings(self):
         """Update extension settings.
@@ -267,6 +264,17 @@ class CylcUIServer(ExtensionApp):
         super().initialize_settings()
         self.log.info("Starting Cylc UI Server")
         self.log.info(f'Serving UI from: {self.ui_path}')
+        self.log.debug(
+            'CylcUIServer config:\n' + '\n'.join(
+                f'  * {key} = {repr(value)}'
+                for key, value in self.config['CylcUIServer'].items()
+            )
+        )
+        # configure the scan
+        ioloop.PeriodicCallback(
+            self.workflows_mgr.update,
+            self.scan_interval * 1000
+        ).start()
 
     def initialize_handlers(self):
         self.handlers.extend([

@@ -90,7 +90,7 @@ def is_token_authenticated(
 
     https://github.com/jupyter-server/jupyter_server/pull/562
     """
-    if isinstance(user, bytes): # noqa: SIM114
+    if isinstance(user, bytes):  # noqa: SIM114
         # Cookie authentication:
         # * The URL token is added to a secure cookie, it can then be
         #   removed from the URL for subsequent requests, the cookie is
