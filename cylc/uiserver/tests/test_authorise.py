@@ -334,17 +334,17 @@ def test_is_permitted(mocked_get_groups,
 
 
 @pytest.mark.parametrize('control, expected',
-    [
-        pytest.param(False,
-                     ALL_OPS,
-                     id="All ops returned"
-                     ),
-        pytest.param(True,
-                     CONTROL_OPS,
-                     id="Control ops returned"
-                     ),
-    ]
-)
+                         [
+                            pytest.param(False,
+                                         ALL_OPS,
+                                         id="All ops returned"
+                                         ),
+                            pytest.param(True,
+                                         CONTROL_OPS,
+                                         id="Control ops returned"
+                                         ),
+                          ]
+                         )
 def test_get_list_of_mutations(control, expected):
     """Test ALL_OPS are returned"""
     actual = get_list_of_mutations(control=control)

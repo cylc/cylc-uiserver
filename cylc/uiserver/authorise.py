@@ -368,26 +368,32 @@ class Authorization:
 
 # GraphQL middleware
 class AuthorizationMiddleware:
+    """Authorization Middleware for authorization checking GraphQL.
 
+    Mutations are checked against permissions from config files.
+
+    Raises:
+        web.HTTPError: Unauthorized requests.
+    """
     auth = None
-    current_user = None
 
     def resolve(self, next_, root, info, **args):
+        current_user = info.context['current_user']
         # We won't be re-checking auth for return variables
         if len(info.path) > 1:
             return next_(root, info, **args)
         op_name = self.get_op_name(info.field_name, info.operation.operation)
         # It shouldn't get here but worth checking for zero trust
         if not op_name:
-            self.auth_failed(self.current_user, op_name, 400,
+            self.auth_failed(current_user, op_name, 400,
                              "Operation not in schema.")
         try:
-            authorised = self.auth.is_permitted(self.current_user, op_name)
+            authorised = self.auth.is_permitted(current_user, op_name)
         except Exception:
             # Fail secure
             authorised = False
         if not authorised:
-            self.auth_failed(self.current_user, op_name, 403)
+            self.auth_failed(current_user, op_name, 403)
         if (info.operation.operation in Authorization.ASYNC_OPS
                 or iscoroutinefunction(next_)):
             return self.async_resolve(next_, root, info, **args)

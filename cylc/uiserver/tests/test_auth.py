@@ -195,43 +195,6 @@ def authorisation_middleware_instances(monkeypatch):
     return instances
 
 
-@pytest.mark.integration
-@pytest.mark.usefixtures("mock_authentication_yossarian")
-async def test_authorisation_middleware_instances(
-    patch_conf_files,
-    jp_fetch,
-    mock_authentication,
-    authorisation_middleware_instances
-):
-    """Test the AuthorizationMiddleware lifecycle.
-
-    Ensure that one AuthorizationMiddleware instance is created for each
-    request and that it is configured for the authenticated used.`
-    """
-    query = 'workflows { id }'
-    for item in range(5):
-        # perform a graphql request as a fake user
-        user = str(uuid1())
-        mock_authentication(user=user)
-        with pytest.raises(HTTPClientError) as error:
-            await jp_fetch('cylc', 'graphql', method='POST', body=query)
-        # this request should fail for authorisation reasons
-        assert error.value.code == 403
-        # a new AuthorizationMiddleware instance should be created for
-        # this request
-        assert len(authorisation_middleware_instances) == item + 1
-        # this AuthorizationMiddleware instance should be configured for the
-        # authenticated user
-        assert authorisation_middleware_instances[-1].current_user == user
-
-    # finally repeat the last graphql request
-    with pytest.raises(HTTPClientError) as error:
-        await jp_fetch('cylc', 'graphql', method='POST', body=query)
-    # we should have a new AuthorizationMiddleware instance
-    assert len(authorisation_middleware_instances) == item + 2
-    assert authorisation_middleware_instances[-1].current_user == user
-
-
 async def _test(jp_fetch, endpoint, code, message, body):
     """Test 400 HTTP response (upgrade to websocket)."""
     fetch = partial(jp_fetch, *endpoint)

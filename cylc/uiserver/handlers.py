@@ -283,18 +283,16 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 
     def initialize(self, schema=None, executor=None, middleware=None,
                    root_value=None, graphiql=False, pretty=False,
-                   batch=False, backend=None, **kwargs):
+                   batch=False, backend=None, auth=None, **kwargs):
         super(TornadoGraphQLHandler, self).initialize()
-        self.auth = kwargs['auth']
+        self.auth = auth
         self.schema = schema
-        self.current_user = parse_current_user(self.get_current_user())['name']
 
         if middleware is not None:
             self.middleware = list(self.instantiate_middleware(middleware))
         # Make authorization info available to auth middleware
         for mw in self.middleware:
             if isinstance(mw, AuthorizationMiddleware):
-                mw.current_user = self.current_user
                 mw.auth = self.auth
         self.executor = executor
         self.root_value = root_value
@@ -309,12 +307,15 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 
     @property
     def context(self):
-        wider_context = {
+        """The GraphQL context passed to resolvers (incl middleware)."""
+        return {
             'graphql_params': self.graphql_params,
             'request': self.request,
             'resolvers': self.resolvers,
+            'current_user': parse_current_user(
+                self.get_current_user()
+            ).get('name'),
         }
-        return wider_context
 
     @web.authenticated
     def prepare(self):
@@ -343,9 +344,6 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         self.queue = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
-        self.current_user = parse_current_user(self.get_current_user())
-        if sub_server:
-            self.subscription_server.current_user = self.current_user['name']
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
@@ -374,8 +372,11 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
 
     @property
     def context(self):
-        wider_context = {
+        """The GraphQL context passed to resolvers (incl middleware)."""
+        return {
             'request': self.request,
             'resolvers': self.resolvers,
+            'current_user': parse_current_user(
+                self.get_current_user()
+            ).get('name'),
         }
-        return wider_context

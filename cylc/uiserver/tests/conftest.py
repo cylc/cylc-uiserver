@@ -218,11 +218,12 @@ def mock_authentication(monkeypatch):
             monkeypatch.setattr(
                 'cylc.uiserver.handlers.parse_current_user',
                 lambda x: {
-            'kind': 'user',
-            'name': None,
-            'server': 'some_server'
-        }
+                    'kind': 'user',
+                    'name': None,
+                    'server': 'some_server'
+                }
             )
+
             def mock_redirect(*args):
                 # normally tornado would attempt to redirect us to the login
                 # page - for testing purposes we will skip this and raise
