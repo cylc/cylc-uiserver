@@ -1,0 +1,21 @@
+name: Check contributor list
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'CONTRIBUTING.md'
+      - '.github/workflows/shortlog.yml'
+
+jobs:
+  check-shortlog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # need to fetch all commits to check contributors
+
+      - name: Check CONTRIBUTING.md
+        uses: cylc/release-actions/check-shortlog@v1
