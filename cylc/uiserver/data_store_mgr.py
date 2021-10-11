@@ -35,6 +35,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from functools import partial
+from pathlib import Path
 import time
 
 from cylc.flow import ID_DELIM
@@ -45,7 +46,11 @@ from cylc.flow.data_store_mgr import (
     EDGES, DATA_TEMPLATE, ALL_DELTAS, DELTAS_MAP, WORKFLOW,
     apply_delta, generate_checksum, create_delta_store
 )
-from cylc.flow.workflow_files import ContactFileFields as CFF
+from cylc.flow.workflow_files import (
+    ContactFileFields as CFF,
+    WorkflowFiles,
+    get_workflow_srv_dir,
+)
 from cylc.flow.workflow_status import WorkflowStatus
 
 from .workflows_mgr import workflow_request
@@ -70,7 +75,13 @@ class DataStoreMgr:
         self.delta_queues = {}
 
     def update_contact(
-            self, w_id, contact_data=None, status=None, pruned=False):
+            self,
+            w_id,
+            contact_data=None,
+            status=None,
+            status_msg=None,
+            pruned=False,
+    ):
         delta = DELTAS_MAP[ALL_DELTAS]()
         delta.workflow.time = time.time()
         flow = delta.workflow.updated
@@ -94,6 +105,8 @@ class DataStoreMgr:
 
         if status is not None:
             flow.status = status
+        if status_msg is not None:
+            flow.status_msg = status_msg
         if pruned:
             flow.pruned = True
             delta.workflow.pruned = w_id
@@ -138,7 +151,7 @@ class DataStoreMgr:
         )
         await self.entire_workflow_update(ids=[w_id])
 
-    async def register_workflow(self, w_id):
+    async def register_workflow(self, w_id: str, is_active: bool) -> None:
         self.log.debug(f'register_workflow({w_id})')
         self.delta_queues[w_id] = {}
 
@@ -147,7 +160,31 @@ class DataStoreMgr:
         self.data[w_id] = data
 
         # create new entry in the delta store
-        self.update_contact(w_id, status=WorkflowStatus.INSTALLED.value)
+        self.update_contact(
+            w_id,
+            status=WorkflowStatus.STOPPED.value,
+            status_msg=self.get_status_msg(w_id, is_active),
+        )
+
+    def get_status_msg(self, w_id: str, is_active: bool) -> str:
+        """Derive a status message for the workflow.
+
+        Running schedulers provide their own status messages.
+
+        We must derive a status message for stopped workflows.
+        """
+        if is_active:
+            # this will get overridden when we sync with the workflow
+            # set a sensible default here incase the sync takes a while
+            return 'Running'
+        reg = w_id.split(ID_DELIM)[-1]
+        db_file = Path(get_workflow_srv_dir(reg), WorkflowFiles.Service.DB)
+        if db_file.exists():
+            # the workflow has previously run
+            return 'Stopped'
+        else:
+            # the workflow has not yet run
+            return 'Not yet run'
 
     async def unregister_workflow(self, w_id):
         self.log.debug(f'unregister_workflow({w_id})')
@@ -163,7 +200,11 @@ class DataStoreMgr:
     def stop_workflow(self, w_id):
         self.log.debug(f'stop_workflow({w_id})')
         self.purge_workflow(w_id, data=False)
-        self.update_contact(w_id, status=WorkflowStatus.STOPPED.value)
+        self.update_contact(
+            w_id,
+            status=WorkflowStatus.STOPPED.value,
+            status_msg=self.get_status_msg(w_id, False),
+        )
 
     def purge_workflow(self, w_id, data=True):
         """Purge the manager of a workflow's subscription and data."""
@@ -222,8 +263,15 @@ class DataStoreMgr:
                 loop_cnt += 1
                 continue
         if topic == 'shutdown':
+            self.log.debug(f'shutdown({w_id})')
             self.delta_store_to_queues(w_id, topic, delta)
             self.workflows_mgr.stopping.add(w_id)
+            # update the status to stopped and set the status message
+            self.update_contact(
+                w_id,
+                status=WorkflowStatus.STOPPED.value,
+                status_msg=self.get_status_msg(w_id, False),
+            )
             return
         self.apply_all_delta(w_id, delta)
         self.delta_store_to_queues(w_id, topic, delta)

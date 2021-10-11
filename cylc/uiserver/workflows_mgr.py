@@ -179,9 +179,9 @@ class WorkflowsManager:
         for wid in inactive_before - (active | inactive):
             yield (wid, 'inactive', None, None)
 
-    async def _register(self, wid, flow):
+    async def _register(self, wid, flow, is_active):
         """Register a new workflow with the data store."""
-        await self.uiserver.data_store_mgr.register_workflow(wid)
+        await self.uiserver.data_store_mgr.register_workflow(wid, is_active)
 
     async def _connect(self, wid, flow):
         """Open a connection to a running workflow."""
@@ -240,11 +240,11 @@ class WorkflowsManager:
                 await self._unregister(wid)
 
             elif before is None and after == 'active':
-                await self._register(wid, flow)
+                await self._register(wid, flow, is_active=True)
                 await self._connect(wid, flow)
 
             elif before is None and after == 'inactive':
-                await self._register(wid, flow)
+                await self._register(wid, flow, is_active=False)
 
             elif before == 'inactive' and after == 'active':
                 await self._connect(wid, flow)
