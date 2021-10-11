@@ -317,7 +317,7 @@ async def test_unregister(
     workflow_name = 'unregister-me'
     workflow_id = f'{getuser()}{ID_DELIM}{workflow_name}'
     uiserver = CylcUIServer()
-    await uiserver.workflows_mgr._register(workflow_id, None)
+    await uiserver.workflows_mgr._register(workflow_id, None, is_active=False)
 
     uiserver.workflows_mgr._scan_pipe = empty_aiter()
     uiserver.workflows_mgr.inactive.add(workflow_id)
