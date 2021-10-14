@@ -152,12 +152,11 @@ class DataStoreMgr:
     async def unregister_workflow(self, w_id):
         self.log.debug(f'unregister_workflow({w_id})')
         self.update_contact(w_id, pruned=True)
-        if w_id in self.delta_queues:
-            while any(
-                not delta_queue.empty()
-                for delta_queue in self.delta_queues[w_id].values()
-            ):
-                await asyncio.sleep(self.PENDING_DELTA_CHECK_INTERVAL)
+        while any(
+            not delta_queue.empty()
+            for delta_queue in self.delta_queues.get(w_id, {}).values()
+        ):
+            await asyncio.sleep(self.PENDING_DELTA_CHECK_INTERVAL)
         self.purge_workflow(w_id)
 
     def stop_workflow(self, w_id):
