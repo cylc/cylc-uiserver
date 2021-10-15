@@ -120,7 +120,8 @@ class CylcUIServer(ExtensionApp):
             ``!``.
 
             Permissions are additive but negated permissions take precedence
-            above additions.
+            above additions e.g. ``CONTROL, !stop`` will permit all operations
+            in the ``CONTROL`` group except for ``stop``.
 
             .. note::
 
@@ -132,6 +133,7 @@ class CylcUIServer(ExtensionApp):
         config=True,
         help='''
             Dictionary containing site limits and defaults for authorization.
+
             This configuration should be placed only in the site set
             configuration file and not the user configuration file (use
             ``c.CylcUIServer.user_authorization`` for user defined
@@ -181,13 +183,16 @@ class CylcUIServer(ExtensionApp):
         config=True,
         help='''
             Dictionary containing authorized users and permission levels for
-            authorization. Use this setting to share control of your workflows
+            authorization.
+
+            Use this setting to share control of your workflows
             with other users.
             Note that you are only permitted to give away permissions up to
             your limit for each user, as defined in the site_authorization
             configuration.
             ''' + AUTH_DESCRIPTION + '''
-            Example configuration, residing in `~/.cylc/hub/jupyter_config.py`:
+            Example configuration, residing in
+            ``~/.cylc/hub/jupyter_config.py``:
 
         .. code-block:: python
 

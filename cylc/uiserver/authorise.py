@@ -112,7 +112,8 @@ class Authorization:
         for action_group, expansion in {
             Authorization.CONTROL: self.control_ops,
             Authorization.ALL: self.all_ops,
-                Authorization.READ: Authorization.READ_OPS}.items():
+            Authorization.READ: Authorization.READ_OPS
+        }.items():
             if action_group in permission_set:
                 permission_set.remove(action_group)
                 permission_set.update(expansion)
@@ -358,11 +359,6 @@ class Authorization:
             else:
                 defaults.update(permission)
         defaults.discard('')
-        LOG.info(
-            f"User {access_user['access_username']} authorization not present "
-            "in user config. Implementing site authorization defaults. "
-            f"Authorized permissions: {sorted(defaults)}"
-        )
         return defaults
 
 

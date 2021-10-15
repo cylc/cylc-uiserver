@@ -16,7 +16,6 @@
 """Test authorisation and authentication HTTP response codes."""
 
 from functools import partial
-from uuid import uuid1
 
 import pytest
 
@@ -116,7 +115,7 @@ async def test_authorised_and_authenticated(
         pytest.param(
             ('cylc', 'userprofile'),
             403,
-            'Forbidden',
+            'login redirect replaced by 403 for test purposes',
             None,
             id='cylc/userprofile',
         )

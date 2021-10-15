@@ -72,7 +72,7 @@ def authorised(fun: Callable) -> Callable:
             isinstance(user, str)  # token authenticated
             or (
                 isinstance(user, dict)
-                and _authorise(handler, user['name'], '')
+                and _authorise(handler, user['name'])
             )
         ):
             raise web.HTTPError(403, reason='authorization insufficient')
@@ -114,33 +114,19 @@ def is_token_authenticated(
 
 def _authorise(
     handler: 'CylcAppHandler',
-    username: str,
-    action: str = 'READ'
+    username: str
 ) -> bool:
     """Authorises a user to perform an action.
 
     Currently this returns False unless the authenticated user is the same
     as the user this server is running under.
     """
-    if username == ME or can_read(handler=handler):
+    if username == ME or handler.auth.is_permitted(
+            username, Authorization.READ_OPERATION):
         return True
     else:
         handler.log.warning(f'Authorization failed for {username}')
         return False
-
-
-def can_read(handler):
-    """Checks if the user has permitted operation `read`
-    """
-    if not handler:
-        return False
-    user = handler.get_current_user()
-    username = user.get('name', '?')
-    if handler.auth.is_permitted(
-        username, Authorization.READ_OPERATION
-    ):
-        return True
-    return False
 
 
 def parse_current_user(current_user):
@@ -247,6 +233,7 @@ class UserProfileHandler(CylcAppHandler):
         super().set_default_headers()
         self.set_header("Content-Type", 'application/json')
 
+    @web.authenticated
     @authorised
     def get(self):
         user_info = self.get_current_user()
