@@ -19,9 +19,12 @@ Multi-user functionality implemented.
 ### Enhancements
 
 [#230](https://github.com/cylc/cylc-uiserver/pull/230) -
-Convert the UI Server to a jupyter_server extension
+Convert the UI Server to a jupyter_server extension.
 
 ### Fixes
+
+[#258](https://github.com/cylc/cylc-uiserver/pull/258) -
+Fix traceback which could appear when workflows are removed.
 
 [#241](https://github.com/cylc/cylc-uiserver/pull/241) -
 Update old, broken hold options for playing workflows.

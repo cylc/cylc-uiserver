@@ -131,7 +131,7 @@ async def test_register_workflow(
     an entry for the workflow in the data store .data map, and another
     entry in the data store .delta_queues map."""
     w_id = 'user|workflow_id'
-    await data_store_mgr.register_workflow(w_id=w_id)
+    await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
     assert w_id in data_store_mgr.data
     assert w_id in data_store_mgr.delta_queues
 
@@ -144,7 +144,7 @@ async def test_update_contact_no_contact_data(
     for the workflow in the data store, like the API version set to zero."""
     w_id = 'user|workflow_id'
     api_version = 0
-    await data_store_mgr.register_workflow(w_id=w_id)
+    await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
     data_store_mgr.update_contact(w_id=w_id, contact_data=None)
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
 
@@ -157,7 +157,7 @@ async def test_update_contact_with_contact_data(
     for the workflow."""
     w_id = 'user|workflow_id'
     api_version = 1
-    await data_store_mgr.register_workflow(w_id=w_id)
+    await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
     contact_data = {
         'name': 'workflow_id',
         'owner': 'cylc',
@@ -177,7 +177,7 @@ async def test_stop_workflow(
     contact with no contact data."""
     w_id = 'user|workflow_id'
     api_version = 1
-    await data_store_mgr.register_workflow(w_id=w_id)
+    await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
     contact_data = {
         'name': 'workflow_id',
         'owner': 'cylc',
