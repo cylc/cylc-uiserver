@@ -24,46 +24,46 @@ from cylc.uiserver.authorise import (
 )
 
 CONTROL_OPS = [
-    "exttrigger",
-    "pause",
+    "ext_trigger",
+    "hold",
     "kill",
     "message",
-    "hold",
+    "pause",
     "play",
     "poll",
     "release",
-    "releaseholdpoint",
+    "release_hold_point",
     "reload",
     "remove",
     "resume",
-    "setgraphwindowextent",
-    "setholdpoint",
-    "setoutputs",
-    "setverbosity",
+    "set_graph_window_extent",
+    "set_hold_point",
+    "set_outputs",
+    "set_verbosity",
     "stop",
     "trigger",
 ]
 
 ALL_OPS = [
-    "ping",
     "read",
     "broadcast",
-    "exttrigger",
-    "pause",
+    "ext_trigger",
+    "hold",
     "kill",
     "message",
-    "hold",
+    "pause",
+    "ping",
     "play",
     "poll",
     "release",
-    "releaseholdpoint",
+    "release_hold_point",
     "reload",
     "remove",
     "resume",
-    "setgraphwindowextent",
-    "setholdpoint",
-    "setoutputs",
-    "setverbosity",
+    "set_graph_window_extent",
+    "set_hold_point",
+    "set_outputs",
+    "set_verbosity",
     "stop",
     "trigger",
 ]
@@ -120,19 +120,19 @@ FAKE_USER_CONF = {
                 "play",
                 "trigger",
                 "resume",
-                "setverbosity",
-                "setgraphwindowextent",
+                "set_verbosity",
+                "set_graph_window_extent",
                 "ping",
                 "read",
                 "poll",
                 "hold",
                 "remove",
-                "setholdpoint",
-                "releaseholdpoint",
-                "exttrigger",
+                "set_hold_point",
+                "release_hold_point",
+                "ext_trigger",
                 "pause",
                 "pause",
-                "setoutputs",
+                "set_outputs",
                 "release",
             },
             "server_owner_2",
@@ -186,7 +186,7 @@ def test_get_permitted_operations(
 ):
     mocked_get_groups.side_effect = [owner_groups, user_groups]
     auth_obj = Authorization(
-        owner_name, FAKE_USER_CONF, FAKE_SITE_CONF, CONTROL_OPS, ALL_OPS
+        owner_name, FAKE_USER_CONF, FAKE_SITE_CONF
     )
     actual_operations = auth_obj.get_permitted_operations(
         access_user=user_name
@@ -243,7 +243,7 @@ def test_get_access_user_permissions_from_owner_conf(
     """Test the un-processed permissions of owner conf."""
     mocked_get_groups.return_value = ["group:blah"]
     authobj = Authorization(
-        "some_user", owner_auth_conf, {"fake": "config"}, CONTROL_OPS, ALL_OPS
+        "some_user", owner_auth_conf, {"fake": "config"}
     )
     permitted_operations = authobj.get_access_user_permissions_from_owner_conf(
         access_user_dict
@@ -275,9 +275,7 @@ def test_expand_and_process_access_groups(permission_set, expected):
     authobj = Authorization(
         "some_user",
         {"fake": "config"},
-        {"fake": "config"},
-        CONTROL_OPS,
-        ALL_OPS
+        {"fake": "config"}
     )
     actual = authobj.expand_and_process_access_groups(permission_set)
     assert actual == expected
@@ -315,9 +313,7 @@ def test_expand_and_process_access_groups(permission_set, expected):
 def test_get_op_name(mut_field_name, operation, expected_op_name):
     mock_authobj = Authorization(
         "some_user", {"fake": "config"},
-        {"fake": "config"},
-        CONTROL_OPS,
-        ALL_OPS
+        {"fake": "config"}
     )
     auth_middleware = AuthorizationMiddleware
     auth_middleware.auth = mock_authobj
@@ -346,7 +342,7 @@ def test_get_op_name(mut_field_name, operation, expected_op_name):
         ),
     ],
 )
-@patch("cylc.uiserver.authorise.Authorization._get_permitted_operations")
+@patch("cylc.uiserver.authorise.Authorization.get_permitted_operations")
 @patch("cylc.uiserver.authorise.get_groups")
 def test_is_permitted(
     mocked_get_groups,
@@ -358,9 +354,7 @@ def test_is_permitted(
 ):
     mocked_get_groups.side_effect = [[""], [""]]
     mocked_get_permitted_operations.return_value = ["fake_operation"]
-    auth_obj = Authorization(
-        owner_name, FAKE_USER_CONF, FAKE_SITE_CONF, CONTROL_OPS, ALL_OPS
-    )
+    auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF)
     actual = auth_obj.is_permitted(
         access_user=user_name, operation="fake_operation"
     )

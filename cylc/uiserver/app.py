@@ -45,8 +45,7 @@ from cylc.uiserver import (
 )
 from cylc.uiserver.authorise import (
     Authorization,
-    AuthorizationMiddleware,
-    get_list_of_mutations
+    AuthorizationMiddleware
 )
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.handlers import (
@@ -469,9 +468,7 @@ class CylcUIServer(ExtensionApp):
         return Authorization(
             getpass.getuser(),
             self.config.CylcUIServer.user_authorization,
-            self.config.CylcUIServer.site_authorization,
-            get_list_of_mutations(control=True),
-            get_list_of_mutations()
+            self.config.CylcUIServer.site_authorization
         )
 
     def initialize_templates(self):

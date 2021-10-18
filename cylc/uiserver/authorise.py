@@ -29,6 +29,16 @@ from cylc.uiserver.schema import UISMutations
 LOG = logging.getLogger(__name__)
 
 
+def constant(func):
+    """Decorator preventing reassignment"""
+    def fset(self, value):
+        raise TypeError
+
+    def fget():
+        return func()
+    return property(fget, fset)
+
+
 class Authorization:
     """Authorization Information Class
     One instance for the life of the UI Server. If authorization settings
@@ -77,16 +87,26 @@ class Authorization:
     ASYNC_OPS = {'query', 'mutation'}
     READ_AUTH_OPS = {'query', 'subscription'}
 
+    @staticmethod
+    @constant
+    def ALL_OPS() -> List[str]:
+        """ALL OPS constant, returns list of all mutations.
+        """
+        return get_list_of_mutations()
+
+    @staticmethod
+    @constant
+    def CONTROL_OPS() -> List[str]:
+        """CONTROL OPS constant, returns list of all control mutations.
+        """
+        return get_list_of_mutations(control=True)
+
     def __init__(
         self,
         owner,
         owner_auth_conf,
-        site_auth_conf,
-        control_ops,
-        all_ops
+        site_auth_conf
     ) -> None:
-        self.control_ops = control_ops
-        self.all_ops = all_ops
         self.owner = owner
         self.owner_auth_conf = self.set_auth_conf(owner_auth_conf)
         self.site_auth_config = self.set_auth_conf(site_auth_conf)
@@ -94,10 +114,9 @@ class Authorization:
             'user': self.owner,
             'user_groups': get_groups(self.owner)}
         self.owner_dict = self.build_owner_site_auth_conf()
-        self.get_permitted_operations = (
-            lru_cache(maxsize=128)(self._get_permitted_operations))
 
-    def expand_and_process_access_groups(self, permission_set: set) -> set:
+    @staticmethod
+    def expand_and_process_access_groups(permission_set: set) -> set:
         """Process a permission set.
 
         Takes a permission set, e.g. limits, defaults.
@@ -110,8 +129,8 @@ class Authorization:
             permission_set: processed permission set.
         """
         for action_group, expansion in {
-            Authorization.CONTROL: self.control_ops,
-            Authorization.ALL: self.all_ops,
+            Authorization.CONTROL: Authorization.CONTROL_OPS.fget(),
+            Authorization.ALL: Authorization.ALL_OPS.fget(),
             Authorization.READ: Authorization.READ_OPS
         }.items():
             if action_group in permission_set:
@@ -120,9 +139,11 @@ class Authorization:
         # Expand negated permissions
         for action_group, expansion in {
                 Authorization.NOT_CONTROL: list(
-                    map((lambda x: '!' + x), self.control_ops)),
+                    map((lambda x: '!' + x),
+                        Authorization.CONTROL_OPS.fget())
+                ),
                 Authorization.NOT_ALL: list(
-                    map((lambda x: '!' + x), self.all_ops)),
+                    map((lambda x: '!' + x), Authorization.ALL_OPS.fget())),
                 Authorization.NOT_READ: list(
                     map((lambda x: '!' + x), Authorization.READ_OPS))}.items():
             if action_group in permission_set:
@@ -210,7 +231,8 @@ class Authorization:
         allowed_operations.discard('')
         return allowed_operations
 
-    def _get_permitted_operations(self, access_user: str):
+    @lru_cache(maxsize=128)
+    def get_permitted_operations(self, access_user: str):
         """Return permitted operations for given access_user.
 
         Cached for efficiency.
@@ -228,7 +250,7 @@ class Authorization:
         """
         # For use in the ui, owner permissions (ALL operations) are set
         if access_user == self.owner:
-            return self.expand_and_process_access_groups(set(self.all_ops))
+            return set(Authorization.ALL_OPS.fget())
         # Otherwise process permissions for (non-uiserver owner) access_user
 
         access_user_dict = {'access_username': access_user,
@@ -272,7 +294,6 @@ class Authorization:
         """
         if access_user == self.owner_user_info['user']:
             return True
-        LOG.info(f'{access_user}: requested {operation}')
         if str(operation) in self.get_permitted_operations(access_user):
             LOG.info(f'{access_user}: authorized to {operation}')
             return True
@@ -295,8 +316,7 @@ class Authorization:
             if uis_owner_conf in items_to_check:
                 # acc_user = access_user
                 for acc_user_conf, acc_user_perms in access_user_dict.items():
-                    with suppress(KeyError):
-                        existing_user_conf = owner_dict.get(acc_user_conf)
+                    existing_user_conf = owner_dict.get(acc_user_conf)
                     if existing_user_conf:
                         # process limits and defaults and update dictionary
                         existing_default = existing_user_conf.get(
@@ -431,7 +451,7 @@ class AuthorizationMiddleware:
             return Authorization.READ_OPERATION
         else:
             # Check it is a mutation in our schema
-            if self.auth and field_name in self.auth.all_ops:
+            if self.auth and field_name in Authorization.ALL_OPS.fget():
                 return field_name
         return None
 
@@ -479,7 +499,7 @@ def parse_group_ids(group_ids: List) -> List:
 def get_list_of_mutations(control=False) -> List[str]:
     """Gets list of mutations"""
     list_of_mutations = [
-        attr.replace('_', '') for attr in dir(UISMutations)
+        attr for attr in dir(UISMutations)
         if isinstance(getattr(UISMutations, attr), graphene.Field)
     ]
     if control:
