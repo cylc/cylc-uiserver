@@ -152,9 +152,8 @@ class Authorization:
 
         for perm in permission_set:
             if perm.startswith("!"):
-                with suppress(KeyError):
-                    remove.add(perm.lstrip("!"))
-                    remove.add(perm)
+                remove.add(perm.lstrip("!"))
+                remove.add(perm)
         permission_set.difference_update(remove)
         permission_set.discard('')
         return permission_set
