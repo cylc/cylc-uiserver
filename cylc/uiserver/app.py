@@ -40,7 +40,7 @@ from cylc.flow.network.graphql import (
 )
 
 from cylc.uiserver import (
-    __file__ as uis_pkg
+    __file__ as uis_pkg,
 )
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.handlers import (
@@ -54,6 +54,15 @@ from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
 from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
+
+
+# UIS configuration dirs
+USER_CONF_ROOT: Path = Path('~/.cylc/hub2').expanduser()
+SITE_CONF_ROOT: Path = Path(
+    os.getenv('CYLC_SITE_CONF_PATH')
+    or GlobalConfig.DEFAULT_SITE_CONF_PATH,
+    'hub'
+)
 
 
 class PathType(TraitType):
@@ -90,13 +99,9 @@ class CylcUIServer(ExtensionApp):
             str,
             [
                 # user configuration
-                Path('~/.cylc/hub').expanduser(),
+                USER_CONF_ROOT,
                 # site configuration
-                Path(
-                    os.getenv('CYLC_SITE_CONF_PATH')
-                    or GlobalConfig.DEFAULT_SITE_CONF_PATH,
-                    'hub'
-                ),
+                SITE_CONF_ROOT,
                 # base configuration - always used
                 Path(uis_pkg).parent,
             ]
