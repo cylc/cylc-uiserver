@@ -118,8 +118,9 @@ def _authorise(
 ) -> bool:
     """Authorises a user to perform an action.
 
-    Currently this returns False unless the authenticated user is the same
-    as the user this server is running under.
+    Returns True if the user is the UIServer owner, or the user has read
+    permissions.
+
     """
     if username == ME or handler.auth.is_permitted(
             username, Authorization.READ_OPERATION):
@@ -217,6 +218,28 @@ class CylcVersionHandler(CylcAppHandler):
         )
 
 
+def snake_to_camel(snake):
+    """Converts snake_case to camelCase
+        Examples:
+        >>> snake_to_camel('foo_bar_baz')
+        'fooBarBaz'
+        >>> snake_to_camel('')
+        ''
+        >>> snake_to_camel(None)
+        Traceback (most recent call last):
+        TypeError: <class 'NoneType'>
+        >>> snake_to_camel('ping')
+        'ping'
+
+    """
+    if isinstance(snake, str):
+        if not snake:
+            return ''
+        components = snake.split('_')
+        return components[0] + ''.join(x.title() for x in components[1:])
+    raise TypeError(type(snake))
+
+
 class UserProfileHandler(CylcAppHandler):
     """Provides information about the user in JSON format.
 
@@ -246,8 +269,10 @@ class UserProfileHandler(CylcAppHandler):
         user_info['owner'] = ME
 
         # Make user permissions available to the ui
-        user_info['permissions'] = list(
-            self.auth.get_permitted_operations(user_info['name']))
+        user_info['permissions'] = [
+            snake_to_camel(perm) for perm in (
+                self.auth.get_permitted_operations(user_info['name']))
+                ]
 
         self.write(json.dumps(user_info))
 

@@ -79,8 +79,7 @@ FAKE_SITE_CONF = {
     },
     "server_owner_1": {
         "*": {"default": ["READ", "message", "!ping"],
-        "limit": ["READ", "CONTROL"]
-        },
+              "limit": ["READ", "CONTROL"]},
         "user1": {"default": ["READ", "play", "pause"], "limit": ["ALL"]},
     },
     "server_owner_2": {
@@ -172,7 +171,7 @@ FAKE_USER_CONF = {
             "user4",
             ["group:group2"],
             id="owner only in group and *",
-        ),
+        )
     ],
 )
 @patch("cylc.uiserver.authorise.get_groups")
