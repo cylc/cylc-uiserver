@@ -23,6 +23,7 @@ from cylc.uiserver import (
     __file__ as uis_pkg,
     getenv,
 )
+from cylc.uiserver.app import USER_CONF_ROOT
 
 
 # the command the hub should spawn (i.e. the cylc uiserver itself)
@@ -57,7 +58,7 @@ c.JupyterHub.template_paths = [
 ]
 
 # store the JupyterHub runtime files in ~/.cylc/hub
-RUNTIME_PATH = Path('~/.cylc/hub').expanduser()
-c.JupyterHub.cookie_secret_file = f'{RUNTIME_PATH / "cookie_secret"}'
-c.JupyterHub.db_url = f'{RUNTIME_PATH / "jupyterhub.sqlite"}'
-c.ConfigurableHTTPProxy.pid_file = f'{RUNTIME_PATH / "jupyterhub-proxy.pid"}'
+USER_CONF_ROOT.mkdir(parents=True, exist_ok=True)
+c.JupyterHub.cookie_secret_file = f'{USER_CONF_ROOT / "cookie_secret"}'
+c.JupyterHub.db_url = f'{USER_CONF_ROOT / "jupyterhub.sqlite"}'
+c.ConfigurableHTTPProxy.pid_file = f'{USER_CONF_ROOT / "jupyterhub-proxy.pid"}'

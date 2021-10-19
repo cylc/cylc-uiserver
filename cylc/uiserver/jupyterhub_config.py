@@ -24,16 +24,22 @@ import logging
 import os
 from pathlib import Path
 
-from cylc.uiserver import __file__ as uis_pkg
+from cylc.uiserver import (
+    __file__ as uis_pkg,
+)
+from cylc.uiserver.app import (
+    SITE_CONF_ROOT,
+    USER_CONF_ROOT,
+)
 
 LOG = logging.getLogger(__name__)
 
 # base configuration - always used
 DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / 'jupyter_config.py'
 # site configuration
-SITE_CONF_PATH: Path = Path('/etc/cylc/hub/jupyter_config.py')
+SITE_CONF_PATH: Path = SITE_CONF_ROOT / 'jupyter_config.py'
 # user configuration
-USER_CONF_PATH: Path = Path('~/.cylc/hub/jupyter_config.py').expanduser()
+USER_CONF_PATH: Path = USER_CONF_ROOT / 'jupyter_config.py'
 
 
 def _load(path):
