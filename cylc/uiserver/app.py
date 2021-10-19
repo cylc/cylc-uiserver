@@ -57,7 +57,7 @@ from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
 # UIS configuration dirs
-USER_CONF_ROOT: Path = Path('~/.cylc/hub2').expanduser()
+USER_CONF_ROOT: Path = Path('~/.cylc/hub').expanduser()
 SITE_CONF_ROOT: Path = Path(
     os.getenv('CYLC_SITE_CONF_PATH')
     or GlobalConfig.DEFAULT_SITE_CONF_PATH,
