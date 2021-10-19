@@ -138,10 +138,8 @@ class Authorization:
                 permission_set.update(expansion)
         # Expand negated permissions
         for action_group, expansion in {
-                Authorization.NOT_CONTROL: list(
-                    map((lambda x: '!' + x),
-                        Authorization.CONTROL_OPS.fget())
-                ),
+                Authorization.NOT_CONTROL: [
+                    f"!{x}" for x in Authorization.CONTROL_OPS.fget()]
                 Authorization.NOT_ALL: list(
                     map((lambda x: '!' + x), Authorization.ALL_OPS.fget())),
                 Authorization.NOT_READ: list(
