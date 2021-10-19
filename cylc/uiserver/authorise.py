@@ -292,7 +292,7 @@ class Authorization:
         """
         if access_user == self.owner_user_info['user']:
             return True
-        if str(operation) in self.get_permitted_operations(access_user):
+        if operation in self.get_permitted_operations(access_user):
             LOG.info(f'{access_user}: authorized to {operation}')
             return True
         LOG.info(f'{access_user}: not authorized to {operation}')
