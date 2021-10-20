@@ -4,7 +4,9 @@
 # The file was copied from this revision:
 # https://github.com/graphql-python/graphql-ws/blob/cf560b9a5d18d4a3908dc2cfe2199766cc988fef/graphql_ws/tornado.py
 
+import getpass
 from inspect import isawaitable, isclass
+import socket
 
 from asyncio import create_task, gather, wait, shield, sleep
 from asyncio.queues import QueueEmpty
@@ -21,6 +23,7 @@ from graphql_ws.constants import (
 
 from typing import Union, Awaitable, Any, List, Tuple, Dict, Optional
 
+from cylc.uiserver.authorise import AuthorizationMiddleware
 setup_observable_extension()
 
 NO_MSG_DELAY = 1.0
@@ -47,10 +50,18 @@ class TornadoConnectionContext(BaseConnectionContext):
 
 
 class TornadoSubscriptionServer(BaseSubscriptionServer):
-    def __init__(self, schema, keep_alive=True, loop=None, backend=None, middleware=None):
+    def __init__(
+        self, schema,
+        keep_alive=True,
+        loop=None,
+        backend=None,
+        middleware=None,
+        auth=None
+    ):
         self.loop = loop
         self.backend = backend or None
         self.middleware = middleware
+        self.auth = auth
         super().__init__(schema, keep_alive)
 
     @staticmethod
@@ -72,6 +83,9 @@ class TornadoSubscriptionServer(BaseSubscriptionServer):
             )
         else:
             middleware = self.middleware
+        for mw in self.middleware:
+            if mw == AuthorizationMiddleware:
+                mw.auth = self.auth
         return dict(
             params,
             return_promise=True,

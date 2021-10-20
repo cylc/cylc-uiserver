@@ -15,7 +15,6 @@
 
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
-import getpass
 import os
 from subprocess import Popen, PIPE, DEVNULL
 
@@ -124,14 +123,9 @@ class Services:
             return cls._error(exc)
 
         # start each requested flow
-        me = getpass.getuser()
-        for user, flow, _ in workflows:
+        for _user, flow, _ in workflows:
             try:
-                if user and user != me:
-                    # TODO: multi-user support
-                    # forward this request to the other users UIS
-                    raise ValueError(f'Cannot start flow for user: {user}')
-
+                # Note: authorisation has already taken place.
                 # add the workflow to the command
                 cmd = [*cmd, flow]
 
@@ -202,7 +196,9 @@ class Resolvers(BaseResolvers):
             'request_string': req_str,
             'variables': variables,
         }
-        return self.workflows_mgr.multi_request('graphql', w_ids, graphql_args)
+        return await self.workflows_mgr.multi_request(
+            'graphql', w_ids, graphql_args
+        )
 
     async def service(self, info, *m_args):
         return await Services.play(
@@ -227,5 +223,6 @@ class Resolvers(BaseResolvers):
             'variables': variables,
         }
         multi_args = {w_id: graphql_args for w_id in w_ids}
-        return self.workflows_mgr.multi_request(
-            'graphql', w_ids, multi_args=multi_args)
+        return await self.workflows_mgr.multi_request(
+            'graphql', w_ids, multi_args=multi_args
+        )

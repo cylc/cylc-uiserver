@@ -18,6 +18,9 @@ Multi-user functionality implemented.
 
 ### Enhancements
 
+[#204](https://github.com/cylc/cylc-uiserver/pull/**204**) -
+Implementation of configurable multi user authorisation.
+
 [#230](https://github.com/cylc/cylc-uiserver/pull/230) -
 Convert the UI Server to a jupyter_server extension.
 

@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import getpass
 import os
 from pathlib import Path, PurePath
 import sys
@@ -23,6 +24,7 @@ from pkg_resources import parse_version
 from tornado import ioloop
 from tornado.web import RedirectHandler
 from traitlets import (
+    Dict,
     Float,
     TraitError,
     TraitType,
@@ -38,9 +40,12 @@ from cylc.flow.cfgspec.globalcfg import GlobalConfig
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
 )
-
 from cylc.uiserver import (
     __file__ as uis_pkg,
+)
+from cylc.uiserver.authorise import (
+    Authorization,
+    AuthorizationMiddleware
 )
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.handlers import (
@@ -106,6 +111,103 @@ class CylcUIServer(ExtensionApp):
                 Path(uis_pkg).parent,
             ]
         )
+    )
+    # TODO: Add a link to the access group table mappings in cylc documentation
+    AUTH_DESCRIPTION = '''
+            Authorization can be granted at operation (mutation) level, i.e.
+            specifically grant user access to execute Cylc commands, e.g.
+            ``play``, ``pause``, ``edit``, ``trigger`` etc. For your
+            convenience, these operations have been mapped to access groups
+            ``READ``, ``CONTROL`` and ``ALL``.
+
+            To remove permissions, prepend the access group or operation with
+            ``!``.
+
+            Permissions are additive but negated permissions take precedence
+            above additions e.g. ``CONTROL, !stop`` will permit all operations
+            in the ``CONTROL`` group except for ``stop``.
+
+            .. note::
+
+               Any authorization permissions granted to a user will be
+               applied to all workflows.
+    '''
+
+    site_authorization = Dict(
+        config=True,
+        help='''
+            Dictionary containing site limits and defaults for authorization.
+
+            This configuration should be placed only in the site set
+            configuration file and not the user configuration file (use
+            ``c.CylcUIServer.user_authorization`` for user defined
+            authorization).
+
+            If this configuration is empty, site authorization defaults to no
+            configurable authorization and users will be unable to set any
+            authorization.
+
+            ''' + AUTH_DESCRIPTION + '''
+
+        .. rubric:: Example Configuration:
+
+        .. code-block:: python
+
+           c.CylcUIServer.site_authorization = {
+               "*": {  # For all ui-server owners,
+                   "*": {  # Any authenticated user
+                       "default": "READ",  # Will have default read-only access
+                   },
+                   "user1": {  # user1
+                       "default": ["!ALL"],  # No privileges for all ui-server
+                       # owners.
+                   },  # No limit set, so all ui-server owners
+               },  # limit is also "!ALL" for user1
+               "server_owner_1": {  # For specific UI Server owner,
+                   "group:group_a": {  # Any user who is a member of group_a
+                       "default": "READ",  # Will have default read-only access
+                       "limit": ["ALL", "!play"],  # server_owner_1 is able to
+                   },  # grant All privileges, except play.
+               },
+               "group:grp_of_svr_owners": {  # Group of owners of UI Servers
+                   "group:group_b": {
+                       "limit": [  # can grant groupB users up to READ and
+                           "READ",  # CONTROL privileges, without stop and
+                           "CONTROL",  # kill
+                           "!stop",
+                           "!kill",  # No default, so default is no access
+                       ],
+                   },
+               },
+           }
+
+        ''')
+
+    user_authorization = Dict(
+        config=True,
+        help='''
+            Dictionary containing authorized users and permission levels for
+            authorization.
+
+            Use this setting to share control of your workflows
+            with other users.
+            Note that you are only permitted to give away permissions up to
+            your limit for each user, as defined in the site_authorization
+            configuration.
+            ''' + AUTH_DESCRIPTION + '''
+            Example configuration, residing in
+            ``~/.cylc/hub/jupyter_config.py``:
+
+        .. code-block:: python
+
+           c.CylcUIServer.user_authorization = {
+               "*": ["READ"],  # any authenticated user has READ access
+               "group:group2": ["ALL"],  # Any user in system group2 has access
+                                         # to all operations
+               "userA": ["ALL", "!stop"],  # userA has ALL operations, not stop
+           }
+
+        '''
     )
 
     ui_path = PathType(
@@ -194,6 +296,14 @@ class CylcUIServer(ExtensionApp):
             return proposed['value']
         raise TraitError(f'ui_build_dir does not exist: {proposed["value"]}')
 
+    @validate('site_authorization')
+    def _check_site_auth_dict_correct_format(self, proposed):
+        # TODO: More advanced auth dict validating
+        if isinstance(proposed['value'], dict):
+            return proposed['value']
+        raise TraitError(
+            f'Error in site authorization config: {proposed["value"]}')
+
     @staticmethod
     def _list_ui_versions(path: Path) -> List[str]:
         """Return a list of UI build versions detected in self.ui_path."""
@@ -248,12 +358,6 @@ class CylcUIServer(ExtensionApp):
             log=self.log,
             workflows_mgr=self.workflows_mgr,
         )
-        self.subscription_server = TornadoSubscriptionServer(
-            schema,
-            backend=CylcGraphQLBackend(),
-            middleware=[IgnoreFieldMiddleware],
-        )
-
         ioloop.IOLoop.current().add_callback(
             self.workflows_mgr.update
         )
@@ -282,8 +386,15 @@ class CylcUIServer(ExtensionApp):
         ).start()
 
     def initialize_handlers(self):
+        self.authobj = self.set_auth()
+        self.set_sub_server()
+
         self.handlers.extend([
-            ('cylc/version', CylcVersionHandler),
+            (
+                'cylc/version',
+                CylcVersionHandler,
+                {'auth': self.authobj}
+            ),
             (
                 'cylc/graphql',
                 UIServerGraphQLHandler,
@@ -291,7 +402,11 @@ class CylcUIServer(ExtensionApp):
                     'schema': schema,
                     'resolvers': self.resolvers,
                     'backend': CylcGraphQLBackend(),
-                    'middleware': [IgnoreFieldMiddleware],
+                    'middleware': [
+                        AuthorizationMiddleware,
+                        IgnoreFieldMiddleware
+                    ],
+                    'auth': self.authobj,
                 }
             ),
             (
@@ -301,8 +416,12 @@ class CylcUIServer(ExtensionApp):
                     'schema': schema,
                     'resolvers': self.resolvers,
                     'backend': CylcGraphQLBackend(),
-                    'middleware': [IgnoreFieldMiddleware],
+                    'middleware': [
+                        AuthorizationMiddleware,
+                        IgnoreFieldMiddleware
+                    ],
                     'batch': True,
+                    'auth': self.authobj,
                 }
             ),
             (
@@ -316,6 +435,7 @@ class CylcUIServer(ExtensionApp):
             (
                 'cylc/userprofile',
                 UserProfileHandler,
+                {'auth': self.authobj}
             ),
             (
                 'cylc/(.*)?',
@@ -334,6 +454,27 @@ class CylcUIServer(ExtensionApp):
                 }
             )
         ])
+
+    def set_sub_server(self):
+        self.subscription_server = TornadoSubscriptionServer(
+            schema,
+            backend=CylcGraphQLBackend(),
+            middleware=[
+                IgnoreFieldMiddleware,
+                AuthorizationMiddleware,
+            ],
+            auth=self.authobj
+        )
+
+    def set_auth(self):
+        """Create authorization object.
+        One for the lifetime of the UIServer.
+        """
+        return Authorization(
+            getpass.getuser(),
+            self.config.CylcUIServer.user_authorization,
+            self.config.CylcUIServer.site_authorization
+        )
 
     def initialize_templates(self):
         """Change the jinja templating environment."""

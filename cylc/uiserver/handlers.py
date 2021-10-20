@@ -32,6 +32,7 @@ from cylc.flow.scripts.cylc import (
     list_plugins as list_cylc_plugins,
 )
 
+from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
 
 
@@ -71,10 +72,10 @@ def authorised(fun: Callable) -> Callable:
             isinstance(user, str)  # token authenticated
             or (
                 isinstance(user, dict)
-                and _authorise(handler, user['name'], '')
+                and _authorise(handler, user['name'])
             )
         ):
-            raise web.HTTPError(403, reason='authorisation insufficient')
+            raise web.HTTPError(403, reason='authorization insufficient')
         return fun(handler, *args, **kwargs)
     return _inner
 
@@ -113,19 +114,37 @@ def is_token_authenticated(
 
 def _authorise(
     handler: 'CylcAppHandler',
-    username: str,
-    action: str = 'READ'
+    username: str
 ) -> bool:
     """Authorises a user to perform an action.
 
-    Currently this returns False unless the authenticated user is the same
-    as the user this server is running under.
+    Returns True if the user is the UIServer owner, or the user has read
+    permissions.
+
     """
-    if username != ME:
-        # auth provided by the hub, check the user name
-        handler.log.warning(f'Authorisation failed for {username}')
+    if username == ME or handler.auth.is_permitted(
+            username, Authorization.READ_OPERATION):
+        return True
+    else:
+        handler.log.warning(f'Authorization failed for {username}')
         return False
-    return True
+
+
+def parse_current_user(current_user):
+    """Standardises and returns the current user."""
+    if isinstance(current_user, dict):
+        # the server is running with authentication services provided
+        # by a hub
+        current_user = dict(current_user)  # make a copy for safety
+        return current_user
+    else:
+        # the server is running using a token
+        # authentication is provided by jupyter server
+        return {
+            'kind': 'user',
+            'name': ME,
+            'server': socket.gethostname()
+        }
 
 
 class CylcAppHandler(JupyterHandler):
@@ -184,8 +203,11 @@ class CylcVersionHandler(CylcAppHandler):
     Equivalent to running `cylc version --long` in the UIS environment.
     """
 
-    @web.authenticated
+    def initialize(self, auth):
+        self.auth = auth
+
     @authorised
+    @web.authenticated
     def get(self):
         self.write(
             '<pre>'
@@ -194,6 +216,28 @@ class CylcVersionHandler(CylcAppHandler):
             + list_cylc_plugins()
             + '</pre>'
         )
+
+
+def snake_to_camel(snake):
+    """Converts snake_case to camelCase
+        Examples:
+        >>> snake_to_camel('foo_bar_baz')
+        'fooBarBaz'
+        >>> snake_to_camel('')
+        ''
+        >>> snake_to_camel(None)
+        Traceback (most recent call last):
+        TypeError: <class 'NoneType'>
+        >>> snake_to_camel('ping')
+        'ping'
+
+    """
+    if isinstance(snake, str):
+        if not snake:
+            return ''
+        components = snake.split('_')
+        return components[0] + ''.join(x.title() for x in components[1:])
+    raise TypeError(type(snake))
 
 
 class UserProfileHandler(CylcAppHandler):
@@ -205,6 +249,9 @@ class UserProfileHandler(CylcAppHandler):
     would have returned.
     """
 
+    def initialize(self, auth):
+        self.auth = auth
+
     def set_default_headers(self) -> None:
         super().set_default_headers()
         self.set_header("Content-Type", 'application/json')
@@ -214,23 +261,18 @@ class UserProfileHandler(CylcAppHandler):
     def get(self):
         user_info = self.get_current_user()
 
-        if isinstance(user_info, dict):
-            # the server is running with authentication services provided
-            # by a hub
-            user_info = dict(user_info)  # make a copy for safety
-        else:
-            # the server is running using a token
-            # authentication is provided by jupyter server
-            user_info = {
-                'kind': 'user',
-                'name': ME,
-                'server': socket.gethostname()
-            }
+        user_info = parse_current_user(user_info)
 
         # add an entry for the workflow owner
         # NOTE: when running behind a hub this may be different from the
         # authenticated user
         user_info['owner'] = ME
+
+        # Make user permissions available to the ui
+        user_info['permissions'] = [
+            snake_to_camel(perm) for perm in (
+                self.auth.get_permitted_operations(user_info['name']))
+                ]
 
         self.write(json.dumps(user_info))
 
@@ -243,6 +285,8 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
     somehow need to pass the request info (headers, username ...etc) in also
     """
 
+    # No authorization decorators here, auth handled in AuthorizationMiddleware
+
     # Declare extra attributes
     resolvers = None
 
@@ -251,12 +295,17 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 
     def initialize(self, schema=None, executor=None, middleware=None,
                    root_value=None, graphiql=False, pretty=False,
-                   batch=False, backend=None, **kwargs):
+                   batch=False, backend=None, auth=None, **kwargs):
         super(TornadoGraphQLHandler, self).initialize()
-
+        self.auth = auth
         self.schema = schema
+
         if middleware is not None:
             self.middleware = list(self.instantiate_middleware(middleware))
+        # Make authorization info available to auth middleware
+        for mw in self.middleware:
+            if isinstance(mw, AuthorizationMiddleware):
+                mw.auth = self.auth
         self.executor = executor
         self.root_value = root_value
         self.pretty = pretty
@@ -270,20 +319,21 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 
     @property
     def context(self):
-        wider_context = {
+        """The GraphQL context passed to resolvers (incl middleware)."""
+        return {
             'graphql_params': self.graphql_params,
             'request': self.request,
             'resolvers': self.resolvers,
+            'current_user': parse_current_user(
+                self.get_current_user()
+            ).get('name'),
         }
-        return wider_context
 
     @web.authenticated
-    @authorised
     def prepare(self):
         super().prepare()
 
     @web.authenticated
-    @authorised
     async def execute(self, *args, **kwargs):
         # Use own backend, and TornadoGraphQLHandler already does validation.
         return await self.schema.execute(
@@ -295,14 +345,13 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
         )
 
     @web.authenticated
-    @authorised
     async def run(self, *args, **kwargs):
         await TornadoGraphQLHandler.run(self, *args, **kwargs)
 
 
 class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     """Endpoint for performing GraphQL subscriptions."""
-
+    # No authorization decorators here, auth handled in AuthorizationMiddleware
     def initialize(self, sub_server, resolvers):
         self.queue = Queue(100)
         self.subscription_server = sub_server
@@ -312,13 +361,11 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         return GRAPHQL_WS
 
     @websockets_authenticated
-    @authorised
     def get(self, *args, **kwargs):
         # forward this call so we can authenticate/authorise it
         return websocket.WebSocketHandler.get(self, *args, **kwargs)
 
     @websockets_authenticated  # noqa: A003
-    @authorised
     def open(self, *args, **kwargs):  # noqa: A003
         IOLoop.current().spawn_callback(
             self.subscription_server.handle,
@@ -337,8 +384,11 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
 
     @property
     def context(self):
-        wider_context = {
+        """The GraphQL context passed to resolvers (incl middleware)."""
+        return {
             'request': self.request,
             'resolvers': self.resolvers,
+            'current_user': parse_current_user(
+                self.get_current_user()
+            ).get('name'),
         }
-        return wider_context

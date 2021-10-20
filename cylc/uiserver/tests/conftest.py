@@ -15,6 +15,7 @@
 """Test code and fixtures."""
 
 import asyncio
+from cylc.uiserver.handlers import UIServerGraphQLHandler
 from getpass import getuser
 import inspect
 import logging
@@ -24,6 +25,7 @@ from socket import gethostname
 from tempfile import TemporaryDirectory
 
 import pytest
+from tornado.web import HTTPError
 from traitlets.config import Config
 import zmq
 
@@ -189,8 +191,17 @@ def mock_config(monkeypatch):
 def authorisation_true(monkeypatch):
     """Disabled request authorisation for test purposes."""
     monkeypatch.setattr(
-        'cylc.uiserver.handlers._authorised',
+        'cylc.uiserver.handlers._authorise',
         lambda x: True
+    )
+
+
+@pytest.fixture
+def authorisation_false(monkeypatch):
+    """Disabled request authorisation for test purposes."""
+    monkeypatch.setattr(
+        'cylc.uiserver.handlers._authorise',
+        lambda x: False
     )
 
 
@@ -203,10 +214,37 @@ def mock_authentication(monkeypatch):
             'server': server or gethostname()
         }
         if none:
-            ret = 'anonymous'
+            ret = None
+            monkeypatch.setattr(
+                'cylc.uiserver.handlers.parse_current_user',
+                lambda x: {
+                    'kind': 'user',
+                    'name': None,
+                    'server': 'some_server'
+                }
+            )
+
+            def mock_redirect(*args):
+                # normally tornado would attempt to redirect us to the login
+                # page - for testing purposes we will skip this and raise
+                # a 403 with an explanatory reason
+                raise HTTPError(
+                    403,
+                    reason='login redirect replaced by 403 for test purposes'
+                )
+
+            monkeypatch.setattr(
+                'cylc.uiserver.handlers.CylcAppHandler.redirect',
+                mock_redirect
+            )
+
         monkeypatch.setattr(
             'cylc.uiserver.handlers.CylcAppHandler.get_current_user',
             lambda x: ret
+        )
+        monkeypatch.setattr(
+            'cylc.uiserver.handlers.CylcAppHandler.get_login_url',
+            lambda x: "http://cylc"
         )
 
     _mock_authentication()
