@@ -138,10 +138,10 @@ class Authorization:
         for action_group, expansion in {
                 Authorization.NOT_CONTROL: [
                     f"!{x}" for x in Authorization.CONTROL_OPS.fget()],
-                Authorization.NOT_ALL: list(
-                    map((lambda x: '!' + x), Authorization.ALL_OPS.fget())),
-                Authorization.NOT_READ: list(
-                    map((lambda x: '!' + x), Authorization.READ_OPS))}.items():
+                Authorization.NOT_ALL: [
+                    f"!{x}" for x in Authorization.ALL_OPS.fget()],
+                Authorization.NOT_READ: [
+                    f"!{x}" for x in Authorization.READ_OPS]}.items():
             if action_group in permission_set:
                 permission_set.remove(action_group)
                 permission_set.update(expansion)
