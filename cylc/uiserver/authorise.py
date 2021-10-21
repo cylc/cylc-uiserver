@@ -474,7 +474,11 @@ class AuthorizationMiddleware:
 
 
 def get_groups(username: str) -> List[str]:
-    """Return list of system groups for given user
+    """Return list of system groups for given user.
+
+    Utilizes `os.getgrouplist` alongside `os.NGROUPS_MAX` to return system
+    groups for a given user. `grp.getgrgid` will then parse these to return a
+    list of group names.
 
     Args:
         username: username used to check system groups.
