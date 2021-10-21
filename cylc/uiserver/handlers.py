@@ -163,6 +163,9 @@ class CylcAppHandler(JupyterHandler):
     singleuser/mixins.py#L826
     """
 
+    def prepare(self):
+        _ = self.xsrf_token
+
     auth_level = None
 
     @property
@@ -194,6 +197,7 @@ class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
     def get(self, path):
         # authenticate the static handler
         # this provides us with login redirection and token cashing
+
         return web.StaticFileHandler.get(self, path)
 
 
