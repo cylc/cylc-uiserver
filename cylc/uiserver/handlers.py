@@ -162,6 +162,10 @@ class CylcAppHandler(JupyterHandler):
     3800ceaf9edf33a0171922b93ea3d94f87aa8d91/jupyterhub/
     singleuser/mixins.py#L826
     """
+    # Without this, there is no xsrf token from the GET which causes a 403 and
+    # a missing _xsrf argument error on the first POST.
+    def prepare(self):
+        _ = self.xsrf_token
 
     auth_level = None
 
