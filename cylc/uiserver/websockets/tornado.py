@@ -14,6 +14,7 @@ from tornado.websocket import WebSocketClosedError
 from graphql.execution.middleware import MiddlewareManager
 from graphql_ws.base import ConnectionClosedException
 from graphql_ws.base_async import (
+    resolve,
     BaseAsyncConnectionContext,
     BaseAsyncSubscriptionServer
 )
@@ -123,6 +124,11 @@ class TornadoSubscriptionServer(BaseAsyncSubscriptionServer):
         await shield(self._handle(ws, request_context), loop=self.loop)
 
     async def on_start(self, connection_context, op_id, params):
+        # Attempt to unsubscribe first in case we already have a subscription
+        # with this id.
+        await connection_context.unsubscribe(op_id)
+
+        params['root_value'] = op_id
         execution_result = self.execute(params)
 
         if isawaitable(execution_result):
@@ -138,3 +144,10 @@ class TornadoSubscriptionServer(BaseAsyncSubscriptionServer):
                     break
                 await self.send_execution_result(connection_context, op_id, single_result)
             await self.send_message(connection_context, op_id, GQL_COMPLETE)
+
+    async def send_execution_result(self, connection_context, op_id, execution_result):
+        # Resolve any pending promises
+        await resolve(execution_result.data)
+        request_context = connection_context.request_context
+        await request_context['resolvers'].flow_delta_processed(request_context, op_id)
+        await super().send_execution_result(connection_context, op_id, execution_result)

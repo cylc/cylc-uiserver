@@ -395,4 +395,5 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
             'current_user': parse_current_user(
                 self.get_current_user()
             ).get('name'),
+            'ops_queue': {},
         }
