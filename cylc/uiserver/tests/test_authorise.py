@@ -14,7 +14,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
-from pytest import MonkeyPatch
 from unittest.mock import patch
 
 from cylc.uiserver.authorise import (
@@ -52,7 +51,6 @@ ALL_OPS = [
     "kill",
     "message",
     "pause",
-    "ping",
     "play",
     "poll",
     "release",
@@ -78,7 +76,7 @@ FAKE_SITE_CONF = {
         },
     },
     "server_owner_1": {
-        "*": {"default": ["READ", "message", "!ping"],
+        "*": {"default": ["READ", "message"],
               "limit": ["READ", "CONTROL"]},
         "user1": {"default": ["READ", "play", "pause"], "limit": ["ALL"]},
     },
@@ -105,7 +103,7 @@ FAKE_USER_CONF = {
     # granted to user2
     "user3": ["READ"],
     "user4": ["!ALL"],
-    "user5": ["play", "pause", "!ping"],
+    "user5": ["play", "pause"],
     "group:group2": ["READ", "CONTROL", "!reload"],
 }
 
@@ -121,7 +119,6 @@ FAKE_USER_CONF = {
                 "resume",
                 "set_verbosity",
                 "set_graph_window_extent",
-                "ping",
                 "read",
                 "poll",
                 "hold",
@@ -141,7 +138,7 @@ FAKE_USER_CONF = {
             id="user in * and groups, owner in * and groups",
         ),
         pytest.param(
-            {"read", "ping"},
+            {"read"},
             "server_owner_3",
             [""],
             "user6",
@@ -149,7 +146,7 @@ FAKE_USER_CONF = {
             id="user only in *, owner only in *",
         ),
         pytest.param(
-            {"read", "ping"},
+            {"read"},
             "server_owner_2",
             ["group:grp_of_svr_owners"],
             "user-not-in-user-conf",
@@ -209,25 +206,25 @@ def test_get_permitted_operations(
             id="Check username in user conf and in *",
         ),
         pytest.param(
-            {"!ping", "READ"},
+            {"READ"},
             {
                 "access_username": "access_user_2",
                 "access_user_groups": ["group:group1", "group:group2"],
             },
             {
-                "*": ["READ", "!ping"],
+                "*": ["READ"],
                 "access_user_1": ["READ", "pause", "kill", "play", "!stop"],
             },
             id="Check user just in *",
         ),
         pytest.param(
-            {"!ping", "pause", "kill", "!stop", "READ", "CONTROL"},
+            {"pause", "kill", "!stop", "READ", "CONTROL"},
             {
                 "access_username": "access_user_1",
                 "access_user_groups": ["group:group1", "group:group2"],
             },
             {
-                "*": ["READ", "!ping"],
+                "*": ["READ"],
                 "access_user_1": ["READ", "pause", "kill", "!stop"],
                 "group:group1": ["CONTROL"],
             },
@@ -254,13 +251,13 @@ def test_get_access_user_permissions_from_owner_conf(
     "permission_set, expected",
     [
         pytest.param(
-            {"!kill", "READ", "kill", "!stop", "!ping", "play"},
+            {"!kill", "READ", "kill", "!stop", "play"},
             {"play", "read"},
             id="Expansion with additions and negations",
         ),
         pytest.param(
             {"!CONTROL", "ALL"},
-            {"broadcast", "ping", "read"},
+            {"broadcast", "read"},
             id="Check expansion and negation",
         ),
         pytest.param(

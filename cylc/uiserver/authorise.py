@@ -83,11 +83,7 @@ class Authorization:
 
     # Access Groups
 
-    READ_OPS = [
-        "ping",
-        READ_OPERATION,
-    ]
-
+    READ_OPS = {READ_OPERATION}
     ASYNC_OPS = {"query", "mutation"}
     READ_AUTH_OPS = {"query", "subscription"}
 
@@ -514,22 +510,19 @@ def parse_group_ids(group_ids: List) -> List:
     return group_list
 
 
-def get_list_of_mutations(control=False) -> List[str]:
+def get_list_of_mutations(control: bool = False) -> List[str]:
     """Gets list of mutations"""
     list_of_mutations = [
         attr for attr in dir(UISMutations)
         if isinstance(getattr(UISMutations, attr), graphene.Field)
     ]
     if control:
-        # Ping is a READ mutation
-        list_of_mutations.remove("ping")
         # Broadcast is an ALL mutation
         list_of_mutations.remove("broadcast")
-        return list_of_mutations
     else:
         # 'read' is used soley for authorization and is not a UISMutation
         list_of_mutations.append(Authorization.READ_OPERATION)
-        return list_of_mutations
+    return list_of_mutations
 
 
 def raise_auth_config_exception(config_type: str):
