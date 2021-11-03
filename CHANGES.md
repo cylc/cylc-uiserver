@@ -32,6 +32,10 @@ Fix traceback which could appear when workflows are removed.
 [#241](https://github.com/cylc/cylc-uiserver/pull/241) -
 Update old, broken hold options for playing workflows.
 
+[#272](https://github.com/cylc/cylc-uiserver/pull/272) -
+Allowed broken entries in the group id database to be
+ignored and logged without causing total failure.
+
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-0.5.0 (<span actions:bind='release-date'>Released 2021-07-28</span>)__
 

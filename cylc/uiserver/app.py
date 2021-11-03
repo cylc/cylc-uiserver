@@ -473,7 +473,8 @@ class CylcUIServer(ExtensionApp):
         return Authorization(
             getpass.getuser(),
             self.config.CylcUIServer.user_authorization,
-            self.config.CylcUIServer.site_authorization
+            self.config.CylcUIServer.site_authorization,
+            self.log
         )
 
     def initialize_templates(self):
