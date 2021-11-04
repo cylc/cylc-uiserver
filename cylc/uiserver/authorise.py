@@ -483,8 +483,8 @@ class AuthorizationMiddleware:
 def get_groups(username: str) -> Tuple[List[str], List[str]]:
     """Return list of system groups for given user.
 
-    Uses `os.getgrouplist` and `os.NGROUPS_MAX` to get system groups for a
-    given user. `grp.getgrgid` then parses these to return a list of group
+    Uses ``os.getgrouplist`` and ``os.NGROUPS_MAX`` to get system groups for a
+    given user. ``grp.getgrgid`` then parses these to return a list of group
     names.
 
     Args:
