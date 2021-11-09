@@ -17,9 +17,8 @@ from contextlib import suppress
 from functools import lru_cache
 import graphene
 import grp
-from typing import List, Dict, Optional, Union, Any, Sequence, Set
+from typing import List, Dict, Optional, Union, Any, Sequence, Set, Tuple
 from inspect import iscoroutinefunction
-import logging
 import os
 import re
 from tornado import web
@@ -27,8 +26,6 @@ from traitlets.config.loader import LazyConfigValue
 from traitlets.traitlets import Bool
 
 from cylc.uiserver.schema import UISMutations
-
-LOG = logging.getLogger(__name__)
 
 
 def constant(func):
@@ -99,13 +96,14 @@ class Authorization:
         """CONTROL OPS constant, returns list of all control mutations."""
         return get_list_of_mutations(control=True)
 
-    def __init__(self, owner, owner_auth_conf, site_auth_conf) -> None:
+    def __init__(self, owner, owner_auth_conf, site_auth_conf, log) -> None:
         self.owner = owner
+        self.log = log
         self.owner_auth_conf = self.set_auth_conf(owner_auth_conf)
         self.site_auth_config = self.set_auth_conf(site_auth_conf)
         self.owner_user_info = {
             "user": self.owner,
-            "user_groups": get_groups(self.owner),
+            "user_groups": self._get_groups(self.owner),
         }
         self.owner_dict = self.build_owner_site_auth_conf()
 
@@ -251,7 +249,7 @@ class Authorization:
 
         access_user_dict = {
             "access_username": access_user,
-            "access_user_groups": get_groups(access_user),
+            "access_user_groups": self._get_groups(access_user),
         }
         limits_owner_can_give = self.get_owner_site_limits_for_access_user(
             access_user=access_user_dict)
@@ -276,7 +274,7 @@ class Authorization:
         allowed_operations = limits_owner_can_give.intersection(
             user_conf_permitted_ops
         )
-        LOG.info(
+        self.log.info(
             f"User {access_user} authorized permissions: "
             f"{sorted(allowed_operations)}"
         )
@@ -299,9 +297,9 @@ class Authorization:
         if re.sub(
             r'(?<!^)(?=[A-Z])', '_', operation
                 ).lower() in self.get_permitted_operations(access_user):
-            LOG.info(f"{access_user}: authorized to {operation}")
+            self.log.info(f"{access_user}: authorized to {operation}")
             return True
-        LOG.info(f"{access_user}: not authorized to {operation}")
+        self.log.info(f"{access_user}: not authorized to {operation}")
 
         return False
 
@@ -387,6 +385,20 @@ class Authorization:
         defaults.discard("")
         return defaults
 
+    def _get_groups(self, user: str) -> List:
+        """Allows get groups to use self.logger if something goes wrong.
+
+        Added to provide a single interface for get_groups to this class, to
+        avoid having to pass the logger to get_groups (and methods it calls).
+        """
+        good_groups, bad_groups = get_groups(user)
+        if bad_groups:
+            self.log.warning(
+                f'{user} has the following invalid groups in their profile '
+                f'{bad_groups} - these groups will be ignored.'
+            )
+        return good_groups
+
 
 # GraphQL middleware
 class AuthorizationMiddleware:
@@ -422,8 +434,7 @@ class AuthorizationMiddleware:
             return self.async_resolve(next_, root, info, **args)
         return next_(root, info, **args)
 
-    @staticmethod
-    def auth_failed(current_user: str, op_name: str,
+    def auth_failed(self, current_user: str, op_name: str,
                     http_code: int, message: Optional[str] = None):
         """
         Raise authorization error
@@ -440,7 +451,7 @@ class AuthorizationMiddleware:
                        f":requested to {op_name}.")
         if message:
             log_message = log_message + " " + message
-        LOG.warning(log_message)
+        Authorization.log.warning(log_message)
         raise web.HTTPError(http_code, reason=message)
 
     def get_op_name(self, field_name: str, operation: str) -> Union[None, str]:
@@ -469,11 +480,11 @@ class AuthorizationMiddleware:
         return await next_(root, info, **args)
 
 
-def get_groups(username: str) -> List[str]:
+def get_groups(username: str) -> Tuple[List[str], List[str]]:
     """Return list of system groups for given user.
 
-    Uses `os.getgrouplist` and `os.NGROUPS_MAX` to get system groups for a
-    given user. `grp.getgrgid` then parses these to return a list of group
+    Uses ``os.getgrouplist`` and ``os.NGROUPS_MAX`` to get system groups for a
+    given user. ``grp.getgrgid`` then parses these to return a list of group
     names.
 
     Args:
@@ -489,7 +500,7 @@ def get_groups(username: str) -> List[str]:
     return parse_group_ids(group_ids)
 
 
-def parse_group_ids(group_ids: List) -> List:
+def parse_group_ids(group_ids: List) -> Tuple[List[str], List[str]]:
     """Returns list of groups in the correct format for authorisation.
 
     Args:
@@ -500,6 +511,7 @@ def parse_group_ids(group_ids: List) -> List:
         prepended.
     """
     group_list = []
+    bad_group_list = []
     for x in group_ids:
         try:
             group_list.append(
@@ -507,7 +519,9 @@ def parse_group_ids(group_ids: List) -> List:
             )
         except OverflowError:
             continue
-    return group_list
+        except KeyError:
+            bad_group_list.append(x)
+    return group_list, bad_group_list
 
 
 def get_list_of_mutations(control: bool = False) -> List[str]:

@@ -13,6 +13,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# from logging import Logger as log
+from types import SimpleNamespace
+from jupyter_server.extension.application import ExtensionApp
 import pytest
 from unittest.mock import patch
 
@@ -20,7 +23,10 @@ from cylc.uiserver.authorise import (
     Authorization,
     AuthorizationMiddleware,
     get_list_of_mutations,
+    parse_group_ids
 )
+
+log = ExtensionApp().log
 
 CONTROL_OPS = [
     "ext_trigger",
@@ -180,9 +186,9 @@ def test_get_permitted_operations(
     user_name,
     user_groups,
 ):
-    mocked_get_groups.side_effect = [owner_groups, user_groups]
+    mocked_get_groups.side_effect = [(owner_groups, []), (user_groups, [])]
     auth_obj = Authorization(
-        owner_name, FAKE_USER_CONF, FAKE_SITE_CONF
+        owner_name, FAKE_USER_CONF, FAKE_SITE_CONF, log
     )
     actual_operations = auth_obj.get_permitted_operations(
         access_user=user_name
@@ -237,9 +243,9 @@ def test_get_access_user_permissions_from_owner_conf(
     mocked_get_groups, expected_operations, access_user_dict, owner_auth_conf
 ):
     """Test the un-processed permissions of owner conf."""
-    mocked_get_groups.return_value = ["group:blah"]
+    mocked_get_groups.return_value = (["group:blah"], [])
     authobj = Authorization(
-        "some_user", owner_auth_conf, {"fake": "config"}
+        "some_user", owner_auth_conf, {"fake": "config"}, log
     )
     permitted_operations = authobj.get_access_user_permissions_from_owner_conf(
         access_user_dict
@@ -271,7 +277,8 @@ def test_expand_and_process_access_groups(permission_set, expected):
     authobj = Authorization(
         "some_user",
         {"fake": "config"},
-        {"fake": "config"}
+        {"fake": "config"},
+        log
     )
     actual = authobj.expand_and_process_access_groups(permission_set)
     assert actual == expected
@@ -309,7 +316,7 @@ def test_expand_and_process_access_groups(permission_set, expected):
 def test_get_op_name(mut_field_name, operation, expected_op_name):
     mock_authobj = Authorization(
         "some_user", {"fake": "config"},
-        {"fake": "config"}
+        {"fake": "config"}, log
     )
     auth_middleware = AuthorizationMiddleware
     auth_middleware.auth = mock_authobj
@@ -348,9 +355,9 @@ def test_is_permitted(
     get_permitted_operations_is_called,
     expected,
 ):
-    mocked_get_groups.side_effect = [[""], [""]]
+    mocked_get_groups.side_effect = [([""], []), ([""], [])]
     mocked_get_permitted_operations.return_value = ["fake_operation"]
-    auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF)
+    auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF, log)
     actual = auth_obj.is_permitted(
         access_user=user_name, operation="fake_operation"
     )
@@ -370,3 +377,33 @@ def test_get_list_of_mutations(control, expected):
     """Test ALL_OPS are returned"""
     actual = get_list_of_mutations(control=control)
     assert set(actual) == set(expected)
+
+
+@pytest.mark.parametrize(
+    'input_',
+    (
+        [123],
+        [123, 456],
+        [100, 123]
+    )
+)
+def test_parse_group_ids(monkeypatch, input_):
+    """Returns a list of group ids or groups where ID's haven't worked
+    """
+    mock_grid_db = {
+        123: 'foo',
+        456: 'bar',
+    }
+    monkeypatch.setattr(
+        'grp.getgrgid', lambda x: SimpleNamespace(gr_name=mock_grid_db[x])
+    )
+    result = parse_group_ids(input_)
+    assert result == (
+        [
+            f'group:{mock_grid_db[i]}'
+            for i in input_ if i in mock_grid_db
+        ],
+        [
+            i for i in input_ if i not in mock_grid_db
+        ],
+        )
