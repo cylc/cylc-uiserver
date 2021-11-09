@@ -190,6 +190,9 @@ class Resolvers(BaseResolvers):
         w_ids = [
             flow[WORKFLOW].id
             for flow in await self.get_workflows_data(w_args)]
+        if not w_ids:
+            return [{
+                'response': (False, 'No matching workflows')}]
         # Pass the request to the workflow GraphQL endpoints
         req_str, variables, _, _ = info.context.get('graphql_params')
         graphql_args = {
@@ -215,7 +218,8 @@ class Resolvers(BaseResolvers):
             flow[WORKFLOW].id
             for flow in await self.get_workflows_data(w_args)]
         if not w_ids:
-            return 'Error: No matching Workflow'
+            return [{
+                'response': (False, 'No matching workflows')}]
         # Pass the multi-node request to the workflow GraphQL endpoints
         req_str, variables, _, _ = info.context.get('graphql_params')
         graphql_args = {

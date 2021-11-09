@@ -284,7 +284,8 @@ class WorkflowsManager:
                 command,
                 multi_args.get(w_id, args),
                 timeout,
-            ) for w_id in self.active
+            ) for w_id in workflows
+            if w_id in self.active
         }
         gathers = [
             workflow_request(req_context=info, *request_args, log=self.log)
