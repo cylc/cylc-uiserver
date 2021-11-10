@@ -451,7 +451,6 @@ class AuthorizationMiddleware:
                        f":requested to {op_name}.")
         if message:
             log_message = log_message + " " + message
-        Authorization.log.warning(log_message)
         raise web.HTTPError(http_code, reason=message)
 
     def get_op_name(self, field_name: str, operation: str) -> Union[None, str]:
