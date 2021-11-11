@@ -1,4 +1,4 @@
-include cylc/uiserver/py.typed
 include cylc/uiserver/logging_config.json
 include cylc/uiserver/logo.svg
+include cylc/uiserver/py.typed
 recursive-include cylc/uiserver/ui/ *
