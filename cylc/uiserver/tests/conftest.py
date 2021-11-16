@@ -52,7 +52,9 @@ class AsyncClientFixture(ZMQSocketBase):
     def will_return(self, returns):
         self.returns = returns
 
-    async def async_request(self, command, args=None, timeout=None):
+    async def async_request(
+        self, command, args=None, timeout=None, auth_user=None
+    ):
         if (
             inspect.isclass(self.returns)
             and issubclass(self.returns, Exception)

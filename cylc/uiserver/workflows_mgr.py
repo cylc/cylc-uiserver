@@ -53,6 +53,7 @@ async def workflow_request(
     req_context=None,
     *,
     log=None,
+    auth_user=None
 ):
     """Workflow request command.
 
@@ -70,7 +71,8 @@ async def workflow_request(
     if req_context is None:
         req_context = command
     try:
-        result = await client.async_request(command, args, timeout)
+        result = await client.async_request(
+            command, args, timeout, auth_user=auth_user)
         return (req_context, result)
     except ClientTimeout as exc:
         if log:
@@ -271,7 +273,8 @@ class WorkflowsManager:
         workflows,
         args=None,
         multi_args=None,
-        timeout=None
+        timeout=None,
+        auth_user=None
     ):
         """Send requests to multiple workflows."""
         if args is None:
@@ -288,7 +291,12 @@ class WorkflowsManager:
             if w_id in self.active
         }
         gathers = [
-            workflow_request(req_context=info, *request_args, log=self.log)
+            workflow_request(
+                req_context=info,
+                *request_args,
+                log=self.log,
+                auth_user=auth_user
+            )
             for info, request_args in req_args.items()
         ]
         results = await asyncio.gather(*gathers, return_exceptions=True)
