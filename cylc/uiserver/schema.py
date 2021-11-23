@@ -19,14 +19,13 @@ extra functionality specific to the UIS.
 
 """
 
-from functools import partial
+from typing import TYPE_CHECKING, Any, List, Optional
 
 import graphene
 from graphene.types.generic import GenericScalar
 
 from cylc.flow.network.schema import (
     CyclePoint,
-    GenericResponse,
     Mutations,
     Queries,
     Subscriptions,
@@ -36,25 +35,9 @@ from cylc.flow.network.schema import (
     sstrip,
 )
 
-
-async def mutator(root, info, command=None, workflows=None,
-                  exworkflows=None, **args):
-    """Call the resolver method that act on the workflow service
-    via the internal command queue."""
-    if workflows is None:
-        workflows = []
-    if exworkflows is None:
-        exworkflows = []
-    w_args = {}
-    w_args['workflows'] = [parse_workflow_id(w_id) for w_id in workflows]
-    w_args['exworkflows'] = [parse_workflow_id(w_id) for w_id in exworkflows]
-    if args.get('args', False):
-        args.update(args.get('args', {}))
-        args.pop('args')
-
-    resolvers = info.context.get('resolvers')
-    res = await resolvers.service(info, command, w_args, args)
-    return GenericResponse(result=res)
+if TYPE_CHECKING:
+    from graphql import ResolveInfo
+    from cylc.uiserver.resolvers import Resolvers
 
 
 class RunMode(graphene.Enum):
@@ -89,7 +72,6 @@ class Play(graphene.Mutation):
         description = sstrip('''
             Start, resume or un-pause a workflow run.
         ''')
-        resolver = partial(mutator, command='play')
 
     class Arguments:
         workflows = graphene.List(WorkflowID, required=True)
@@ -198,6 +180,30 @@ class Play(graphene.Mutation):
                 on the `cylc play` command line if they need to be overridden.
             ''')
         )
+
+    @staticmethod
+    async def mutate(
+        root: Optional[Any],
+        info: 'ResolveInfo',
+        *,
+        workflows: Optional[List[str]] = None,
+        # _exworkflows: Optional[List[str]] = None,
+        **kwargs: Any
+    ):
+        """Call the resolver method that act on the workflow service
+        via the internal command queue."""
+        if workflows is None:
+            workflows = []
+        parsed_workflows = [parse_workflow_id(w_id) for w_id in workflows]
+        if kwargs.get('args', False):
+            kwargs.update(kwargs.get('args', {}))
+            kwargs.pop('args')
+
+        resolvers: 'Resolvers' = (
+            info.context.get('resolvers')  # type: ignore[union-attr]
+        )
+        res = await resolvers.service(parsed_workflows, kwargs)
+        return Play(result=res)
 
     result = GenericScalar()
 

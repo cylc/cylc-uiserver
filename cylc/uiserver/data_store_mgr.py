@@ -37,6 +37,7 @@ from copy import deepcopy
 from functools import partial
 from pathlib import Path
 import time
+from typing import Optional
 
 from cylc.flow import ID_DELIM
 from cylc.flow.network.server import PB_METHOD_MAP
@@ -342,7 +343,7 @@ class DataStoreMgr:
                     ),
                     self.loop
                 )
-                _, new_delta_msg = future.result(self.RECONCILE_TIMEOUT)
+                new_delta_msg = future.result(self.RECONCILE_TIMEOUT)
                 new_delta = DELTAS_MAP[topic]()
                 new_delta.ParseFromString(new_delta_msg)
                 self.clear_data_field(w_id, topic)
@@ -358,12 +359,11 @@ class DataStoreMgr:
             except Exception as exc:
                 self.log.exception(exc)
 
-    async def entire_workflow_update(self, ids=None):
+    async def entire_workflow_update(self, ids: Optional[list] = None) -> None:
         """Update entire local data-store of workflow(s).
 
         Args:
-            ids (list): List of workflow external IDs.
-
+            ids: List of workflow external IDs.
 
         """
         if ids is None:
@@ -371,37 +371,35 @@ class DataStoreMgr:
 
         # Request new data
         req_method = 'pb_entire_workflow'
-        req_kwargs = (
-            {'client': info['req_client'],
-             'command': req_method,
-             'req_context': w_id}
-            for w_id, info in self.workflows_mgr.active.items())
 
-        gathers = [
-            workflow_request(**kwargs)
-            for kwargs in req_kwargs
-            if not ids or kwargs['req_context'] in ids
-        ]
-        items = await asyncio.gather(*gathers, return_exceptions=True)
-        for item in items:
-            if isinstance(item, Exception):
+        requests = {
+            w_id: workflow_request(
+                client=info['req_client'], command=req_method
+            )
+            for w_id, info in self.workflows_mgr.active.items()
+            if not ids or w_id in ids
+        }
+        results = await asyncio.gather(
+            *requests.values(), return_exceptions=True
+        )
+        # result:
+        for w_id, result in zip(requests, results):
+            if isinstance(result, Exception):
                 self.log.exception(
                     'Failed to update entire local data-store '
-                    'of a workflow', exc_info=item
+                    'of a workflow', exc_info=result
                 )
-            else:
-                w_id, result = item
-                if result is not None and result != MSG_TIMEOUT:
-                    pb_data = PB_METHOD_MAP[req_method]()
-                    pb_data.ParseFromString(result)
-                    new_data = deepcopy(DATA_TEMPLATE)
-                    for field, value in pb_data.ListFields():
-                        if field.name == WORKFLOW:
-                            new_data[field.name].CopyFrom(value)
-                            new_data['delta_times'] = {
-                                key: value.last_updated
-                                for key in DATA_TEMPLATE
-                            }
-                            continue
-                        new_data[field.name] = {n.id: n for n in value}
-                    self.data[w_id] = new_data
+            elif result is not None and result != MSG_TIMEOUT:
+                pb_data = PB_METHOD_MAP[req_method]()
+                pb_data.ParseFromString(result)
+                new_data = deepcopy(DATA_TEMPLATE)
+                for field, value in pb_data.ListFields():
+                    if field.name == WORKFLOW:
+                        new_data[field.name].CopyFrom(value)
+                        new_data['delta_times'] = {
+                            key: value.last_updated
+                            for key in DATA_TEMPLATE
+                        }
+                        continue
+                    new_data[field.name] = {n.id: n for n in value}
+                self.data[w_id] = new_data
