@@ -41,7 +41,6 @@ from typing import Optional
 
 from cylc.flow import ID_DELIM
 from cylc.flow.network.server import PB_METHOD_MAP
-from cylc.flow.network import MSG_TIMEOUT
 from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
 from cylc.flow.data_store_mgr import (
     EDGES, DATA_TEMPLATE, ALL_DELTAS, DELTAS_MAP, WORKFLOW,
@@ -382,24 +381,22 @@ class DataStoreMgr:
         results = await asyncio.gather(
             *requests.values(), return_exceptions=True
         )
-        # result:
         for w_id, result in zip(requests, results):
             if isinstance(result, Exception):
                 self.log.exception(
                     'Failed to update entire local data-store '
                     'of a workflow', exc_info=result
                 )
-            elif result is not None and result != MSG_TIMEOUT:
-                pb_data = PB_METHOD_MAP[req_method]()
-                pb_data.ParseFromString(result)
-                new_data = deepcopy(DATA_TEMPLATE)
-                for field, value in pb_data.ListFields():
-                    if field.name == WORKFLOW:
-                        new_data[field.name].CopyFrom(value)
-                        new_data['delta_times'] = {
-                            key: value.last_updated
-                            for key in DATA_TEMPLATE
-                        }
-                        continue
-                    new_data[field.name] = {n.id: n for n in value}
-                self.data[w_id] = new_data
+            pb_data = PB_METHOD_MAP[req_method]()
+            pb_data.ParseFromString(result)
+            new_data = deepcopy(DATA_TEMPLATE)
+            for field, value in pb_data.ListFields():
+                if field.name == WORKFLOW:
+                    new_data[field.name].CopyFrom(value)
+                    new_data['delta_times'] = {
+                        key: value.last_updated
+                        for key in DATA_TEMPLATE
+                    }
+                    continue
+                new_data[field.name] = {n.id: n for n in value}
+            self.data[w_id] = new_data
