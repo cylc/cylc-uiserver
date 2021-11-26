@@ -39,8 +39,9 @@ from typing import (
 from graphql.language.base import print_ast
 import psutil
 
-from cylc.flow.data_store_mgr import WORKFLOW
 from cylc.flow.exceptions import (
+    ClientError,
+    ClientTimeout,
     ServiceFileError,
     WorkflowFilesError,
 )
@@ -497,13 +498,9 @@ class Resolvers(BaseResolvers):
                 'current_user', 'unknown user'
             )
         }
-        w_ids = [
-            flow[WORKFLOW].id
-            for flow in await self.get_workflows_data(w_args)]
+        w_ids = await self.get_workflow_ids(w_args)
         if not w_ids:
-            return [
-                GenericResponse(success=False, message="No matching workflows")
-            ]
+            return [self._no_matching_workflows_response]
         # Pass the request to the workflow GraphQL endpoints
         _, variables, _, _ = info.context.get(  # type: ignore[union-attr]
             'graphql_params'
@@ -528,17 +525,21 @@ class Resolvers(BaseResolvers):
             ]
         ret: List[GenericResponse] = []
         for result in results:
-            if not isinstance(result, dict):
-                raise TypeError(
-                    "Expected to receive GraphQL response dict "
-                    f"but received: {result}"
+            if isinstance(result, (ClientTimeout, ClientError)):
+                ret.append(
+                    GenericResponse(
+                        workflowId=result.workflow,
+                        success=False,
+                        message=str(result)
+                    )
                 )
-            if not result.get('data'):
-                raise ValueError(f"Unexpected response: {result}")
+                continue
+            if isinstance(result, Exception):
+                raise result
+            if not isinstance(result, dict) or not result.get('data'):
+                raise ValueError(f"Unexpected response: {result!r}")
             mutation_result: dict = result['data'][command]['results'][0]
-            ret.append(
-                GenericResponse(**mutation_result)
-            )
+            ret.append(GenericResponse(**mutation_result))
         return ret
 
     async def service(

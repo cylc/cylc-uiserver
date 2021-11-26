@@ -95,6 +95,7 @@ async def workflow_request(
         else:
             print(msg, file=sys.stderr)
             print(exc, file=sys.stderr)
+        exc.workflow = client.workflow
         raise exc
 
 
