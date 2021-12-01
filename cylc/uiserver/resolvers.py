@@ -502,45 +502,11 @@ class Resolvers(BaseResolvers):
         if not w_ids:
             return [self._no_matching_workflows_response]
         # Pass the request to the workflow GraphQL endpoints
-        _, variables, _, _ = info.context.get(  # type: ignore[union-attr]
-            'graphql_params'
-        )
-        # Create a modified request string,
-        # containing only the current mutation/field.
-        operation_ast = deepcopy(info.operation)
-        operation_ast.selection_set.selections = info.field_asts
-
-        graphql_args = {
-            'request_string': print_ast(operation_ast),
-            'variables': variables,
-        }
+        graphql_args = _get_graphql_args(info)
         results = await self.workflows_mgr.multi_request(
             'graphql', w_ids, graphql_args, req_meta=req_meta
         )
-        if not results:
-            return [
-                GenericResponse(
-                    success=False, message="No matching workflows running"
-                )
-            ]
-        ret: List[GenericResponse] = []
-        for result in results:
-            if isinstance(result, (ClientTimeout, ClientError)):
-                ret.append(
-                    GenericResponse(
-                        workflowId=result.workflow,
-                        success=False,
-                        message=str(result)
-                    )
-                )
-                continue
-            if isinstance(result, Exception):
-                raise result
-            if not isinstance(result, dict) or not result.get('data'):
-                raise ValueError(f"Unexpected response: {result!r}")
-            mutation_result: dict = result['data'][command]['results'][0]
-            ret.append(GenericResponse(**mutation_result))
-        return ret
+        return process_graphql_multi_request_results(command, results)
 
     async def service(
         self,
@@ -658,3 +624,65 @@ async def stream_log(
         file
     ):
         yield item
+
+
+def _get_graphql_args(info: 'ResolveInfo') -> Dict[str, Any]:
+    """Helper function for mutator."""
+    _, variables, _, _ = info.context.get(  # type: ignore[union-attr]
+        'graphql_params'
+    )
+    # Create a modified request string,
+    # containing only the current mutation/field.
+    operation_ast = deepcopy(info.operation)
+    operation_ast.selection_set.selections = info.field_asts
+
+    return {
+        'request_string': print_ast(operation_ast),
+        'variables': variables,
+    }
+
+
+def process_graphql_multi_request_results(
+    command: str,
+    results: List[Union[object, bytes, Exception]]
+) -> List[GenericResponse]:
+    """Wrap multi_request results as list of GenericResponses, suitable for
+    GraphQL mutator return value.
+
+    Extracts result[data][command][results] from Scheduler GraphQL mutator
+    response to avoid double-nesting when passing it to UIServer GraphQL
+    mutator.
+
+    Args:
+        command: The GraphQL mutation name.
+        results: Return value of WorkflowsManager.multi_request().
+
+    N.B. WorkflowsManager.multi_request() can be used for non-GraphQL requests,
+    so this processing is in a separate function.
+    """
+    if not results:
+        return [
+            GenericResponse(
+                success=False, message="No matching workflows running"
+            )
+        ]
+    ret: List[GenericResponse] = []
+    for result in results:
+        if isinstance(result, (ClientTimeout, ClientError)):
+            # "Expected" error
+            ret.append(
+                GenericResponse(
+                    workflowId=result.workflow,
+                    success=False,
+                    message=str(result)
+                )
+            )
+            continue
+        if isinstance(result, Exception):
+            # Unexpected error
+            raise result
+        if not isinstance(result, dict) or not result.get('data'):
+            raise ValueError(f"Unexpected response: {result!r}")
+        mutation_result: dict = result['data'][command]['results'][0]
+        ret.append(GenericResponse(**mutation_result))
+    return ret
