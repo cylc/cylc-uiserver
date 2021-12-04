@@ -18,7 +18,7 @@ from functools import wraps
 import json
 import getpass
 import socket
-from typing import Callable, Union
+from typing import TYPE_CHECKING, Callable, Union
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
@@ -34,6 +34,9 @@ from cylc.flow.scripts.cylc import (
 
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
+
+if TYPE_CHECKING:
+    from graphql.execution import ExecutionResult
 
 
 ME = getpass.getuser()
@@ -338,7 +341,7 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
         super().prepare()
 
     @web.authenticated
-    async def execute(self, *args, **kwargs):
+    async def execute(self, *args, **kwargs) -> 'ExecutionResult':
         # Use own backend, and TornadoGraphQLHandler already does validation.
         return await self.schema.execute(
             *args,

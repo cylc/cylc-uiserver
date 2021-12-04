@@ -17,9 +17,20 @@
 
 import os
 from subprocess import Popen, PIPE, DEVNULL
+from typing import (
+    TYPE_CHECKING, Any, Dict, List
+)
 
-from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.data_store_mgr import WORKFLOW
+from cylc.flow.network.resolvers import BaseResolvers
+from cylc.flow.network.schema import GenericResponseTuple
+
+
+if TYPE_CHECKING:
+    from logging import Logger
+    from graphql import ResolveInfo
+    from cylc.flow.data_store_mgr import DataStoreMgr
+    from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
 # show traceback from cylc commands
@@ -172,11 +183,16 @@ class Services:
 class Resolvers(BaseResolvers):
     """UI Server context GraphQL query and mutation resolvers."""
 
-    workflows_mgr = None
-
-    def __init__(self, data, log, **kwargs):
+    def __init__(
+        self,
+        data: 'DataStoreMgr',
+        log: 'Logger',
+        workflows_mgr: 'WorkflowsManager',
+        **kwargs
+    ):
         super().__init__(data)
         self.log = log
+        self.workflows_mgr = workflows_mgr
 
         # Set extra attributes
         for key, value in kwargs.items():
@@ -184,24 +200,52 @@ class Resolvers(BaseResolvers):
                 setattr(self, key, value)
 
     # Mutations
-    async def mutator(self, info, *m_args):
+    async def mutator(
+        self,
+        info: 'ResolveInfo',
+        command: str,
+        w_args: Dict[str, Any],
+        _kwargs: Dict[str, Any]
+    ) -> List[GenericResponseTuple]:
         """Mutate workflow."""
-        _, w_args, _ = m_args
         w_ids = [
             flow[WORKFLOW].id
             for flow in await self.get_workflows_data(w_args)]
         if not w_ids:
-            return [{
-                'response': (False, 'No matching workflows')}]
+            return [
+                GenericResponseTuple(None, False, "No matching workflows")
+            ]
         # Pass the request to the workflow GraphQL endpoints
-        req_str, variables, _, _ = info.context.get('graphql_params')
+        req_str, variables, _, _ = (
+            info.context.get('graphql_params')  # type: ignore[union-attr]
+        )
         graphql_args = {
             'request_string': req_str,
             'variables': variables,
         }
-        return await self.workflows_mgr.multi_request(
+        results = await self.workflows_mgr.multi_request(
             'graphql', w_ids, graphql_args
         )
+        if not results:
+            return [
+                GenericResponseTuple(
+                    None, False, "No matching workflows running"
+                )
+            ]
+        ret: List[GenericResponseTuple] = []
+        for result in results:
+            if not isinstance(result, dict):
+                raise TypeError(
+                    "Expected to receive GraphQL response dict "
+                    f"but received: {result}"
+                )
+            if not result.get('data'):
+                raise ValueError(f"Unexpected response: {result}")
+            mutation_result: dict = result['data'][command]['results'][0]
+            ret.append(
+                GenericResponseTuple(**mutation_result)
+            )
+        return ret
 
     async def service(self, info, *m_args):
         return await Services.play(

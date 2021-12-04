@@ -26,6 +26,9 @@ import asyncio
 from contextlib import suppress
 from getpass import getuser
 import sys
+from typing import (
+    TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Union
+)
 
 import zmq.asyncio
 
@@ -33,7 +36,6 @@ from cylc.flow import ID_DELIM
 from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.network import API
 from cylc.flow.network.client import WorkflowRuntimeClient
-from cylc.flow.network import MSG_TIMEOUT
 from cylc.flow.network.scan import (
     api_version,
     contact_info,
@@ -42,48 +44,38 @@ from cylc.flow.network.scan import (
 )
 from cylc.flow.workflow_files import ContactFileFields as CFF
 
+if TYPE_CHECKING:
+    from logging import Logger
+
+
 CLIENT_TIMEOUT = 2.0
 
 
 async def workflow_request(
-    client,
-    command,
-    args=None,
-    timeout=None,
-    req_context=None,
+    client: WorkflowRuntimeClient,
+    command: str,
+    args: Optional[Dict[str, Any]] = None,
+    timeout: Optional[float] = None,
     *,
-    log=None,
-):
+    log: Optional['Logger'] = None,
+) -> Union[bytes, object]:
     """Workflow request command.
 
     Args:
-        client (WorkflowRuntimeClient): Instantiated workflow client.
-        command (str): Command/Endpoint name.
-        args (dict): Endpoint arguments.
-        timeout (float): Client request timeout (secs).
-        req_context (str): A string to identifier.
-
-    Returns:
-        tuple: (req_context, result)
+        client: Instantiated workflow client.
+        command: Command/Endpoint name.
+        args: Endpoint arguments.
+        timeout: Client request timeout (secs).
 
     """
-    if req_context is None:
-        req_context = command
     try:
-        result = await client.async_request(command, args, timeout)
-        return (req_context, result)
-    except ClientTimeout as exc:
+        return await client.async_request(command, args, timeout)
+    except (ClientTimeout, ClientError) as exc:
         if log:
             log.exception(exc)
         else:
             print(exc, file=sys.stderr)
-        return (req_context, MSG_TIMEOUT)
-    except ClientError as exc:
-        if log:
-            log.exception(exc)
-        else:
-            print(exc, file=sys.stderr)
-        return (req_context, None)
+        raise exc
 
 
 class WorkflowsManager:
@@ -267,44 +259,37 @@ class WorkflowsManager:
 
     async def multi_request(
         self,
-        command,
-        workflows,
-        args=None,
-        multi_args=None,
+        command: str,
+        workflows: Iterable[str],
+        args: Optional[Dict[str, Any]] = None,
+        multi_args: Optional[Dict[str, Any]] = None,
         timeout=None
-    ):
+    ) -> List[object]:
         """Send requests to multiple workflows."""
         if args is None:
             args = {}
         if multi_args is None:
             multi_args = {}
-        req_args = {
-            w_id: (
+        gathers = [
+            workflow_request(
                 self.active[w_id]['req_client'],
                 command,
                 multi_args.get(w_id, args),
                 timeout,
-            ) for w_id in workflows
+                log=self.log
+            )
+            for w_id in workflows
             if w_id in self.active
-        }
-        gathers = [
-            workflow_request(req_context=info, *request_args, log=self.log)
-            for info, request_args in req_args.items()
         ]
-        results = await asyncio.gather(*gathers, return_exceptions=True)
-        res = []
+        results: List[
+            Union[bytes, object, Exception]
+        ] = await asyncio.gather(*gathers, return_exceptions=True)
+        res: List[Union[bytes, object]] = []
         for result in results:
             if isinstance(result, Exception):
                 self.log.exception(
                     'Failed to send requests to multiple workflows',
                     exc_info=result
                 )
-            else:
-                _, val = result
-                res.extend([
-                    msg_core
-                    for msg_core in list(val.values())[0].get('result')
-                    if isinstance(val, dict)
-                    and list(val.values())
-                ])
+            res.append(result)
         return res
