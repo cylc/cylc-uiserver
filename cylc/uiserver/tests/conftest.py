@@ -15,7 +15,6 @@
 """Test code and fixtures."""
 
 import asyncio
-from cylc.uiserver.handlers import UIServerGraphQLHandler
 from getpass import getuser
 import inspect
 import logging
@@ -29,12 +28,14 @@ from tornado.web import HTTPError
 from traitlets.config import Config
 import zmq
 
+from cylc.flow import ID_DELIM
 from cylc.flow.data_messages_pb2 import (  # type: ignore
     PbEntireWorkflow,
     PbWorkflow,
     PbFamilyProxy,
 )
 from cylc.flow.network import ZMQSocketBase
+from cylc.flow.workflow_files import ContactFileFields as CFF
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.workflows_mgr import WorkflowsManager
@@ -260,3 +261,113 @@ def mock_authentication_yossarian(mock_authentication):
 @pytest.fixture
 def mock_authentication_none(mock_authentication):
     mock_authentication(none=True)
+
+
+@pytest.fixture
+def jp_server_config(jp_template_dir):
+    """Config to turn the CylcUIServer extension on.
+
+    Auto-loading, add as an argument in the test function to activate.
+    """
+    config = {
+        "ServerApp": {
+            "jpserver_extensions": {
+                'cylc.uiserver': True
+            },
+        }
+    }
+    return config
+
+
+@pytest.fixture
+def patch_conf_files(monkeypatch):
+    """Auto-patches the CylcUIServer to prevent it loading config files.
+
+    Auto-loading, add as an argument in the test function to activate.
+    """
+    monkeypatch.setattr(
+        'cylc.uiserver.app.CylcUIServer.config_file_paths', []
+    )
+    yield
+
+
+@pytest.fixture
+def cylc_uis(jp_serverapp):
+    """Return the UIS extension for the JupyterServer ServerApp."""
+    return [
+        *jp_serverapp.extension_manager.extension_apps['cylc.uiserver']
+    ][0]
+
+
+@pytest.fixture
+def cylc_workflows_mgr(cylc_uis):
+    """Return the workflows manager for the UIS extension."""
+    return cylc_uis.workflows_mgr
+
+
+@pytest.fixture
+def cylc_data_store_mgr(cylc_uis):
+    """Return the data store manager for the UIS extension."""
+    return cylc_uis.data_store_mgr
+
+
+@pytest.fixture
+def disable_workflows_update(cylc_workflows_mgr, monkeypatch):
+    """Prevent the workflow manager from scanning for workflows.
+
+    Auto-loading, add as an argument in the test function to activate.
+    """
+    monkeypatch.setattr(cylc_workflows_mgr, 'update', lambda: None)
+
+
+@pytest.fixture
+def disable_workflow_connection(cylc_data_store_mgr, monkeypatch):
+    """Prevent the data store manager from connecting to workflows.
+
+    Auto-loading, add as an argument in the test function to activate.
+    """
+
+    async def _null(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(
+        cylc_data_store_mgr,
+        'sync_workflow',
+        _null
+    )
+
+
+@pytest.fixture
+def dummy_workflow(
+    cylc_workflows_mgr,
+    disable_workflow_connection,
+    disable_workflows_update,
+    monkeypatch,
+):
+    """Register a dummy workflow with the workflow manager / data store.
+
+    Use like so:
+
+      dummy_workflow('id')
+
+    Workflows registered in this way will appear as stopped but will contain
+    contact info as if they were running (change this later as required).
+
+    No connection will be made to the schedulers (because they don't exist).
+
+    """
+
+    async def _register(name):
+        await cylc_workflows_mgr._register(
+            f'me{ID_DELIM}{name}',
+            {
+                'name': name,
+                'owner': '',
+                CFF.HOST: 'localhost',
+                CFF.PORT: 1234,
+                CFF.API: 1,
+            },
+            True,
+        )
+
+    return _register
