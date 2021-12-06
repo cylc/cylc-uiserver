@@ -18,7 +18,19 @@ pytest_plugins = [
 ]
 
 
+ignore_collect = [
+    # jupyterhub stuff messes with the environment
+    'cylc/uiserver/hubapp.py',
+    'cylc/uiserver/scripts/hubapp.py',
+    'cylc/uiserver/scripts/hub.py',
+    # the jupyter config cannot be imported
+    'cylc/uiserver/jupyter_config.py',
+]
+
+
 def pytest_ignore_collect(path):
     # --doctest-modules seems to ignore the value if configured in pyproject
-    if 'jupyter_config.py' in str(path):
-        return True
+    return any(
+        ignore_path in str(path)
+        for ignore_path in ignore_collect
+    )
