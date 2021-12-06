@@ -16,7 +16,10 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 import os
+from copy import deepcopy
 from subprocess import Popen, PIPE, DEVNULL
+
+from graphql.language.base import print_ast
 
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.data_store_mgr import WORKFLOW
@@ -194,9 +197,15 @@ class Resolvers(BaseResolvers):
             return [{
                 'response': (False, 'No matching workflows')}]
         # Pass the request to the workflow GraphQL endpoints
-        req_str, variables, _, _ = info.context.get('graphql_params')
+        _, variables, _, _ = info.context.get('graphql_params')
+
+        # Create a modified request string,
+        # containing only the current mutation/field.
+        operation_ast = deepcopy(info.operation)
+        operation_ast.selection_set.selections = info.field_asts
+
         graphql_args = {
-            'request_string': req_str,
+            'request_string': print_ast(operation_ast),
             'variables': variables,
         }
         return await self.workflows_mgr.multi_request(
@@ -221,9 +230,15 @@ class Resolvers(BaseResolvers):
             return [{
                 'response': (False, 'No matching workflows')}]
         # Pass the multi-node request to the workflow GraphQL endpoints
-        req_str, variables, _, _ = info.context.get('graphql_params')
+        _, variables, _, _ = info.context.get('graphql_params')
+
+        # Create a modified request string,
+        # containing only the current mutation/field.
+        operation_ast = deepcopy(info.operation)
+        operation_ast.selection_set.selections = info.field_asts
+
         graphql_args = {
-            'request_string': req_str,
+            'request_string': print_ast(operation_ast),
             'variables': variables,
         }
         multi_args = {w_id: graphql_args for w_id in w_ids}
