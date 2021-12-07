@@ -22,28 +22,6 @@ import pytest
 from tornado.httpclient import HTTPClientError
 
 
-@pytest.fixture
-def jp_server_config(jp_template_dir):
-    """Config to turn the CylcUIServer extension on."""
-    config = {
-        "ServerApp": {
-            "jpserver_extensions": {
-                'cylc.uiserver': True
-            },
-        }
-    }
-    return config
-
-
-@pytest.fixture
-def patch_conf_files(monkeypatch):
-    """Auto-patches the CylcUIServer to prevent it loading config files."""
-    monkeypatch.setattr(
-        'cylc.uiserver.app.CylcUIServer.config_file_paths', []
-    )
-    yield
-
-
 @pytest.mark.integration
 @pytest.mark.usefixtures("mock_authentication")
 async def test_cylc_handler(patch_conf_files, jp_fetch):
