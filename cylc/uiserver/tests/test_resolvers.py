@@ -41,13 +41,12 @@ def test__schema_opts_to_api_opts(schema_opts, schema, expect):
 @pytest.mark.parametrize(
     'func, message, expect',
     [
-        (services._return, 'Hello.', [True, 'Hello.']),
-        (services._error, 'Goodbye.', [False, 'Goodbye.'])
+        (services._return, 'Hello.', (True, 'Hello.')),
+        (services._error, 'Goodbye.', (False, 'Goodbye.'))
     ]
 )
 def test_Services_anciliary_methods(func, message, expect):
-    """Small functions return [bool, message].
-    """
+    """Small functions return (bool, message)."""
     assert func(message) == expect
 
 
@@ -58,7 +57,7 @@ def test_Services_anciliary_methods(func, message, expect):
             [Tokens('wflow1'), Tokens('~murray/wflow2')],
             {},
             {},
-            [True, "Workflow(s) started"],
+            (True, "Workflow(s) started"),
             {},
             id="multiple"
         ),
@@ -66,7 +65,7 @@ def test_Services_anciliary_methods(func, message, expect):
             [Tokens('~feynman/wflow1')],
             {},
             {},
-            [False, "Cannot start workflows for other users."],
+            (False, "Cannot start workflows for other users."),
             {},
             id="other user's wflow"
         ),
@@ -74,7 +73,7 @@ def test_Services_anciliary_methods(func, message, expect):
             [Tokens('wflow1')],
             {'cylc_version': 'top'},
             {'CYLC_VERSION': 'bottom', 'CYLC_ENV_NAME': 'quark'},
-            [True, "Workflow(s) started"],
+            (True, "Workflow(s) started"),
             {'CYLC_VERSION': 'top'},
             id="cylc version overrides env"
         ),
@@ -82,7 +81,7 @@ def test_Services_anciliary_methods(func, message, expect):
             [Tokens('wflow1')],
             {},
             {'CYLC_VERSION': 'charm', 'CYLC_ENV_NAME': 'quark'},
-            [True, "Workflow(s) started"],
+            (True, "Workflow(s) started"),
             {'CYLC_VERSION': 'charm', 'CYLC_ENV_NAME': 'quark'},
             id="cylc env not overriden if no version specified"
         ),
@@ -93,7 +92,7 @@ async def test_play(
     workflows: List[Tokens],
     args: Dict[str, Any],
     env: Dict[str, str],
-    expected_ret: list,
+    expected_ret: Tuple[bool, str],
     expected_env: Dict[str, str],
 ):
     """It runs cylc play correctly.
@@ -223,9 +222,9 @@ async def test_play_timeout(monkeypatch: pytest.MonkeyPatch):
         workflows_mgr=Mock(spec=WorkflowsManager),
         log=Mock(),
     )
-    assert ret == [
+    assert ret == (
         False, "Command 'cylc play wflow1' timed out after 20 seconds"
-    ]
+    )
 
 
 async def test_cat_log(workflow_run_dir):

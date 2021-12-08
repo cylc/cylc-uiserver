@@ -207,20 +207,14 @@ class Services:
     """Cylc services provided by the UI Server."""
 
     @staticmethod
-    def _error(message: Union[Exception, str]):
+    def _error(message: Union[Exception, str]) -> Tuple[bool, str]:
         """Format error case response."""
-        return [
-            False,
-            str(message)
-        ]
+        return (False, str(message))
 
     @staticmethod
-    def _return(message: str):
+    def _return(message: str) -> Tuple[bool, str]:
         """Format success case response."""
-        return [
-            True,
-            message
-        ]
+        return (True, message)
 
     @classmethod
     async def clean(
@@ -230,7 +224,7 @@ class Services:
         workflows_mgr: 'WorkflowsManager',
         executor: 'Executor',
         log: 'Logger'
-    ):
+    ) -> Tuple[bool, str]:
         """Calls `cylc clean`"""
         # Convert Schema options → cylc.flow.workflow_files.init_clean opts:
         opts = _schema_opts_to_api_opts(args, schema=CleanOptions)
@@ -277,7 +271,7 @@ class Services:
         args: Dict[str, Any],
         workflows_mgr: 'WorkflowsManager',
         log: 'Logger',
-    ) -> List[Union[bool, str]]:
+    ) -> Tuple[bool, str]:
         """Calls `cylc play`."""
         cylc_version = args.pop('cylc_version', None)
         results: Dict[str, str] = {}
@@ -513,8 +507,7 @@ class Resolvers(BaseResolvers):
         command: str,
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any],
-    ) -> List[Union[bool, str]]:
-
+    ) -> Optional[Tuple[bool, str]]:
         if command == 'clean':  # noqa: SIM116
             return await Services.clean(
                 workflows,

@@ -37,10 +37,11 @@ from cylc.uiserver.utils import is_bearer_token_authenticated
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
 
 if TYPE_CHECKING:
-    from cylc.uiserver.resolvers import Resolvers
-    from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
+    from graphene import Schema
     from graphql.execution import ExecutionResult
     from jupyter_server.auth.identity import User as JPSUser
+    from cylc.uiserver.resolvers import Resolvers
+    from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 
 
 ME = getpass.getuser()
@@ -300,11 +301,20 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
     def set_default_headers(self) -> None:
         self.set_header('Server', '')
 
-    def initialize(self, schema=None, executor=None, middleware=None,
-                   root_value=None, graphiql=False, pretty=False,
-                   batch=False, backend=None, auth=None, **kwargs):
-        super(TornadoGraphQLHandler, self).initialize()
-        self.auth = auth
+    def initialize(  # type: ignore[override]
+        self,
+        schema: 'Schema',
+        executor=None,
+        middleware=None,
+        root_value=None,
+        graphiql: bool = False,
+        pretty: bool = False,
+        batch: bool = False,
+        backend=None,
+        auth=None,
+        **kwargs
+    ):
+        CylcAppHandler.initialize(self, auth)
         self.schema = schema
 
         if middleware is not None:

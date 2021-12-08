@@ -57,7 +57,9 @@ from .utils import fmt_call
 from .workflows_mgr import workflow_request
 
 if TYPE_CHECKING:
+    from logging import Logger
     from cylc.flow.data_messages_pb2 import PbWorkflow
+    from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
 def log_call(fcn):
@@ -99,15 +101,26 @@ class DataStoreMgr:
     RECONCILE_TIMEOUT = 5.  # seconds
     PENDING_DELTA_CHECK_INTERVAL = 0.5
 
-    def __init__(self, workflows_mgr, log, max_threads=10):
+    def __init__(
+        self,
+        workflows_mgr: 'WorkflowsManager',
+        log: 'Logger',
+        max_threads: int = 10
+    ):
         self.workflows_mgr = workflows_mgr
         self.log = log
-        self.data = {}
+        self.data: Dict[str, dict] = {}
         self.w_subs: Dict[str, WorkflowSubscriber] = {}
         self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown'}
-        self.loop = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
         self.executor = ThreadPoolExecutor(max_threads)
-        self.delta_queues = {}
+        self.delta_queues: Dict[str, dict] = {}
+
+    @property
+    def loop(self) -> asyncio.AbstractEventLoop:
+        if self._loop is None:
+            self._loop = asyncio.get_running_loop()
+        return self._loop
 
     @log_call
     async def register_workflow(self, w_id: str, is_active: bool) -> None:
@@ -155,8 +168,8 @@ class DataStoreMgr:
         blocking the main loop.
 
         """
-        if self.loop is None:
-            self.loop = asyncio.get_running_loop()
+        # get event loop:
+        self.loop
 
         # don't sync if subscription exists
         if w_id in self.w_subs:
