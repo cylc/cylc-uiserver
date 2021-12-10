@@ -194,8 +194,10 @@ class Resolvers(BaseResolvers):
     # Mutations
     async def mutator(self, info, *m_args):
         """Mutate workflow."""
+        req_meta = {}
         _, w_args, _, _ = m_args
-        auth_user = info.context.get('current_user', 'unknown user')
+        req_meta['auth_user'] = info.context.get(
+            'current_user', 'unknown user')
         w_ids = [
             flow[WORKFLOW].id
             for flow in await self.get_workflows_data(w_args)]
@@ -215,7 +217,7 @@ class Resolvers(BaseResolvers):
             'variables': variables,
         }
         return await self.workflows_mgr.multi_request(
-            'graphql', w_ids, graphql_args, auth_user=auth_user
+            'graphql', w_ids, graphql_args, req_meta=req_meta
         )
 
     async def service(self, info, *m_args):

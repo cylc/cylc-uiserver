@@ -53,7 +53,7 @@ async def workflow_request(
     req_context=None,
     *,
     log=None,
-    auth_user=None
+    req_meta=None
 ):
     """Workflow request command.
 
@@ -63,6 +63,7 @@ async def workflow_request(
         args (dict): Endpoint arguments.
         timeout (float): Client request timeout (secs).
         req_context (str): A string to identifier.
+        req_meta (dict): Meta data related to request, e.g. auth_user
 
     Returns:
         tuple: (req_context, result)
@@ -72,7 +73,7 @@ async def workflow_request(
         req_context = command
     try:
         result = await client.async_request(
-            command, args, timeout, auth_user=auth_user)
+            command, args, timeout, req_meta=req_meta)
         return (req_context, result)
     except ClientTimeout as exc:
         if log:
@@ -274,13 +275,15 @@ class WorkflowsManager:
         args=None,
         multi_args=None,
         timeout=None,
-        auth_user=None
+        req_meta=None
     ):
         """Send requests to multiple workflows."""
         if args is None:
             args = {}
         if multi_args is None:
             multi_args = {}
+        if req_meta is None:
+            req_meta = {}
         req_args = {
             w_id: (
                 self.active[w_id]['req_client'],
@@ -295,7 +298,7 @@ class WorkflowsManager:
                 req_context=info,
                 *request_args,
                 log=self.log,
-                auth_user=auth_user
+                req_meta=req_meta
             )
             for info, request_args in req_args.items()
         ]
