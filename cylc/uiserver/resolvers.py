@@ -227,31 +227,3 @@ class Resolvers(BaseResolvers):
             self.workflows_mgr,
             log=self.log
         )
-
-    async def nodes_mutator(self, info, *m_args):
-        """Mutate node items of associated workflows."""
-        _, _, w_args, _ = m_args
-        w_ids = [
-            flow[WORKFLOW].id
-            for flow in await self.get_workflows_data(w_args)]
-        if not w_ids:
-            return [{
-                'response': (False, 'No matching workflows')}]
-        auth_user = info.context.get('current_user', 'unknown user')
-
-        # Pass the multi-node request to the workflow GraphQL endpoints
-        _, variables, _, _ = info.context.get('graphql_params')
-
-        # Create a modified request string,
-        # containing only the current mutation/field.
-        operation_ast = deepcopy(info.operation)
-        operation_ast.selection_set.selections = info.field_asts
-
-        graphql_args = {
-            'request_string': print_ast(operation_ast),
-            'variables': variables,
-        }
-        multi_args = {w_id: graphql_args for w_id in w_ids}
-        return await self.workflows_mgr.multi_request(
-            'graphql', w_ids, multi_args=multi_args, auth_user=auth_user
-        )
