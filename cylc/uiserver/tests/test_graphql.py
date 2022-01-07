@@ -18,6 +18,8 @@ from textwrap import dedent
 
 import pytest
 
+from cylc.flow.id import Tokens
+
 
 @pytest.fixture
 def gql_query(jp_fetch):
@@ -80,11 +82,11 @@ async def test_query(gql_query, dummy_workflow):
     assert body['data'] == {
         'workflows': [
             {
-                'id': 'me|foo',
+                'id': Tokens(user='me', workflow='foo').id,
                 'status': 'stopped',
             },
             {
-                'id': 'me|bar',
+                'id': Tokens(user='me', workflow='bar').id,
                 'status': 'stopped',
             },
         ]
