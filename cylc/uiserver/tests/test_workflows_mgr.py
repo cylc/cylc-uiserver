@@ -21,7 +21,7 @@ from random import random
 import pytest
 from pytest_mock import MockFixture
 
-from cylc.flow import ID_DELIM
+from cylc.flow.id import Tokens
 from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.network import API
 from cylc.flow.workflow_files import (
@@ -144,7 +144,7 @@ async def test_workflow_state_changes(tmp_path, active_before, active_after):
 
     # mock the results of the previous scan
     wfm = WorkflowsManager(None, LOG, context=None, run_dir=tmp_path)
-    wid = f'{wfm.owner}{ID_DELIM}a'
+    wid = Tokens(user=wfm.owner, workflow='a').id
     if active_before == 'active':
         wfm.active[wid] = {
             CFF.API: API,
@@ -177,7 +177,7 @@ async def test_workflow_state_change_restart(tmp_path):
     """It identifies workflows which have restarted between scans."""
     # mock the result of the previous scan
     wfm = WorkflowsManager(None, LOG, context=None, run_dir=tmp_path)
-    wid = f'{wfm.owner}{ID_DELIM}a'
+    wid = Tokens(user=wfm.owner, workflow='a').id
     wfm.active[wid] = {
             CFF.API: API,
             CFF.UUID: '41'
@@ -265,7 +265,7 @@ async def test_register(
     It depends on the pipes returning a workflow with no
     previous state, and the next state as 'active'."""
     workflow_name = 'register-me'
-    workflow_id = f'{getuser()}|{workflow_name}'
+    workflow_id = Tokens(user=getuser(), workflow=workflow_name).id
     uiserver = CylcUIServer()
 
     assert workflow_id not in uiserver.data_store_mgr.data
@@ -315,7 +315,7 @@ async def test_unregister(
     workflow from the data store attributes, and call the necessary
     functions."""
     workflow_name = 'unregister-me'
-    workflow_id = f'{getuser()}{ID_DELIM}{workflow_name}'
+    workflow_id = Tokens(user=getuser(), workflow=workflow_name).id
     uiserver = CylcUIServer()
     await uiserver.workflows_mgr._register(workflow_id, None, is_active=False)
 
@@ -341,7 +341,7 @@ async def test_connect(
     If a workflow is running, but in the inactive state,
     then the connect method will be called."""
     workflow_name = 'connect'
-    workflow_id = f'{getuser()}{ID_DELIM}{workflow_name}'
+    workflow_id = Tokens(user=getuser(), workflow=workflow_name).id
     uiserver = CylcUIServer()
     uiserver.workflows_mgr.inactive.add(workflow_id)
 
@@ -400,7 +400,7 @@ async def test_disconnect_and_stop(
     If a workflow is active, but the next state is inactive, the
     workflow manager will take care to stop and disconnect the workflow."""
     workflow_name = 'disconnect-stop'
-    workflow_id = f'{getuser()}|{workflow_name}'
+    workflow_id = Tokens(user=getuser(), workflow=workflow_name).id
     uiserver = CylcUIServer()
 
     flow = {

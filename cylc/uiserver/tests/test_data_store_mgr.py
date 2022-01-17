@@ -16,10 +16,12 @@
 """Tests for the ``data_store_mgr`` module and its objects and functions."""
 
 import pytest
+
+from cylc.flow.id import Tokens
 from cylc.flow.network import MSG_TIMEOUT
 from cylc.flow.workflow_files import ContactFileFields as CFF
-
 from cylc.uiserver.data_store_mgr import DataStoreMgr
+
 from .conftest import AsyncClientFixture
 
 
@@ -130,7 +132,7 @@ async def test_register_workflow(
     """Passing a workflow ID through register_workflow creates
     an entry for the workflow in the data store .data map, and another
     entry in the data store .delta_queues map."""
-    w_id = 'user|workflow_id'
+    w_id = Tokens(user='user', workflow='workflow_id').id
     await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
     assert w_id in data_store_mgr.data
     assert w_id in data_store_mgr.delta_queues
@@ -142,7 +144,7 @@ async def test_update_contact_no_contact_data(
 ):
     """Updating contact with no contact data results in default values
     for the workflow in the data store, like the API version set to zero."""
-    w_id = 'user|workflow_id'
+    w_id = Tokens(user='user', workflow='workflow_id').id
     api_version = 0
     await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
     data_store_mgr.update_contact(w_id=w_id, contact_data=None)
@@ -155,7 +157,7 @@ async def test_update_contact_with_contact_data(
 ):
     """Updating contact with contact data sets the values int he data store
     for the workflow."""
-    w_id = 'user|workflow_id'
+    w_id = Tokens(user='user', workflow='workflow_id').id
     api_version = 1
     await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
     contact_data = {
@@ -175,7 +177,7 @@ async def test_stop_workflow(
 ):
     """Telling a data store to stop a workflow, is the same as updating
     contact with no contact data."""
-    w_id = 'user|workflow_id'
+    w_id = Tokens(user='user', workflow='workflow_id').id
     api_version = 1
     await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
     contact_data = {

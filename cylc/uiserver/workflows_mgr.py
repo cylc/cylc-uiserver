@@ -29,7 +29,7 @@ import sys
 
 import zmq.asyncio
 
-from cylc.flow import ID_DELIM
+from cylc.flow.id import Tokens
 from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.network import API
 from cylc.flow.network.client import WorkflowRuntimeClient
@@ -141,7 +141,7 @@ class WorkflowsManager:
 
         async for flow in self._scan_pipe:
             flow['owner'] = self.owner
-            wid = f'{flow["owner"]}{ID_DELIM}{flow["name"]}'
+            wid = Tokens(user=flow['owner'], workflow=flow['name']).id
             flow['id'] = wid
 
             if not flow.get('contact'):

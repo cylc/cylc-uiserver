@@ -28,7 +28,7 @@ from tornado.web import HTTPError
 from traitlets.config import Config
 import zmq
 
-from cylc.flow import ID_DELIM
+from cylc.flow.id import Tokens
 from cylc.flow.data_messages_pb2 import (  # type: ignore
     PbEntireWorkflow,
     PbWorkflow,
@@ -359,10 +359,10 @@ def dummy_workflow(
 
     async def _register(name):
         await cylc_workflows_mgr._register(
-            f'me{ID_DELIM}{name}',
+            Tokens(user='me', workflow=name).id,
             {
                 'name': name,
-                'owner': '',
+                'owner': 'me',
                 CFF.HOST: 'localhost',
                 CFF.PORT: 1234,
                 CFF.API: 1,

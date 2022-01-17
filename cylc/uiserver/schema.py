@@ -31,6 +31,7 @@ from graphene import (
 )
 from graphene.types.generic import GenericScalar
 
+from cylc.flow.id import Tokens
 from cylc.flow.network.schema import (
     CyclePoint,
     GenericResponse,
@@ -39,7 +40,6 @@ from cylc.flow.network.schema import (
     Subscriptions,
     WorkflowID,
     _mut_field,
-    parse_workflow_id,
     sstrip,
 )
 
@@ -53,8 +53,8 @@ async def mutator(root, info, command=None, workflows=None,
     if exworkflows is None:
         exworkflows = []
     w_args = {}
-    w_args['workflows'] = [parse_workflow_id(w_id) for w_id in workflows]
-    w_args['exworkflows'] = [parse_workflow_id(w_id) for w_id in exworkflows]
+    w_args['workflows'] = [Tokens(w_id) for w_id in workflows]
+    w_args['exworkflows'] = [Tokens(w_id) for w_id in exworkflows]
     if args.get('args', False):
         args.update(args.get('args', {}))
         args.pop('args')

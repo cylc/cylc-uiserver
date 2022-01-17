@@ -38,7 +38,7 @@ from functools import partial
 from pathlib import Path
 import time
 
-from cylc.flow import ID_DELIM
+from cylc.flow.id import Tokens
 from cylc.flow.network.server import PB_METHOD_MAP
 from cylc.flow.network import MSG_TIMEOUT
 from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
@@ -97,7 +97,9 @@ class DataStoreMgr:
             flow.api_version = int(contact_data[CFF.API])
         else:
             # wipe pre-existing contact-file data
-            flow.owner, flow.name = w_id.split(ID_DELIM)
+            w_tokens = Tokens(w_id)
+            flow.owner = w_tokens['user']
+            flow.name = w_tokens['workflow']
             flow.host = ''
             flow.port = 0
             # flow.pub_port = 0
@@ -177,8 +179,8 @@ class DataStoreMgr:
             # this will get overridden when we sync with the workflow
             # set a sensible default here incase the sync takes a while
             return 'Running'
-        reg = w_id.split(ID_DELIM)[-1]
-        db_file = Path(get_workflow_srv_dir(reg), WorkflowFiles.Service.DB)
+        w_id = Tokens(w_id)['workflow']
+        db_file = Path(get_workflow_srv_dir(w_id), WorkflowFiles.Service.DB)
         if db_file.exists():
             # the workflow has previously run
             return 'Stopped'

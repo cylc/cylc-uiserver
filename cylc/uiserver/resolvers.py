@@ -15,6 +15,7 @@
 
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
+from getpass import getuser
 import os
 from copy import deepcopy
 from subprocess import Popen, PIPE, DEVNULL
@@ -126,11 +127,15 @@ class Services:
             return cls._error(exc)
 
         # start each requested flow
-        for _user, flow, _ in workflows:
+        for tokens in workflows:
             try:
+                if tokens['user'] and tokens['user'] != getuser():
+                    return cls._error(
+                        'Cannot start workflows for other users.'
+                    )
                 # Note: authorisation has already taken place.
                 # add the workflow to the command
-                cmd = [*cmd, flow]
+                cmd = [*cmd, tokens['workflow']]
 
                 # get a representation of the command being run
                 cmd_repr = ' '.join(cmd)
@@ -152,7 +157,7 @@ class Services:
                     # command failed
                     _, err = proc.communicate()
                     raise Exception(
-                        f'Could not start {flow} - {cmd_repr}'
+                        f'Could not start {tokens["workflow"]} - {cmd_repr}'
                         # suppress traceback unless in debug mode
                         + (f' - {err}' if DEBUG else '')
                     )
