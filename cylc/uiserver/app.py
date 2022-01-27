@@ -112,7 +112,6 @@ class CylcUIServer(ExtensionApp):
             ]
         )
     )
-    # TODO: Add a link to the access group table mappings in cylc documentation
     AUTH_DESCRIPTION = '''
             Authorization can be granted at operation (mutation) level, i.e.
             specifically grant user access to execute Cylc commands, e.g.
@@ -131,6 +130,9 @@ class CylcUIServer(ExtensionApp):
 
                Any authorization permissions granted to a user will be
                applied to all workflows.
+
+            For more information, including the access group mappings, see
+            :ref:`Authorization`.
     '''
 
     site_authorization = Dict(
@@ -149,37 +151,37 @@ class CylcUIServer(ExtensionApp):
 
             ''' + AUTH_DESCRIPTION + '''
 
-        .. rubric:: Example Configuration:
+            .. rubric:: Example Configuration:
 
-        .. code-block:: python
+            .. code-block:: python
 
-           c.CylcUIServer.site_authorization = {
-               "*": {  # For all ui-server owners,
-                   "*": {  # Any authenticated user
-                       "default": "READ",  # Will have default read-only access
+               c.CylcUIServer.site_authorization = {
+                   "*": {  # For all ui-server owners,
+                       "*": {  # Any authenticated user
+                           "default": "READ",  # Has default read access
+                       },
+                       "user1": {  # user1
+                           "default": ["!ALL"],  # No privileges for all
+                           # ui-server owners.
+                       },  # No limit set, so all ui-server owners
+                   },  # limit is also "!ALL" for user1
+                   "server_owner_1": {  # For specific UI Server owner,
+                       "group:group_a": {  # Any member of group_a
+                           "default": "READ",  # Will have default read access
+                           "limit": ["ALL", "!play"],  # server_owner_1 can
+                       },  # grant All privileges, except play.
                    },
-                   "user1": {  # user1
-                       "default": ["!ALL"],  # No privileges for all ui-server
-                       # owners.
-                   },  # No limit set, so all ui-server owners
-               },  # limit is also "!ALL" for user1
-               "server_owner_1": {  # For specific UI Server owner,
-                   "group:group_a": {  # Any user who is a member of group_a
-                       "default": "READ",  # Will have default read-only access
-                       "limit": ["ALL", "!play"],  # server_owner_1 is able to
-                   },  # grant All privileges, except play.
-               },
-               "group:grp_of_svr_owners": {  # Group of owners of UI Servers
-                   "group:group_b": {
-                       "limit": [  # can grant groupB users up to READ and
-                           "READ",  # CONTROL privileges, without stop and
-                           "CONTROL",  # kill
-                           "!stop",
-                           "!kill",  # No default, so default is no access
-                       ],
+                   "group:grp_of_svr_owners": {  # Group of UI Server owners
+                       "group:group_b": {
+                           "limit": [  # can grant groupB users up to READ and
+                               "READ",  # CONTROL privileges, without stop and
+                               "CONTROL",  # kill
+                               "!stop",
+                               "!kill",  # No default, so default is no access
+                           ],
+                       },
                    },
-               },
-           }
+               }
 
         ''')
 
@@ -191,21 +193,25 @@ class CylcUIServer(ExtensionApp):
 
             Use this setting to share control of your workflows
             with other users.
+
             Note that you are only permitted to give away permissions up to
             your limit for each user, as defined in the site_authorization
             configuration.
+
             ''' + AUTH_DESCRIPTION + '''
+
             Example configuration, residing in
             ``~/.cylc/hub/jupyter_config.py``:
 
-        .. code-block:: python
+            .. code-block:: python
 
-           c.CylcUIServer.user_authorization = {
-               "*": ["READ"],  # any authenticated user has READ access
-               "group:group2": ["ALL"],  # Any user in system group2 has access
-                                         # to all operations
-               "userA": ["ALL", "!stop"],  # userA has ALL operations, not stop
-           }
+               c.CylcUIServer.user_authorization = {
+                   "*": ["READ"],  # any authenticated user has READ access
+                   "group:group2": ["ALL"],  # Any user in system group2 has
+                                             # access to all operations
+                   "userA": ["ALL", "!stop"],  # userA has ALL operations, not
+                                               # stop
+               }
 
         '''
     )
@@ -283,12 +289,9 @@ class CylcUIServer(ExtensionApp):
 
             This involves a number of filesystem operations, to reduce
             system load set a higher value.
-        '''
+        ''',
+        default_value=5.0  # default values as kwargs correctly display in docs
     )
-
-    @default('scan_interval')
-    def _default_scan_interval(self):
-        return 5
 
     @validate('ui_build_dir')
     def _check_ui_build_dir_exists(self, proposed):
