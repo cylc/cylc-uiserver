@@ -89,4 +89,4 @@ def test_get_conf_dir_hierarchy(monkeypatch):
     ]
     monkeypatch.setattr(jupyterhub_config, 'hub_version', '0.6.0')
     actual = get_conf_dir_hierarchy(config_paths)
-    assert actual==expected
+    assert actual == expected

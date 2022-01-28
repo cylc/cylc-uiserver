@@ -30,6 +30,7 @@ from cylc.flow.cfgspec.globalcfg import get_version_hierarchy
 
 from cylc.uiserver import (
     __file__ as uis_pkg,
+    __version__
 )
 from cylc.uiserver.app import (
     SITE_CONF_ROOT,
@@ -57,7 +58,7 @@ def _load(path):
 def get_conf_dir_hierarchy(config_paths: List[Path]):
     """Takes list of config paths, adds version and filename to the path"""
     conf_hierarchy = []
-    version_hierarchy = get_version_hierarchy(hub_version)
+    version_hierarchy = get_version_hierarchy(hub_version or __version__)
     for x in product(config_paths, version_hierarchy):
         conf_hierarchy.append(Path(x[0], x[1], 'jupyter_config.py'))
     return conf_hierarchy
