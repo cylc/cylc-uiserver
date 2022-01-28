@@ -88,11 +88,12 @@ from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
 # UIS configuration dirs
-USER_CONF_ROOT: Path = Path('~/.cylc/hub').expanduser()
+UISERVER_DIR = 'uiserver'
+USER_CONF_ROOT: Path = Path(f'~/.cylc/{UISERVER_DIR}').expanduser()
 SITE_CONF_ROOT: Path = Path(
     os.getenv('CYLC_SITE_CONF_PATH')
     or GlobalConfig.DEFAULT_SITE_CONF_PATH,
-    'hub'
+    UISERVER_DIR
 )
 
 
@@ -227,7 +228,7 @@ class CylcUIServer(ExtensionApp):
             ''' + AUTH_DESCRIPTION + '''
 
             Example configuration, residing in
-            ``~/.cylc/hub/jupyter_config.py``:
+            ``~/.cylc/uiserver/jupyter_config.py``:
 
             .. code-block:: python
 

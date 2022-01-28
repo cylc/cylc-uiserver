@@ -19,12 +19,13 @@ from pathlib import Path
 import pytest
 
 from cylc.uiserver import __file__ as UIS_PKG
-from cylc.uiserver.jupyterhub_config import load
+from cylc.uiserver import jupyterhub_config
+from cylc.uiserver.jupyterhub_config import get_conf_dir_hierarchy, load
 
 
 SYS_CONF = Path(UIS_PKG).parent / 'jupyter_config.py'
-USER_CONF = Path('~/.cylc/hub/jupyter_config.py').expanduser()
-SITE_CONF = Path('/etc/cylc/hub/jupyter_config.py')
+USER_CONF = Path('~/.cylc/uiserver').expanduser()
+SITE_CONF = Path('/etc/cylc/uiserver')
 
 
 @pytest.fixture
@@ -46,22 +47,46 @@ def capload(monkeypatch):
     return files
 
 
-def test_config(clear_env, capload):
+def test_config(clear_env, capload, monkeypatch):
     """It should load the system, site and user configs in that order."""
+    monkeypatch.setattr(jupyterhub_config, 'hub_version', '0')
     load()
     assert capload == [
         SYS_CONF,
-        SITE_CONF,
-        USER_CONF,
+        Path(SITE_CONF/'jupyter_config.py'),
+        Path(SITE_CONF/'0/jupyter_config.py'),
+        Path(USER_CONF/'jupyter_config.py'),
+        Path(USER_CONF/'0/jupyter_config.py')
     ]
 
 
 def test_cylc_site_conf_path(clear_env, capload, monkeypatch):
     """The site config should change to $CYLC_SITE_CONF_PATH if set."""
     monkeypatch.setenv('CYLC_SITE_CONF_PATH', 'elephant')
+    monkeypatch.setattr(jupyterhub_config, 'hub_version', '0')
     load()
     assert capload == [
         SYS_CONF,
-        Path('elephant/hub/jupyter_config.py'),
-        USER_CONF,
+        Path('elephant/uiserver/jupyter_config.py'),
+        Path('elephant/uiserver/0/jupyter_config.py'),
+        Path(USER_CONF/'jupyter_config.py'),
+        Path(USER_CONF/'0/jupyter_config.py')
     ]
+
+
+def test_get_conf_dir_hierarchy(monkeypatch):
+    """Tests hierarchy of versioning for config"""
+    config_paths = ['config_path/one', 'config_path/two']
+    expected = [
+        Path('config_path/one/jupyter_config.py'),
+        Path('config_path/one/0/jupyter_config.py'),
+        Path('config_path/one/0.6/jupyter_config.py'),
+        Path('config_path/one/0.6.0/jupyter_config.py'),
+        Path('config_path/two/jupyter_config.py'),
+        Path('config_path/two/0/jupyter_config.py'),
+        Path('config_path/two/0.6/jupyter_config.py'),
+        Path('config_path/two/0.6.0/jupyter_config.py')
+    ]
+    monkeypatch.setattr(jupyterhub_config, 'hub_version', '0.6.0')
+    actual = get_conf_dir_hierarchy(config_paths)
+    assert actual==expected
