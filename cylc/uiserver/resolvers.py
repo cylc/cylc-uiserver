@@ -46,6 +46,7 @@ from cylc.flow.exceptions import (
 )
 from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
+from cylc.flow.network.schema import GenericResponse
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.flow.scripts.clean import run
 
@@ -489,7 +490,7 @@ class Resolvers(BaseResolvers):
         w_args: Dict[str, Any],
         _kwargs: Dict[str, Any],
         _meta: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    ) -> List[GenericResponse]:
         """Mutate workflow."""
         req_meta = {
             'auth_user': info.context.get(  # type: ignore[union-attr]
@@ -500,8 +501,9 @@ class Resolvers(BaseResolvers):
             flow[WORKFLOW].id
             for flow in await self.get_workflows_data(w_args)]
         if not w_ids:
-            return [{
-                'response': (False, 'No matching workflows')}]
+            return [
+                GenericResponse(success=False, message="No matching workflows")
+            ]
         # Pass the request to the workflow GraphQL endpoints
         _, variables, _, _ = info.context.get(  # type: ignore[union-attr]
             'graphql_params'
@@ -515,13 +517,32 @@ class Resolvers(BaseResolvers):
             'request_string': print_ast(operation_ast),
             'variables': variables,
         }
-        return await self.workflows_mgr.multi_request(  # type: ignore # TODO
+        results = await self.workflows_mgr.multi_request(
             'graphql', w_ids, graphql_args, req_meta=req_meta
         )
+        if not results:
+            return [
+                GenericResponse(
+                    success=False, message="No matching workflows running"
+                )
+            ]
+        ret: List[GenericResponse] = []
+        for result in results:
+            if not isinstance(result, dict):
+                raise TypeError(
+                    "Expected to receive GraphQL response dict "
+                    f"but received: {result}"
+                )
+            if not result.get('data'):
+                raise ValueError(f"Unexpected response: {result}")
+            mutation_result: dict = result['data'][command]['results'][0]
+            ret.append(
+                GenericResponse(**mutation_result)
+            )
+        return ret
 
     async def service(
         self,
-        info: 'ResolveInfo',
         command: str,
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any],

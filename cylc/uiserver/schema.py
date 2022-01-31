@@ -33,7 +33,6 @@ from cylc.flow.workflow_files import WorkflowFiles
 from cylc.flow.network.schema import (
     NODE_MAP,
     CyclePoint,
-    GenericResponse,
     SortArgs,
     Task,
     Job,
@@ -77,8 +76,10 @@ async def mutator(
     resolvers: 'Resolvers' = (
         info.context.get('resolvers')  # type: ignore[union-attr]
     )
-    res = await resolvers.service(info, command, parsed_workflows, kwargs)
-    return GenericResponse(result=res)
+    res = await resolvers.service(command, parsed_workflows, kwargs)
+    return info.return_type.graphene_type(  # type: ignore[union-attr]
+        result=res
+    )
 
 
 class RunMode(graphene.Enum):
