@@ -14,6 +14,32 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+Cylc UI Server can be configured using a ``jupyter_config.py`` file located in:
+
+* ``$CYLC_SITE_CONF_PATH/hub/jupyter_config.py`` (for site-level configuration)
+* ``/etc/cylc/hub/jupyter_config.py`` (for system-level configuration)
+* ``~/.cylc/hub/jupyter_config.py`` (for user-level configuration)
+
+An example configuration might look like this:
+
+.. code-block:: python
+
+   # scan for workflows every 10 seconds
+   c.CylcUIServer.scan_interval = 10
+
+The Cylc UI Server is a `Jupyter Server`_ extension. For generic configuration
+options see the Jupyter Servers documentation:
+:external+jupyter_server:ref:`other-full-config`.
+Cylc specific configurations are documented here.
+
+.. note::
+
+   ``c.CylcUIServer.site_authorization`` should be defined in
+   ``/etc/cylc/hub/jupyter_config.py``, or, alternatively, via
+   the environment variable ``CYLC_SITE_CONF_PATH``.
+"""
+
 import getpass
 import os
 from pathlib import Path, PurePath
