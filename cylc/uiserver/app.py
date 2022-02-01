@@ -41,7 +41,6 @@ Cylc specific configurations are documented here.
 """
 
 import getpass
-import os
 from pathlib import Path, PurePath
 import sys
 from typing import List
@@ -62,7 +61,6 @@ from traitlets import (
 
 from jupyter_server.extension.application import ExtensionApp
 
-from cylc.flow.cfgspec.globalcfg import GlobalConfig
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
 )
@@ -81,21 +79,15 @@ from cylc.uiserver.handlers import (
     UIServerGraphQLHandler,
     UserProfileHandler,
 )
-from cylc.uiserver.jupyterhub_config import get_conf_dir_hierarchy
+from cylc.uiserver.jupyterhub_config import (
+    get_conf_dir_hierarchy,
+    SITE_CONF_ROOT,
+    USER_CONF_ROOT
+)
 from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
 from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
-
-
-# UIS configuration dirs
-UISERVER_DIR = 'uiserver'
-USER_CONF_ROOT = Path.home() / '.cylc' / UISERVER_DIR
-SITE_CONF_ROOT: Path = Path(
-    os.getenv('CYLC_SITE_CONF_PATH')
-    or GlobalConfig.DEFAULT_SITE_CONF_PATH,
-    UISERVER_DIR
-)
 
 
 class PathType(TraitType):

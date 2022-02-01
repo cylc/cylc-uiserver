@@ -26,22 +26,29 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-from cylc.flow.cfgspec.globalcfg import get_version_hierarchy
+from cylc.flow.cfgspec.globalcfg import (
+    GlobalConfig,
+    get_version_hierarchy
+)
 
 from cylc.uiserver import (
     __file__ as uis_pkg,
     __version__
 )
-from cylc.uiserver.app import (
-    SITE_CONF_ROOT,
-    USER_CONF_ROOT,
-    UISERVER_DIR
-)
+
 
 LOG = logging.getLogger(__name__)
 
 # base configuration - always used
 DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / 'jupyter_config.py'
+UISERVER_DIR = 'uiserver'
+# UIS configuration dirs
+SITE_CONF_ROOT: Path = Path(
+    os.getenv('CYLC_SITE_CONF_PATH')
+    or GlobalConfig.DEFAULT_SITE_CONF_PATH,
+    UISERVER_DIR
+)
+USER_CONF_ROOT = Path.home() / '.cylc' / UISERVER_DIR
 
 
 def _load(path):
