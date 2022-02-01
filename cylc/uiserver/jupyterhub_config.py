@@ -24,7 +24,7 @@ from itertools import product
 import logging
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from cylc.flow.cfgspec.globalcfg import get_version_hierarchy
 
@@ -42,10 +42,6 @@ LOG = logging.getLogger(__name__)
 
 # base configuration - always used
 DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / 'jupyter_config.py'
-# site configuration
-SITE_CONF_PATH: Path = SITE_CONF_ROOT / 'jupyter_config.py'
-# user configuration
-USER_CONF_PATH: Path = USER_CONF_ROOT / 'jupyter_config.py'
 
 
 def _load(path):
@@ -55,16 +51,21 @@ def _load(path):
         exec(path.read_text())
 
 
-def get_conf_dir_hierarchy(config_paths: List[Path]):
+def get_conf_dir_hierarchy(
+        config_paths: List[Path], filename: Optional[bool] = True
+) -> List[Path]:
     """Takes list of config paths, adds version and filename to the path"""
     conf_hierarchy = []
     version_hierarchy = get_version_hierarchy(hub_version or __version__)
     for x in product(config_paths, version_hierarchy):
-        conf_hierarchy.append(Path(x[0], x[1], 'jupyter_config.py'))
+        if filename:
+            conf_hierarchy.append(Path(x[0], x[1], 'jupyter_config.py'))
+        else:
+            conf_hierarchy.append(Path(x[0], x[1]))
     return conf_hierarchy
 
 
-def load():
+def load() -> None:
     """Load the relevant UIS/Hub configuration files."""
     if os.getenv('CYLC_SITE_CONF_PATH'):
         site_conf_path: Path = Path(
@@ -72,7 +73,7 @@ def load():
             UISERVER_DIR
         )
     else:
-        site_conf_path: Path = SITE_CONF_ROOT
+        site_conf_path = SITE_CONF_ROOT
     base_config_paths = [site_conf_path, USER_CONF_ROOT]
     # add versioning to paths
     config_paths = get_conf_dir_hierarchy(base_config_paths)

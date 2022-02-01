@@ -81,6 +81,7 @@ from cylc.uiserver.handlers import (
     UIServerGraphQLHandler,
     UserProfileHandler,
 )
+from cylc.uiserver.jupyterhub_config import get_conf_dir_hierarchy
 from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
 from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
@@ -129,16 +130,18 @@ class CylcUIServer(ExtensionApp):
     config_file_paths = list(
         map(
             str,
-            [
-                # user configuration
-                USER_CONF_ROOT,
-                # site configuration
-                SITE_CONF_ROOT,
-                # base configuration - always used
-                Path(uis_pkg).parent,
-            ]
+            get_conf_dir_hierarchy(
+                [
+                    # user configuration
+                    USER_CONF_ROOT,
+                    # site configuration
+                    SITE_CONF_ROOT,
+                ], filename=False
+            )
         )
     )
+    config_file_paths.append(str(Path(uis_pkg).parent))
+    # TODO: Add a link to the access group table mappings in cylc documentation
     AUTH_DESCRIPTION = '''
             Authorization can be granted at operation (mutation) level, i.e.
             specifically grant user access to execute Cylc commands, e.g.
