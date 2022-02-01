@@ -445,3 +445,31 @@ async def test_disconnect_and_stop(
     assert workflow_id in uiserver.workflows_mgr.inactive
 
 # TODO: add tests for remaining methods in WorkflowsManager
+
+
+async def test_crashed_workflow(one_workflow_aiter, caplog, uis_caplog):
+    """It should swallow client connect errors."""
+    # create a UIS, configure it for logging
+    uiserver = CylcUIServer()
+    uis_caplog(caplog, uiserver, logging.DEBUG)
+    caplog.clear()
+
+    # register a running workflow, the UIS will attempt to connect to it ...
+    uiserver.workflows_mgr._scan_pipe = one_workflow_aiter(**{
+        'name': 'one',
+        'contact': True,
+        CFF.HOST: 'localhost',
+        CFF.PORT: 0,
+        CFF.PUBLISH_PORT: 0,
+        CFF.API: 1,
+    })
+
+    # ... connection will fail, the UIS should catch the ClientError
+    await uiserver.workflows_mgr.update()
+
+    # we should have two log messages
+    assert len(caplog.records) == 2
+    # one when it attempted to register the workflow
+    assert 'register_workflow' in caplog.records[0].message
+    # and one when it failed to connect
+    assert 'Could not connect' in caplog.records[1].message
