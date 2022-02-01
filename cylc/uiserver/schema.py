@@ -20,6 +20,7 @@ extra functionality specific to the UIS.
 """
 
 from functools import partial
+from typing import TYPE_CHECKING, Any, List, Optional
 
 import graphene
 from graphene.types.generic import GenericScalar
@@ -36,25 +37,32 @@ from cylc.flow.network.schema import (
     sstrip,
 )
 
+if TYPE_CHECKING:
+    from graphql import ResolveInfo
+    from cylc.uiserver.resolvers import Resolvers
 
-async def mutator(root, info, command=None, workflows=None,
-                  exworkflows=None, **args):
+
+async def mutator(
+    root: Optional[Any],
+    info: 'ResolveInfo',
+    *,
+    command: str,
+    workflows: Optional[List[str]] = None,
+    **kwargs: Any
+):
     """Call the resolver method that act on the workflow service
     via the internal command queue."""
     if workflows is None:
         workflows = []
-    if exworkflows is None:
-        exworkflows = []
-    w_args = {
-        'workflows': [Tokens(w_id) for w_id in workflows],
-        'exworkflows': [Tokens(w_id) for w_id in exworkflows],
-    }
-    if args.get('args', False):
-        args.update(args.get('args', {}))
-        args.pop('args')
+    parsed_workflows = [Tokens(w_id) for w_id in workflows]
+    if kwargs.get('args', False):
+        kwargs.update(kwargs.get('args', {}))
+        kwargs.pop('args')
 
-    resolvers = info.context.get('resolvers')
-    res = await resolvers.service(info, command, w_args, args)
+    resolvers: 'Resolvers' = (
+        info.context.get('resolvers')  # type: ignore[union-attr]
+    )
+    res = await resolvers.service(info, command, parsed_workflows, kwargs)
     return GenericResponse(result=res)
 
 

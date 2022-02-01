@@ -48,7 +48,7 @@ async def test_workflow_request_client_timeout(
     async_client.will_return(ClientTimeout)
     ctx, msg = await workflow_request(client=async_client, command='')
     assert not ctx
-    assert 'timeout' in msg.lower()
+    assert 'timeout' in msg.lower()  # type: ignore[attr-defined]
 
 
 @pytest.mark.asyncio
