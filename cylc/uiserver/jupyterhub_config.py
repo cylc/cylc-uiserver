@@ -24,7 +24,7 @@ from itertools import product
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from cylc.flow.cfgspec.globalcfg import (
     GlobalConfig,

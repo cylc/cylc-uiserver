@@ -15,11 +15,22 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Cylc UI Server can be configured using a ``jupyter_config.py`` file located in:
+Cylc UI Server can be configured using a ``jupyter_config.py`` file, loaded
+from a hierarchy of locations. Including the site directory,
+(defaults to ``/etc/cylc/uiserver``) and the user directory
+(``~/.cylc/uiserver``).
+For example, at Cylc UI Server version 0.6.0, the hierarchy would be:
 
-* ``$CYLC_SITE_CONF_PATH/hub/jupyter_config.py`` (for site-level configuration)
-* ``/etc/cylc/hub/jupyter_config.py`` (for system-level configuration)
-* ``~/.cylc/hub/jupyter_config.py`` (for user-level configuration)
+* ``$CYLC_SITE_CONF_PATH/uiserver/jupyter_config.py``
+* ``/etc/cylc/uiserver/jupyter_config.py``
+* ``/etc/cylc/uiserver/0/jupyter_config.py``
+* ``/etc/cylc/uiserver/0.6/jupyter_config.py``
+* ``/etc/cylc/uiserver/0.6.0/jupyter_config.py``
+* ``~/.cylc/uiserver/jupyter_config.py``
+* ``~/.cylc/uiserver/0/jupyter_config.py``
+* ``~/.cylc/uiserver/0.6/jupyter_config.py``
+* ``~/.cylc/uiserver/0.6.0/jupyter_config.py``
+
 
 An example configuration might look like this:
 
@@ -404,6 +415,7 @@ class CylcUIServer(ExtensionApp):
                 for key, value in self.config['CylcUIServer'].items()
             )
         )
+        print(f"{self.scan_interval}<<<<<<<<<<<<<<<<scan interval used")
         # configure the scan
         ioloop.PeriodicCallback(
             self.workflows_mgr.update,
