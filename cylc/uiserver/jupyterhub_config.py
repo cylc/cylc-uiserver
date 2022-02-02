@@ -59,7 +59,7 @@ def _load(path):
 
 
 def get_conf_dir_hierarchy(
-        config_paths: List[Path], filename: Optional[bool] = True
+        config_paths: List[Path], filename: bool = True
 ) -> List[Path]:
     """Takes list of config paths, adds version and filename to the path"""
     conf_hierarchy = []
