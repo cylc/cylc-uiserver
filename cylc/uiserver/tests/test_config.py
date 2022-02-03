@@ -27,7 +27,7 @@ from cylc.uiserver.jupyterhub_config import load
 
 SYS_CONF = Path(UIS_PKG).parent / 'jupyter_config.py'
 USER_CONF = Path('~/.cylc/uiserver').expanduser()
-SITE_CONF = Path('~/etc/cylc/uiserver').expanduser()
+SITE_CONF = Path('/etc/cylc/uiserver')
 
 
 @pytest.fixture
