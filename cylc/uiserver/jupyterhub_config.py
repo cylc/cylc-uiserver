@@ -56,7 +56,7 @@ def load() -> None:
     # add versioning to paths
     config_paths = get_conf_dir_hierarchy(base_config_paths)
     # Default conf path not currently versioned:
-    config_paths.insert(0, DEFAULT_CONF_PATH)
+    config_paths.insert(0, str(DEFAULT_CONF_PATH))
     for path in config_paths:
         _load(Path(path))
 
