@@ -17,9 +17,9 @@
 """
 Cylc UI Server can be configured using a ``jupyter_config.py`` file, loaded
 from a hierarchy of locations. This hierarchy includes the prepackaged
-configuration, the site directory, which defaults to ``/etc/cylc/uiserver`` but can be set with the
-environment variable ``$CYLC_SITE_CONF_PATH`` ) and the user directory
-(``~/.cylc/uiserver``).
+configuration, the site directory, which defaults to ``/etc/cylc/uiserver`` but
+can be set with the environment variable ``$CYLC_SITE_CONF_PATH`` ) and
+the user directory (``~/.cylc/uiserver``).
 For example, at Cylc UI Server version 0.6.0, the hierarchy (highest priority
 at the bottom) would be:
 
