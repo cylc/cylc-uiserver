@@ -15,11 +15,24 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Cylc UI Server can be configured using a ``jupyter_config.py`` file located in:
+Cylc UI Server can be configured using a ``jupyter_config.py`` file, loaded
+from a hierarchy of locations. This hierarchy includes the prepackaged
+configuration, the site directory (which defaults to ``/etc/cylc/uiserver`` but
+can be set with the environment variable ``$CYLC_SITE_CONF_PATH``) and
+the user directory (``~/.cylc/uiserver``).
+For example, at Cylc UI Server version 0.6.0, the hierarchy (highest priority
+at the bottom) would be:
 
-* ``$CYLC_SITE_CONF_PATH/hub/jupyter_config.py`` (for site-level configuration)
-* ``/etc/cylc/hub/jupyter_config.py`` (for system-level configuration)
-* ``~/.cylc/hub/jupyter_config.py`` (for user-level configuration)
+* ``cylc/uiserver/jupyter_config.py`` (pre-packaged default)
+* ``/etc/cylc/uiserver/jupyter_config.py``
+* ``/etc/cylc/uiserver/0/jupyter_config.py``
+* ``/etc/cylc/uiserver/0.6/jupyter_config.py``
+* ``/etc/cylc/uiserver/0.6.0/jupyter_config.py``
+* ``~/.cylc/uiserver/jupyter_config.py``
+* ``~/.cylc/uiserver/0/jupyter_config.py``
+* ``~/.cylc/uiserver/0.6/jupyter_config.py``
+* ``~/.cylc/uiserver/0.6.0/jupyter_config.py``
+
 
 An example configuration might look like this:
 
@@ -36,12 +49,11 @@ Cylc specific configurations are documented here.
 .. note::
 
    ``c.CylcUIServer.site_authorization`` should be defined in
-   ``/etc/cylc/hub/jupyter_config.py``, or, alternatively, via
+   ``/etc/cylc/uiserver/jupyter_config.py``, or, alternatively, via
    the environment variable ``CYLC_SITE_CONF_PATH``.
 """
 
 import getpass
-import os
 from pathlib import Path, PurePath
 import sys
 from typing import List
@@ -62,7 +74,6 @@ from traitlets import (
 
 from jupyter_server.extension.application import ExtensionApp
 
-from cylc.flow.cfgspec.globalcfg import GlobalConfig
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
 )
@@ -81,19 +92,15 @@ from cylc.uiserver.handlers import (
     UIServerGraphQLHandler,
     UserProfileHandler,
 )
+from cylc.uiserver.config_util import (
+    get_conf_dir_hierarchy,
+    SITE_CONF_ROOT,
+    USER_CONF_ROOT
+)
 from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
 from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
-
-
-# UIS configuration dirs
-USER_CONF_ROOT: Path = Path('~/.cylc/hub').expanduser()
-SITE_CONF_ROOT: Path = Path(
-    os.getenv('CYLC_SITE_CONF_PATH')
-    or GlobalConfig.DEFAULT_SITE_CONF_PATH,
-    'hub'
-)
 
 
 class PathType(TraitType):
@@ -125,19 +132,16 @@ class CylcUIServer(ExtensionApp):
     examples = '''
         cylc gui    # start the cylc GUI
     '''
-    config_file_paths = list(
-        map(
-            str,
-            [
-                # user configuration
-                USER_CONF_ROOT,
-                # site configuration
-                SITE_CONF_ROOT,
-                # base configuration - always used
-                Path(uis_pkg).parent,
-            ]
-        )
-    )
+    config_file_paths = get_conf_dir_hierarchy(
+                [
+                    SITE_CONF_ROOT,  # site configuration
+                    USER_CONF_ROOT,  # user configuration
+                ], filename=False
+            )
+    # Next include currently needed for directory making
+    config_file_paths.insert(0, str(Path(uis_pkg).parent))  # packaged config
+    config_file_paths.reverse()
+    # TODO: Add a link to the access group table mappings in cylc documentation
     AUTH_DESCRIPTION = '''
             Authorization can be granted at operation (mutation) level, i.e.
             specifically grant user access to execute Cylc commands, e.g.
@@ -227,7 +231,7 @@ class CylcUIServer(ExtensionApp):
             ''' + AUTH_DESCRIPTION + '''
 
             Example configuration, residing in
-            ``~/.cylc/hub/jupyter_config.py``:
+            ``~/.cylc/uiserver/jupyter_config.py``:
 
             .. code-block:: python
 

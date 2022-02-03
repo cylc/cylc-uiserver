@@ -24,22 +24,16 @@ import logging
 import os
 from pathlib import Path
 
-from cylc.uiserver import (
-    __file__ as uis_pkg,
-)
-from cylc.uiserver.app import (
-    SITE_CONF_ROOT,
+from cylc.uiserver.config_util import (
+    DEFAULT_CONF_PATH,
+    UISERVER_DIR,
     USER_CONF_ROOT,
+    SITE_CONF_ROOT,
+    get_conf_dir_hierarchy
+
 )
 
 LOG = logging.getLogger(__name__)
-
-# base configuration - always used
-DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / 'jupyter_config.py'
-# site configuration
-SITE_CONF_PATH: Path = SITE_CONF_ROOT / 'jupyter_config.py'
-# user configuration
-USER_CONF_PATH: Path = USER_CONF_ROOT / 'jupyter_config.py'
 
 
 def _load(path):
@@ -49,21 +43,26 @@ def _load(path):
         exec(path.read_text())
 
 
-def load():
+def load() -> None:
     """Load the relevant UIS/Hub configuration files."""
     if os.getenv('CYLC_SITE_CONF_PATH'):
         site_conf_path: Path = Path(
             os.environ['CYLC_SITE_CONF_PATH'],
-            'hub/jupyter_config.py'
+            UISERVER_DIR
         )
     else:
-        site_conf_path: Path = SITE_CONF_PATH
-    config_paths = [DEFAULT_CONF_PATH, site_conf_path, USER_CONF_PATH]
+        site_conf_path = SITE_CONF_ROOT
+    base_config_paths = [site_conf_path, USER_CONF_ROOT]
+    # add versioning to paths
+    config_paths = get_conf_dir_hierarchy(base_config_paths)
+    # Default conf path not currently versioned:
+    config_paths.insert(0, str(DEFAULT_CONF_PATH))
     for path in config_paths:
-        _load(path)
+        _load(Path(path))
 
 
-if 'CYLC_HUB_VERSION' in os.environ:
+hub_version = os.environ.get('CYLC_HUB_VERSION')
+if hub_version:
     # auto-load the config (jupyterhub requirement)
     # the env var prevents the config from being loaded on import
     load()

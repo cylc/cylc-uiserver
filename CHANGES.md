@@ -16,6 +16,10 @@ ones in. -->
 
 ### Enhancements
 
+[#301](https://github.com/cylc/cylc-uiserver/pull/301) -
+Version hierarchy added to jupyter_config.py files, to match cylc-flow. Config
+files are now sourced from `.cylc/uiserver/<version>` rather than `.cylc/hub`.
+
 [#297](https://github.com/cylc/cylc-uiserver/pull/297) -
 Updated for the new Global Universal ID.
 
