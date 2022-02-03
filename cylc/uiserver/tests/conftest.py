@@ -373,3 +373,22 @@ def dummy_workflow(
         )
 
     return _register
+
+
+@pytest.fixture
+def uis_caplog():
+    """Patch the UIS logging to allow caplog to do its job.
+
+    Use like so:
+        uiserver = CylcUIServer()
+        uis_caplog(caplog, uiserver, logging.<level>)
+        # continue using caplog as normal
+
+    See test_fixtures for example.
+
+    """
+    def _caplog(caplog, uiserver, level=logging.INFO):
+        uiserver.log.handlers = [caplog.handler]
+        caplog.set_level(level, uiserver.log.name)
+
+    return _caplog

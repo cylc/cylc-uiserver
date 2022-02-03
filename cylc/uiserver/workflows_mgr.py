@@ -189,11 +189,16 @@ class WorkflowsManager:
     async def _connect(self, wid, flow):
         """Open a connection to a running workflow."""
         self.active[wid] = flow
-        flow['req_client'] = WorkflowRuntimeClient(flow['name'])
+        try:
+            flow['req_client'] = WorkflowRuntimeClient(flow['name'])
+        except ClientError as exc:
+            self.log.debug(f'Could not connect to {wid}: {exc}')
+            return False
         await self.uiserver.data_store_mgr.sync_workflow(
             wid,
             flow
         )
+        return True
 
     async def _disconnect(self, wid):
         """Disconnect from a running workflow."""
@@ -244,13 +249,15 @@ class WorkflowsManager:
 
             elif before is None and after == 'active':
                 await self._register(wid, flow, is_active=True)
-                await self._connect(wid, flow)
+                if not await self._connect(wid, flow):
+                    after = 'inactive'
 
             elif before is None and after == 'inactive':
                 await self._register(wid, flow, is_active=False)
 
             elif before == 'inactive' and after == 'active':
-                await self._connect(wid, flow)
+                if not await self._connect(wid, flow):
+                    after = 'inactive'
 
             elif before == 'inactive' and after is None:
                 await self._unregister(wid)

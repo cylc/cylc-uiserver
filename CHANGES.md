@@ -23,6 +23,11 @@ files are now sourced from `.cylc/uiserver/<version>` rather than `.cylc/hub`.
 [#297](https://github.com/cylc/cylc-uiserver/pull/297) -
 Updated for the new Global Universal ID.
 
+### Fixes
+
+[#304](https://github.com/cylc/cylc-uiserver/pull/304) -
+Suppressed client connection traceback.
+
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-0.6.0 (<span actions:bind='release-date'>Released 2021-11-11</span>)__
 
