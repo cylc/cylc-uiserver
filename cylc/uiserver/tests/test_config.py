@@ -55,10 +55,10 @@ def test_config(clear_env, capload, monkeypatch):
     load()
     assert capload == [
         SYS_CONF,
-        (SITE_CONF/'jupyter_config.py').expanduser(),
-        (SITE_CONF/'0/jupyter_config.py').expanduser(),
-        (USER_CONF/'jupyter_config.py').expanduser(),
-        (USER_CONF/'0/jupyter_config.py').expanduser()
+        (SITE_CONF/'jupyter_config.py'),
+        (SITE_CONF/'0/jupyter_config.py'),
+        (USER_CONF/'jupyter_config.py'),
+        (USER_CONF/'0/jupyter_config.py')
     ]
 
 
