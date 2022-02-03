@@ -20,35 +20,20 @@ Note: Jupyterhub configs cannot be imported directly due to the way Jupyterhub
 provides the configuration object to the file when it is loaded.
 
 """
-from itertools import product
 import logging
 import os
 from pathlib import Path
-from typing import List
 
-from cylc.flow.cfgspec.globalcfg import (
-    GlobalConfig,
-    get_version_hierarchy
+from cylc.uiserver.config_util import (
+    DEFAULT_CONF_PATH,
+    UISERVER_DIR,
+    USER_CONF_ROOT,
+    SITE_CONF_ROOT,
+    get_conf_dir_hierarchy
+
 )
-
-from cylc.uiserver import (
-    __file__ as uis_pkg,
-    __version__
-)
-
 
 LOG = logging.getLogger(__name__)
-
-# base configuration - always used
-DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / 'jupyter_config.py'
-UISERVER_DIR = 'uiserver'
-# UIS configuration dirs
-SITE_CONF_ROOT: Path = Path(
-    os.getenv('CYLC_SITE_CONF_PATH')
-    or GlobalConfig.DEFAULT_SITE_CONF_PATH,
-    UISERVER_DIR
-)
-USER_CONF_ROOT = Path.home() / '.cylc' / UISERVER_DIR
 
 
 def _load(path):
@@ -56,20 +41,6 @@ def _load(path):
     if path.exists():
         LOG.info(f'Loading config file: {path}')
         exec(path.read_text())
-
-
-def get_conf_dir_hierarchy(
-        config_paths: List[Path], filename: bool = True
-) -> List[Path]:
-    """Takes list of config paths, adds version and filename to the path"""
-    conf_hierarchy = []
-    version_hierarchy = get_version_hierarchy(hub_version or __version__)
-    for x in product(config_paths, version_hierarchy):
-        if filename:
-            conf_hierarchy.append(Path(x[0], x[1], 'jupyter_config.py'))
-        else:
-            conf_hierarchy.append(Path(x[0], x[1]))
-    return conf_hierarchy
 
 
 def load() -> None:
@@ -87,7 +58,7 @@ def load() -> None:
     # Default conf path not currently versioned:
     config_paths.insert(0, DEFAULT_CONF_PATH)
     for path in config_paths:
-        _load(path)
+        _load(Path(path))
 
 
 hub_version = os.environ.get('CYLC_HUB_VERSION')

@@ -16,12 +16,14 @@
 
 """
 Cylc UI Server can be configured using a ``jupyter_config.py`` file, loaded
-from a hierarchy of locations. Including the site directory,
-(defaults to ``/etc/cylc/uiserver``) and the user directory
+from a hierarchy of locations. Including the site directory, which defaults
+to ``/etc/cylc/uiserver`` but can be set with the environment variable
+``$CYLC_SITE_CONF_PATH`` ) and the user directory
 (``~/.cylc/uiserver``).
-For example, at Cylc UI Server version 0.6.0, the hierarchy would be:
+For example, at Cylc UI Server version 0.6.0, the hierarchy (highest priority
+at the bottom) would be:
 
-* ``$CYLC_SITE_CONF_PATH/uiserver/jupyter_config.py``
+* ``cylc/uiserver/jupyter_config.py`` (pre-packaged default)
 * ``/etc/cylc/uiserver/jupyter_config.py``
 * ``/etc/cylc/uiserver/0/jupyter_config.py``
 * ``/etc/cylc/uiserver/0.6/jupyter_config.py``
@@ -47,7 +49,7 @@ Cylc specific configurations are documented here.
 .. note::
 
    ``c.CylcUIServer.site_authorization`` should be defined in
-   ``/etc/cylc/hub/jupyter_config.py``, or, alternatively, via
+   ``/etc/cylc/uiserver/jupyter_config.py``, or, alternatively, via
    the environment variable ``CYLC_SITE_CONF_PATH``.
 """
 
@@ -90,7 +92,7 @@ from cylc.uiserver.handlers import (
     UIServerGraphQLHandler,
     UserProfileHandler,
 )
-from cylc.uiserver.jupyterhub_config import (
+from cylc.uiserver.config_util import (
     get_conf_dir_hierarchy,
     SITE_CONF_ROOT,
     USER_CONF_ROOT
@@ -130,20 +132,15 @@ class CylcUIServer(ExtensionApp):
     examples = '''
         cylc gui    # start the cylc GUI
     '''
-    config_file_paths = list(
-        map(
-            str,
-            get_conf_dir_hierarchy(
+    config_file_paths = get_conf_dir_hierarchy(
                 [
-                    # user configuration
-                    USER_CONF_ROOT,
-                    # site configuration
-                    SITE_CONF_ROOT,
+                    SITE_CONF_ROOT,  # site configuration
+                    USER_CONF_ROOT,  # user configuration
                 ], filename=False
             )
-        )
-    )
-    config_file_paths.append(str(Path(uis_pkg).parent))
+    # Next include currently needed for directory making
+    config_file_paths.insert(0, str(Path(uis_pkg).parent))  # packaged config
+    config_file_paths.reverse()
     # TODO: Add a link to the access group table mappings in cylc documentation
     AUTH_DESCRIPTION = '''
             Authorization can be granted at operation (mutation) level, i.e.
@@ -415,7 +412,6 @@ class CylcUIServer(ExtensionApp):
                 for key, value in self.config['CylcUIServer'].items()
             )
         )
-        print(f"{self.scan_interval}<<<<<<<<<<<<<<<<scan interval used")
         # configure the scan
         ioloop.PeriodicCallback(
             self.workflows_mgr.update,
