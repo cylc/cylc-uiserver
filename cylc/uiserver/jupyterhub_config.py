@@ -34,6 +34,7 @@ from cylc.uiserver.config_util import (
 )
 
 LOG = logging.getLogger(__name__)
+LOG.setLevel(20)
 
 
 def _load(path):
