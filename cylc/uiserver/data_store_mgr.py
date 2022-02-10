@@ -190,7 +190,8 @@ class DataStoreMgr:
 
     async def unregister_workflow(self, w_id):
         self.log.debug(f'unregister_workflow({w_id})')
-        self.update_contact(w_id, pruned=True)
+        if w_id in self.data:
+            self.update_contact(w_id, pruned=True)
         while any(
             not delta_queue.empty()
             for delta_queue in self.delta_queues.get(w_id, {}).values()
