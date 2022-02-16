@@ -90,6 +90,83 @@ class Services:
         ]
 
     @classmethod
+    async def clean(cls, workflows, args, workflows_mgr, log):
+        """Calls `cylc clean`."""
+        response = []
+
+        # get ready to run the command
+        try:
+            # build the command
+            cmd = ['cylc', 'clean', '--color=never']
+            for key, value in args.items():
+                if value is False:
+                    # don't add binary flags
+                    continue
+                key = snake_to_kebab(key)
+                if not isinstance(value, list):
+                    if isinstance(value, int):
+                        value = str(value)
+                    value = [value]
+                for item in value:
+                    cmd.append(key)
+                    if item is not True:
+                        # don't provide values for binary flags
+                        cmd.append(item)
+
+        except Exception as exc:
+            # oh noes, something went wrong, send back confirmation
+            return cls._error(exc)
+
+        # start each requested flow
+        for tokens in workflows:
+            try:
+                if tokens['user'] and tokens['user'] != getuser():
+                    return cls._error(
+                        'Cannot start workflows for other users.'
+                    )
+                # Note: authorisation has already taken place.
+                # add the workflow to the command
+                cmd = [*cmd, tokens['workflow']]
+
+                # get a representation of the command being run
+                cmd_repr = ' '.join(cmd)
+                log.info(f'$ {cmd_repr}')
+
+                # run cylc run
+                proc = Popen(
+                    cmd,
+                    stdin=DEVNULL,
+                    stdout=PIPE,
+                    stderr=PIPE,
+                    text=True
+                )
+                ret = proc.wait(timeout=20)
+
+                if ret:
+                    # command failed
+                    _, err = proc.communicate()
+                    raise Exception(
+                        f'Could not start {tokens["workflow"]} - {cmd_repr}'
+                        # suppress traceback unless in debug mode
+                        + (f' - {err}' if DEBUG else '')
+                    )
+
+            except Exception as exc:
+                # oh noes, something went wrong, send back confirmation
+                return cls._error(exc)
+
+            else:
+                # send a success message
+                return cls._return(
+                    'Workflow cleaned'
+                )
+
+        # trigger a re-scan
+        await workflows_mgr.update()
+        return response
+
+
+    @classmethod
     async def play(cls, workflows, args, workflows_mgr, log):
         """Calls `cylc play`."""
         response = []
@@ -221,9 +298,17 @@ class Resolvers(BaseResolvers):
         )
 
     async def service(self, info, *m_args):
-        return await Services.play(
-            m_args[1]['workflows'],
-            m_args[2],
-            self.workflows_mgr,
-            log=self.log
-        )
+        if m_args[0] == 'clean':
+            return await Services.clean(
+                m_args[1]['workflows'],
+                m_args[2],
+                self.workflows_mgr,
+                log=self.log
+            )
+        else:
+            return await Services.play(
+                m_args[1]['workflows'],
+                m_args[2],
+                self.workflows_mgr,
+                log=self.log
+            )

@@ -28,6 +28,7 @@ from graphene import (
     Mutation,
     Schema,
     String,
+    Int,
 )
 from graphene.types.generic import GenericScalar
 
@@ -210,9 +211,60 @@ class Play(Mutation):
     result = GenericScalar()
 
 
+class Clean(Mutation):
+    class Meta:
+        description = sstrip('''
+            Clean a workflow from the run directory.
+        ''')
+        resolver = partial(mutator, command='clean')
+
+    class Arguments:
+        workflows = List(WorkflowID, required=True)
+        rm = String(
+            description=sstrip('''
+                Only clean the specified subdirectories (or files) in
+                the run directory, rather than the whole run
+            ''')
+        )
+        local_only = Boolean(
+            default_value=False,
+            description=sstrip('''
+                Only clean on the local filesystem (not remote hosts).
+            ''')
+        )
+        remote_only = Boolean(
+            default_value=False,
+            description=sstrip('''
+                Only clean on remote hosts (not the local filesystem).
+            ''')
+        )
+        timeout=Int(
+            default_value=10,
+            description=sstrip('''
+                The number of seconds to wait for cleaning to take
+                place on remote hosts before cancelling.
+            ''')
+        )
+        debug = Boolean(
+            default_value=False,
+            description=sstrip('''
+                Output developer information and show exception tracebacks.
+            ''')
+        )
+        no_timestamp = Boolean(
+            default_value=False,
+            description=sstrip('''
+                Don't timestamp logged messages.
+            ''')
+        )
+
+    result = GenericScalar()
+
+
 class UISMutations(Mutations):
 
     play = _mut_field(Play)
+    clean = _mut_field(Clean)
 
 
 schema = Schema(
