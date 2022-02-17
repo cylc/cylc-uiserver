@@ -6,7 +6,7 @@ on:
     paths:
       - 'CONTRIBUTING.md'
       - '.github/workflows/shortlog.yml'
-      - '.mailmap.
+      - '.mailmap'
 
 jobs:
   check-shortlog:
