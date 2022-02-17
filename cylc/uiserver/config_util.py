@@ -18,7 +18,7 @@
 from itertools import product
 import os
 from pathlib import Path
-from typing import List
+from typing import Iterable, List, Union
 
 from cylc.flow.cfgspec.globalcfg import (
     GlobalConfig,
@@ -42,7 +42,7 @@ USER_CONF_ROOT = Path.home() / '.cylc' / UISERVER_DIR
 
 
 def get_conf_dir_hierarchy(
-        config_paths: List[Path], filename: bool = True
+    config_paths: Iterable[Union[Path, str]], filename: bool = True
 ) -> List[str]:
     """Takes list of config paths, adds version and filename to the path"""
     conf_hierarchy = []

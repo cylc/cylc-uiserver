@@ -20,7 +20,6 @@ from cylc.uiserver import config_util
 import pytest
 
 from cylc.uiserver import __file__ as UIS_PKG
-from cylc.uiserver import jupyterhub_config
 from cylc.uiserver.config_util import get_conf_dir_hierarchy
 from cylc.uiserver.jupyterhub_config import load
 
@@ -76,7 +75,7 @@ def test_cylc_site_conf_path(clear_env, capload, monkeypatch):
     ]
 
 
-def test_get_conf_dir_hierarchy(monkeypatch):
+def test_get_conf_dir_hierarchy(monkeypatch: pytest.MonkeyPatch):
     """Tests hierarchy of versioning for config"""
     config_paths = ['config_path/one', 'config_path/two']
     expected = [
@@ -89,6 +88,6 @@ def test_get_conf_dir_hierarchy(monkeypatch):
         ('config_path/two/0.6/jupyter_config.py'),
         ('config_path/two/0.6.0/jupyter_config.py')
     ]
-    monkeypatch.setattr(jupyterhub_config, 'hub_version', '0.6.0')
+    monkeypatch.setattr(config_util, '__version__', '0.6.0')
     actual = get_conf_dir_hierarchy(config_paths)
     assert actual == expected
