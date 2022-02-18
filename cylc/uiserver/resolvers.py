@@ -18,6 +18,8 @@
 from getpass import getuser
 import os
 from copy import deepcopy
+from logging import Logger
+from typing import Dict, List
 from subprocess import Popen, PIPE, DEVNULL
 
 from graphql.language.base import print_ast
@@ -70,6 +72,50 @@ def check_cylc_version(version):
     return ret or out.strip() == version
 
 
+def _build_cmd(cmd: List, args: Dict) -> List:
+    """Add args to command.
+
+    Args:
+        cmd: A base command.
+        args: Args to append to base command.
+
+    Returns: An elaborated command.
+
+    Examples:
+        It adds one arg to a command:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': 'qux'})
+            ['foo', 'bar', '--set-baz', 'qux']
+
+        It adds one integer arg to a command:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': 42})
+            ['foo', 'bar', '--set-baz', '42']
+
+        It adds a list of the same arg to a command:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': ['qux', 'quiz']})
+            ['foo', 'bar', '--set-baz', 'qux', '--set-baz', 'quiz']
+
+        It doesn't append args == False:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': False})
+            ['foo', 'bar']
+    """
+    for key, value in args.items():
+        if value is False:
+            # don't add binary flags
+            continue
+        key = snake_to_kebab(key)
+        if not isinstance(value, list):
+            if isinstance(value, int):
+                # Any iteger items need converting to strings:
+                value = str(value)
+            value = [value]
+        for item in value:
+            cmd.append(key)
+            if item is not True:
+                # don't provide values for binary flags
+                cmd.append(item)
+    return cmd
+
+
 class Services:
     """Cylc services provided by the UI Server."""
 
@@ -90,6 +136,46 @@ class Services:
         ]
 
     @classmethod
+    async def _run_cmd(cls, cmd: List, tokens: List, log: Logger) -> None:
+        """Run a command.
+
+        Args:
+            cmd: Command to run.
+            tokens: workflow tokens.
+            log: where to log problems.
+        """
+        if tokens['user'] and tokens['user'] != getuser():
+            return cls._error(
+                'Cannot clean workflows for other users.'
+            )
+        # Note: authorisation has already taken place.
+        # add the workflow to the command
+        cmd = [*cmd, tokens['workflow']]
+
+        # get a representation of the command being cleaned
+        cmd_repr = ' '.join(cmd)
+        log.info(f'$ {cmd_repr}')
+
+        # run cylc clean
+        proc = Popen(
+            cmd,
+            stdin=DEVNULL,
+            stdout=PIPE,
+            stderr=PIPE,
+            text=True
+        )
+        ret = proc.wait(timeout=20)
+
+        if ret:
+            # command failed
+            _, err = proc.communicate()
+            raise Exception(
+                f'Could not start {tokens["workflow"]} - {cmd_repr}'
+                # suppress traceback unless in debug mode
+                + (f' - {err}' if DEBUG else '')
+            )
+
+    @classmethod
     async def clean(cls, workflows, args, workflows_mgr, log):
         """Calls `cylc clean`."""
         response = []
@@ -97,64 +183,18 @@ class Services:
         # get ready to run the command
         try:
             # build the command
-            cmd = ['cylc', 'clean', '--color=never']
-            for key, value in args.items():
-                if value is False:
-                    # don't add binary flags
-                    continue
-                key = snake_to_kebab(key)
-                if not isinstance(value, list):
-                    if isinstance(value, int):
-                        value = str(value)
-                    value = [value]
-                for item in value:
-                    cmd.append(key)
-                    if item is not True:
-                        # don't provide values for binary flags
-                        cmd.append(item)
-
+            cmd = _build_cmd(['cylc', 'clean', '--color=never'], args)
         except Exception as exc:
             # oh noes, something went wrong, send back confirmation
             return cls._error(exc)
 
-        # start each requested flow
+        # clean each requested flow
         for tokens in workflows:
             try:
-                if tokens['user'] and tokens['user'] != getuser():
-                    return cls._error(
-                        'Cannot start workflows for other users.'
-                    )
-                # Note: authorisation has already taken place.
-                # add the workflow to the command
-                cmd = [*cmd, tokens['workflow']]
-
-                # get a representation of the command being run
-                cmd_repr = ' '.join(cmd)
-                log.info(f'$ {cmd_repr}')
-
-                # run cylc run
-                proc = Popen(
-                    cmd,
-                    stdin=DEVNULL,
-                    stdout=PIPE,
-                    stderr=PIPE,
-                    text=True
-                )
-                ret = proc.wait(timeout=20)
-
-                if ret:
-                    # command failed
-                    _, err = proc.communicate()
-                    raise Exception(
-                        f'Could not start {tokens["workflow"]} - {cmd_repr}'
-                        # suppress traceback unless in debug mode
-                        + (f' - {err}' if DEBUG else '')
-                    )
-
+                cls._run_cmd(cmd, tokens, log)
             except Exception as exc:
                 # oh noes, something went wrong, send back confirmation
                 return cls._error(exc)
-
             else:
                 # send a success message
                 return cls._return(
@@ -185,19 +225,7 @@ class Services:
                 args.pop('cylc_version')
 
             # build the command
-            cmd = ['cylc', 'play', '--color=never']
-            for key, value in args.items():
-                if value is False:
-                    # don't add binary flags
-                    continue
-                key = snake_to_kebab(key)
-                if not isinstance(value, list):
-                    value = [value]
-                for item in value:
-                    cmd.append(key)
-                    if item is not True:
-                        # don't provide values for binary flags
-                        cmd.append(item)
+            cmd = _build_cmd(['cylc', 'play', '--color=never'], args)
 
         except Exception as exc:
             # oh noes, something went wrong, send back confirmation
@@ -206,43 +234,10 @@ class Services:
         # start each requested flow
         for tokens in workflows:
             try:
-                if tokens['user'] and tokens['user'] != getuser():
-                    return cls._error(
-                        'Cannot start workflows for other users.'
-                    )
-                # Note: authorisation has already taken place.
-                # add the workflow to the command
-                cmd = [*cmd, tokens['workflow']]
-
-                # get a representation of the command being run
-                cmd_repr = ' '.join(cmd)
-                if cylc_version:
-                    cmd_repr = f'CYLC_VERSION={cylc_version} {cmd_repr}'
-                log.info(f'$ {cmd_repr}')
-
-                # run cylc run
-                proc = Popen(
-                    cmd,
-                    stdin=DEVNULL,
-                    stdout=PIPE,
-                    stderr=PIPE,
-                    text=True
-                )
-                ret = proc.wait(timeout=20)
-
-                if ret:
-                    # command failed
-                    _, err = proc.communicate()
-                    raise Exception(
-                        f'Could not start {tokens["workflow"]} - {cmd_repr}'
-                        # suppress traceback unless in debug mode
-                        + (f' - {err}' if DEBUG else '')
-                    )
-
+                cls._run_cmd(cmd, tokens, log)
             except Exception as exc:
                 # oh noes, something went wrong, send back confirmation
                 return cls._error(exc)
-
             else:
                 # send a success message
                 return cls._return(
