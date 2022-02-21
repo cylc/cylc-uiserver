@@ -157,6 +157,8 @@ class Services:
         log.info(f'$ {cmd_repr}')
 
         # run cylc clean
+
+        # while proc.poll await asyncio.sleep() ?
         proc = Popen(
             cmd,
             stdin=DEVNULL,
