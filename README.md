@@ -156,22 +156,13 @@ $ cylc hub --config
 > The hub can also be run using the ``jupyterhub`` command, however, you
 > must source the configuration files manually on the command line.
 
-See the Jupyterhub documentation for details on configuration options.
+See the JupyterHub documentation for details on configuration options.
 
 ### UI Server
 
-The UI Server is also configured from the same configuration file(s) as the hub
-using the `UIServer` namespace.
-
-Currently the UI Server accepts these configurations:
-
-* `c.CylcUIServer.ui_build_dir`
-* `c.CylcUIServer.ui_version`
-* `c.CylcUIServer.scan_iterval`
-* `c.CylcUIServer.site_authorization`
-* `c.CylcUIServer.user_authorization`
-
-See the `cylc.uiserver.app.UIServer` file for details.
+See the [Cylc documentation](
+https://cylc.github.io/cylc-doc/latest/html/reference/config/ui-server.html)
+for all Cylc-specific configuration options.
 
 The Cylc UI Server is a
 [Jupyter Server](https://github.com/jupyter-server/jupyter_server) extension.
