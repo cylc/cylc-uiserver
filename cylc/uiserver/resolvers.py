@@ -21,11 +21,18 @@ from copy import deepcopy
 from logging import Logger
 from typing import Dict, List
 from subprocess import Popen, PIPE, DEVNULL
+from types import SimpleNamespace
 
 from graphql.language.base import print_ast
 
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.data_store_mgr import WORKFLOW
+from cylc.flow.exceptions import CylcError
+from cylc.flow.workflow_files import init_clean
+
+
+class InvalidSchemaOptionError(CylcError):
+    ...
 
 
 # show traceback from cylc commands
@@ -116,6 +123,52 @@ def _build_cmd(cmd: List, args: Dict) -> List:
     return cmd
 
 
+def _schema_opts_to_api_opts(schema_opts: Dict) -> SimpleNamespace:
+    """Convert Schema opts to api Opts
+
+    Contains data SCHEMA_TO_API:
+        A mapping of schema options to functions in the form:
+        def func(schema_key, schema_value):
+            return (option_key, option _value)
+
+    Args:
+        schema_opts: Opts as described by the schema.
+
+    Returns:
+        Namespace for use as options.
+
+    TODO:
+        So far only `cyle clean` has been added. It may become necessary
+        to separate the SCHEMA_TO_API dict into GENERIC_SCHEMA_TO_API and
+        <COMMAND>_SCHEMA_TO_API, and add a kwarg indicating which
+        additional schema to use.
+
+    question:
+        convert to class?
+    """
+    SCHEMA_TO_API = {
+        'rm': lambda opt, value: ('rm_dirs', value),
+        'local_only': None,
+        'remote_only': None,
+        'debug':
+            lambda opt, value:
+                ('verbosity', 2) if value is True else ('verbosity', 0),
+        'no_timestamp': lambda opt, value: ('log_timestamp', not value),
+    }
+    api_opts = {}
+    for opt, value in schema_opts.items():
+        if opt in SCHEMA_TO_API and SCHEMA_TO_API[opt]:
+            api_opt_name, api_opt_value = SCHEMA_TO_API[opt](opt, value)
+            api_opts[api_opt_name] = api_opt_value
+        elif opt in SCHEMA_TO_API:
+            api_opts[opt] = value
+        else:
+            raise InvalidSchemaOptionError(
+                f'{opt} is not a valid option for Cylc Clean'
+            )
+    return SimpleNamespace(**api_opts)
+
+
 class Services:
     """Cylc services provided by the UI Server."""
 
@@ -181,11 +234,11 @@ class Services:
     async def clean(cls, workflows, args, workflows_mgr, log):
         """Calls `cylc clean`."""
         response = []
-
         # get ready to run the command
         try:
             # build the command
-            cmd = _build_cmd(['cylc', 'clean', '--color=never'], args)
+            opts = _schema_opts_to_api_opts(args)
+
         except Exception as exc:
             # oh noes, something went wrong, send back confirmation
             return cls._error(exc)
@@ -193,7 +246,9 @@ class Services:
         # clean each requested flow
         for tokens in workflows:
             try:
-                cls._run_cmd(cmd, tokens, log)
+                # set timeout to 10 minutes.
+                opts.timeout = 600
+                init_clean(tokens.pop('workflow'), opts)
             except Exception as exc:
                 # oh noes, something went wrong, send back confirmation
                 return cls._error(exc)

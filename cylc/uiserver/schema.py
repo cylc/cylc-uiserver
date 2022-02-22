@@ -221,6 +221,7 @@ class Clean(Mutation):
     class Arguments:
         workflows = List(WorkflowID, required=True)
         rm = String(
+            default_value='',
             description=sstrip('''
                 Only clean the specified subdirectories (or files) in
                 the run directory, rather than the whole run
@@ -236,13 +237,6 @@ class Clean(Mutation):
             default_value=False,
             description=sstrip('''
                 Only clean on remote hosts (not the local filesystem).
-            ''')
-        )
-        timeout=Int(
-            default_value=10,
-            description=sstrip('''
-                The number of seconds to wait for cleaning to take
-                place on remote hosts before cancelling.
             ''')
         )
         debug = Boolean(
