@@ -37,14 +37,14 @@ async def test_entire_workflow_update(
     async_client.will_return(entire_workflow.SerializeToString())
 
     # Set the client used by our test workflow.
-    data_store_mgr.workflows_mgr.active[w_id] = {
+    data_store_mgr.workflows_mgr.workflows[w_id] = {
         'req_client': async_client
     }
 
     # Call the entire_workflow_update function.
     # This should use the client defined above (``async_client``) when
     # calling ``workflow_request``.
-    await data_store_mgr.entire_workflow_update()
+    await data_store_mgr._entire_workflow_update()
 
     # The ``DataStoreMgr`` sets the workflow data retrieved in its
     # own ``.data`` dictionary, which will contain Protobuf message
@@ -70,14 +70,14 @@ async def test_entire_workflow_update_ignores_timeout_message(
     async_client.will_return(MSG_TIMEOUT)
 
     # Set the client used by our test workflow.
-    data_store_mgr.workflows_mgr.active[w_id] = {
+    data_store_mgr.workflows_mgr.workflows[w_id] = {
         'req_client': async_client
     }
 
     # Call the entire_workflow_update function.
     # This should use the client defined above (``async_client``) when
     # calling ``workflow_request``.
-    await data_store_mgr.entire_workflow_update()
+    await data_store_mgr._entire_workflow_update()
 
     # When a ``MSG_TIMEOUT`` happens, the ``DataStoreMgr`` object ignores
     # that message. So it means that its ``.data`` dictionary MUST NOT
@@ -89,7 +89,6 @@ async def test_entire_workflow_update_ignores_timeout_message(
 async def test_entire_workflow_update_gather_error(
     async_client: AsyncClientFixture,
     data_store_mgr: DataStoreMgr,
-    mocker,
     caplog,
 ):
     """
@@ -106,7 +105,7 @@ async def test_entire_workflow_update_gather_error(
     async_client.will_return(error_type)
 
     # Set the client used by our test workflow.
-    data_store_mgr.workflows_mgr.active['workflow_id'] = {
+    data_store_mgr.workflows_mgr.workflows['workflow_id'] = {
         'req_client': async_client
     }
 
@@ -114,7 +113,7 @@ async def test_entire_workflow_update_gather_error(
     # This should use the client defined above (``async_client``) when
     # calling ``workflow_request``.
     caplog.clear()
-    await data_store_mgr.entire_workflow_update()
+    await data_store_mgr._entire_workflow_update()
     assert caplog.record_tuples == [
         (
             'cylc',
@@ -147,7 +146,7 @@ async def test_update_contact_no_contact_data(
     w_id = Tokens(user='user', workflow='workflow_id').id
     api_version = 0
     await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
-    data_store_mgr.update_contact(w_id=w_id, contact_data=None)
+    data_store_mgr._update_contact(w_id=w_id, contact_data=None)
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
 
 
@@ -167,7 +166,7 @@ async def test_update_contact_with_contact_data(
         CFF.PORT: 40000,
         CFF.API: api_version
     }
-    data_store_mgr.update_contact(w_id=w_id, contact_data=contact_data)
+    data_store_mgr._update_contact(w_id=w_id, contact_data=contact_data)
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
 
 
@@ -187,7 +186,7 @@ async def test_stop_workflow(
         CFF.PORT: 40000,
         CFF.API: api_version
     }
-    data_store_mgr.update_contact(w_id=w_id, contact_data=contact_data)
+    data_store_mgr._update_contact(w_id=w_id, contact_data=contact_data)
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
 
     data_store_mgr.stop_workflow(w_id=w_id)

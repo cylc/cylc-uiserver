@@ -74,13 +74,330 @@ class DataStoreMgr:
         self.executors = {}
         self.delta_queues = {}
 
-    def update_contact(
-            self,
+    async def register_workflow(self, w_id: str, is_active: bool) -> None:
+        """Register a new workflow with the data store.
+
+        Call this when a new workflow is discovered on the file system
+        (e.g. installed).
+        """
+        self.log.debug(f'register_workflow({w_id})')
+        self.delta_queues[w_id] = {}
+
+        # create new entry in the data store
+        data = deepcopy(DATA_TEMPLATE)
+        self.data[w_id] = data
+
+        # create new entry in the delta store
+        self._update_contact(
             w_id,
-            contact_data=None,
-            status=None,
-            status_msg=None,
-            pruned=False,
+            status=WorkflowStatus.STOPPED.value,
+            status_msg=self._get_status_msg(w_id, is_active),
+        )
+
+    async def unregister_workflow(self, w_id):
+        """Remove a workflow from the data store entirely.
+
+        Call this when a workflow is deleted.
+        """
+        self.log.debug(f'unregister_workflow({w_id})')
+        if w_id in self.data:
+            self._update_contact(w_id, pruned=True)
+        while any(
+            not delta_queue.empty()
+            for delta_queue in self.delta_queues.get(w_id, {}).values()
+        ):
+            await asyncio.sleep(self.PENDING_DELTA_CHECK_INTERVAL)
+        self._purge_workflow(w_id)
+
+    async def connect_workflow(self, w_id, contact_data):
+        """Initiate workflow subscriptions.
+
+        Call this when a workflow has started.
+
+        Subscriptions and sync management is instantiated and run in
+        a separate thread for each workflow. This is to avoid the sync loop
+        blocking the main loop.
+
+        """
+        self.log.debug(f'connect_workflow({w_id})')
+        if self.loop is None:
+            self.loop = asyncio.get_running_loop()
+
+        # don't sync if subscription exists
+        if w_id in self.w_subs:
+            return
+
+        self.delta_queues[w_id] = {}
+        self._update_contact(w_id, contact_data)
+
+        # Might be options other than threads to achieve
+        # non-blocking subscriptions, but this works.
+        self.executors[w_id] = ThreadPoolExecutor()
+        self.executors[w_id].submit(
+            partial(
+                self._start_subscription,
+                w_id,
+                contact_data['name'],
+                contact_data[CFF.HOST],
+                contact_data[CFF.PUBLISH_PORT]
+            )
+        )
+        await self._entire_workflow_update(ids=[w_id])
+
+    def disconnect_workflow(self, w_id):
+        """Terminate workflow subscriptions.
+
+        Call this when a workflow has stopped.
+        """
+        self.log.debug(f'disconnect_workflow({w_id})')
+        if w_id in self.w_subs:
+            self.w_subs[w_id].stop()
+            del self.w_subs[w_id]
+        if w_id in self.executors:
+            self.executors[w_id].shutdown(wait=True)
+            del self.executors[w_id]
+
+    def stop_workflow(self, w_id):
+        """Inform the data store that a workflow has stopped.
+
+        Call this when the data store thinks a workflow is running but it
+        isn't. Normally the data store will be subscribed to the workflow
+        when it shuts down so will be sent a shutdown message. However, in
+        some circumstances the data store will not be subscribed so will not
+        receive this message and we have to call this method manually.
+        """
+        self.log.debug(f'stop_workflow({w_id})')
+        self.disconnect_workflow(w_id)
+        self._update_contact(
+            w_id,
+            status=WorkflowStatus.STOPPED.value,
+            status_msg=self._get_status_msg(w_id, False),
+        )
+
+    def get_workflows(self):
+        """Return all workflows the data store is currently tracking.
+
+        Returns:
+            (active, inactive)
+                active: Set of active (running, paused, stopping) workflows.
+                inactive: Set of (stopped) workflows.
+        """
+        active = set()
+        inactive = set()
+        for w_id, workflow in self.data.items():
+            status = getattr(workflow.get('workflow'), 'status', 'stopped')
+            if status == 'stopped':
+                inactive.add(w_id)
+            else:
+                active.add(w_id)
+        return active, inactive
+
+    def _purge_workflow(self, w_id):
+        """Purge the manager of a workflow's subscription and data."""
+        self.log.debug(f'delete_workflow({w_id})')
+        self.disconnect_workflow(w_id)
+        if w_id in self.data:
+            del self.data[w_id]
+        if w_id in self.delta_queues:
+            del self.delta_queues[w_id]
+
+    def _start_subscription(self, w_id, reg, host, port):
+        """Instantiate and run subscriber data-store sync.
+
+        Args:
+            w_id (str): Workflow external ID.
+            reg (str): Registered workflow name.
+            host (str): Hostname of target workflow.
+            port (int): Port of target workflow.
+
+        """
+        self.w_subs[w_id] = WorkflowSubscriber(
+            reg,
+            host=host,
+            port=port,
+            context=self.workflows_mgr.context,
+            topics=self.topics
+        )
+        self.w_subs[w_id].loop.run_until_complete(
+            self.w_subs[w_id].subscribe(
+                process_delta_msg,
+                func=self._update_workflow_data,
+                w_id=w_id))
+
+    def _update_workflow_data(self, topic, delta, w_id):
+        """Manage and apply incoming data-store deltas.
+
+        Args:
+            topic (str): topic of published data.
+            delta (object): Published protobuf message data container.
+            w_id (str): Workflow external ID.
+
+        """
+        # wait until data-store is populated for this workflow
+        if w_id not in self.data:
+            loop_cnt = 0
+            while loop_cnt < self.INIT_DATA_WAIT_TIME:
+                if w_id in self.data:
+                    break
+                time.sleep(self.INIT_DATA_RETRY_DELAY)
+                loop_cnt += 1
+                continue
+        if topic == 'shutdown':
+            self.log.debug(f'shutdown({w_id})')
+            self._delta_store_to_queues(w_id, topic, delta)
+            # update the status to stopped and set the status message
+            self._update_contact(
+                w_id,
+                status=WorkflowStatus.STOPPED.value,
+                status_msg=self._get_status_msg(w_id, False),
+            )
+            # close connections
+            self.disconnect_workflow(w_id)
+            return
+        self._apply_all_delta(w_id, delta)
+        self._delta_store_to_queues(w_id, topic, delta)
+
+    def _clear_data_field(self, w_id, field_name):
+        if field_name == WORKFLOW:
+            self.data[w_id][field_name].Clear()
+        else:
+            self.data[w_id][field_name].clear()
+
+    def _apply_all_delta(self, w_id, delta):
+        """Apply the AllDeltas delta."""
+        for field, sub_delta in delta.ListFields():
+            delta_time = getattr(sub_delta, 'time', 0.0)
+            # If the workflow has reloaded clear the data before
+            # delta application.
+            if sub_delta.reloaded:
+                self._clear_data_field(w_id, field.name)
+                self.data[w_id]['delta_times'][field.name] = 0.0
+            # hard to catch errors in a threaded async app, so use try-except.
+            try:
+                # Apply the delta if newer than the previously applied.
+                if delta_time >= self.data[w_id]['delta_times'][field.name]:
+                    apply_delta(field.name, sub_delta, self.data[w_id])
+                    self.data[w_id]['delta_times'][field.name] = delta_time
+                    if not sub_delta.reloaded:
+                        self._reconcile_update(field.name, sub_delta, w_id)
+            except Exception as exc:
+                self.log.exception(exc)
+
+    def _delta_store_to_queues(self, w_id, topic, delta):
+        # Queue delta for graphql subscription resolving
+        if self.delta_queues[w_id]:
+            delta_store = create_delta_store(delta, w_id)
+            for delta_queue in self.delta_queues[w_id].values():
+                delta_queue.put((w_id, topic, delta_store))
+
+    def _reconcile_update(self, topic, delta, w_id):
+        """Reconcile local with workflow data-store.
+
+        Verify data-store is in sync by topic/element-type
+        and on failure request entire set of respective data elements.
+
+        Args:
+            topic (str): topic of published data.
+            delta (object): Published protobuf message data container.
+            w_id (str): Workflow external ID.
+
+        """
+        if topic == WORKFLOW:
+            return
+        if topic == EDGES:
+            s_att = 'id'
+        else:
+            s_att = 'stamp'
+        local_checksum = generate_checksum(
+            [getattr(e, s_att)
+             for e in self.data[w_id][topic].values()])
+        if local_checksum != delta.checksum:
+            self.log.debug(
+                f'Out of sync with {topic} of {w_id}... Reconciling.')
+            try:
+                # use threadsafe as client socket is in main loop thread.
+                future = asyncio.run_coroutine_threadsafe(
+                    workflow_request(
+                        self.workflows_mgr.workflows[w_id]['req_client'],
+                        'pb_data_elements',
+                        args={'element_type': topic}
+                    ),
+                    self.loop
+                )
+                _, new_delta_msg = future.result(self.RECONCILE_TIMEOUT)
+                new_delta = DELTAS_MAP[topic]()
+                new_delta.ParseFromString(new_delta_msg)
+                self._clear_data_field(w_id, topic)
+                apply_delta(topic, new_delta, self.data[w_id])
+                self.data[w_id]['delta_times'][topic] = new_delta.time
+            except asyncio.TimeoutError:
+                self.log.debug(
+                    f'The reconcile update coroutine {w_id} {topic}'
+                    f'took too long, cancelling the subscription/sync.'
+                )
+                future.cancel()
+            except Exception as exc:
+                self.log.exception(exc)
+
+    async def _entire_workflow_update(self, ids=None):
+        """Update entire local data-store of workflow(s).
+
+        Args:
+            ids (list): List of workflow external IDs.
+
+
+        """
+        if ids is None:
+            ids = []
+
+        # Request new data
+        req_method = 'pb_entire_workflow'
+        req_kwargs = (
+            {
+                'client': info['req_client'],
+                'command': req_method,
+                'req_context': w_id
+            }
+            for w_id, info in self.workflows_mgr.workflows.items()
+            if info.get('req_client')  # skip stopped workflows
+        )
+
+        gathers = [
+            workflow_request(**kwargs)
+            for kwargs in req_kwargs
+            if not ids or kwargs['req_context'] in ids
+        ]
+        items = await asyncio.gather(*gathers, return_exceptions=True)
+        for item in items:
+            if isinstance(item, Exception):
+                self.log.exception(
+                    'Failed to update entire local data-store '
+                    'of a workflow', exc_info=item
+                )
+            else:
+                w_id, result = item
+                if result is not None and result != MSG_TIMEOUT:
+                    pb_data = PB_METHOD_MAP[req_method]()
+                    pb_data.ParseFromString(result)
+                    new_data = deepcopy(DATA_TEMPLATE)
+                    for field, value in pb_data.ListFields():
+                        if field.name == WORKFLOW:
+                            new_data[field.name].CopyFrom(value)
+                            new_data['delta_times'] = {
+                                key: value.last_updated
+                                for key in DATA_TEMPLATE
+                            }
+                            continue
+                        new_data[field.name] = {n.id: n for n in value}
+                    self.data[w_id] = new_data
+
+    def _update_contact(
+        self,
+        w_id,
+        contact_data=None,
+        status=None,
+        status_msg=None,
+        pruned=False,
     ):
         delta = DELTAS_MAP[ALL_DELTAS]()
         delta.workflow.time = time.time()
@@ -116,59 +433,11 @@ class DataStoreMgr:
         # Apply to existing workflow data
         if 'delta_times' not in self.data[w_id]:
             self.data[w_id]['delta_times'] = {WORKFLOW: 0.0}
-        self.apply_all_delta(w_id, delta)
+        self._apply_all_delta(w_id, delta)
         # Queue delta for subscription push
-        self.delta_store_to_queues(w_id, ALL_DELTAS, delta)
+        self._delta_store_to_queues(w_id, ALL_DELTAS, delta)
 
-    async def sync_workflow(self, w_id, contact_data):
-        """Run data store sync with workflow services.
-
-        Subscriptions and sync management is instantiated and run in
-        a separate thread for each workflow. This is to avoid the sync loop
-        blocking the main loop.
-
-        """
-        self.log.debug(f'sync_workflow({w_id})')
-        if self.loop is None:
-            self.loop = asyncio.get_running_loop()
-
-        # don't sync if subscription exists
-        if w_id in self.w_subs:
-            return
-
-        self.delta_queues[w_id] = {}
-        self.update_contact(w_id, contact_data)
-
-        # Might be options other than threads to achieve
-        # non-blocking subscriptions, but this works.
-        self.executors[w_id] = ThreadPoolExecutor()
-        self.executors[w_id].submit(
-            partial(
-                self.start_subscription,
-                w_id,
-                contact_data['name'],
-                contact_data[CFF.HOST],
-                contact_data[CFF.PUBLISH_PORT]
-            )
-        )
-        await self.entire_workflow_update(ids=[w_id])
-
-    async def register_workflow(self, w_id: str, is_active: bool) -> None:
-        self.log.debug(f'register_workflow({w_id})')
-        self.delta_queues[w_id] = {}
-
-        # create new entry in the data store
-        data = deepcopy(DATA_TEMPLATE)
-        self.data[w_id] = data
-
-        # create new entry in the delta store
-        self.update_contact(
-            w_id,
-            status=WorkflowStatus.STOPPED.value,
-            status_msg=self.get_status_msg(w_id, is_active),
-        )
-
-    def get_status_msg(self, w_id: str, is_active: bool) -> str:
+    def _get_status_msg(self, w_id: str, is_active: bool) -> str:
         """Derive a status message for the workflow.
 
         Running schedulers provide their own status messages.
@@ -187,224 +456,3 @@ class DataStoreMgr:
         else:
             # the workflow has not yet run
             return 'Not yet run'
-
-    async def unregister_workflow(self, w_id):
-        self.log.debug(f'unregister_workflow({w_id})')
-        if w_id in self.data:
-            self.update_contact(w_id, pruned=True)
-        while any(
-            not delta_queue.empty()
-            for delta_queue in self.delta_queues.get(w_id, {}).values()
-        ):
-            await asyncio.sleep(self.PENDING_DELTA_CHECK_INTERVAL)
-        self.purge_workflow(w_id)
-
-    def stop_workflow(self, w_id):
-        self.log.debug(f'stop_workflow({w_id})')
-        self.purge_workflow(w_id, data=False)
-        self.update_contact(
-            w_id,
-            status=WorkflowStatus.STOPPED.value,
-            status_msg=self.get_status_msg(w_id, False),
-        )
-
-    def purge_workflow(self, w_id, data=True):
-        """Purge the manager of a workflow's subscription and data."""
-        self.log.debug(f'purge_workflow({w_id})')
-        if w_id in self.w_subs:
-            self.w_subs[w_id].stop()
-            del self.w_subs[w_id]
-        if data:
-            if w_id in self.data:
-                del self.data[w_id]
-            if w_id in self.delta_queues:
-                del self.delta_queues[w_id]
-        if w_id in self.executors:
-            self.executors[w_id].shutdown(wait=True)
-            del self.executors[w_id]
-
-    def start_subscription(self, w_id, reg, host, port):
-        """Instantiate and run subscriber data-store sync.
-
-        Args:
-            w_id (str): Workflow external ID.
-            reg (str): Registered workflow name.
-            host (str): Hostname of target workflow.
-            port (int): Port of target workflow.
-
-        """
-        self.w_subs[w_id] = WorkflowSubscriber(
-            reg,
-            host=host,
-            port=port,
-            context=self.workflows_mgr.context,
-            topics=self.topics
-        )
-        self.w_subs[w_id].loop.run_until_complete(
-            self.w_subs[w_id].subscribe(
-                process_delta_msg,
-                func=self.update_workflow_data,
-                w_id=w_id))
-
-    def update_workflow_data(self, topic, delta, w_id):
-        """Manage and apply incoming data-store deltas.
-
-        Args:
-            topic (str): topic of published data.
-            delta (object): Published protobuf message data container.
-            w_id (str): Workflow external ID.
-
-        """
-        # wait until data-store is populated for this workflow
-        if w_id not in self.data:
-            loop_cnt = 0
-            while loop_cnt < self.INIT_DATA_WAIT_TIME:
-                if w_id in self.data:
-                    break
-                time.sleep(self.INIT_DATA_RETRY_DELAY)
-                loop_cnt += 1
-                continue
-        if topic == 'shutdown':
-            self.log.debug(f'shutdown({w_id})')
-            self.delta_store_to_queues(w_id, topic, delta)
-            self.workflows_mgr.stopping.add(w_id)
-            # update the status to stopped and set the status message
-            self.update_contact(
-                w_id,
-                status=WorkflowStatus.STOPPED.value,
-                status_msg=self.get_status_msg(w_id, False),
-            )
-            return
-        self.apply_all_delta(w_id, delta)
-        self.delta_store_to_queues(w_id, topic, delta)
-
-    def clear_data_field(self, w_id, field_name):
-        if field_name == WORKFLOW:
-            self.data[w_id][field_name].Clear()
-        else:
-            self.data[w_id][field_name].clear()
-
-    def apply_all_delta(self, w_id, delta):
-        """Apply the AllDeltas delta."""
-        for field, sub_delta in delta.ListFields():
-            delta_time = getattr(sub_delta, 'time', 0.0)
-            # If the workflow has reloaded clear the data before
-            # delta application.
-            if sub_delta.reloaded:
-                self.clear_data_field(w_id, field.name)
-                self.data[w_id]['delta_times'][field.name] = 0.0
-            # hard to catch errors in a threaded async app, so use try-except.
-            try:
-                # Apply the delta if newer than the previously applied.
-                if delta_time >= self.data[w_id]['delta_times'][field.name]:
-                    apply_delta(field.name, sub_delta, self.data[w_id])
-                    self.data[w_id]['delta_times'][field.name] = delta_time
-                    if not sub_delta.reloaded:
-                        self.reconcile_update(field.name, sub_delta, w_id)
-            except Exception as exc:
-                self.log.exception(exc)
-
-    def delta_store_to_queues(self, w_id, topic, delta):
-        # Queue delta for graphql subscription resolving
-        if self.delta_queues[w_id]:
-            delta_store = create_delta_store(delta, w_id)
-            for delta_queue in self.delta_queues[w_id].values():
-                delta_queue.put((w_id, topic, delta_store))
-
-    def reconcile_update(self, topic, delta, w_id):
-        """Reconcile local with workflow data-store.
-
-        Verify data-store is in sync by topic/element-type
-        and on failure request entire set of respective data elements.
-
-        Args:
-            topic (str): topic of published data.
-            delta (object): Published protobuf message data container.
-            w_id (str): Workflow external ID.
-
-        """
-        if topic == WORKFLOW:
-            return
-        if topic == EDGES:
-            s_att = 'id'
-        else:
-            s_att = 'stamp'
-        local_checksum = generate_checksum(
-            [getattr(e, s_att)
-             for e in self.data[w_id][topic].values()])
-        if local_checksum != delta.checksum:
-            self.log.debug(
-                f'Out of sync with {topic} of {w_id}... Reconciling.')
-            try:
-                # use threadsafe as client socket is in main loop thread.
-                future = asyncio.run_coroutine_threadsafe(
-                    workflow_request(
-                        self.workflows_mgr.active[w_id]['req_client'],
-                        'pb_data_elements',
-                        args={'element_type': topic}
-                    ),
-                    self.loop
-                )
-                _, new_delta_msg = future.result(self.RECONCILE_TIMEOUT)
-                new_delta = DELTAS_MAP[topic]()
-                new_delta.ParseFromString(new_delta_msg)
-                self.clear_data_field(w_id, topic)
-                apply_delta(topic, new_delta, self.data[w_id])
-                self.data[w_id]['delta_times'][topic] = new_delta.time
-            except asyncio.TimeoutError:
-                self.log.debug(
-                    f'The reconcile update coroutine {w_id} {topic}'
-                    f'took too long, cancelling the subscription/sync.'
-                )
-                future.cancel()
-                self.workflows_mgr.stopping.add(w_id)
-            except Exception as exc:
-                self.log.exception(exc)
-
-    async def entire_workflow_update(self, ids=None):
-        """Update entire local data-store of workflow(s).
-
-        Args:
-            ids (list): List of workflow external IDs.
-
-
-        """
-        if ids is None:
-            ids = []
-
-        # Request new data
-        req_method = 'pb_entire_workflow'
-        req_kwargs = (
-            {'client': info['req_client'],
-             'command': req_method,
-             'req_context': w_id}
-            for w_id, info in self.workflows_mgr.active.items())
-
-        gathers = [
-            workflow_request(**kwargs)
-            for kwargs in req_kwargs
-            if not ids or kwargs['req_context'] in ids
-        ]
-        items = await asyncio.gather(*gathers, return_exceptions=True)
-        for item in items:
-            if isinstance(item, Exception):
-                self.log.exception(
-                    'Failed to update entire local data-store '
-                    'of a workflow', exc_info=item
-                )
-            else:
-                w_id, result = item
-                if result is not None and result != MSG_TIMEOUT:
-                    pb_data = PB_METHOD_MAP[req_method]()
-                    pb_data.ParseFromString(result)
-                    new_data = deepcopy(DATA_TEMPLATE)
-                    for field, value in pb_data.ListFields():
-                        if field.name == WORKFLOW:
-                            new_data[field.name].CopyFrom(value)
-                            new_data['delta_times'] = {
-                                key: value.last_updated
-                                for key in DATA_TEMPLATE
-                            }
-                            continue
-                        new_data[field.name] = {n.id: n for n in value}
-                    self.data[w_id] = new_data

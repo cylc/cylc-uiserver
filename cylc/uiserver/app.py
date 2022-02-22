@@ -391,9 +391,6 @@ class CylcUIServer(ExtensionApp):
             log=self.log,
             workflows_mgr=self.workflows_mgr,
         )
-        ioloop.IOLoop.current().add_callback(
-            self.workflows_mgr.run
-        )
 
     def initialize_settings(self):
         """Update extension settings.
@@ -412,7 +409,11 @@ class CylcUIServer(ExtensionApp):
                 for key, value in self.config['CylcUIServer'].items()
             )
         )
-        # configure the scan
+        # start the async scan task running (do this on server start not init)
+        ioloop.IOLoop.current().add_callback(
+            self.workflows_mgr.run
+        )
+        # configure the scan interval
         ioloop.PeriodicCallback(
             self.workflows_mgr.scan,
             self.scan_interval * 1000
@@ -522,6 +523,7 @@ class CylcUIServer(ExtensionApp):
         super().launch_instance(argv=argv, **kwargs)
 
     async def stop_extension(self):
+        # stop the async scan task
         await self.workflows_mgr.stop()
         for sub in self.data_store_mgr.w_subs.values():
             sub.stop()

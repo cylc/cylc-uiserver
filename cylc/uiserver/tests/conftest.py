@@ -116,7 +116,9 @@ def make_entire_workflow():
 def one_workflow_aiter():
     """An async generator fixture that returns a single workflow.
     """
-    async def _create_aiter(*args, **kwargs):
+    async def _create_aiter(*args, none=False, **kwargs):
+        if none:
+            return
         yield kwargs
 
     return _create_aiter
@@ -334,7 +336,7 @@ def disable_workflow_connection(cylc_data_store_mgr, monkeypatch):
 
     monkeypatch.setattr(
         cylc_data_store_mgr,
-        'sync_workflow',
+        'connect_workflow',
         _null
     )
 
