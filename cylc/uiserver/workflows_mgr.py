@@ -114,6 +114,7 @@ class WorkflowsManager:
             # only flows which are using the same api version
             | api_version(f'=={API}')
         )
+        self.queue = asyncio.Queue()
 
     def spawn_workflow(self):
         """Start/spawn a workflow."""
@@ -326,3 +327,16 @@ class WorkflowsManager:
                     and list(val.values())
                 ])
         return res
+
+    async def scan(self):
+        if self.queue.empty():
+            await self.queue.put(False)
+
+    async def run(self):
+        stop = False
+        while not stop:
+            await self.update()
+            stop = await self.queue.get()  # wait for a signal
+
+    async def stop(self):
+        await self.queue.put(True)

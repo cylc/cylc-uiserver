@@ -392,7 +392,7 @@ class CylcUIServer(ExtensionApp):
             workflows_mgr=self.workflows_mgr,
         )
         ioloop.IOLoop.current().add_callback(
-            self.workflows_mgr.update
+            self.workflows_mgr.run
         )
 
     def initialize_settings(self):
@@ -414,7 +414,7 @@ class CylcUIServer(ExtensionApp):
         )
         # configure the scan
         ioloop.PeriodicCallback(
-            self.workflows_mgr.update,
+            self.workflows_mgr.scan,
             self.scan_interval * 1000
         ).start()
 
@@ -522,6 +522,7 @@ class CylcUIServer(ExtensionApp):
         super().launch_instance(argv=argv, **kwargs)
 
     async def stop_extension(self):
+        await self.workflows_mgr.stop()
         for sub in self.data_store_mgr.w_subs.values():
             sub.stop()
         # Shutdown the thread pool executor
