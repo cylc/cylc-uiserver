@@ -173,11 +173,12 @@ def _schema_opts_to_api_opts(schema_opts: Dict) -> SimpleNamespace:
 
 
 def clean(tokens, opts):
-    """Run Cylc Clean using workflow_files api.
+    """Run Cylc Clean using `cylc.flow.workflow_files` api.
     """
     # set remote timeout to 10 minutes.
     opts.timeout = 600
     init_clean(tokens.pop('workflow'), opts)
+    return 'Workflow cleaned'
 
 
 class Services:
@@ -242,26 +243,30 @@ class Services:
             )
 
     @classmethod
-    async def _run_cmd_in_procpoolexecutor(cls, funcs, timeout=600):
-        """Run functions in procpool executor.
+    async def _run_cmd_in_procpoolexecutor(cls, func_, timeout=600):
+        """Run a function in procpool executor.
 
         Deliberately agnostic of the function to be run.
 
         Args:
-            func_: A list of callables to be run
+            func_: Callable to be run
             timeout: Number of seconds to wait.
+
+        TODO:
+            Consider extending this to work with a list of functions.
         """
         with ProcessPoolExecutor(max_workers=None) as executor:
-            futures = [executor.submit(func_) for func_ in funcs]
+            future = executor.submit(func_)
             # If no exception is raised this is the same as
             # `return_when=ALL_COMPLETED`:
             done, _ = wait(
-                futures, timeout=timeout, return_when=FIRST_EXCEPTION
+                [future], timeout=timeout, return_when=FIRST_EXCEPTION
             )
         failed = [d for d in done if d.exception() is not None]
+        done = [d for d in done]
         if failed:
             return cls._error(failed[0].exception())
-        return cls._return('Workflow cleaned')
+        return cls._return(done[0].result())
 
     @classmethod
     async def clean(cls, workflows, args, workflows_mgr, log):
