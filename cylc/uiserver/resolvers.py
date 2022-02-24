@@ -17,7 +17,9 @@
 
 from getpass import getuser
 import os
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_EXCEPTION
 from copy import deepcopy
+from functools import partial
 from logging import Logger
 from typing import Dict, List
 from subprocess import Popen, PIPE, DEVNULL
@@ -160,13 +162,22 @@ def _schema_opts_to_api_opts(schema_opts: Dict) -> SimpleNamespace:
         if opt in SCHEMA_TO_API and SCHEMA_TO_API[opt]:
             api_opt_name, api_opt_value = SCHEMA_TO_API[opt](opt, value)
             api_opts[api_opt_name] = api_opt_value
-        elif opt in SCHEMA_TO_API:
-            api_opts[opt] = value
-        else:
+        elif opt not in SCHEMA_TO_API:
             raise InvalidSchemaOptionError(
                 f'{opt} is not a valid option for Cylc Clean'
             )
+        else:
+            api_opts[opt] = value
+
     return SimpleNamespace(**api_opts)
+
+
+def clean(tokens, opts):
+    """Run Cylc Clean using workflow_files api.
+    """
+    # set remote timeout to 10 minutes.
+    opts.timeout = 600
+    init_clean(tokens.pop('workflow'), opts)
 
 
 class Services:
@@ -231,6 +242,28 @@ class Services:
             )
 
     @classmethod
+    async def _run_cmd_in_procpoolexecutor(cls, funcs, timeout=600):
+        """Run functions in procpool executor.
+
+        Deliberately agnostic of the function to be run.
+
+        Args:
+            func_: A list of callables to be run
+            timeout: Number of seconds to wait.
+        """
+        with ProcessPoolExecutor(max_workers=None) as executor:
+            futures = [executor.submit(func_) for func_ in funcs]
+            # If no exception is raised this is the same as
+            # `return_when=ALL_COMPLETED`:
+            done, _ = wait(
+                futures, timeout=timeout, return_when=FIRST_EXCEPTION
+            )
+        failed = [d for d in done if d.exception() is not None]
+        if failed:
+            return cls._error(failed[0].exception())
+        return cls._return('Workflow cleaned')
+
+    @classmethod
     async def clean(cls, workflows, args, workflows_mgr, log):
         """Calls `cylc clean`."""
         response = []
@@ -245,23 +278,12 @@ class Services:
 
         # clean each requested flow
         for tokens in workflows:
-            try:
-                # set timeout to 10 minutes.
-                opts.timeout = 600
-                init_clean(tokens.pop('workflow'), opts)
-            except Exception as exc:
-                # oh noes, something went wrong, send back confirmation
-                return cls._error(exc)
-            else:
-                # send a success message
-                return cls._return(
-                    'Workflow cleaned'
-                )
+            clean_func = partial(clean, tokens, opts)
+            await cls._run_cmd_in_procpoolexecutor([clean_func])
 
         # trigger a re-scan
         await workflows_mgr.update()
         return response
-
 
     @classmethod
     async def play(cls, workflows, args, workflows_mgr, log):

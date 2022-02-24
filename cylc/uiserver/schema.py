@@ -28,7 +28,6 @@ from graphene import (
     Mutation,
     Schema,
     String,
-    Int,
 )
 from graphene.types.generic import GenericScalar
 

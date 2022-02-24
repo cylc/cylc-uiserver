@@ -64,6 +64,7 @@ from tornado.web import RedirectHandler
 from traitlets import (
     Dict,
     Float,
+    Int,
     TraitError,
     TraitType,
     Undefined,
@@ -321,6 +322,13 @@ class CylcUIServer(ExtensionApp):
             system load set a higher value.
         ''',
         default_value=5.0  # default values as kwargs correctly display in docs
+    )
+    max_workers = Int(
+        config=True,
+        help='''
+            Set the maximum number of workers for process pools.
+        ''',
+        default_value=1
     )
 
     @validate('ui_build_dir')
