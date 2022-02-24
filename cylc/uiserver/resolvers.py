@@ -20,7 +20,6 @@ import os
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_EXCEPTION
 from copy import deepcopy
 from functools import partial
-from logging import Logger
 from typing import Dict, List
 from subprocess import Popen, PIPE, DEVNULL
 from types import SimpleNamespace
@@ -221,7 +220,7 @@ class Services:
                 [future], timeout=timeout, return_when=FIRST_EXCEPTION
             )
         failed = [d for d in done if d.exception() is not None]
-        done = [d for d in done]
+        done = list(done)
         if failed:
             return cls._error(failed[0].exception())
         return cls._return(done[0].result())
