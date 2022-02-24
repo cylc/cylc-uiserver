@@ -201,48 +201,6 @@ class Services:
         ]
 
     @classmethod
-    async def _run_cmd(cls, cmd: List, tokens: List, log: Logger) -> None:
-        """Run a command.
-
-        Args:
-            cmd: Command to run.
-            tokens: workflow tokens.
-            log: where to log problems.
-        """
-        if tokens['user'] and tokens['user'] != getuser():
-            return cls._error(
-                'Cannot clean workflows for other users.'
-            )
-        # Note: authorisation has already taken place.
-        # add the workflow to the command
-        cmd = [*cmd, tokens['workflow']]
-
-        # get a representation of the command being cleaned
-        cmd_repr = ' '.join(cmd)
-        log.info(f'$ {cmd_repr}')
-
-        # run cylc clean
-
-        # while proc.poll await asyncio.sleep() ?
-        proc = Popen(
-            cmd,
-            stdin=DEVNULL,
-            stdout=PIPE,
-            stderr=PIPE,
-            text=True
-        )
-        ret = proc.wait(timeout=20)
-
-        if ret:
-            # command failed
-            _, err = proc.communicate()
-            raise Exception(
-                f'Could not start {tokens["workflow"]} - {cmd_repr}'
-                # suppress traceback unless in debug mode
-                + (f' - {err}' if DEBUG else '')
-            )
-
-    @classmethod
     async def _run_cmd_in_procpoolexecutor(cls, func_, timeout=600):
         """Run a function in procpool executor.
 
@@ -294,7 +252,6 @@ class Services:
     async def play(cls, workflows, args, workflows_mgr, log):
         """Calls `cylc play`."""
         response = []
-
         # get ready to run the command
         try:
             # check that the request cylc version is available
@@ -309,25 +266,68 @@ class Services:
                 args.pop('cylc_version')
 
             # build the command
-            cmd = _build_cmd(['cylc', 'play', '--color=never'], args)
+            cmd = ['cylc', 'play', '--color=never']
+            for key, value in args.items():
+                if value is False:
+                    # don't add binary flags
+                    continue
+                key = snake_to_kebab(key)
+                if not isinstance(value, list):
+                    value = [value]
+                for item in value:
+                    cmd.append(key)
+                    if item is not True:
+                        # don't provide values for binary flags
+                        cmd.append(item)
 
         except Exception as exc:
             # oh noes, something went wrong, send back confirmation
             return cls._error(exc)
-
         # start each requested flow
         for tokens in workflows:
             try:
-                cls._run_cmd(cmd, tokens, log)
+                if tokens['user'] and tokens['user'] != getuser():
+                    return cls._error(
+                        'Cannot start workflows for other users.'
+                    )
+                # Note: authorisation has already taken place.
+                # add the workflow to the command
+                cmd = [*cmd, tokens['workflow']]
+
+                # get a representation of the command being run
+                cmd_repr = ' '.join(cmd)
+                if cylc_version:
+                    cmd_repr = f'CYLC_VERSION={cylc_version} {cmd_repr}'
+                log.info(f'$ {cmd_repr}')
+
+                # run cylc run
+                proc = Popen(
+                    cmd,
+                    stdin=DEVNULL,
+                    stdout=PIPE,
+                    stderr=PIPE,
+                    text=True
+                )
+                ret = proc.wait(timeout=20)
+
+                if ret:
+                    # command failed
+                    _, err = proc.communicate()
+                    raise Exception(
+                        f'Could not start {tokens["workflow"]} - {cmd_repr}'
+                        # suppress traceback unless in debug mode
+                        + (f' - {err}' if DEBUG else '')
+                    )
+
             except Exception as exc:
                 # oh noes, something went wrong, send back confirmation
                 return cls._error(exc)
+
             else:
                 # send a success message
                 return cls._return(
                     'Workflow started'
                 )
-
         # trigger a re-scan
         await workflows_mgr.update()
         return response
