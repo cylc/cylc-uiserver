@@ -20,7 +20,7 @@ import os
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_EXCEPTION
 from copy import deepcopy
 from functools import partial
-from typing import Dict, List
+from typing import Callable, Dict, List, Union
 from subprocess import Popen, PIPE, DEVNULL
 from types import SimpleNamespace
 
@@ -147,7 +147,7 @@ def _schema_opts_to_api_opts(schema_opts: Dict) -> SimpleNamespace:
     question:
         convert to class?
     """
-    SCHEMA_TO_API = {
+    SCHEMA_TO_API: Dict[str, Union[Callable, None]] = {
         'rm': lambda opt, value: ('rm_dirs', value),
         'local_only': None,
         'remote_only': None,
@@ -158,13 +158,18 @@ def _schema_opts_to_api_opts(schema_opts: Dict) -> SimpleNamespace:
     }
     api_opts = {}
     for opt, value in schema_opts.items():
-        if opt in SCHEMA_TO_API and SCHEMA_TO_API[opt]:
-            api_opt_name, api_opt_value = SCHEMA_TO_API[opt](opt, value)
-            api_opts[api_opt_name] = api_opt_value
-        elif opt not in SCHEMA_TO_API:
+        # All valid options should be in SCHEMA_TO_API:
+        if opt not in SCHEMA_TO_API:
             raise InvalidSchemaOptionError(
                 f'{opt} is not a valid option for Cylc Clean'
             )
+
+        # If converter is callable, call it on opt, value,
+        # else just copy them verbatim to api_opts
+        converter = SCHEMA_TO_API[opt]
+        if callable(converter):
+            api_opt_name, api_opt_value = converter(opt, value)
+            api_opts[api_opt_name] = api_opt_value
         else:
             api_opts[opt] = value
 
