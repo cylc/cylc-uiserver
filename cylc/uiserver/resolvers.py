@@ -15,6 +15,7 @@
 
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
+import asyncio
 from getpass import getuser
 import os
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_EXCEPTION
@@ -205,33 +206,7 @@ class Services:
         ]
 
     @classmethod
-    async def _run_cmd_in_procpoolexecutor(cls, func_, timeout=600):
-        """Run a function in procpool executor.
-
-        Deliberately agnostic of the function to be run.
-
-        Args:
-            func_: Callable to be run
-            timeout: Number of seconds to wait.
-
-        TODO:
-            Consider extending this to work with a list of functions.
-        """
-        with ProcessPoolExecutor(max_workers=None) as executor:
-            future = executor.submit(func_)
-            # If no exception is raised this is the same as
-            # `return_when=ALL_COMPLETED`:
-            done, _ = wait(
-                [future], timeout=timeout, return_when=FIRST_EXCEPTION
-            )
-        failed = [d for d in done if d.exception() is not None]
-        done = list(done)
-        if failed:
-            return cls._error(failed[0].exception())
-        return cls._return(done[0].result())
-
-    @classmethod
-    async def clean(cls, workflows, args, workflows_mgr, log):
+    async def clean(cls, workflows, args, workflows_mgr, log, executor):
         """Calls `cylc clean`."""
         response = []
         # get ready to run the command
@@ -246,7 +221,12 @@ class Services:
         # clean each requested flow
         for tokens in workflows:
             clean_func = partial(clean, tokens, opts)
-            await cls._run_cmd_in_procpoolexecutor([clean_func])
+            try:
+                future = await asyncio.wrap_future(executor.submit(clean_func))
+            except Exception as exc:
+                return cls._error(exc)
+            else:
+                cls._return(future)
 
         # trigger a re-scan
         await workflows_mgr.update()
@@ -331,9 +311,10 @@ class Resolvers(BaseResolvers):
 
     workflows_mgr = None
 
-    def __init__(self, data, log, **kwargs):
+    def __init__(self, data, log, executor, **kwargs):
         super().__init__(data)
         self.log = log
+        self.executor = executor
 
         # Set extra attributes
         for key, value in kwargs.items():
@@ -375,7 +356,8 @@ class Resolvers(BaseResolvers):
                 m_args[1]['workflows'],
                 m_args[2],
                 self.workflows_mgr,
-                log=self.log
+                log=self.log,
+                executor=self.executor
             )
         else:
             return await Services.play(

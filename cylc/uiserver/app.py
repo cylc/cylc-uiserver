@@ -53,6 +53,7 @@ Cylc specific configurations are documented here.
    the environment variable ``CYLC_SITE_CONF_PATH``.
 """
 
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_EXCEPTION
 import getpass
 from pathlib import Path, PurePath
 import sys
@@ -392,11 +393,13 @@ class CylcUIServer(ExtensionApp):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.executor = ProcessPoolExecutor(max_workers=self.max_workers)
         self.workflows_mgr = WorkflowsManager(self, log=self.log)
         self.data_store_mgr = DataStoreMgr(self.workflows_mgr, self.log)
         self.resolvers = Resolvers(
             self.data_store_mgr,
             log=self.log,
+            executor=self.executor,
             workflows_mgr=self.workflows_mgr,
         )
 
@@ -538,5 +541,7 @@ class CylcUIServer(ExtensionApp):
         # Shutdown the thread pool executor
         for executor in self.data_store_mgr.executors.values():
             executor.shutdown(wait=False)
+        # Shutdown processpool executor.
+        self.executor.shutdown(wait=False)
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()
