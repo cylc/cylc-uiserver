@@ -29,6 +29,7 @@ from cylc.uiserver.authorise import (
 log = ExtensionApp().log
 
 CONTROL_OPS = [
+    "clean",
     "ext_trigger",
     "hold",
     "kill",
@@ -50,6 +51,7 @@ CONTROL_OPS = [
 ]
 
 ALL_OPS = [
+    "clean",
     "read",
     "broadcast",
     "ext_trigger",
@@ -119,6 +121,7 @@ FAKE_USER_CONF = {
     [
         pytest.param(
             {
+                "clean",
                 "message",
                 "play",
                 "trigger",
