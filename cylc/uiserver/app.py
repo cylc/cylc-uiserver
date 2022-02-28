@@ -53,7 +53,7 @@ Cylc specific configurations are documented here.
    the environment variable ``CYLC_SITE_CONF_PATH``.
 """
 
-from concurrent.futures import ProcessPoolExecutor, wait, FIRST_EXCEPTION
+from concurrent.futures import ProcessPoolExecutor
 import getpass
 from pathlib import Path, PurePath
 import sys
