@@ -241,7 +241,10 @@ class WorkflowsManager:  # noqa: SIM119
         return True
 
     async def _disconnect(self, wid):
-        """Disconnect from a running workflow."""
+        """Disconnect from a running workflow.
+
+        Marks the workflow as stopped.
+        """
         self.uiserver.data_store_mgr.disconnect_workflow(wid)
         with suppress(KeyError, IOError):
             self.workflows[wid]['req_client'].stop(stop_loop=False)
@@ -253,13 +256,6 @@ class WorkflowsManager:  # noqa: SIM119
         await self.uiserver.data_store_mgr.unregister_workflow(wid)
         if wid in self.workflows:
             self.workflows.pop(wid)
-
-    async def _stop(self, wid):
-        """Mark a workflow as stopped.
-
-        The workflow can't do this itself, because it's not running.
-        """
-        self.uiserver.data_store_mgr.stop_workflow(wid)
 
     async def update(self):
         """Scans for workflows, handles any state changes.
@@ -288,10 +284,7 @@ class WorkflowsManager:  # noqa: SIM119
         async for wid, before, after, flow in self._workflow_state_changes():
             if before == 'active' and after == 'inactive':
                 # workflow has stopped
-                run(
-                    self._disconnect(wid),
-                    self._stop(wid),
-                )
+                run(self._disconnect(wid))
 
             elif before == 'active' and after is None:
                 # workflow has stopped and been deleted
@@ -326,10 +319,7 @@ class WorkflowsManager:  # noqa: SIM119
                 cmds = []
                 if before == '/active':
                     # disconnect from the old workflow
-                    cmds.extend([
-                        self._disconnect(wid),
-                        self._stop(wid),
-                    ])
+                    cmds.append(self._disconnect(wid))
                 # re-register the workflow
                 cmds.extend([
                     self._unregister(wid),

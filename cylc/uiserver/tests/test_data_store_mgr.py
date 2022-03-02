@@ -171,7 +171,7 @@ async def test_update_contact_with_contact_data(
 
 
 @pytest.mark.asyncio
-async def test_stop_workflow(
+async def test_disconnect_workflow(
     data_store_mgr: DataStoreMgr
 ):
     """Telling a data store to stop a workflow, is the same as updating
@@ -189,5 +189,5 @@ async def test_stop_workflow(
     data_store_mgr._update_contact(w_id=w_id, contact_data=contact_data)
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
 
-    data_store_mgr.stop_workflow(w_id=w_id)
+    data_store_mgr.disconnect_workflow(w_id=w_id)
     assert data_store_mgr.data[w_id]['workflow'].api_version == 0

@@ -44,7 +44,6 @@ def dummy_uis():
         unregister_workflow=partial(async_capture, 'unregister'),
         connect_workflow=partial(async_capture, 'connect'),
         disconnect_workflow=partial(sync_capture, 'disconnect'),
-        stop_workflow=partial(sync_capture, 'stop'),
         calls=calls,
     )
 
@@ -92,12 +91,12 @@ def dummy_uis():
         (
             'active',
             None,
-            ['disconnect', 'unregister'],  # TODO: should this stop?
+            ['disconnect', 'unregister'],
         ),
         (
             'active',
             'inactive',
-            ['disconnect', 'stop'],
+            ['disconnect'],
         ),
         (
             'active',

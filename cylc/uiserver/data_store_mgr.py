@@ -150,29 +150,17 @@ class DataStoreMgr:
         Call this when a workflow has stopped.
         """
         self.log.debug(f'disconnect_workflow({w_id})')
+        self._update_contact(
+            w_id,
+            status=WorkflowStatus.STOPPED.value,
+            status_msg=self._get_status_msg(w_id, False),
+        )
         if w_id in self.w_subs:
             self.w_subs[w_id].stop()
             del self.w_subs[w_id]
         if w_id in self.executors:
             self.executors[w_id].shutdown(wait=True)
             del self.executors[w_id]
-
-    def stop_workflow(self, w_id):
-        """Inform the data store that a workflow has stopped.
-
-        Call this when the data store thinks a workflow is running but it
-        isn't. Normally the data store will be subscribed to the workflow
-        when it shuts down so will be sent a shutdown message. However, in
-        some circumstances the data store will not be subscribed so will not
-        receive this message and we have to call this method manually.
-        """
-        self.log.debug(f'stop_workflow({w_id})')
-        self.disconnect_workflow(w_id)
-        self._update_contact(
-            w_id,
-            status=WorkflowStatus.STOPPED.value,
-            status_msg=self._get_status_msg(w_id, False),
-        )
 
     def get_workflows(self):
         """Return all workflows the data store is currently tracking.
