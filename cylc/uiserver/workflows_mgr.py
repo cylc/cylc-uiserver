@@ -228,12 +228,12 @@ class WorkflowsManager:  # noqa: SIM119
 
     async def _connect(self, wid, flow):
         """Open a connection to a running workflow."""
-        self.workflows[wid] = flow
         try:
             flow['req_client'] = WorkflowRuntimeClient(flow['name'])
         except ClientError as exc:
             self.log.debug(f'Could not connect to {wid}: {exc}')
             return False
+        self.workflows[wid] = flow
         await self.uiserver.data_store_mgr.connect_workflow(
             wid,
             flow
@@ -259,6 +259,8 @@ class WorkflowsManager:  # noqa: SIM119
 
     async def update(self):
         """Scans for workflows, handles any state changes.
+
+        Don't call this method directly, call self.scan to queue an update.
 
         Possible workflow states:
             active:
