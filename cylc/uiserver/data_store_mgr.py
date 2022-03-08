@@ -141,9 +141,9 @@ class DataStoreMgr:
                 contact_data[CFF.PUBLISH_PORT]
             )
         )
-        sucessfull_updates = await self._entire_workflow_update(ids=[w_id])
+        successful_updates = await self._entire_workflow_update(ids=[w_id])
 
-        if w_id not in sucessfull_updates:
+        if w_id not in successful_updates:
             # something went wrong, undo any changes to allow for subsequent
             # connection attempts
             self.log.debug(f'failed to connect to {w_id}')
