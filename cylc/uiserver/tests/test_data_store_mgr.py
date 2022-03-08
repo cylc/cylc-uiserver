@@ -15,11 +15,15 @@
 
 """Tests for the ``data_store_mgr`` module and its objects and functions."""
 
+import logging
+
 import pytest
+import zmq
 
 from cylc.flow.id import Tokens
-from cylc.flow.network import MSG_TIMEOUT
+from cylc.flow.network import (MSG_TIMEOUT, ZMQSocketBase)
 from cylc.flow.workflow_files import ContactFileFields as CFF
+
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 
 from .conftest import AsyncClientFixture
@@ -191,3 +195,63 @@ async def test_disconnect_workflow(
 
     data_store_mgr.disconnect_workflow(w_id=w_id)
     assert data_store_mgr.data[w_id]['workflow'].api_version == 0
+
+
+@pytest.mark.asyncio
+async def test_workflow_connect_fail(
+    data_store_mgr: DataStoreMgr,
+    port_range,
+    monkeypatch,
+    caplog,
+):
+    """Simulate a failure during workflow connection.
+
+    The data store should "rollback" any incidental changes made during the
+    failed connection attempt by disconnecting from the workflow afterwards.
+
+    Not an ideal test as we don't actually get a communication failure,
+    the data store manager just skips contacting the workflow because
+    we aren't providing a client for it to connect to, however, probably the
+    best we can achieve without actually running a workflow.
+    """
+    # patch the zmq logic so that the connection doesn't fail at the first
+    # hurdle
+    def _null(*args, **kwargs): pass
+    monkeypatch.setattr(
+        'cylc.flow.network.ZMQSocketBase._socket_bind',
+        _null,
+    )
+
+    # start a ZMQ REPLY socket in order to claim an unused port
+    w_id = Tokens(user='user', workflow='workflow_id').id
+    context = zmq.Context()
+    server = ZMQSocketBase(zmq.REP, context=context, workflow=w_id, bind=True)
+    server._socket_bind(*port_range)
+
+    # register the workflow with the data store
+    await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
+    contact_data = {
+        'name': 'workflow_id',
+        'owner': 'cylc',
+        CFF.HOST: 'localhost',
+        CFF.PORT: server.port,
+        CFF.PUBLISH_PORT: server.port,
+        CFF.API: 1
+    }
+
+    # try to connect to the workflow
+    caplog.set_level(logging.DEBUG, data_store_mgr.log.name)
+    await data_store_mgr.connect_workflow(w_id, contact_data)
+
+    # the connection should fail because our ZMQ socket is not a
+    # WorkflowRuntimeServer with the correct endpoints and auth
+    assert len(caplog.records) == 3
+    assert [record.message for record in caplog.records] == [
+        'connect_workflow(~user/workflow_id)',
+        'failed to connect to ~user/workflow_id',
+        'disconnect_workflow(~user/workflow_id)',
+    ]
+
+    # tidy up
+    server.stop()
+    context.destroy()

@@ -128,7 +128,6 @@ class DataStoreMgr:
             return
 
         self.delta_queues[w_id] = {}
-        self._update_contact(w_id, contact_data)
 
         # Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.
@@ -142,7 +141,17 @@ class DataStoreMgr:
                 contact_data[CFF.PUBLISH_PORT]
             )
         )
-        await self._entire_workflow_update(ids=[w_id])
+        sucessfull_updates = await self._entire_workflow_update(ids=[w_id])
+
+        if w_id not in sucessfull_updates:
+            # something went wrong, undo any changes to allow for subsequent
+            # connection attempts
+            self.log.debug(f'failed to connect to {w_id}')
+            self.disconnect_workflow(w_id)
+            return False
+        else:
+            # don't update the contact data until we have successfully updated
+            self._update_contact(w_id, contact_data)
 
     def disconnect_workflow(self, w_id):
         """Terminate workflow subscriptions.
@@ -356,6 +365,8 @@ class DataStoreMgr:
             if not ids or kwargs['req_context'] in ids
         ]
         items = await asyncio.gather(*gathers, return_exceptions=True)
+
+        successes = set()
         for item in items:
             if isinstance(item, Exception):
                 self.log.exception(
@@ -378,6 +389,13 @@ class DataStoreMgr:
                             continue
                         new_data[field.name] = {n.id: n for n in value}
                     self.data[w_id] = new_data
+                    successes.add(w_id)
+                else:
+                    self.log.error(
+                        f'Error: communicating with {w_id} - {result}'
+                    )
+
+        return successes
 
     def _update_contact(
         self,

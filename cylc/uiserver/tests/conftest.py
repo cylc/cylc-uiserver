@@ -28,6 +28,7 @@ from tornado.web import HTTPError
 from traitlets.config import Config
 import zmq
 
+from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
 from cylc.flow.id import Tokens
 from cylc.flow.data_messages_pb2 import (  # type: ignore
     PbEntireWorkflow,
@@ -394,3 +395,8 @@ def uis_caplog():
         caplog.set_level(level, uiserver.log.name)
 
     return _caplog
+
+
+@pytest.fixture(scope='session')
+def port_range():
+    return glbl_cfg().get(['scheduler', 'run hosts', 'ports'])
