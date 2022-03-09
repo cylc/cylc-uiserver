@@ -135,7 +135,12 @@ class WorkflowsManager:  # noqa: SIM119
             # only flows which are using the same api version
             | api_version(f'=={API}')
         )
+
+        # queue for requesting new scans
         self.queue = asyncio.Queue()
+        # signal that the scanner is stopping, subsequent scan requests
+        # will be ignored
+        self.stopping = False
 
     def get_workflows(self):
         return self.uiserver.data_store_mgr.get_workflows()
@@ -391,7 +396,7 @@ class WorkflowsManager:  # noqa: SIM119
 
     async def scan(self):
         """Request a new workflow scan."""
-        if self.queue.empty():
+        if not self.stopping and self.queue.empty():
             await self.queue.put(False)
 
     async def run(self):
@@ -407,13 +412,37 @@ class WorkflowsManager:  # noqa: SIM119
         """
         stop = False
         while not stop:
-            await self.update()
+            try:
+                await self.update()
+            except Exception as exc:
+                # log exceptions but carry on
+                # (otherwise a temporary issue will kill the scan task)
+                self.log.exception(exc)
             try:
                 stop = await self.queue.get()  # wait for a signal
             except RuntimeError:
                 # RuntimeError may be raised if the event loop is closed
                 break
+        # inform stop() that this task has completed
+        await self.queue.put(None)
 
     async def stop(self):
-        """Request the "run" task to stop."""
+        """Stop the workflow scanner task.
+
+        Request the "run" task to stop and wait for confirmation that it has.
+        """
+        # prevent any new scans being requested
+        self.stopping = True
+        # wipe any scan requests
+        while not self.queue.empty():
+            status = await self.queue.get()
+            if status is None:
+                # the scanner stopped itself i.e. RuntimeError
+                return
+        # request the scan task to stop
         await self.queue.put(True)
+        # wait for confirmation that it has
+        # (note the async sleep appears to be necessary otherwise tornado
+        # does not recognise that the scan task has completed)
+        await asyncio.sleep(0)
+        await self.queue.get()
