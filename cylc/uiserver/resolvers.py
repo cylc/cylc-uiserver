@@ -113,7 +113,7 @@ def _build_cmd(cmd: List, args: Dict) -> List:
         key = snake_to_kebab(key)
         if not isinstance(value, list):
             if isinstance(value, int):
-                # Any iteger items need converting to strings:
+                # Any integer items need converting to strings:
                 value = str(value)
             value = [value]
         for item in value:
@@ -139,7 +139,7 @@ def _schema_opts_to_api_opts(schema_opts: Dict) -> SimpleNamespace:
         Namespace for use as options.
 
     TODO:
-        So far only `cyle clean` has been added. It may become necessary
+        So far only `cylc clean` has been added. It may become necessary
         to separate the SCHEMA_TO_API dict into GENERIC_SCHEMA_TO_API and
         <COMMAND>_SCHEMA_TO_API, and add a kwarg indicating which
         additional schema to use.
