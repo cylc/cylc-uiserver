@@ -176,11 +176,9 @@ def _schema_opts_to_api_opts(schema_opts: Dict) -> SimpleNamespace:
     return SimpleNamespace(**api_opts)
 
 
-def clean(tokens, opts):
+def _clean(tokens, opts):
     """Run Cylc Clean using `cylc.flow.workflow_files` api.
     """
-    # set remote timeout to 10 minutes.
-    opts.timeout = 600
     init_clean(tokens.pop('workflow'), opts)
     return 'Workflow cleaned'
 
@@ -206,20 +204,20 @@ class Services:
 
     @classmethod
     async def clean(cls, workflows, args, workflows_mgr, log, executor):
-        """Calls `cylc clean`."""
+        """Calls `init_clean`"""
         response = []
-        # get ready to run the command
-        try:
-            # build the command
-            opts = _schema_opts_to_api_opts(args)
 
+        # Convert Schema options → cylc.flow.workflow_files.init_clean opts:
+        try:
+            opts = _schema_opts_to_api_opts(args)
         except Exception as exc:
-            # oh noes, something went wrong, send back confirmation
             return cls._error(exc)
+        # Hard set remote timeout.
+        opts.remote_timeout = "600"
 
         # clean each requested flow
         for tokens in workflows:
-            clean_func = partial(clean, tokens, opts)
+            clean_func = partial(_clean, tokens, opts)
             try:
                 future = await asyncio.wrap_future(executor.submit(clean_func))
             except Exception as exc:
