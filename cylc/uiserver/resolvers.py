@@ -144,8 +144,6 @@ def _schema_opts_to_api_opts(schema_opts: Dict) -> SimpleNamespace:
         <COMMAND>_SCHEMA_TO_API, and add a kwarg indicating which
         additional schema to use.
 
-    question:
-        convert to class?
     """
     SCHEMA_TO_API: Dict[str, Union[Callable, None]] = {
         'rm': lambda opt, value: ('rm_dirs', value),
