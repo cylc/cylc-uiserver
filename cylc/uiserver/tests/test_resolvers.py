@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from cylc.uiserver.resolvers import (
     _schema_opts_to_api_opts,
     InvalidSchemaOptionError,
-    clean,
+    _clean,
     Services
 )
 
