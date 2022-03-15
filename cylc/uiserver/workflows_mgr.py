@@ -26,6 +26,7 @@ import asyncio
 from contextlib import suppress
 from getpass import getuser
 from pathlib import Path
+from typing import Dict, Union
 import sys
 
 import zmq.asyncio
@@ -116,7 +117,7 @@ class WorkflowsManager:  # noqa: SIM119
 
     """
 
-    def __init__(self, uiserver, log, context=None, run_dir=None):
+    def __init__(self, uiserver, log, context=None, run_dir=None) -> None:
         self.uiserver = uiserver
         self.log = log
         if context is None:
@@ -124,7 +125,11 @@ class WorkflowsManager:  # noqa: SIM119
         else:
             self.context = context
         self.owner = getuser()
-        self.workflows = {}  # all workflows currently tracked
+
+        # all workflows currently tracked
+        self.workflows: 'Dict[str, Dict]' = {}
+
+        # the "workflow pipe" used to detect workflows on the filesystem
         self._scan_pipe = (
             # all flows on the filesystem
             scan(run_dir)
@@ -136,11 +141,15 @@ class WorkflowsManager:  # noqa: SIM119
             | api_version(f'=={API}')
         )
 
-        # queue for requesting new scans
-        self.queue = asyncio.Queue()
+        # queue for requesting new scans, valid queued values are:
+        # * True  - (stop=True)  The stop signal (stops the scanner)
+        # * False - (stop=False) Request a new scan
+        # * None  - The "stopped" signal, sent after the scan task has stooped
+        self._queue: 'asyncio.Queue[Union[bool, None]]' = asyncio.Queue()
+
         # signal that the scanner is stopping, subsequent scan requests
         # will be ignored
-        self.stopping = False
+        self._stopping = False
 
     def get_workflows(self):
         return self.uiserver.data_store_mgr.get_workflows()
@@ -396,8 +405,8 @@ class WorkflowsManager:  # noqa: SIM119
 
     async def scan(self):
         """Request a new workflow scan."""
-        if not self.stopping and self.queue.empty():
-            await self.queue.put(False)
+        if not self._stopping and self._queue.empty():
+            await self._queue.put(False)
 
     async def run(self):
         """Coroutine that performs workflow scans on request asynchronously.
@@ -419,12 +428,12 @@ class WorkflowsManager:  # noqa: SIM119
                 # (otherwise a temporary issue will kill the scan task)
                 self.log.exception(exc)
             try:
-                stop = await self.queue.get()  # wait for a signal
+                stop = await self._queue.get()  # wait for a signal
             except RuntimeError:
                 # RuntimeError may be raised if the event loop is closed
                 break
         # inform stop() that this task has completed
-        await self.queue.put(None)
+        await self._queue.put(None)
 
     async def stop(self):
         """Stop the workflow scanner task.
@@ -432,17 +441,17 @@ class WorkflowsManager:  # noqa: SIM119
         Request the "run" task to stop and wait for confirmation that it has.
         """
         # prevent any new scans being requested
-        self.stopping = True
+        self._stopping = True
         # wipe any scan requests
-        while not self.queue.empty():
-            status = await self.queue.get()
+        while not self._queue.empty():
+            status = await self._queue.get()
             if status is None:
                 # the scanner stopped itself i.e. RuntimeError
                 return
         # request the scan task to stop
-        await self.queue.put(True)
+        await self._queue.put(True)
         # wait for confirmation that it has
         # (note the async sleep appears to be necessary otherwise tornado
         # does not recognise that the scan task has completed)
         await asyncio.sleep(0)
-        await self.queue.get()
+        await self._queue.get()
