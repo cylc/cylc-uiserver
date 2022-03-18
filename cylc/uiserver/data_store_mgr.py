@@ -416,7 +416,6 @@ class DataStoreMgr:
             flow.owner = contact_data['owner']
             flow.host = contact_data[CFF.HOST]
             flow.port = int(contact_data[CFF.PORT])
-            # flow.pub_port = int(contact_data[CFF.PUBLISH_PORT])
             flow.api_version = int(contact_data[CFF.API])
         else:
             # wipe pre-existing contact-file data
@@ -425,7 +424,6 @@ class DataStoreMgr:
             flow.name = w_tokens['workflow']
             flow.host = ''
             flow.port = 0
-            # flow.pub_port = 0
             flow.api_version = 0
 
         if status is not None:
