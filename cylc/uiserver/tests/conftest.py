@@ -28,6 +28,7 @@ from tornado.web import HTTPError
 from traitlets.config import Config
 import zmq
 
+from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
 from cylc.flow.id import Tokens
 from cylc.flow.data_messages_pb2 import (  # type: ignore
     PbEntireWorkflow,
@@ -116,7 +117,9 @@ def make_entire_workflow():
 def one_workflow_aiter():
     """An async generator fixture that returns a single workflow.
     """
-    async def _create_aiter(*args, **kwargs):
+    async def _create_aiter(*args, none=False, **kwargs):
+        if none:
+            return
         yield kwargs
 
     return _create_aiter
@@ -334,7 +337,7 @@ def disable_workflow_connection(cylc_data_store_mgr, monkeypatch):
 
     monkeypatch.setattr(
         cylc_data_store_mgr,
-        'sync_workflow',
+        'connect_workflow',
         _null
     )
 
@@ -392,3 +395,8 @@ def uis_caplog():
         caplog.set_level(level, uiserver.log.name)
 
     return _caplog
+
+
+@pytest.fixture(scope='session')
+def port_range():
+    return glbl_cfg().get(['scheduler', 'run hosts', 'ports'])
