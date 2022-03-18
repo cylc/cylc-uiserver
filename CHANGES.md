@@ -12,6 +12,14 @@ updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
 
 -------------------------------------------------------------------------------
+## __cylc-uiserver-1.0.0 (<span actions:bind='release-date'>Under Development</span>)__
+
+### Fixes
+
+[#324](https://github.com/cylc/cylc-uiserver/pull/324) -
+Fix issues where workflow status could be incorrect.
+
+-------------------------------------------------------------------------------
 ## __cylc-uiserver-1.0.0 (<span actions:bind='release-date'>Released 2022-02-17</span>)__
 
 ### Enhancements
