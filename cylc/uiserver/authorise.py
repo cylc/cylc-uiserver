@@ -225,7 +225,7 @@ class Authorization:
         allowed_operations.discard("")
         return allowed_operations
 
-    @lru_cache(maxsize=128)
+    @lru_cache(maxsize=128)  # noqa B019 TODO?
     def get_permitted_operations(self, access_user: str):
         """Return permitted operations for given access_user.
 
