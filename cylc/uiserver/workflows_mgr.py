@@ -134,7 +134,7 @@ class WorkflowsManager:  # noqa: SIM119
             # all flows on the filesystem
             scan(run_dir)
             # stop here is the flow is stopped, else...
-            | is_active(True, filter_stop=False)
+            | is_active(is_active=True, filter_stop=False)
             # extract info from the contact file
             | contact_info
             # only flows which are using the same api version
