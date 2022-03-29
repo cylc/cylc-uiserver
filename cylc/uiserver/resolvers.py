@@ -19,11 +19,22 @@ from getpass import getuser
 import os
 from copy import deepcopy
 from subprocess import Popen, PIPE, DEVNULL
+from typing import (
+    TYPE_CHECKING, Any, Dict, Iterable, List, Union
+)
 
 from graphql.language.base import print_ast
 
-from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.data_store_mgr import WORKFLOW
+from cylc.flow.network.resolvers import BaseResolvers
+
+
+if TYPE_CHECKING:
+    from logging import Logger
+    from graphql import ResolveInfo
+    from cylc.flow.data_store_mgr import DataStoreMgr
+    from cylc.flow.id import Tokens
+    from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
 # show traceback from cylc commands
@@ -180,11 +191,16 @@ class Services:
 class Resolvers(BaseResolvers):
     """UI Server context GraphQL query and mutation resolvers."""
 
-    workflows_mgr = None
-
-    def __init__(self, data, log, **kwargs):
+    def __init__(
+        self,
+        data: 'DataStoreMgr',
+        log: 'Logger',
+        workflows_mgr: 'WorkflowsManager',
+        **kwargs
+    ):
         super().__init__(data)
         self.log = log
+        self.workflows_mgr = workflows_mgr
 
         # Set extra attributes
         for key, value in kwargs.items():
@@ -192,12 +208,20 @@ class Resolvers(BaseResolvers):
                 setattr(self, key, value)
 
     # Mutations
-    async def mutator(self, info, *m_args):
+    async def mutator(
+        self,
+        info: 'ResolveInfo',
+        command: str,
+        w_args: Dict[str, Any],
+        _kwargs: Dict[str, Any],
+        _meta: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Mutate workflow."""
-        req_meta = {}
-        _, w_args, _, _ = m_args
-        req_meta['auth_user'] = info.context.get(
-            'current_user', 'unknown user')
+        req_meta = {
+            'auth_user': info.context.get(  # type: ignore[union-attr]
+                'current_user', 'unknown user'
+            )
+        }
         w_ids = [
             flow[WORKFLOW].id
             for flow in await self.get_workflows_data(w_args)]
@@ -205,8 +229,9 @@ class Resolvers(BaseResolvers):
             return [{
                 'response': (False, 'No matching workflows')}]
         # Pass the request to the workflow GraphQL endpoints
-        _, variables, _, _ = info.context.get('graphql_params')
-
+        _, variables, _, _ = info.context.get(  # type: ignore[union-attr]
+            'graphql_params'
+        )
         # Create a modified request string,
         # containing only the current mutation/field.
         operation_ast = deepcopy(info.operation)
@@ -216,14 +241,20 @@ class Resolvers(BaseResolvers):
             'request_string': print_ast(operation_ast),
             'variables': variables,
         }
-        return await self.workflows_mgr.multi_request(
+        return await self.workflows_mgr.multi_request(  # type: ignore # TODO
             'graphql', w_ids, graphql_args, req_meta=req_meta
         )
 
-    async def service(self, info, *m_args):
+    async def service(
+        self,
+        info: 'ResolveInfo',
+        command: str,
+        workflows: Iterable['Tokens'],
+        kwargs: Dict[str, Any]
+    ) -> List[Union[bool, str]]:
         return await Services.play(
-            m_args[1]['workflows'],
-            m_args[2],
+            workflows,
+            kwargs,
             self.workflows_mgr,
             log=self.log
         )

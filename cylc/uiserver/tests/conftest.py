@@ -35,14 +35,14 @@ from cylc.flow.data_messages_pb2 import (  # type: ignore
     PbWorkflow,
     PbFamilyProxy,
 )
-from cylc.flow.network import ZMQSocketBase
+from cylc.flow.network.client import WorkflowRuntimeClient
 from cylc.flow.workflow_files import ContactFileFields as CFF
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
-class AsyncClientFixture(ZMQSocketBase):
+class AsyncClientFixture(WorkflowRuntimeClient):
     pattern = zmq.REQ
     host = ''
     port = 0

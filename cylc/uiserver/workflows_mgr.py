@@ -26,16 +26,17 @@ import asyncio
 from contextlib import suppress
 from getpass import getuser
 from pathlib import Path
-from typing import Dict, Union
 import sys
+from typing import (
+    TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Union
+)
 
 import zmq.asyncio
 
 from cylc.flow.id import Tokens
 from cylc.flow.exceptions import ClientError, ClientTimeout
-from cylc.flow.network import API
+from cylc.flow.network import API, MSG_TIMEOUT
 from cylc.flow.network.client import WorkflowRuntimeClient
-from cylc.flow.network import MSG_TIMEOUT
 from cylc.flow.network.scan import (
     api_version,
     contact_info,
@@ -47,32 +48,35 @@ from cylc.flow.workflow_files import (
     WorkflowFiles,
 )
 
+if TYPE_CHECKING:
+    from logging import Logger
+
+
 CLIENT_TIMEOUT = 2.0
 
 
 async def workflow_request(
-    client,
-    command,
-    args=None,
-    timeout=None,
-    req_context=None,
+    client: WorkflowRuntimeClient,
+    command: str,
+    args: Optional[Dict[str, Any]] = None,
+    timeout: Optional[float] = None,
+    req_context: Optional[str] = None,
     *,
-    log=None,
-    req_meta=None
-):
+    log: Optional['Logger'] = None,
+    req_meta: Optional[Dict[str, Any]] = None
+) -> Tuple[str, object]:
     """Workflow request command.
 
     Args:
-        client (WorkflowRuntimeClient): Instantiated workflow client.
-        command (str): Command/Endpoint name.
-        args (dict): Endpoint arguments.
-        timeout (float): Client request timeout (secs).
-        req_context (str): A string to identifier.
-        req_meta (dict): Meta data related to request, e.g. auth_user
+        client: Instantiated workflow client.
+        command: Command/Endpoint name.
+        args: Endpoint arguments.
+        timeout: Client request timeout (secs).
+        req_context: A string to identifier.
+        req_meta: Meta data related to request, e.g. auth_user
 
     Returns:
         tuple: (req_context, result)
-
     """
     if req_context is None:
         req_context = command
@@ -351,13 +355,13 @@ class WorkflowsManager:  # noqa: SIM119
 
     async def multi_request(
         self,
-        command,
-        workflows,
-        args=None,
-        multi_args=None,
+        command: str,
+        workflows: Iterable[str],
+        args: Optional[Dict[str, Any]] = None,
+        multi_args: Optional[Dict[str, Any]] = None,
         timeout=None,
-        req_meta=None
-    ):
+        req_meta: Optional[Dict[str, Any]] = None
+    ) -> List[object]:
         """Send requests to multiple workflows."""
         if args is None:
             args = {}
