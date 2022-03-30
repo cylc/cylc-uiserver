@@ -71,11 +71,9 @@ def authorised(fun: Callable) -> Callable:
             # NOTE: Auth tests will hit this line unless mocked authentication
             # is provided.
             raise web.HTTPError(403, reason='Forbidden')
-        if not (
-            isinstance(user, str)  # token authenticated
-            or (
-                isinstance(user, dict)
-                and _authorise(handler, user['name'])
+        if not (  # token authenticated
+            isinstance(user, str) or (
+                isinstance(user, dict) and _authorise(handler, user['name'])
             )
         ):
             raise web.HTTPError(403, reason='authorization insufficient')
@@ -217,11 +215,8 @@ class CylcVersionHandler(CylcAppHandler):
     @web.authenticated
     def get(self):
         self.write(
-            '<pre>'
-            + get_cylc_version(long=True)
-            + '\n'
-            + list_cylc_plugins()
-            + '</pre>'
+            '<pre>' + get_cylc_version(long=True) + '\n' + (
+                list_cylc_plugins()) + '</pre>'
         )
 
 
@@ -279,7 +274,7 @@ class UserProfileHandler(CylcAppHandler):
         user_info['permissions'] = [
             snake_to_camel(perm) for perm in (
                 self.auth.get_permitted_operations(user_info['name']))
-                ]
+        ]
 
         self.write(json.dumps(user_info))
 

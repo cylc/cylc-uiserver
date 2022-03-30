@@ -138,11 +138,11 @@ class WorkflowsManager:  # noqa: SIM119
             # all flows on the filesystem
             scan(run_dir)
             # stop here is the flow is stopped, else...
-            | is_active(is_active=True, filter_stop=False)
+            | is_active(is_active=True, filter_stop=False)  # noqa W503
             # extract info from the contact file
-            | contact_info
+            | contact_info  # noqa W503 Comments useful.
             # only flows which are using the same api version
-            | api_version(f'=={API}')
+            | api_version(f'=={API}')  # noqa W503 Comments useful.
         )
 
         # queue for requesting new scans, valid queued values are:
@@ -194,9 +194,9 @@ class WorkflowsManager:  # noqa: SIM119
                 inactive.add(wid)
                 if (
                     # if the workflow has previously started...
-                    self.workflows.get(wid, {}).get(CFF.UUID)
-                    # ...but the database has since been removed...
-                    and not db_file_exists(flow)
+                    self.workflows.get(wid, {}).get(CFF.UUID) and (
+                        # ...but the database has since been removed...
+                        not db_file_exists(flow))
                 ):
                     # ...then it is no longer the same run, the transition is:
                     #   <before-state> => None > <after-state>
@@ -214,8 +214,8 @@ class WorkflowsManager:  # noqa: SIM119
                     yield (wid, None, 'inactive', flow)
 
             elif (
-                wid in self.workflows
-                and flow[CFF.UUID] != self.workflows[wid].get(CFF.UUID)
+                wid in self.workflows and (
+                    flow[CFF.UUID] != self.workflows[wid].get(CFF.UUID))
             ):
                 # this flow is running but it's a different run
                 active.add(wid)
@@ -402,8 +402,8 @@ class WorkflowsManager:  # noqa: SIM119
                 res.extend([
                     msg_core
                     for msg_core in list(val.values())[0].get('result')
-                    if isinstance(val, dict)
-                    and list(val.values())
+                    if isinstance(val, dict) and (
+                        list(val.values()))
                 ])
         return res
 

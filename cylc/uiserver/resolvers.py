@@ -168,9 +168,11 @@ class Services:
                     # command failed
                     _, err = proc.communicate()
                     raise Exception(
-                        f'Could not start {tokens["workflow"]} - {cmd_repr}'
-                        # suppress traceback unless in debug mode
-                        + (f' - {err}' if DEBUG else '')
+                        f'Could not start {tokens["workflow"]} '
+                        f'- {cmd_repr}' + (
+                            # suppress traceback unless in debug mode
+                            f' - {err}' if DEBUG else ''
+                        )
                     )
 
             except Exception as exc:

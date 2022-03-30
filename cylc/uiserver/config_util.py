@@ -34,8 +34,7 @@ DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / 'jupyter_config.py'
 UISERVER_DIR = 'uiserver'
 # UIS configuration dirs
 SITE_CONF_ROOT: Path = Path(
-    os.getenv('CYLC_SITE_CONF_PATH')
-    or GlobalConfig.DEFAULT_SITE_CONF_PATH,
+    os.getenv('CYLC_SITE_CONF_PATH') or GlobalConfig.DEFAULT_SITE_CONF_PATH,
     UISERVER_DIR
 )
 USER_CONF_ROOT = Path.home() / '.cylc' / UISERVER_DIR
