@@ -431,8 +431,8 @@ class AuthorizationMiddleware:
             authorised = False
         if not authorised:
             self.auth_failed(current_user, op_name, http_code=403)
-        if (info.operation.operation in Authorization.ASYNC_OPS or (
-                iscoroutinefunction(next_))):
+        if (info.operation.operation in Authorization.ASYNC_OPS
+                or iscoroutinefunction(next_)):
             return self.async_resolve(next_, root, info, **args)
         return next_(root, info, **args)
 

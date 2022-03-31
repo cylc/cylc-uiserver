@@ -71,9 +71,11 @@ def authorised(fun: Callable) -> Callable:
             # NOTE: Auth tests will hit this line unless mocked authentication
             # is provided.
             raise web.HTTPError(403, reason='Forbidden')
-        if not (  # token authenticated
-            isinstance(user, str) or (
-                isinstance(user, dict) and _authorise(handler, user['name'])
+        if not (
+            isinstance(user, str)  # token authenticated
+            or (
+                isinstance(user, dict)
+                and _authorise(handler, user['name'])
             )
         ):
             raise web.HTTPError(403, reason='authorization insufficient')
@@ -215,8 +217,11 @@ class CylcVersionHandler(CylcAppHandler):
     @web.authenticated
     def get(self):
         self.write(
-            '<pre>' + get_cylc_version(long=True) + '\n' + (
-                list_cylc_plugins()) + '</pre>'
+            '<pre>'
+            + get_cylc_version(long=True)
+            + '\n'
+            + list_cylc_plugins()
+            + '</pre>'
         )
 
 
