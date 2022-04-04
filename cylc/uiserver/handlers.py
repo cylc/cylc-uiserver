@@ -17,6 +17,7 @@ from asyncio import Queue
 from functools import wraps
 import json
 import getpass
+import os
 import socket
 from typing import TYPE_CHECKING, Callable, Union
 
@@ -280,7 +281,11 @@ class UserProfileHandler(CylcAppHandler):
             snake_to_camel(perm) for perm in (
                 self.auth.get_permitted_operations(user_info['name']))
         ]
-
+        # Pass the gui mode to the ui
+        if not os.environ.get("JUPYTERHUB_SINGLEUSER_APP"):
+            user_info['mode'] = 'single user'
+        else:
+            user_info['mode'] = 'multi user'
         self.write(json.dumps(user_info))
 
 
