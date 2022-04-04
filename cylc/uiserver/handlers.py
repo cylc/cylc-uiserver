@@ -19,7 +19,7 @@ import json
 import getpass
 import os
 import socket
-from typing import Callable, Union
+from typing import TYPE_CHECKING, Callable, Union
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
@@ -35,6 +35,9 @@ from cylc.flow.scripts.cylc import (
 
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
+
+if TYPE_CHECKING:
+    from graphql.execution import ExecutionResult
 
 
 ME = getpass.getuser()
@@ -277,7 +280,7 @@ class UserProfileHandler(CylcAppHandler):
         user_info['permissions'] = [
             snake_to_camel(perm) for perm in (
                 self.auth.get_permitted_operations(user_info['name']))
-                ]
+        ]
         # Pass the gui mode to the ui
         if not os.environ.get("JUPYTERHUB_SINGLEUSER_APP"):
             user_info['mode'] = 'single user'
@@ -342,8 +345,8 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
     def prepare(self):
         super().prepare()
 
-    @web.authenticated
-    async def execute(self, *args, **kwargs):
+    @web.authenticated  # type: ignore[arg-type]
+    async def execute(self, *args, **kwargs) -> 'ExecutionResult':
         # Use own backend, and TornadoGraphQLHandler already does validation.
         return await self.schema.execute(
             *args,

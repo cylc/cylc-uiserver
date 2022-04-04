@@ -133,11 +133,11 @@ class CylcUIServer(ExtensionApp):
         cylc gui    # start the cylc GUI
     '''
     config_file_paths = get_conf_dir_hierarchy(
-                [
-                    SITE_CONF_ROOT,  # site configuration
-                    USER_CONF_ROOT,  # user configuration
-                ], filename=False
-            )
+        [
+            SITE_CONF_ROOT,  # site configuration
+            USER_CONF_ROOT,  # user configuration
+        ], filename=False
+    )
     # Next include currently needed for directory making
     config_file_paths.insert(0, str(Path(uis_pkg).parent))  # packaged config
     config_file_paths.reverse()
@@ -391,9 +391,6 @@ class CylcUIServer(ExtensionApp):
             log=self.log,
             workflows_mgr=self.workflows_mgr,
         )
-        ioloop.IOLoop.current().add_callback(
-            self.workflows_mgr.update
-        )
 
     def initialize_settings(self):
         """Update extension settings.
@@ -412,9 +409,13 @@ class CylcUIServer(ExtensionApp):
                 for key, value in self.config['CylcUIServer'].items()
             )
         )
-        # configure the scan
+        # start the async scan task running (do this on server start not init)
+        ioloop.IOLoop.current().add_callback(
+            self.workflows_mgr.run
+        )
+        # configure the scan interval
         ioloop.PeriodicCallback(
-            self.workflows_mgr.update,
+            self.workflows_mgr.scan,
             self.scan_interval * 1000
         ).start()
 
@@ -522,6 +523,8 @@ class CylcUIServer(ExtensionApp):
         super().launch_instance(argv=argv, **kwargs)
 
     async def stop_extension(self):
+        # stop the async scan task
+        await self.workflows_mgr.stop()
         for sub in self.data_store_mgr.w_subs.values():
             sub.stop()
         # Shutdown the thread pool executor
