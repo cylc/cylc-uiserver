@@ -279,7 +279,7 @@ class UserProfileHandler(CylcAppHandler):
         user_info['permissions'] = [
             snake_to_camel(perm) for perm in (
                 self.auth.get_permitted_operations(user_info['name']))
-                ]
+        ]
 
         self.write(json.dumps(user_info))
 
