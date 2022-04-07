@@ -257,7 +257,7 @@ class Services:
 
             # build the command
             cmd = ['cylc', 'play', '--color=never']
-            cmd = cls._build_cmd(cmd, args)
+            cmd = _build_cmd(cmd, args)
 
         except Exception as exc:
             # oh noes, something went wrong, send back confirmation
