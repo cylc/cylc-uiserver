@@ -257,7 +257,18 @@ class Services:
 
             # build the command
             cmd = ['cylc', 'play', '--color=never']
-            cmd = cls._build_cmd(cmd, args)
+            for key, value in args.items():
+                if value is False:
+                    # don't add binary flags
+                    continue
+                key = snake_to_kebab(key)
+                if not isinstance(value, list):
+                    value = [value]
+                for item in value:
+                    cmd.append(key)
+                    if item is not True:
+                        # don't provide values for binary flags
+                        cmd.append(item)
 
         except Exception as exc:
             # oh noes, something went wrong, send back confirmation
