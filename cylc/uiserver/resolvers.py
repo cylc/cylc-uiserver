@@ -49,6 +49,17 @@ if TYPE_CHECKING:
 # show traceback from cylc commands
 DEBUG = True
 CLEAN = 'clean'
+OPT_CONVERTERS: Dict[str, Dict[str, Union[Callable, None]]] = {
+    CLEAN: {
+        'rm': lambda opt, value: ('rm_dirs', value),
+        'local_only': None,
+        'remote_only': None,
+        'debug':
+            lambda opt, value:
+                ('verbosity', 2) if value is True else ('verbosity', 0),
+        'no_timestamp': lambda opt, value: ('log_timestamp', not value),
+    }
+}
 
 
 def snake_to_kebab(snake):
@@ -153,17 +164,6 @@ def _schema_opts_to_api_opts(
     Returns:
         Namespace for use as options.
     """
-    OPT_CONVERTERS: Dict[str, Dict[str, Union[Callable, None]]] = {
-        CLEAN: {
-            'rm': lambda opt, value: ('rm_dirs', value),
-            'local_only': None,
-            'remote_only': None,
-            'debug':
-                lambda opt, value:
-                    ('verbosity', 2) if value is True else ('verbosity', 0),
-            'no_timestamp': lambda opt, value: ('log_timestamp', not value),
-        }
-    }
     converters = OPT_CONVERTERS[schema]
     api_opts = {}
     for opt, value in schema_opts.items():
@@ -215,7 +215,6 @@ class Services:
     async def clean(cls, workflows, args, workflows_mgr, executor, log):
         """Calls `init_clean`"""
         response = []
-
         # Convert Schema options → cylc.flow.workflow_files.init_clean opts:
         try:
             opts = _schema_opts_to_api_opts(args, schema=CLEAN)
@@ -230,6 +229,7 @@ class Services:
             try:
                 future = await asyncio.wrap_future(executor.submit(clean_func))
             except Exception as exc:
+                log.exception(exc)
                 return cls._error(exc)
             else:
                 cls._return(future)
