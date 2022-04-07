@@ -37,6 +37,7 @@ from copy import deepcopy
 from functools import partial
 from pathlib import Path
 import time
+from typing import Optional, Set
 
 from cylc.flow.id import Tokens
 from cylc.flow.network.server import PB_METHOD_MAP
@@ -336,12 +337,13 @@ class DataStoreMgr:
             except Exception as exc:
                 self.log.exception(exc)
 
-    async def _entire_workflow_update(self, ids=None):
+    async def _entire_workflow_update(
+        self, ids: Optional[list] = None
+    ) -> Set[str]:
         """Update entire local data-store of workflow(s).
 
         Args:
-            ids (list): List of workflow external IDs.
-
+            ids: List of workflow external IDs.
 
         """
         if ids is None:
@@ -366,7 +368,7 @@ class DataStoreMgr:
         ]
         items = await asyncio.gather(*gathers, return_exceptions=True)
 
-        successes = set()
+        successes: Set[str] = set()
         for item in items:
             if isinstance(item, Exception):
                 self.log.exception(

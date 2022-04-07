@@ -135,11 +135,11 @@ class CylcUIServer(ExtensionApp):
         cylc gui    # start the cylc GUI
     '''
     config_file_paths = get_conf_dir_hierarchy(
-                [
-                    SITE_CONF_ROOT,  # site configuration
-                    USER_CONF_ROOT,  # user configuration
-                ], filename=False
-            )
+        [
+            SITE_CONF_ROOT,  # site configuration
+            USER_CONF_ROOT,  # user configuration
+        ], filename=False
+    )
     # Next include currently needed for directory making
     config_file_paths.insert(0, str(Path(uis_pkg).parent))  # packaged config
     config_file_paths.reverse()

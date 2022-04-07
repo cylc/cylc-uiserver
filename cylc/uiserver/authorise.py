@@ -296,7 +296,7 @@ class Authorization:
         # re.sub needed for snake/camel case
         if re.sub(
             r'(?<!^)(?=[A-Z])', '_', operation
-                ).lower() in self.get_permitted_operations(access_user):
+        ).lower() in self.get_permitted_operations(access_user):
             self.log.info(f"{access_user}: authorized to {operation}")
             return True
         self.log.info(f"{access_user}: not authorized to {operation}")
@@ -420,15 +420,17 @@ class AuthorizationMiddleware:
         op_name = self.get_op_name(info.field_name, info.operation.operation)
         # It shouldn't get here but worth checking for zero trust
         if not op_name:
-            self.auth_failed(current_user, op_name, 400,
-                             "Operation not in schema.")
+            self.auth_failed(
+                current_user, op_name, http_code=400,
+                msg="Operation not in schema."
+            )
         try:
             authorised = self.auth.is_permitted(current_user, op_name)
         except Exception:
             # Fail secure
             authorised = False
         if not authorised:
-            self.auth_failed(current_user, op_name, 403)
+            self.auth_failed(current_user, op_name, http_code=403)
         if (info.operation.operation in Authorization.ASYNC_OPS
                 or iscoroutinefunction(next_)):
             return self.async_resolve(next_, root, info, **args)
@@ -453,7 +455,7 @@ class AuthorizationMiddleware:
             log_message = log_message + " " + message
         raise web.HTTPError(http_code, reason=message)
 
-    def get_op_name(self, field_name: str, operation: str) -> Union[None, str]:
+    def get_op_name(self, field_name: str, operation: str) -> Optional[str]:
         """
         Returns operation name required for authorization.
         Converts queries and subscriptions to read operations.
@@ -470,7 +472,7 @@ class AuthorizationMiddleware:
             # Check it is a mutation in our schema
             if self.auth and re.sub(
                 r'(?<!^)(?=[A-Z])', '_', field_name
-                    ).lower() in Authorization.ALL_OPS.fget():
+            ).lower() in Authorization.ALL_OPS.fget():
                 return field_name
         return None
 
