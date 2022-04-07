@@ -20,23 +20,22 @@ from getpass import getuser
 import os
 from copy import deepcopy
 from functools import partial
-from typing import Callable, Dict, List, Union
 from subprocess import Popen, PIPE, DEVNULL
 from types import SimpleNamespace
 from typing import (
-    TYPE_CHECKING, Any, Dict, Iterable, List, Union
+    TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Union
 )
 
 from graphql.language.base import print_ast
 
 from cylc.flow.data_store_mgr import WORKFLOW
 from cylc.flow.exceptions import CylcError
+from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.workflow_files import init_clean
 
 
 class InvalidSchemaOptionError(CylcError):
     ...
-from cylc.flow.network.resolvers import BaseResolvers
 
 
 if TYPE_CHECKING:
@@ -212,7 +211,7 @@ class Services:
         ]
 
     @classmethod
-    async def clean(cls, workflows, args, workflows_mgr, log, executor):
+    async def clean(cls, workflows, args, workflows_mgr, executor, log):
         """Calls `init_clean`"""
         response = []
 
@@ -383,7 +382,8 @@ class Resolvers(BaseResolvers):
                 workflows,
                 kwargs,
                 self.workflows_mgr,
-                log=self.log
+                log=self.log,
+                executor=self.executor
             )
 
         else:

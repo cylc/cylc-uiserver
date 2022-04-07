@@ -211,7 +211,7 @@ class Play(graphene.Mutation):
     result = GenericScalar()
 
 
-class Clean(Mutation):
+class Clean(graphene.Mutation):
     class Meta:
         description = sstrip('''
             Clean a workflow from the run directory.
@@ -219,33 +219,33 @@ class Clean(Mutation):
         resolver = partial(mutator, command='clean')
 
     class Arguments:
-        workflows = List(WorkflowID, required=True)
-        rm = String(
+        workflows = graphene.List(WorkflowID, required=True)
+        rm = graphene.String(
             default_value='',
             description=sstrip('''
                 Only clean the specified subdirectories (or files) in
                 the run directory, rather than the whole run
             ''')
         )
-        local_only = Boolean(
+        local_only = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 Only clean on the local filesystem (not remote hosts).
             ''')
         )
-        remote_only = Boolean(
+        remote_only = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 Only clean on remote hosts (not the local filesystem).
             ''')
         )
-        debug = Boolean(
+        debug = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 Output developer information and show exception tracebacks.
             ''')
         )
-        no_timestamp = Boolean(
+        no_timestamp = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 Don't timestamp logged messages.
