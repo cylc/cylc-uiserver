@@ -225,6 +225,9 @@ class Clean(graphene.Mutation):
             description=sstrip('''
                 Only clean the specified subdirectories (or files) in
                 the run directory, rather than the whole run
+
+                Can be a colon separated list:
+                E.g. '.service/db:log:share:work'.
             ''')
         )
         local_only = graphene.Boolean(

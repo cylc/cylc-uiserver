@@ -16,20 +16,20 @@ services = Services()
 @pytest.mark.parametrize(
     'schema_opts, expect',
     [
-        ({'rm': ''}, {'rm_dirs': ''}),
-        ({'rm': 'work share'}, {'rm_dirs': 'work share'}),
-        ({'local_only': True}, {'local_only': True}),
-        ({'remote_only': False}, {'remote_only': False}),
-        ({'no_timestamp': False}, {'log_timestamp': True}),
-        ({'no_timestamp': True}, {'log_timestamp': False}),
-        ({'debug': True}, {'verbosity': 2}),
-        ({'debug': False}, {'verbosity': 0}),
+        ([{'rm': ''}, 'clean'], {'rm_dirs': ''}),
+        ([{'rm': 'work share'}, 'clean'], {'rm_dirs': 'work share'}),
+        ([{'local_only': True}, 'clean'], {'local_only': True}),
+        ([{'remote_only': False}, 'clean'], {'remote_only': False}),
+        ([{'no_timestamp': False}, 'clean'], {'log_timestamp': True}),
+        ([{'no_timestamp': True}, 'clean'], {'log_timestamp': False}),
+        ([{'debug': True}, 'clean'], {'verbosity': 2}),
+        ([{'debug': False}, 'clean'], {'verbosity': 0}),
     ]
 )
 def test__schema_opts_to_api_opts(schema_opts, expect):
     """It converts items correctly.
     """
-    result = _schema_opts_to_api_opts(schema_opts)
+    result = _schema_opts_to_api_opts(*schema_opts)
     assert SimpleNamespace(**expect) == result
 
 
@@ -39,7 +39,7 @@ def test__schema_opts_to_api_opts_fails():
     with pytest.raises(
         InvalidSchemaOptionError, match='^foo is not a valid.*$'
     ):
-        _schema_opts_to_api_opts({'foo': 254})
+        _schema_opts_to_api_opts({'foo': 254}, 'clean')
 
 
 @pytest.mark.parametrize(

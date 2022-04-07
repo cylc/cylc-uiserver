@@ -48,6 +48,7 @@ if TYPE_CHECKING:
 
 # show traceback from cylc commands
 DEBUG = True
+CLEAN = 'clean'
 
 
 def snake_to_kebab(snake):
@@ -134,7 +135,9 @@ def _build_cmd(cmd: List, args: Dict) -> List:
     return cmd
 
 
-def _schema_opts_to_api_opts(schema_opts: Dict) -> SimpleNamespace:
+def _schema_opts_to_api_opts(
+    schema_opts: Dict, schema: str
+) -> SimpleNamespace:
     """Convert Schema opts to api Opts
 
     Contains data SCHEMA_TO_API:
@@ -144,37 +147,35 @@ def _schema_opts_to_api_opts(schema_opts: Dict) -> SimpleNamespace:
 
     Args:
         schema_opts: Opts as described by the schema.
+        schema: Name of schema for conversion - used to select
+            converter functions from SCHEMA_TO_API.
 
     Returns:
         Namespace for use as options.
-
-    TODO:
-        So far only `cylc clean` has been added. It may become necessary
-        to separate the SCHEMA_TO_API dict into GENERIC_SCHEMA_TO_API and
-        <COMMAND>_SCHEMA_TO_API, and add a kwarg indicating which
-        additional schema to use.
-
     """
-    SCHEMA_TO_API: Dict[str, Union[Callable, None]] = {
-        'rm': lambda opt, value: ('rm_dirs', value),
-        'local_only': None,
-        'remote_only': None,
-        'debug':
-            lambda opt, value:
-                ('verbosity', 2) if value is True else ('verbosity', 0),
-        'no_timestamp': lambda opt, value: ('log_timestamp', not value),
+    OPT_CONVERTERS: Dict[str, Dict[str, Union[Callable, None]]] = {
+        CLEAN: {
+            'rm': lambda opt, value: ('rm_dirs', value),
+            'local_only': None,
+            'remote_only': None,
+            'debug':
+                lambda opt, value:
+                    ('verbosity', 2) if value is True else ('verbosity', 0),
+            'no_timestamp': lambda opt, value: ('log_timestamp', not value),
+        }
     }
+    converters = OPT_CONVERTERS[schema]
     api_opts = {}
     for opt, value in schema_opts.items():
         # All valid options should be in SCHEMA_TO_API:
-        if opt not in SCHEMA_TO_API:
+        if opt not in converters:
             raise InvalidSchemaOptionError(
                 f'{opt} is not a valid option for Cylc Clean'
             )
 
         # If converter is callable, call it on opt, value,
         # else just copy them verbatim to api_opts
-        converter = SCHEMA_TO_API[opt]
+        converter = converters[opt]
         if callable(converter):
             api_opt_name, api_opt_value = converter(opt, value)
             api_opts[api_opt_name] = api_opt_value
@@ -217,7 +218,7 @@ class Services:
 
         # Convert Schema options → cylc.flow.workflow_files.init_clean opts:
         try:
-            opts = _schema_opts_to_api_opts(args)
+            opts = _schema_opts_to_api_opts(args, schema=CLEAN)
         except Exception as exc:
             return cls._error(exc)
         # Hard set remote timeout.
