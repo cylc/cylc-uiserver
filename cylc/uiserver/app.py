@@ -293,22 +293,6 @@ class CylcUIServer(ExtensionApp):
             Takes effect on (re)start.
         '''
     )
-    logging_config = PathType(
-        config=True,
-        help='''
-            Set the path to a logging config JSON file.
-
-            This configures what gets logged where.
-
-            For more information on logging configuration see:
-            https://docs.python.org/3/library/logging.config.html
-
-            Currently only JSON format is supported.
-
-            If unspecified the default config located in
-            ``cylc/uiserver/logging_config.json`` will apply.
-        '''
-    )
     scan_interval = Float(
         config=True,
         help='''
@@ -377,10 +361,6 @@ class CylcUIServer(ExtensionApp):
             return ui_path
 
         raise Exception(f'Could not find UI build in {ui_path}')
-
-    @default('logging_config')
-    def _default_logging_config(self):
-        return Path(Path(uis_pkg).parent / 'logging_config.json')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
