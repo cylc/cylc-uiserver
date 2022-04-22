@@ -19,8 +19,12 @@ from cylc.uiserver import config_util
 
 import pytest
 
+from cylc.flow.cfgspec.globalcfg import GlobalConfig
 from cylc.uiserver import __file__ as UIS_PKG
-from cylc.uiserver.config_util import get_conf_dir_hierarchy
+from cylc.uiserver.config_util import (
+    UISERVER_DIR,
+    get_conf_dir_hierarchy,
+)
 from cylc.uiserver.jupyterhub_config import load
 
 
@@ -30,7 +34,7 @@ SITE_CONF = Path('/etc/cylc/uiserver')
 
 
 @pytest.fixture
-def clear_env(monkeypatch):
+def clear_env(monkeypatch: pytest.MonkeyPatch):
     for envvar in ('CYLC_SITE_CONF_PATH',):
         if envvar in os.environ:
             monkeypatch.delenv(envvar)
@@ -48,16 +52,21 @@ def capload(monkeypatch):
     return files
 
 
-def test_config(clear_env, capload, monkeypatch):
+def test_config(clear_env, capload: list, monkeypatch: pytest.MonkeyPatch):
     """It should load the system, site and user configs in that order."""
     monkeypatch.setattr(config_util, '__version__', '0')
+    # This constant was set before clear_env took effect:
+    monkeypatch.setattr(
+        'cylc.uiserver.jupyterhub_config.SITE_CONF_ROOT',
+        Path(GlobalConfig.DEFAULT_SITE_CONF_PATH, UISERVER_DIR)
+    )
     load()
     assert capload == [
         SYS_CONF,
-        (SITE_CONF/'jupyter_config.py'),
-        (SITE_CONF/'0/jupyter_config.py'),
-        (USER_CONF/'jupyter_config.py'),
-        (USER_CONF/'0/jupyter_config.py')
+        (SITE_CONF / 'jupyter_config.py'),
+        (SITE_CONF / '0/jupyter_config.py'),
+        (USER_CONF / 'jupyter_config.py'),
+        (USER_CONF / '0/jupyter_config.py')
     ]
 
 
@@ -70,8 +79,8 @@ def test_cylc_site_conf_path(clear_env, capload, monkeypatch):
         SYS_CONF,
         Path('elephant/uiserver/jupyter_config.py'),
         Path('elephant/uiserver/0/jupyter_config.py'),
-        Path(USER_CONF/'jupyter_config.py'),
-        Path(USER_CONF/'0/jupyter_config.py')
+        Path(USER_CONF / 'jupyter_config.py'),
+        Path(USER_CONF / '0/jupyter_config.py')
     ]
 
 
