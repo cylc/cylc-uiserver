@@ -40,7 +40,6 @@ LOG = logging.getLogger('cylc')
 
 # --- workflow_request
 
-@pytest.mark.asyncio
 async def test_workflow_request_client_timeout(
         async_client: AsyncClientFixture):
     async_client.will_return(ClientTimeout)
@@ -49,7 +48,6 @@ async def test_workflow_request_client_timeout(
     assert 'timeout' in msg.lower()  # type: ignore[attr-defined]
 
 
-@pytest.mark.asyncio
 async def test_workflow_request_client_error(
         async_client: AsyncClientFixture, caplog):
     caplog.set_level(logging.CRITICAL, logger='cylc')
@@ -59,7 +57,6 @@ async def test_workflow_request_client_error(
     assert not msg
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "returns,command,req_context,expected_ctx,expected_msg",
     [
@@ -125,7 +122,6 @@ def mk_flow(path, reg, active=True, database=True):
             )
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     # generate all possible normal state changes
     'active_before,active_after',
@@ -169,7 +165,6 @@ async def test_workflow_state_changes(tmp_path, active_before, active_after):
     'active_before,active_after',
     product([True, False], repeat=2)
 )
-@pytest.mark.asyncio
 async def test_workflow_state_change_uuid(
     tmp_path,
     active_before,
@@ -229,7 +224,6 @@ async def test_workflow_state_change_uuid(
         assert changes[0][3][CFF.UUID] == '42'
 
 
-@pytest.mark.asyncio
 async def test_multi_request(
     workflows_manager,
     async_client: AsyncClientFixture
@@ -259,7 +253,6 @@ async def test_multi_request(
     assert value == response[0]
 
 
-@pytest.mark.asyncio
 async def test_multi_request_gather_errors(
     workflows_manager,
     async_client: AsyncClientFixture,

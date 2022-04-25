@@ -72,27 +72,6 @@ def async_client():
     return AsyncClientFixture()
 
 
-@pytest.fixture(scope='module')
-def event_loop():
-    """This fixture defines the event loop used for each test.
-
-    The overrides the default function-scope for this pytest-asyncio fixture,
-    allowing module scoped async fixtures. It means all tests in a module
-    will run in the same event loop. This is fine, it's actually an
-    efficiency win but also something to be aware of.
-
-    See: https://github.com/pytest-dev/pytest-asyncio/issues/171
-    """
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    # gracefully exit async generators
-    loop.run_until_complete(loop.shutdown_asyncgens())
-    # cancel any tasks still running in this event loop
-    for task in asyncio.all_tasks(loop):
-        task.cancel()
-    loop.close()
-
-
 @pytest.fixture
 def workflows_manager() -> WorkflowsManager:
     return WorkflowsManager(None, logging.getLogger('cylc'))
