@@ -216,10 +216,8 @@ async def test_workflow_connect_fail(
     """
     # patch the zmq logic so that the connection doesn't fail at the first
     # hurdle
-    def _null(*args, **kwargs): pass
     monkeypatch.setattr(
-        'cylc.flow.network.ZMQSocketBase._socket_bind',
-        _null,
+        'cylc.flow.network.ZMQSocketBase._socket_bind', lambda *a, **k: None,
     )
 
     # start a ZMQ REPLY socket in order to claim an unused port

@@ -18,7 +18,6 @@
 from functools import partial
 
 import pytest
-
 from tornado.httpclient import HTTPClientError
 
 

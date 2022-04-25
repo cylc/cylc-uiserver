@@ -72,9 +72,17 @@ def async_client():
     return AsyncClientFixture()
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def event_loop():
-    """This fixture defines the event loop used for each test."""
+    """This fixture defines the event loop used for each test.
+
+    The overrides the default function-scope for this pytest-asyncio fixture,
+    allowing module scoped async fixtures. It means all tests in a module
+    will run in the same event loop. This is fine, it's actually an
+    efficiency win but also something to be aware of.
+
+    See: https://github.com/pytest-dev/pytest-asyncio/issues/171
+    """
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     # gracefully exit async generators
@@ -212,7 +220,7 @@ def authorisation_false(monkeypatch):
 
 
 @pytest.fixture
-def mock_authentication(monkeypatch):
+def mock_authentication(monkeypatch: pytest.MonkeyPatch):
 
     def _mock_authentication(user=None, server=None, none=False):
         ret = {
@@ -293,7 +301,6 @@ def patch_conf_files(monkeypatch):
     monkeypatch.setattr(
         'cylc.uiserver.app.CylcUIServer.config_file_paths', []
     )
-    yield
 
 
 @pytest.fixture
