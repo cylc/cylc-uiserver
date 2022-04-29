@@ -127,6 +127,10 @@ def _build_cmd(cmd: List, args: Dict) -> List:
         It doesn't append args == False:
             >>> _build_cmd(['foo', 'bar'], {'set_baz': False})
             ['foo', 'bar']
+
+        It doesn't add boolean values, just the switch
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': True})
+            ['foo', 'bar', '--set-baz']
     """
     for key, value in args.items():
         if value is False:
@@ -134,7 +138,7 @@ def _build_cmd(cmd: List, args: Dict) -> List:
             continue
         key = snake_to_kebab(key)
         if not isinstance(value, list):
-            if isinstance(value, int):
+            if isinstance(value, int) and not isinstance(value, bool):
                 # Any integer items need converting to strings:
                 value = str(value)
             value = [value]
