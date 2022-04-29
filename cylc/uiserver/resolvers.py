@@ -231,6 +231,7 @@ class Services:
         for tokens in workflows:
             clean_func = partial(_clean, tokens, opts)
             try:
+                log.info(f'Cleaning {tokens}')
                 future = await asyncio.wrap_future(executor.submit(clean_func))
             except Exception as exc:
                 log.exception(exc)
