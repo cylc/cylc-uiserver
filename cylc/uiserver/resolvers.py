@@ -29,7 +29,7 @@ from typing import (
 from graphql.language.base import print_ast
 
 from cylc.flow.data_store_mgr import WORKFLOW
-from cylc.flow.exceptions import CylcError
+from cylc.flow.exceptions import CylcError, ServiceFileError
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.workflow_files import init_clean
 
@@ -60,6 +60,7 @@ OPT_CONVERTERS: Dict[str, Dict[str, Union[Callable, None]]] = {
         'no_timestamp': lambda opt, value: ('log_timestamp', not value),
     }
 }
+WORKFLOW_RUNNING_MSG = 'You can\'t clean a running workflow'
 
 
 def snake_to_kebab(snake):
@@ -192,8 +193,12 @@ def _schema_opts_to_api_opts(
 def _clean(tokens, opts):
     """Run Cylc Clean using `cylc.flow.workflow_files` api.
     """
-    init_clean(tokens.pop('workflow'), opts)
-    return 'Workflow cleaned'
+    try:
+        init_clean(tokens.pop('workflow'), opts)
+    except ServiceFileError as exc:
+        return WORKFLOW_RUNNING_MSG
+    else:
+        return 'Workflow cleaned'
 
 
 class Services:
@@ -237,7 +242,11 @@ class Services:
                 log.exception(exc)
                 return cls._error(exc)
             else:
-                cls._return(future)
+                if future == WORKFLOW_RUNNING_MSG:
+                    log.error(ServiceFileError(WORKFLOW_RUNNING_MSG))
+                    return cls._error(WORKFLOW_RUNNING_MSG)
+                else:
+                    cls._return(future)
 
         # trigger a re-scan
         await workflows_mgr.update()
