@@ -150,8 +150,19 @@ async def test_update_contact_no_contact_data(
     w_id = Tokens(user='user', workflow='workflow_id').id
     api_version = 0
     await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
-    data_store_mgr._update_contact(w_id=w_id, contact_data=None)
+    assert data_store_mgr._update_contact(w_id=w_id, contact_data=None)
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
+
+
+@pytest.mark.asyncio
+async def test_update_contact_no_workflow(
+    data_store_mgr: DataStoreMgr
+):
+    """Ensure _update_contact doesn't error if the workflow is missing.
+
+    This can happen if the workflow is removed.
+    """
+    assert not data_store_mgr._update_contact(w_id='elephant')
 
 
 @pytest.mark.asyncio
