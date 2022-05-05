@@ -407,6 +407,24 @@ class DataStoreMgr:
         status_msg=None,
         pruned=False,
     ):
+        """Update the data store with information from the contact file.
+
+        Args:
+            w_id: Workflow ID.
+            contact_data: Contact file data dictionary.
+            status: Workflow status (e.g. "running").
+            status_msg: Workflow status message (e.g. "will stop at 2000").
+            pruned: ?
+
+        Returns:
+            True if the contact data is successfully updated or False if
+            the workflow is no longer in the store (e.g. has been removed).
+
+        """
+        if w_id not in self.data:
+            # workflow has been removed - do nothing
+            return False
+
         delta = DELTAS_MAP[ALL_DELTAS]()
         delta.workflow.time = time.time()
         flow = delta.workflow.updated
@@ -442,6 +460,8 @@ class DataStoreMgr:
         self._apply_all_delta(w_id, delta)
         # Queue delta for subscription push
         self._delta_store_to_queues(w_id, ALL_DELTAS, delta)
+
+        return True
 
     def _get_status_msg(self, w_id: str, is_active: bool) -> str:
         """Derive a status message for the workflow.
