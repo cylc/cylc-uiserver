@@ -342,14 +342,19 @@ class Services:
         buffer = []
         while True:
             # TODO proc.poll
+            print('.')
             line = proc.stdout.readline()
             if line:
                 buffer.append(line)
+                if len(buffer) > 20:
+                    yield list(buffer)
+                    buffer.clear()
             else:
                 if buffer:
-                    yield buffer
-                    buffer = []
+                    yield list(buffer)
+                    buffer.clear()
                 await asyncio.sleep(1)
+                # proc.stdout.flush()
         log.info('[EXIT] ' + ' '.join(cmd))
 
 
