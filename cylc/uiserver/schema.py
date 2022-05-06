@@ -30,16 +30,17 @@ from cylc.flow.network.schema import (
     CyclePoint,
     GenericResponse,
     Mutations,
+    NamespaceIDGlob,
     Queries,
     Subscriptions,
     WorkflowID,
     _mut_field,
     sstrip,
 )
+from cylc.uiserver.resolvers import Resolvers, Services
 
 if TYPE_CHECKING:
     from graphql import ResolveInfo
-    from cylc.uiserver.resolvers import Resolvers
 
 
 async def mutator(
@@ -64,6 +65,38 @@ async def mutator(
     )
     res = await resolvers.service(info, command, parsed_workflows, kwargs)
     return GenericResponse(result=res)
+
+
+async def subscriber(
+    root: Optional[Any],
+    info: 'ResolveInfo',
+    *,
+    command: str,
+    workflows: Optional[List[str]] = None,
+    **kwargs: Any,
+):
+    print('# subscriber')
+    if workflows is None:
+        workflows = []
+    parsed_workflows = [Tokens(w_id) for w_id in workflows]
+    if kwargs.get('args', False):
+        kwargs.update(kwargs.get('args', {}))
+        kwargs.pop('args')
+
+    resolvers: 'Resolvers' = (
+        info.context.get('resolvers')  # type: ignore[union-attr]
+    )
+    ret = resolvers.subscription_service(
+        info,
+        command,
+        parsed_workflows,
+        kwargs,
+    )
+    print(f'# subscriber({ret})')
+    # return ret
+    async for item in ret:
+        yield item
+    print('# [exit] subscriber')
 
 
 class RunMode(graphene.Enum):
@@ -258,14 +291,36 @@ class Clean(graphene.Mutation):
     result = GenericScalar()
 
 
+class UISSubscriptions(Subscriptions):
+
+    logs = graphene.List(
+        graphene.String,
+        description=sstrip('''
+            Workflow / job logs.
+        '''),
+        workflows=graphene.List(
+            WorkflowID,
+            required=True,
+        ),
+        tasks=graphene.List(
+            NamespaceIDGlob,
+            required=False,
+        ),
+        resolver=partial(subscriber, command='cat_log'),
+    )
+
+
 class UISMutations(Mutations):
 
     play = _mut_field(Play)
     clean = _mut_field(Clean)
 
 
+
+
+
 schema = graphene.Schema(
     query=Queries,
-    subscription=Subscriptions,
+    subscription=UISSubscriptions,
     mutation=UISMutations
 )
