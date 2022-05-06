@@ -73,19 +73,6 @@ def async_client():
 
 
 @pytest.fixture
-def event_loop():
-    """This fixture defines the event loop used for each test."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    # gracefully exit async generators
-    loop.run_until_complete(loop.shutdown_asyncgens())
-    # cancel any tasks still running in this event loop
-    for task in asyncio.all_tasks(loop):
-        task.cancel()
-    loop.close()
-
-
-@pytest.fixture
 def workflows_manager() -> WorkflowsManager:
     return WorkflowsManager(None, logging.getLogger('cylc'))
 
@@ -212,7 +199,7 @@ def authorisation_false(monkeypatch):
 
 
 @pytest.fixture
-def mock_authentication(monkeypatch):
+def mock_authentication(monkeypatch: pytest.MonkeyPatch):
 
     def _mock_authentication(user=None, server=None, none=False):
         ret = {
@@ -293,7 +280,6 @@ def patch_conf_files(monkeypatch):
     monkeypatch.setattr(
         'cylc.uiserver.app.CylcUIServer.config_file_paths', []
     )
-    yield
 
 
 @pytest.fixture

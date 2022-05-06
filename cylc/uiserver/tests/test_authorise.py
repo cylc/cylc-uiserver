@@ -13,11 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from logging import Logger as log
-from types import SimpleNamespace
 from jupyter_server.extension.application import ExtensionApp
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import patch
 
 from cylc.uiserver.authorise import (
     Authorization,
@@ -345,24 +345,22 @@ def test_get_op_name(mut_field_name, operation, expected_op_name):
         ),
     ],
 )
-@patch("cylc.uiserver.authorise.Authorization.get_permitted_operations")
 @patch("cylc.uiserver.authorise.get_groups")
 def test_is_permitted(
     mocked_get_groups,
-    mocked_get_permitted_operations,
     owner_name,
     user_name,
     get_permitted_operations_is_called,
     expected,
 ):
     mocked_get_groups.side_effect = [([""], []), ([""], [])]
-    mocked_get_permitted_operations.return_value = ["fake_operation"]
     auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF, log)
+    auth_obj.get_permitted_operations = Mock(return_value=["fake_operation"])
     actual = auth_obj.is_permitted(
         access_user=user_name, operation="fake_operation"
     )
     if get_permitted_operations_is_called:
-        mocked_get_permitted_operations.assert_called_with(user_name)
+        auth_obj.get_permitted_operations.assert_called_with(user_name)
     assert actual == expected
 
 
