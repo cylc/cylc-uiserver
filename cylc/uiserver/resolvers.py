@@ -321,6 +321,47 @@ class Services:
         await workflows_mgr.scan()
         return response
 
+    @classmethod
+    async def cat_log(cls, log, workflow, task=None):
+        print('###1')
+        cmd = ['cylc', 'cat-log', '-m', 't', f'{workflow.id}//']
+        if task:
+            cmd += [task]
+        log.info('$ ' + ' '.join(cmd))
+        proc = Popen(
+            cmd,
+            stdin=DEVNULL,
+            stdout=PIPE,
+            stderr=PIPE,
+            text=True,
+            bufsize=0,  # unbuffered
+            # bufsize=1,  # line buffered
+            # universal_newlines=True,
+        )
+        print('###2')
+        buffer = []
+        while True:
+            # TODO proc.poll
+            # TODO pass down subscription close context
+            print('.')
+            line = proc.stdout.readline()
+            if line:
+                # read a new line
+                buffer.append(line)
+                if len(buffer) > 20:
+                    yield list(buffer)
+                    await asyncio.sleep(0)
+                    buffer.clear()
+            else:
+                # nothing new to read
+                if buffer:
+                    yield list(buffer)
+                    await asyncio.sleep(0)
+                    buffer.clear()
+                # wait for more stuff to appear
+                await asyncio.sleep(1)
+        log.info('[EXIT] ' + ' '.join(cmd))
+
 
 class Resolvers(BaseResolvers):
     """UI Server context GraphQL query and mutation resolvers."""
