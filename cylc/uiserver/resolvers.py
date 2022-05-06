@@ -360,6 +360,7 @@ class Services:
                     buffer.clear()
                 # wait for more stuff to appear
                 await asyncio.sleep(1)
+                # proc.stdout.flush()
         log.info('[EXIT] ' + ' '.join(cmd))
 
 
