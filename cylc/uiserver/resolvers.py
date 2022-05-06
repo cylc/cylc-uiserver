@@ -438,10 +438,29 @@ class Resolvers(BaseResolvers):
                 executor=self.executor
             )
 
-        else:
+        elif command == 'play':
             return await Services.play(
                 workflows,
                 kwargs,
                 self.workflows_mgr,
                 log=self.log
             )
+
+        raise Exception()
+
+    async def subscription_service(
+        self,
+        info: 'ResolveInfo',
+        _command: str,
+        workflows: Iterable['Tokens'],
+        kwargs: Dict[str, Any]
+    ):
+        self.log.info('# subscription_service')
+        async for ret in Services.cat_log(
+            self.log,
+            workflows[0],
+            kwargs.get('tasks', [None])[0],
+        ):
+            self.log.info(f'# subscription_service: {ret}')
+            yield ret
+        self.log.info('# [exit] subscription_service')
