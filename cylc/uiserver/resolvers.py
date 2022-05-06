@@ -327,7 +327,8 @@ class Services:
 
     @classmethod
     async def cat_log(cls, log, workflow, task=None):
-        cmd = ['cylc', 'cat-log', f'{workflow.id}//']
+        print('###1')
+        cmd = ['cylc', 'cat-log', '-m', 't', f'{workflow.id}//']
         if task:
             cmd += [task]
         log.info('$ ' + ' '.join(cmd))
@@ -338,23 +339,31 @@ class Services:
             stderr=PIPE,
             text=True,
             bufsize=0,  # unbuffered
+            # bufsize=1,  # line buffered
+            # universal_newlines=True,
         )
+        print('###2')
         buffer = []
         while True:
             # TODO proc.poll
+            # TODO pass down subscription close context
             print('.')
             line = proc.stdout.readline()
             if line:
+                # read a new line
                 buffer.append(line)
                 if len(buffer) > 20:
                     yield list(buffer)
+                    await asyncio.sleep(0)
                     buffer.clear()
             else:
+                # nothing new to read
                 if buffer:
                     yield list(buffer)
+                    await asyncio.sleep(0)
                     buffer.clear()
+                # wait for more stuff to appear
                 await asyncio.sleep(1)
-                # proc.stdout.flush()
         log.info('[EXIT] ' + ' '.join(cmd))
 
 
