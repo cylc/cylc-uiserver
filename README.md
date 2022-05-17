@@ -170,6 +170,13 @@ Jupyter Server can run multiple extensions. To control the extensions that
 are run use the `ServerApp.jpserver_extensions` configuration, see the
 [Jupyter Server configuration documentation](https://jupyter-server.readthedocs.io/en/latest/other/full-config.html#other-full-config).
 
+By default the Cylc part of the UI Server log is written to
+`~/.cylc/uiserver/uiserver.log`.
+
+<!--
+TODO: Link to Jupyter Server logging_config docs when published
+-->
+
 ### UI
 
 The UI can be configured via the "Settings" option in the Dashboard.
