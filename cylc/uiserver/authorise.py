@@ -23,7 +23,6 @@ import os
 import re
 from tornado import web
 from traitlets.config.loader import LazyConfigValue
-from traitlets.traitlets import Bool
 
 from cylc.uiserver.schema import UISMutations
 
@@ -160,9 +159,8 @@ class Authorization:
         Returns:
             Valid configuration dictionary
         """
-        if isinstance(auth_conf, LazyConfigValue) and not auth_conf.to_dict():
-            # no owner user auth - return empty dict
-            return {}
+        if isinstance(auth_conf, LazyConfigValue):
+            return auth_conf.to_dict()
         return auth_conf
 
     def get_owner_site_limits_for_access_user(
@@ -280,7 +278,7 @@ class Authorization:
         )
         return allowed_operations
 
-    def is_permitted(self, access_user: str, operation: str) -> Bool:
+    def is_permitted(self, access_user: str, operation: str) -> bool:
         """Checks if user is permitted to action operation.
 
         Args:
