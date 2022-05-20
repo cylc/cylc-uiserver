@@ -12,7 +12,14 @@ updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
 
 -------------------------------------------------------------------------------
-## __cylc-uiserver-1.0.1 (<span actions:bind='release-date'>Released 2022-05-19</span>)__
+## __cylc-uiserver-1.0.2 (<span actions:bind='release-date'>Released 2022-05-20</span>)__
+
+Updated cylc-ui to 1.2.0
+
+Internal changes, see https://github.com/cylc/cylc-uiserver/milestone/11?closed=1
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.0.1 (<span actions:bind='release-date'>Released 2022-03-23</span>)__
 
 ### Fixes
 
