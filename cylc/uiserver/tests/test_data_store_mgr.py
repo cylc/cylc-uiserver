@@ -252,9 +252,9 @@ async def test_workflow_connect_fail(
         # the connection should fail because our ZMQ socket is not a
         # WorkflowRuntimeServer with the correct endpoints and auth
         assert [record.message for record in caplog.records] == [
-            'connect_workflow(~user/workflow_id)',
+            "[data-store] connect_workflow('~user/workflow_id', <dict>)",
             'failed to connect to ~user/workflow_id',
-            'disconnect_workflow(~user/workflow_id)',
+            "[data-store] disconnect_workflow('~user/workflow_id')",
         ]
     finally:
         # tidy up
