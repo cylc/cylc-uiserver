@@ -245,12 +245,10 @@ class Services:
                 if future == WORKFLOW_RUNNING_MSG:
                     log.error(ServiceFileError(WORKFLOW_RUNNING_MSG))
                     return cls._error(WORKFLOW_RUNNING_MSG)
-                else:
-                    cls._return(future)
 
         # trigger a re-scan
         await workflows_mgr.update()
-        return response
+        return cls._return("Workflow(s) cleaned")
 
     @classmethod
     async def play(cls, workflows, args, workflows_mgr, log):
