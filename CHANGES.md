@@ -10,16 +10,22 @@ creating a new release entry be sure to copy & paste the span tag with the
 `actions:bind` attribute, which is used by a regex to find the text to be
 updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.0.3 (<span actions:bind='release-date'>Released 2022-05-20</span>)__
+
+[Updated cylc-ui to 1.2.1](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-121-released-2022-05-30)
 
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.0.2 (<span actions:bind='release-date'>Released 2022-05-20</span>)__
 
-Updated cylc-ui to 1.2.0
+[Updated cylc-ui to 1.2.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-120-released-2022-05-19)
 
 Internal changes, see https://github.com/cylc/cylc-uiserver/milestone/11?closed=1
 
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.0.1 (<span actions:bind='release-date'>Released 2022-03-23</span>)__
+
+[Updated cylc-ui to 1.1.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-110-released-2022-03-23)
 
 ### Fixes
 
@@ -28,6 +34,8 @@ Fix issues where workflow status could be incorrect.
 
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.0.0 (<span actions:bind='release-date'>Released 2022-02-17</span>)__
+
+[Updated cylc-ui to 1.0.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-100-released-2022-02-17)
 
 ### Enhancements
 
@@ -47,6 +55,8 @@ Suppressed client connection traceback.
 ## __cylc-uiserver-0.6.0 (<span actions:bind='release-date'>Released 2021-11-11</span>)__
 
 Multi-user functionality implemented.
+
+[Updated cylc-ui to 0.6.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-06-released-2021-11-10)
 
 ### Enhancements
 
