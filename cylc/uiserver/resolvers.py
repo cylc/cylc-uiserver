@@ -195,8 +195,8 @@ def _clean(tokens, opts):
     """
     try:
         init_clean(tokens.pop('workflow'), opts)
-    except ServiceFileError:
-        return WORKFLOW_RUNNING_MSG
+    except ServiceFileError as exc:
+        return str(exc).split('\n')[0]
     else:
         return 'Workflow cleaned'
 
