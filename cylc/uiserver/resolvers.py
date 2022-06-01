@@ -223,7 +223,6 @@ class Services:
     @classmethod
     async def clean(cls, workflows, args, workflows_mgr, executor, log):
         """Calls `init_clean`"""
-        response = []
         # Convert Schema options → cylc.flow.workflow_files.init_clean opts:
         try:
             opts = _schema_opts_to_api_opts(args, schema=CLEAN)
