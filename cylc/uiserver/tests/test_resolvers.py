@@ -16,8 +16,8 @@ services = Services()
 @pytest.mark.parametrize(
     'schema_opts, expect',
     [
-        ([{'rm': ''}, 'clean'], {'rm_dirs': ''}),
-        ([{'rm': 'work share'}, 'clean'], {'rm_dirs': 'work share'}),
+        ([{'rm': ''}, 'clean'], {'rm_dirs': ['']}),
+        ([{'rm': 'work:share'}, 'clean'], {'rm_dirs': ['work', 'share']}),
         ([{'local_only': True}, 'clean'], {'local_only': True}),
         ([{'remote_only': False}, 'clean'], {'remote_only': False}),
         ([{'no_timestamp': False}, 'clean'], {'log_timestamp': True}),

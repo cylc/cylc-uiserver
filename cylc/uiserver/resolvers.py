@@ -51,7 +51,9 @@ DEBUG = True
 CLEAN = 'clean'
 OPT_CONVERTERS: Dict[str, Dict[str, Union[Callable, None]]] = {
     CLEAN: {
-        'rm': lambda opt, value: ('rm_dirs', value),
+        'rm': lambda opt, value: (
+            'rm_dirs', [v.strip() for v in value.split(':')]
+        ),
         'local_only': None,
         'remote_only': None,
         'debug':
@@ -186,7 +188,6 @@ def _schema_opts_to_api_opts(
             api_opts[api_opt_name] = api_opt_value
         else:
             api_opts[opt] = value
-
     return SimpleNamespace(**api_opts)
 
 
