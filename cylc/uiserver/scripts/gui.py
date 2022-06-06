@@ -20,10 +20,33 @@ Launch the Cylc GUI as a standalone web app for local use.
 For a multi-user system see `cylc hub`.
 """
 
+import sys
+
+# from cylc.flow.id_cli import parse_id, parse_id_async
+from cylc.flow.exceptions import InputError
+
 from cylc.uiserver import init_log
 from cylc.uiserver.app import CylcUIServer
 
 
 def main(*argv):
     init_log()
-    return CylcUIServer.launch_instance(argv or None)
+    workflow_id = None
+    for arg in argv:
+        if arg.startswith('-'):
+            continue
+        try:
+            # workflow_id, _, _ = parse_id(
+            # arg, constraint='workflows', infer_latest_runs=True)
+
+            # The following line needs to be replaced with the line above in
+            # order to interpret the workflow_id. This, causes problems with
+            # the ServerApp Event loop.
+
+            workflow_id = arg
+            argv = tuple(x for x in argv if x != arg)
+            sys.argv.remove(arg)
+        except InputError:
+            print(f"Workflow '{arg}' does not exist.")
+            break
+    return CylcUIServer.launch_instance(argv or None, workflow_id=workflow_id)

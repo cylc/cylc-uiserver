@@ -126,7 +126,7 @@ class CylcUIServer(ExtensionApp):
 
     name = 'cylc'
     app_name = 'cylc-gui'
-    default_url = "/cylc"
+    subcommands = []
     load_other_extensions = True
     description = '''
     Cylc - A user interface for monitoring and controlling Cylc workflows.
@@ -506,7 +506,11 @@ class CylcUIServer(ExtensionApp):
         """Change the jinja templating environment."""
 
     @classmethod
-    def launch_instance(cls, argv=None, **kwargs):
+    def launch_instance(cls, argv=None, workflow_id=None, **kwargs):
+        if workflow_id:
+            cls.default_url = f"/cylc/#/workflows/{workflow_id}"
+        else:
+            cls.default_url = "/cylc"
         if argv is None:
             # jupyter server isn't expecting to be launched by a Cylc command
             # this patches some internal logic
