@@ -58,7 +58,7 @@ OPT_CONVERTERS: Dict[str, Dict[str, Union[Callable, None]]] = {
         'remote_only': None,
         'debug':
             lambda opt, value:
-                ('verbosity', 2) if value is True else ('verbosity', 0),
+                ('verbosity', 2 if value is True else 0),
         'no_timestamp': lambda opt, value: ('log_timestamp', not value),
     }
 }
