@@ -508,7 +508,6 @@ class CylcUIServer(ExtensionApp):
         for sub in self.data_store_mgr.w_subs.values():
             sub.stop()
         # Shutdown the thread pool executor
-        for executor in self.data_store_mgr.executors.values():
-            executor.shutdown(wait=False)
+        self.data_store_mgr.executor.shutdown(wait=False)
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()
