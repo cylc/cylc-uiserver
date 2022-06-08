@@ -128,10 +128,10 @@ class CylcUIServer(ExtensionApp):
     load_other_extensions = True
     description = '''
     Cylc - A user interface for monitoring and controlling Cylc workflows.
-    '''
+    '''  # type: ignore[assignment]
     examples = '''
         cylc gui    # start the cylc GUI
-    '''
+    '''  # type: ignore[assignment]
     config_file_paths = get_conf_dir_hierarchy(
         [
             SITE_CONF_ROOT,  # site configuration
