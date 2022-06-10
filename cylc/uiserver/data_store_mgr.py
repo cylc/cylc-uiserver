@@ -34,10 +34,9 @@ Subscriptions are currently run in a different thread (via ThreadPoolExecutor).
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from functools import partial
 from pathlib import Path
 import time
-from typing import Optional, Set
+from typing import Dict, Optional, Set
 
 from cylc.flow.id import Tokens
 from cylc.flow.network.server import PB_METHOD_MAP
@@ -85,10 +84,10 @@ class DataStoreMgr:
         self.workflows_mgr = workflows_mgr
         self.log = log
         self.data = {}
-        self.w_subs = {}
+        self.w_subs: Dict[str, WorkflowSubscriber] = {}
         self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown'}
         self.loop = None
-        self.executors = {}
+        self.executor = ThreadPoolExecutor()
         self.delta_queues = {}
 
     @log_call
@@ -148,15 +147,12 @@ class DataStoreMgr:
 
         # Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.
-        self.executors[w_id] = ThreadPoolExecutor()
-        self.executors[w_id].submit(
-            partial(
-                self._start_subscription,
-                w_id,
-                contact_data['name'],
-                contact_data[CFF.HOST],
-                contact_data[CFF.PUBLISH_PORT]
-            )
+        self.executor.submit(
+            self._start_subscription,
+            w_id,
+            contact_data['name'],
+            contact_data[CFF.HOST],
+            contact_data[CFF.PUBLISH_PORT]
         )
         successful_updates = await self._entire_workflow_update(ids=[w_id])
 
@@ -184,9 +180,6 @@ class DataStoreMgr:
         if w_id in self.w_subs:
             self.w_subs[w_id].stop()
             del self.w_subs[w_id]
-        if w_id in self.executors:
-            self.executors[w_id].shutdown(wait=True)
-            del self.executors[w_id]
 
     def get_workflows(self):
         """Return all workflows the data store is currently tracking.
