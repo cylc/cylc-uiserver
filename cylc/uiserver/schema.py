@@ -96,7 +96,7 @@ class CylcVersion(graphene.String):
 class Play(graphene.Mutation):
     class Meta:
         description = sstrip('''
-            Start, resume or un-pause a workflow run.
+            Start, resume or restart a workflow run.
         ''')
         resolver = partial(mutator, command='play')
 
@@ -151,7 +151,9 @@ class Play(graphene.Mutation):
                 Hold all tasks after this cycle point.
             ''')
         )
-        mode = RunMode()
+        mode = RunMode(
+            default_value=RunMode.Live.name  # type: ignore[attr-defined]
+        )
         host = graphene.String(
             description=sstrip('''
                 Specify the host on which to start-up the workflow. If not
