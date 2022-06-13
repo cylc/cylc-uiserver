@@ -142,7 +142,7 @@ class WorkflowsManager:  # noqa: SIM119
             | is_active(is_active=True, filter_stop=False)
             # extract info from the contact file
             | contact_info
-            # ensure contact file is not corrupt
+            # ensure required contact file fields are present
             | validate_contact_info
             # only flows which are using the same api version
             | api_version(f'=={API}')
