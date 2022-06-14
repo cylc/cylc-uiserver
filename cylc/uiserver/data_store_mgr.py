@@ -34,10 +34,9 @@ Subscriptions are currently run in a different thread (via ThreadPoolExecutor).
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from functools import partial
 from pathlib import Path
 import time
-from typing import Optional, Set
+from typing import Dict, Optional, Set
 
 from cylc.flow.id import Tokens
 from cylc.flow.network.server import PB_METHOD_MAP
@@ -54,7 +53,23 @@ from cylc.flow.workflow_files import (
 )
 from cylc.flow.workflow_status import WorkflowStatus
 
+from .utils import fmt_call
 from .workflows_mgr import workflow_request
+
+
+def log_call(fcn):
+    """Decorator for data store methods we want to log."""
+    fcn_name = f'[data-store] {fcn.__name__}'
+
+    def _inner(*args, **kwargs):  # works for serial & async calls
+        nonlocal fcn
+        self = args[0]
+        # log this method call
+        self.log.info(fmt_call(fcn_name, args[1:], kwargs))
+        # then do it
+        return fcn(*args, **kwargs)
+
+    return _inner
 
 
 class DataStoreMgr:
@@ -69,19 +84,19 @@ class DataStoreMgr:
         self.workflows_mgr = workflows_mgr
         self.log = log
         self.data = {}
-        self.w_subs = {}
+        self.w_subs: Dict[str, WorkflowSubscriber] = {}
         self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown'}
         self.loop = None
-        self.executors = {}
+        self.executor = ThreadPoolExecutor()
         self.delta_queues = {}
 
+    @log_call
     async def register_workflow(self, w_id: str, is_active: bool) -> None:
         """Register a new workflow with the data store.
 
         Call this when a new workflow is discovered on the file system
         (e.g. installed).
         """
-        self.log.debug(f'register_workflow({w_id})')
         self.delta_queues[w_id] = {}
 
         # create new entry in the data store
@@ -95,12 +110,12 @@ class DataStoreMgr:
             status_msg=self._get_status_msg(w_id, is_active),
         )
 
+    @log_call
     async def unregister_workflow(self, w_id):
         """Remove a workflow from the data store entirely.
 
         Call this when a workflow is deleted.
         """
-        self.log.debug(f'unregister_workflow({w_id})')
         if w_id in self.data:
             self._update_contact(w_id, pruned=True)
         while any(
@@ -110,6 +125,7 @@ class DataStoreMgr:
             await asyncio.sleep(self.PENDING_DELTA_CHECK_INTERVAL)
         self._purge_workflow(w_id)
 
+    @log_call
     async def connect_workflow(self, w_id, contact_data):
         """Initiate workflow subscriptions.
 
@@ -120,7 +136,6 @@ class DataStoreMgr:
         blocking the main loop.
 
         """
-        self.log.debug(f'connect_workflow({w_id})')
         if self.loop is None:
             self.loop = asyncio.get_running_loop()
 
@@ -132,34 +147,31 @@ class DataStoreMgr:
 
         # Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.
-        self.executors[w_id] = ThreadPoolExecutor()
-        self.executors[w_id].submit(
-            partial(
-                self._start_subscription,
-                w_id,
-                contact_data['name'],
-                contact_data[CFF.HOST],
-                contact_data[CFF.PUBLISH_PORT]
-            )
+        self.executor.submit(
+            self._start_subscription,
+            w_id,
+            contact_data['name'],
+            contact_data[CFF.HOST],
+            contact_data[CFF.PUBLISH_PORT]
         )
         successful_updates = await self._entire_workflow_update(ids=[w_id])
 
         if w_id not in successful_updates:
             # something went wrong, undo any changes to allow for subsequent
             # connection attempts
-            self.log.debug(f'failed to connect to {w_id}')
+            self.log.info(f'failed to connect to {w_id}')
             self.disconnect_workflow(w_id)
             return False
         else:
             # don't update the contact data until we have successfully updated
             self._update_contact(w_id, contact_data)
 
+    @log_call
     def disconnect_workflow(self, w_id):
         """Terminate workflow subscriptions.
 
         Call this when a workflow has stopped.
         """
-        self.log.debug(f'disconnect_workflow({w_id})')
         self._update_contact(
             w_id,
             status=WorkflowStatus.STOPPED.value,
@@ -168,9 +180,6 @@ class DataStoreMgr:
         if w_id in self.w_subs:
             self.w_subs[w_id].stop()
             del self.w_subs[w_id]
-        if w_id in self.executors:
-            self.executors[w_id].shutdown(wait=True)
-            del self.executors[w_id]
 
     def get_workflows(self):
         """Return all workflows the data store is currently tracking.
@@ -190,9 +199,9 @@ class DataStoreMgr:
                 active.add(w_id)
         return active, inactive
 
+    @log_call
     def _purge_workflow(self, w_id):
         """Purge the manager of a workflow's subscription and data."""
-        self.log.debug(f'delete_workflow({w_id})')
         self.disconnect_workflow(w_id)
         if w_id in self.data:
             del self.data[w_id]
@@ -241,7 +250,6 @@ class DataStoreMgr:
                 loop_cnt += 1
                 continue
         if topic == 'shutdown':
-            self.log.debug(f'shutdown({w_id})')
             self._delta_store_to_queues(w_id, topic, delta)
             # update the status to stopped and set the status message
             self._update_contact(
@@ -407,6 +415,24 @@ class DataStoreMgr:
         status_msg=None,
         pruned=False,
     ):
+        """Update the data store with information from the contact file.
+
+        Args:
+            w_id: Workflow ID.
+            contact_data: Contact file data dictionary.
+            status: Workflow status (e.g. "running").
+            status_msg: Workflow status message (e.g. "will stop at 2000").
+            pruned: ?
+
+        Returns:
+            True if the contact data is successfully updated or False if
+            the workflow is no longer in the store (e.g. has been removed).
+
+        """
+        if w_id not in self.data:
+            # workflow has been removed - do nothing
+            return False
+
         delta = DELTAS_MAP[ALL_DELTAS]()
         delta.workflow.time = time.time()
         flow = delta.workflow.updated
@@ -442,6 +468,8 @@ class DataStoreMgr:
         self._apply_all_delta(w_id, delta)
         # Queue delta for subscription push
         self._delta_store_to_queues(w_id, ALL_DELTAS, delta)
+
+        return True
 
     def _get_status_msg(self, w_id: str, is_active: bool) -> str:
         """Derive a status message for the workflow.

@@ -130,10 +130,10 @@ class CylcUIServer(ExtensionApp):
     load_other_extensions = True
     description = '''
     Cylc - A user interface for monitoring and controlling Cylc workflows.
-    '''
+    '''  # type: ignore[assignment]
     examples = '''
         cylc gui    # start the cylc GUI
-    '''
+    '''  # type: ignore[assignment]
     config_file_paths = get_conf_dir_hierarchy(
         [
             SITE_CONF_ROOT,  # site configuration
@@ -519,9 +519,6 @@ class CylcUIServer(ExtensionApp):
         for sub in self.data_store_mgr.w_subs.values():
             sub.stop()
         # Shutdown the thread pool executor
-        for executor in self.data_store_mgr.executors.values():
-            executor.shutdown(wait=False)
-        # Shutdown processpool executor.
-        self.executor.shutdown(wait=False)
+        self.data_store_mgr.executor.shutdown(wait=False)
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()

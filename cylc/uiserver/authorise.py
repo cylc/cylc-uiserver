@@ -23,7 +23,6 @@ import os
 import re
 from tornado import web
 from traitlets.config.loader import LazyConfigValue
-from traitlets.traitlets import Bool
 
 from cylc.uiserver.schema import UISMutations
 
@@ -107,6 +106,11 @@ class Authorization:
         }
         self.owner_dict = self.build_owner_site_auth_conf()
 
+        # lru_cache this method - see flake8-bugbear B019
+        self.get_permitted_operations = lru_cache(maxsize=128)(
+            self._get_permitted_operations
+        )
+
     @staticmethod
     def expand_and_process_access_groups(permission_set: set) -> set:
         """Process a permission set.
@@ -160,9 +164,8 @@ class Authorization:
         Returns:
             Valid configuration dictionary
         """
-        if isinstance(auth_conf, LazyConfigValue) and not auth_conf.to_dict():
-            # no owner user auth - return empty dict
-            return {}
+        if isinstance(auth_conf, LazyConfigValue):
+            return auth_conf.to_dict()
         return auth_conf
 
     def get_owner_site_limits_for_access_user(
@@ -225,8 +228,8 @@ class Authorization:
         allowed_operations.discard("")
         return allowed_operations
 
-    @lru_cache(maxsize=128)  # noqa B019 TODO?
-    def get_permitted_operations(self, access_user: str):
+    # lru_cached - see __init__()
+    def _get_permitted_operations(self, access_user: str):
         """Return permitted operations for given access_user.
 
         Cached for efficiency.
@@ -280,7 +283,7 @@ class Authorization:
         )
         return allowed_operations
 
-    def is_permitted(self, access_user: str, operation: str) -> Bool:
+    def is_permitted(self, access_user: str, operation: str) -> bool:
         """Checks if user is permitted to action operation.
 
         Args:

@@ -127,7 +127,8 @@ def _authorise(
 
     """
     if username == ME or handler.auth.is_permitted(
-            username, Authorization.READ_OPERATION):
+        username, Authorization.READ_OPERATION
+    ):
         return True
     else:
         handler.log.warning(f'Authorization failed for {username}')
@@ -166,12 +167,14 @@ class CylcAppHandler(JupyterHandler):
     3800ceaf9edf33a0171922b93ea3d94f87aa8d91/jupyterhub/
     singleuser/mixins.py#L826
     """
+
+    def initialize(self, auth):
+        self.auth = auth
+
     # Without this, there is no xsrf token from the GET which causes a 403 and
     # a missing _xsrf argument error on the first POST.
     def prepare(self):
         _ = self.xsrf_token
-
-    auth_level = None
 
     @property
     def hub_users(self):
@@ -198,6 +201,9 @@ class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
       multi-user access.
     """
 
+    def initialize(self, *args, **kwargs):
+        return web.StaticFileHandler.initialize(self, *args, **kwargs)
+
     @web.authenticated
     def get(self, path):
         # authenticate the static handler
@@ -210,9 +216,6 @@ class CylcVersionHandler(CylcAppHandler):
 
     Equivalent to running `cylc version --long` in the UIS environment.
     """
-
-    def initialize(self, auth):
-        self.auth = auth
 
     @authorised
     @web.authenticated
@@ -256,9 +259,6 @@ class UserProfileHandler(CylcAppHandler):
     When running standalone we provide something similar to what the hub
     would have returned.
     """
-
-    def initialize(self, auth):
-        self.auth = auth
 
     def set_default_headers(self) -> None:
         super().set_default_headers()

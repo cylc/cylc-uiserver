@@ -54,7 +54,6 @@ def dummy_uis():
     return uis
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     'before,after,actions',
     [

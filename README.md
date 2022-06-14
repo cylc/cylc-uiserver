@@ -167,8 +167,15 @@ for all Cylc-specific configuration options.
 The Cylc UI Server is a
 [Jupyter Server](https://github.com/jupyter-server/jupyter_server) extension.
 Jupyter Server can run multiple extensions. To control the extensions that
-are run use the `ServerApp.jpserver_extensions` configuration, see the 
+are run use the `ServerApp.jpserver_extensions` configuration, see the
 [Jupyter Server configuration documentation](https://jupyter-server.readthedocs.io/en/latest/other/full-config.html#other-full-config).
+
+By default the Cylc part of the UI Server log is written to
+`~/.cylc/uiserver/uiserver.log`.
+
+<!--
+TODO: Link to Jupyter Server logging_config docs when published
+-->
 
 ### UI
 
@@ -214,6 +221,12 @@ Contributions welcome:
    # ~/.cylc/uiserver/jupyter_config.py
    c.CylcUIServer.ui_build_dir = '~/cylc-ui/dist'  # path to build
    ```
+
+Note about testing: unlike cylc-flow, cylc-uiserver uses the
+[pytest-tornasync](https://github.com/eukaryote/pytest-tornasync/) plugin
+instead of [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio).
+This means you should not decorate async test functions with
+`@pytest.mark.asyncio`.
 
 ## Copyright and Terms of Use
 

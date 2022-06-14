@@ -29,7 +29,6 @@ from cylc.uiserver.data_store_mgr import DataStoreMgr
 from .conftest import AsyncClientFixture
 
 
-@pytest.mark.asyncio
 async def test_entire_workflow_update(
     async_client: AsyncClientFixture,
     data_store_mgr: DataStoreMgr,
@@ -61,7 +60,6 @@ async def test_entire_workflow_update(
     assert entire_workflow.workflow.id == w_id_data['workflow'].id
 
 
-@pytest.mark.asyncio
 async def test_entire_workflow_update_ignores_timeout_message(
     async_client: AsyncClientFixture,
     data_store_mgr: DataStoreMgr
@@ -89,7 +87,6 @@ async def test_entire_workflow_update_ignores_timeout_message(
     assert w_id not in data_store_mgr.data
 
 
-@pytest.mark.asyncio
 async def test_entire_workflow_update_gather_error(
     async_client: AsyncClientFixture,
     data_store_mgr: DataStoreMgr,
@@ -128,7 +125,6 @@ async def test_entire_workflow_update_gather_error(
     assert caplog.records[0].exc_info[0] == error_type
 
 
-@pytest.mark.asyncio
 async def test_register_workflow(
     data_store_mgr: DataStoreMgr
 ):
@@ -141,7 +137,6 @@ async def test_register_workflow(
     assert w_id in data_store_mgr.delta_queues
 
 
-@pytest.mark.asyncio
 async def test_update_contact_no_contact_data(
     data_store_mgr: DataStoreMgr
 ):
@@ -150,11 +145,20 @@ async def test_update_contact_no_contact_data(
     w_id = Tokens(user='user', workflow='workflow_id').id
     api_version = 0
     await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
-    data_store_mgr._update_contact(w_id=w_id, contact_data=None)
+    assert data_store_mgr._update_contact(w_id=w_id, contact_data=None)
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
 
 
-@pytest.mark.asyncio
+async def test_update_contact_no_workflow(
+    data_store_mgr: DataStoreMgr
+):
+    """Ensure _update_contact doesn't error if the workflow is missing.
+
+    This can happen if the workflow is removed.
+    """
+    assert not data_store_mgr._update_contact(w_id='elephant')
+
+
 async def test_update_contact_with_contact_data(
     data_store_mgr: DataStoreMgr
 ):
@@ -174,7 +178,6 @@ async def test_update_contact_with_contact_data(
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
 
 
-@pytest.mark.asyncio
 async def test_disconnect_workflow(
     data_store_mgr: DataStoreMgr
 ):
@@ -197,7 +200,6 @@ async def test_disconnect_workflow(
     assert data_store_mgr.data[w_id]['workflow'].api_version == 0
 
 
-@pytest.mark.asyncio
 async def test_workflow_connect_fail(
     data_store_mgr: DataStoreMgr,
     port_range,
@@ -216,10 +218,8 @@ async def test_workflow_connect_fail(
     """
     # patch the zmq logic so that the connection doesn't fail at the first
     # hurdle
-    def _null(*args, **kwargs): pass
     monkeypatch.setattr(
-        'cylc.flow.network.ZMQSocketBase._socket_bind',
-        _null,
+        'cylc.flow.network.ZMQSocketBase._socket_bind', lambda *a, **k: None,
     )
 
     # start a ZMQ REPLY socket in order to claim an unused port
@@ -252,9 +252,9 @@ async def test_workflow_connect_fail(
         # the connection should fail because our ZMQ socket is not a
         # WorkflowRuntimeServer with the correct endpoints and auth
         assert [record.message for record in caplog.records] == [
-            'connect_workflow(~user/workflow_id)',
+            "[data-store] connect_workflow('~user/workflow_id', <dict>)",
             'failed to connect to ~user/workflow_id',
-            'disconnect_workflow(~user/workflow_id)',
+            "[data-store] disconnect_workflow('~user/workflow_id')",
         ]
     finally:
         # tidy up

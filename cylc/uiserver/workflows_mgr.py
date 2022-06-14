@@ -275,7 +275,7 @@ class WorkflowsManager:  # noqa: SIM119
         if wid in self.workflows:
             self.workflows.pop(wid)
 
-    async def update(self):
+    async def update(self) -> None:
         """Scans for workflows, handles any state changes.
 
         Don't call this method directly, call self.scan to queue an update.
@@ -291,7 +291,7 @@ class WorkflowsManager:  # noqa: SIM119
         Between scans workflows can jump from any state to any other state.
 
         """
-        tasks = []
+        tasks: List[asyncio.Task] = []
 
         def run(*coros):
             # start tasks running as soon as possible
