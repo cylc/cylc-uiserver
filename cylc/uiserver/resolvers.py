@@ -51,14 +51,12 @@ DEBUG = True
 CLEAN = 'clean'
 OPT_CONVERTERS: Dict[str, Dict[str, Union[Callable, None]]] = {
     CLEAN: {
-        'rm': lambda opt, value: (
-            'rm_dirs', [v.strip() for v in value.split(':')]
-        ),
+        'rm': lambda opt, value: ('rm_dirs', [value]),
         'local_only': None,
         'remote_only': None,
         'debug':
             lambda opt, value:
-                ('verbosity', 2) if value is True else ('verbosity', 0),
+                ('verbosity', 2 if value is True else 0),
         'no_timestamp': lambda opt, value: ('log_timestamp', not value),
     }
 }
