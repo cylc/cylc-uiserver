@@ -244,18 +244,6 @@ class Clean(graphene.Mutation):
                 Only clean on remote hosts (not the local filesystem).
             ''')
         )
-        debug = graphene.Boolean(
-            default_value=False,
-            description=sstrip('''
-                Output developer information and show exception tracebacks.
-            ''')
-        )
-        no_timestamp = graphene.Boolean(
-            default_value=False,
-            description=sstrip('''
-                Don't timestamp logged messages.
-            ''')
-        )
 
     result = GenericScalar()
 

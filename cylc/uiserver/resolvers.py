@@ -53,8 +53,6 @@ OPT_CONVERTERS: Dict['Options', Dict[
 ]] = {
     CleanOptions: {
         'rm': lambda value: ('rm_dirs', [value] if value else None),
-        'debug': lambda value: ('verbosity', 2 if value else 0),
-        'no_timestamp': lambda value: ('log_timestamp', not value),
     }
 }
 
