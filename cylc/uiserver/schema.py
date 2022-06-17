@@ -225,11 +225,11 @@ class Clean(graphene.Mutation):
         rm = graphene.String(
             default_value='',
             description=sstrip('''
-                Only clean the specified subdirectories (or files) in
-                the run directory, rather than the whole run
+                Only clean the specified subdirectories or files in
+                the run directory, rather than the whole run.
 
-                Can be a colon separated list:
-                E.g. '.service/db:log:share:work'.
+                A colon separated list that accepts globs,
+                e.g. ``.service/db:log:share:work/2020*``.
             ''')
         )
         local_only = graphene.Boolean(
