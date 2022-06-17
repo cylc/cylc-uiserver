@@ -117,6 +117,7 @@ def mk_flow(path, reg, active=True, database=True):
                     f'{CFF.API}={API}',
                     f'{CFF.HOST}=42',
                     f'{CFF.PORT}=42',
+                    f'{CFF.NAME}=42',
                     f'{CFF.UUID}=42'
                 ])
             )

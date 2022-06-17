@@ -41,7 +41,8 @@ from cylc.flow.network.scan import (
     api_version,
     contact_info,
     is_active,
-    scan
+    scan,
+    validate_contact_info
 )
 from cylc.flow.workflow_files import (
     ContactFileFields as CFF,
@@ -141,6 +142,8 @@ class WorkflowsManager:  # noqa: SIM119
             | is_active(is_active=True, filter_stop=False)
             # extract info from the contact file
             | contact_info
+            # ensure required contact file fields are present
+            | validate_contact_info
             # only flows which are using the same api version
             | api_version(f'=={API}')
         )
@@ -148,7 +151,7 @@ class WorkflowsManager:  # noqa: SIM119
         # queue for requesting new scans, valid queued values are:
         # * True  - (stop=True)  The stop signal (stops the scanner)
         # * False - (stop=False) Request a new scan
-        # * None  - The "stopped" signal, sent after the scan task has stooped
+        # * None  - The "stopped" signal, sent after the scan task has stopped
         self._queue: 'asyncio.Queue[Union[bool, None]]' = asyncio.Queue()
 
         # signal that the scanner is stopping, subsequent scan requests
