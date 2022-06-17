@@ -53,6 +53,7 @@ Cylc specific configurations are documented here.
    the environment variable ``CYLC_SITE_CONF_PATH``.
 """
 
+from concurrent.futures import ProcessPoolExecutor
 import getpass
 from pathlib import Path, PurePath
 import sys
@@ -64,6 +65,7 @@ from tornado.web import RedirectHandler
 from traitlets import (
     Dict,
     Float,
+    Int,
     TraitError,
     TraitType,
     Undefined,
@@ -306,6 +308,13 @@ class CylcUIServer(ExtensionApp):
         ''',
         default_value=5.0  # default values as kwargs correctly display in docs
     )
+    max_workers = Int(
+        config=True,
+        help='''
+            Set the maximum number of workers for process pools.
+        ''',
+        default_value=1
+    )
 
     @validate('ui_build_dir')
     def _check_ui_build_dir_exists(self, proposed):
@@ -364,11 +373,13 @@ class CylcUIServer(ExtensionApp):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.executor = ProcessPoolExecutor(max_workers=self.max_workers)
         self.workflows_mgr = WorkflowsManager(self, log=self.log)
         self.data_store_mgr = DataStoreMgr(self.workflows_mgr, self.log)
         self.resolvers = Resolvers(
             self.data_store_mgr,
             log=self.log,
+            executor=self.executor,
             workflows_mgr=self.workflows_mgr,
         )
 

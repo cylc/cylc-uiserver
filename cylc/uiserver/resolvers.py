@@ -15,18 +15,27 @@
 
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
+import asyncio
 from getpass import getuser
 import os
 from copy import deepcopy
+from functools import partial
 from subprocess import Popen, PIPE, DEVNULL
+from types import SimpleNamespace
 from typing import (
-    TYPE_CHECKING, Any, Dict, Iterable, List, Union
+    TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Union
 )
 
 from graphql.language.base import print_ast
 
 from cylc.flow.data_store_mgr import WORKFLOW
+from cylc.flow.exceptions import CylcError, ServiceFileError
 from cylc.flow.network.resolvers import BaseResolvers
+from cylc.flow.workflow_files import init_clean
+
+
+class InvalidSchemaOptionError(CylcError):
+    ...
 
 
 if TYPE_CHECKING:
@@ -39,6 +48,19 @@ if TYPE_CHECKING:
 
 # show traceback from cylc commands
 DEBUG = True
+CLEAN = 'clean'
+OPT_CONVERTERS: Dict[str, Dict[str, Union[Callable, None]]] = {
+    CLEAN: {
+        'rm': lambda opt, value: ('rm_dirs', [value]),
+        'local_only': None,
+        'remote_only': None,
+        'debug':
+            lambda opt, value:
+                ('verbosity', 2 if value is True else 0),
+        'no_timestamp': lambda opt, value: ('log_timestamp', not value),
+    }
+}
+WORKFLOW_RUNNING_MSG = 'You can\'t clean a running workflow'
 
 
 def snake_to_kebab(snake):
@@ -81,6 +103,103 @@ def check_cylc_version(version):
     return ret or out.strip() == version
 
 
+def _build_cmd(cmd: List, args: Dict) -> List:
+    """Add args to command.
+
+    Args:
+        cmd: A base command.
+        args: Args to append to base command.
+
+    Returns: An elaborated command.
+
+    Examples:
+        It adds one arg to a command:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': 'qux'})
+            ['foo', 'bar', '--set-baz', 'qux']
+
+        It adds one integer arg to a command:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': 42})
+            ['foo', 'bar', '--set-baz', '42']
+
+        It adds a list of the same arg to a command:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': ['qux', 'quiz']})
+            ['foo', 'bar', '--set-baz', 'qux', '--set-baz', 'quiz']
+
+        It doesn't append args == False:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': False})
+            ['foo', 'bar']
+
+        It doesn't add boolean values, just the switch
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': True})
+            ['foo', 'bar', '--set-baz']
+    """
+    for key, value in args.items():
+        if value is False:
+            # don't add binary flags
+            continue
+        key = snake_to_kebab(key)
+        if not isinstance(value, list):
+            if isinstance(value, int) and not isinstance(value, bool):
+                # Any integer items need converting to strings:
+                value = str(value)
+            value = [value]
+        for item in value:
+            cmd.append(key)
+            if item is not True:
+                # don't provide values for binary flags
+                cmd.append(item)
+    return cmd
+
+
+def _schema_opts_to_api_opts(
+    schema_opts: Dict, schema: str
+) -> SimpleNamespace:
+    """Convert Schema opts to api Opts
+
+    Contains data SCHEMA_TO_API:
+        A mapping of schema options to functions in the form:
+        def func(schema_key, schema_value):
+            return (option_key, option _value)
+
+    Args:
+        schema_opts: Opts as described by the schema.
+        schema: Name of schema for conversion - used to select
+            converter functions from SCHEMA_TO_API.
+
+    Returns:
+        Namespace for use as options.
+    """
+    converters = OPT_CONVERTERS[schema]
+    api_opts = {}
+    for opt, value in schema_opts.items():
+        # All valid options should be in SCHEMA_TO_API:
+        if opt not in converters:
+            raise InvalidSchemaOptionError(
+                f'{opt} is not a valid option for Cylc Clean'
+            )
+
+        # If converter is callable, call it on opt, value,
+        # else just copy them verbatim to api_opts
+        converter = converters[opt]
+        if callable(converter):
+            api_opt_name, api_opt_value = converter(opt, value)
+            api_opts[api_opt_name] = api_opt_value
+        else:
+            api_opts[opt] = value
+    return SimpleNamespace(**api_opts)
+
+
+def _clean(tokens, opts):
+    """Run Cylc Clean using `cylc.flow.workflow_files` api.
+    """
+    try:
+        init_clean(tokens.pop('workflow'), opts)
+    except ServiceFileError as exc:
+        return str(exc).split('\n')[0]
+    else:
+        return 'Workflow cleaned'
+
+
 class Services:
     """Cylc services provided by the UI Server."""
 
@@ -101,10 +220,38 @@ class Services:
         ]
 
     @classmethod
+    async def clean(cls, workflows, args, workflows_mgr, executor, log):
+        """Calls `init_clean`"""
+        # Convert Schema options → cylc.flow.workflow_files.init_clean opts:
+        try:
+            opts = _schema_opts_to_api_opts(args, schema=CLEAN)
+        except Exception as exc:
+            return cls._error(exc)
+        # Hard set remote timeout.
+        opts.remote_timeout = "600"
+
+        # clean each requested flow
+        for tokens in workflows:
+            clean_func = partial(_clean, tokens, opts)
+            try:
+                log.info(f'Cleaning {tokens}')
+                future = await asyncio.wrap_future(executor.submit(clean_func))
+            except Exception as exc:
+                log.exception(exc)
+                return cls._error(exc)
+            else:
+                if future == WORKFLOW_RUNNING_MSG:
+                    log.error(ServiceFileError(WORKFLOW_RUNNING_MSG))
+                    return cls._error(WORKFLOW_RUNNING_MSG)
+
+        # trigger a re-scan
+        await workflows_mgr.update()
+        return cls._return("Workflow(s) cleaned")
+
+    @classmethod
     async def play(cls, workflows, args, workflows_mgr, log):
         """Calls `cylc play`."""
         response = []
-
         # get ready to run the command
         try:
             # check that the request cylc version is available
@@ -120,23 +267,11 @@ class Services:
 
             # build the command
             cmd = ['cylc', 'play', '--color=never']
-            for key, value in args.items():
-                if value is False:
-                    # don't add binary flags
-                    continue
-                key = snake_to_kebab(key)
-                if not isinstance(value, list):
-                    value = [value]
-                for item in value:
-                    cmd.append(key)
-                    if item is not True:
-                        # don't provide values for binary flags
-                        cmd.append(item)
+            cmd = _build_cmd(cmd, args)
 
         except Exception as exc:
             # oh noes, something went wrong, send back confirmation
             return cls._error(exc)
-
         # start each requested flow
         for tokens in workflows:
             try:
@@ -182,7 +317,6 @@ class Services:
                 return cls._return(
                     'Workflow started'
                 )
-
         # trigger a re-scan
         await workflows_mgr.update()
         return response
@@ -196,11 +330,13 @@ class Resolvers(BaseResolvers):
         data: 'DataStoreMgr',
         log: 'Logger',
         workflows_mgr: 'WorkflowsManager',
+        executor,
         **kwargs
     ):
         super().__init__(data)
         self.log = log
         self.workflows_mgr = workflows_mgr
+        self.executor = executor
 
         # Set extra attributes
         for key, value in kwargs.items():
@@ -252,9 +388,19 @@ class Resolvers(BaseResolvers):
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any]
     ) -> List[Union[bool, str]]:
-        return await Services.play(
-            workflows,
-            kwargs,
-            self.workflows_mgr,
-            log=self.log
-        )
+        if command == 'clean':
+            return await Services.clean(
+                workflows,
+                kwargs,
+                self.workflows_mgr,
+                log=self.log,
+                executor=self.executor
+            )
+
+        else:
+            return await Services.play(
+                workflows,
+                kwargs,
+                self.workflows_mgr,
+                log=self.log
+            )

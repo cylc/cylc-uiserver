@@ -37,6 +37,13 @@ Configure default logging. The UIServer log now goes to
 `~/.cylc/uiserver/uiserver.log` at the `INFO` level by default. See the
 Traitlets `logging_config` "trait" for more information.
 
+## __cylc-uiserver-1.1.0 (<span actions:bind='release-date'></span>)__
+
+### Enhancements
+
+[#323](https://github.com/cylc/cylc-uiserver/pull/323) -
+`cylc clean` made available for runs and files within runs.
+
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.0.1 (<span actions:bind='release-date'>Released 2022-03-23</span>)__
 

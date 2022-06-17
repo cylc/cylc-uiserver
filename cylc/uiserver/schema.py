@@ -211,9 +211,57 @@ class Play(graphene.Mutation):
     result = GenericScalar()
 
 
+class Clean(graphene.Mutation):
+    class Meta:
+        description = sstrip('''
+            Clean a workflow from the run directory.
+        ''')
+        resolver = partial(mutator, command='clean')
+
+    class Arguments:
+        workflows = graphene.List(WorkflowID, required=True)
+        rm = graphene.String(
+            default_value='',
+            description=sstrip('''
+                Only clean the specified subdirectories (or files) in
+                the run directory, rather than the whole run
+
+                Can be a colon separated list:
+                E.g. '.service/db:log:share:work'.
+            ''')
+        )
+        local_only = graphene.Boolean(
+            default_value=False,
+            description=sstrip('''
+                Only clean on the local filesystem (not remote hosts).
+            ''')
+        )
+        remote_only = graphene.Boolean(
+            default_value=False,
+            description=sstrip('''
+                Only clean on remote hosts (not the local filesystem).
+            ''')
+        )
+        debug = graphene.Boolean(
+            default_value=False,
+            description=sstrip('''
+                Output developer information and show exception tracebacks.
+            ''')
+        )
+        no_timestamp = graphene.Boolean(
+            default_value=False,
+            description=sstrip('''
+                Don't timestamp logged messages.
+            ''')
+        )
+
+    result = GenericScalar()
+
+
 class UISMutations(Mutations):
 
     play = _mut_field(Play)
+    clean = _mut_field(Clean)
 
 
 schema = graphene.Schema(
