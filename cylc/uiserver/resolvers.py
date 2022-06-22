@@ -51,7 +51,7 @@ DEBUG = True
 CLEAN = 'clean'
 OPT_CONVERTERS: Dict[str, Dict[str, Union[Callable, None]]] = {
     CLEAN: {
-        'rm': lambda opt, value: ('rm_dirs', [value]),
+        'rm': lambda opt, value: ('rm_dirs', [value] if value else None),
         'local_only': None,
         'remote_only': None,
         'debug':
@@ -235,17 +235,20 @@ class Services:
             clean_func = partial(_clean, tokens, opts)
             try:
                 log.info(f'Cleaning {tokens}')
-                future = await asyncio.wrap_future(executor.submit(clean_func))
+                string = await asyncio.wrap_future(
+                    executor.submit(clean_func)
+                )
             except Exception as exc:
                 log.exception(exc)
                 return cls._error(exc)
             else:
-                if future == WORKFLOW_RUNNING_MSG:
+                if string == WORKFLOW_RUNNING_MSG:
                     log.error(ServiceFileError(WORKFLOW_RUNNING_MSG))
                     return cls._error(WORKFLOW_RUNNING_MSG)
+                log.info(string)
 
         # trigger a re-scan
-        await workflows_mgr.update()
+        await workflows_mgr.scan()
         return cls._return("Workflow(s) cleaned")
 
     @classmethod
@@ -318,7 +321,7 @@ class Services:
                     'Workflow started'
                 )
         # trigger a re-scan
-        await workflows_mgr.update()
+        await workflows_mgr.scan()
         return response
 
 
