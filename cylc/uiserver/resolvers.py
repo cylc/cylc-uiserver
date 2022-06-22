@@ -231,7 +231,7 @@ class Services:
                 return cls._error(msg)
 
         # trigger a re-scan
-        await workflows_mgr.update()
+        await workflows_mgr.scan()
         return cls._return("Workflow(s) cleaned")
 
     @classmethod
@@ -304,7 +304,7 @@ class Services:
                     'Workflow started'
                 )
         # trigger a re-scan
-        await workflows_mgr.update()
+        await workflows_mgr.scan()
         return response
 
 
