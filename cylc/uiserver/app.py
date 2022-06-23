@@ -132,7 +132,7 @@ class CylcUIServer(ExtensionApp):
     Cylc - A user interface for monitoring and controlling Cylc workflows.
     '''  # type: ignore[assignment]
     examples = '''
-        cylc gui    # start the cylc GUI
+        cylc gui [workflow]   # start the cylc GUI [at the workflow page]
     '''  # type: ignore[assignment]
     config_file_paths = get_conf_dir_hierarchy(
         [
