@@ -21,8 +21,8 @@ For a multi-user system see `cylc hub`.
 """
 
 import sys
-
-# from cylc.flow.id_cli import parse_id, parse_id_async
+import asyncio
+from cylc.flow.id_cli import parse_id_async
 from cylc.flow.exceptions import InputError
 
 from cylc.uiserver import init_log
@@ -36,14 +36,13 @@ def main(*argv):
         if arg.startswith('-'):
             continue
         try:
-            # workflow_id, _, _ = parse_id(
-            # arg, constraint='workflows', infer_latest_runs=True)
-
-            # The following line needs to be replaced with the line above in
-            # order to interpret the workflow_id. This, causes problems with
-            # the ServerApp Event loop.
-
-            workflow_id = arg
+            loop = asyncio.new_event_loop()
+            task = loop.create_task(
+                parse_id_async(
+                    arg, constraint='workflows'))
+            loop.run_until_complete(task)
+            loop.close()
+            workflow_id, _, _ = task.result()
             argv = tuple(x for x in argv if x != arg)
             sys.argv.remove(arg)
         except InputError:

@@ -126,7 +126,6 @@ class CylcUIServer(ExtensionApp):
 
     name = 'cylc'
     app_name = 'cylc-gui'
-    subcommands = []
     load_other_extensions = True
     description = '''
     Cylc - A user interface for monitoring and controlling Cylc workflows.

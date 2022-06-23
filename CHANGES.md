@@ -46,6 +46,11 @@ Traitlets `logging_config` "trait" for more information.
 [#323](https://github.com/cylc/cylc-uiserver/pull/323) -
 `cylc clean` made available for runs and files within runs.
 
+### Enhancements
+
+[#370](https://github.com/cylc/cylc-uiserver/pull/370) - Gui command adapted:
+`cylc gui workflow_name` is now supported and will open gui at that workflow.
+
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.0.3 (<span actions:bind='release-date'>Released 2022-05-31</span>)__
 
