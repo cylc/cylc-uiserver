@@ -54,6 +54,7 @@ Cylc specific configurations are documented here.
 """
 
 from concurrent.futures import ProcessPoolExecutor
+import contextlib
 import getpass
 from pathlib import Path, PurePath
 import sys
@@ -525,3 +526,12 @@ class CylcUIServer(ExtensionApp):
         self.data_store_mgr.executor.shutdown(wait=False)
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()
+        self.clean_pid_file()
+
+    @staticmethod
+    def clean_pid_file():
+        """Remove pid file if it exists."""
+        pid_file = Path("~/.cylc/uiserver/pid").expanduser()
+        print(f"Removing Process Id file from {pid_file.parent}.")
+        with contextlib.suppress(FileNotFoundError):
+            pid_file.unlink()

@@ -20,8 +20,13 @@ Launch the Cylc GUI as a standalone web app for local use.
 For a multi-user system see `cylc hub`.
 """
 
-import sys
 import asyncio
+import os
+import sys
+
+from pathlib import Path
+from psutil import pid_exists
+
 from cylc.flow.id_cli import parse_id_async
 from cylc.flow.exceptions import InputError
 
@@ -31,6 +36,10 @@ from cylc.uiserver.app import CylcUIServer
 
 def main(*argv):
     init_log()
+    pid_file = Path("~/.cylc/uiserver/pid").expanduser()
+    check_pid(pid_file)
+    create_pid_file(pid_file)
+
     workflow_id = None
     for arg in argv:
         if arg.startswith('-'):
@@ -49,3 +58,30 @@ def main(*argv):
             print(f"Workflow '{arg}' does not exist.")
             break
     return CylcUIServer.launch_instance(argv or None, workflow_id=workflow_id)
+
+
+def check_pid(pid_file: Path):
+    """Check for process_id file.
+
+    Raises exception if gui is currently running with active process id.
+    """
+    if not pid_file.is_file():
+        return
+    else:
+        pid = pid_file.read_text()
+        try:
+            if pid_exists(int(pid)):
+                raise Exception(f"cylc gui is running at process id: {pid}")
+        except (TypeError, ValueError):
+            try:
+                pid_file.unlink()
+                print(f"Deleting corrupt process id file. {pid_file.parent}")
+            except FileNotFoundError:
+                pass
+
+
+def create_pid_file(pid_file: Path):
+    """Write current process to process id file."""
+    pid = os.getpid()
+    with open(pid_file, "w") as f:
+        f.write(str(pid))
