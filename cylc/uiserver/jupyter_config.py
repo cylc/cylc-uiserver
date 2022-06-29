@@ -41,7 +41,6 @@ c.Spawner.environment = getenv(
     # may be used by Cylc UI developers to use a development UI build
     'CYLC_DEV',
 )
-
 # this auto-spawns uiservers without user interaction
 c.JupyterHub.implicit_spawn_seconds = 0.01
 

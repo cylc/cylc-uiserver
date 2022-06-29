@@ -13,37 +13,59 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import json
 from pathlib import Path
 import pytest
 import os
 
-from cylc.uiserver.scripts.gui import check_pid
+from cylc.uiserver.scripts.gui import update_html_file
 
+@pytest.mark.parametrize(
+    'existing_content,workflow_id,expected_updated_content',
+    [
+        pytest.param(
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#" /> ',
+            None,
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#" /> ',
+            id='existing_no_workflow_new_no_workflow'
+        ),
+        pytest.param(
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#" /> ',
+            'some/workflow',
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workflows/some/workflow" /> ',
+            id='existing_no_workflow_new_workflow'
+        ),
+        pytest.param(
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workflows/some/workflow" /> ',
+            'another/flow',
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workflows/another/flow" /> ',
+            id='existing_workflow_new_workflow'
+        ),
+        pytest.param(
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workflows/some/workflow" /> ',
+            None,
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#" /> ',
+            id='existing_workflow_no_new_workflow'
+        ),
+        pytest.param(
+            'content="1;no url in this file "',
+            'another/flow',
+            'content="1;no url in this file "',
+            id='no_url_no_change'
+        ),
+    ]
+)
+def test_update_html_file_updates_gui_file(
+    existing_content,
+    workflow_id,
+    expected_updated_content,
+    tmp_path):
+    """Tests html file is updated correctly"""
+    Path(tmp_path).mkdir(exist_ok=True)
+    tmp_gui_file = Path(tmp_path / "gui")
+    tmp_gui_file.touch()
+    tmp_gui_file.write_text(existing_content)
+    update_html_file(tmp_gui_file, workflow_id)
+    updated_file_content = tmp_gui_file.read_text()
 
-def test_check_pid_raises_error_for_existing_process(mod_tmp_path):
-    """Tests exisiting process in file raises Exception"""
-    pid = os.getpid()
-    tmp_pid_file = Path(mod_tmp_path/"pid")
-    with open(tmp_pid_file, "w") as f:
-        f.write(str(pid))
-    with pytest.raises(Exception) as exc_msg:
-        check_pid(tmp_pid_file)
-    assert f'cylc gui is running at process id: {pid}' == str(exc_msg.value)
-
-
-def test_checking_no_pid_file_does_not_raise_exception(mod_tmp_path):
-    """Test check with no process id file runs without exception."""
-    tmp_pid_file = Path(mod_tmp_path)
-    try:
-        check_pid(tmp_pid_file)
-    except Exception as ex:
-        pytest.fail(f"check_pid() raised Exception unexpectedly: {ex}")
-
-
-def test_check_junk_in_pid_file_deletes_file(mod_tmp_path):
-    """Tests exisiting process in file raises Exception"""
-    tmp_pid_file = Path(mod_tmp_path/"pid")
-    with open(tmp_pid_file, "w") as f:
-        f.write(str("This is a load of rubbish."))
-    check_pid(tmp_pid_file)
-    assert not tmp_pid_file.exists()
+    assert updated_file_content == expected_updated_content
