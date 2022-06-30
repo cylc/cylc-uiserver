@@ -33,7 +33,7 @@ from cylc.flow.exceptions import (
 )
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.scripts.clean import CleanOptions
-from cylc.flow.workflow_files import init_clean
+from cylc.flow.scripts.clean import run
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
@@ -177,6 +177,19 @@ def _schema_opts_to_api_opts(
     return schema(**api_opts)
 
 
+def _clean(workflow_ids, opts):
+    """Helper funciton to call `cylc clean`.
+
+    Execute this function inside of an "executor" (note this is why we have
+    to set up asynio here).
+    """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop.run_until_complete(
+        run(*workflow_ids, opts=opts)
+    )
+
+
 class Services:
     """Cylc services provided by the UI Server."""
 
@@ -205,30 +218,31 @@ class Services:
         executor: 'Executor',
         log: 'Logger'
     ):
-        """Calls `init_clean`"""
+        """Calls `cylc clean`"""
         # Convert Schema options → cylc.flow.workflow_files.init_clean opts:
         opts = _schema_opts_to_api_opts(args, schema=CleanOptions)
-        # Hard set remote timeout.
-        opts.remote_timeout = "600"
+        opts.remote_timeout = "600"  # Hard set remote timeout.
+        opts.skip_interactive = True  # disable interactive prompts
 
-        # clean each requested flow
-        for tokens in workflows:
-            log.info(f'Cleaning {tokens}')
-            workflow = tokens.pop('workflow')
-            try:
-                await asyncio.wrap_future(
-                    executor.submit(init_clean, workflow, opts)
-                )
-            except Exception as exc:
-                if isinstance(exc, ServiceFileError):  # Expected error
-                    # The "workflow still running" msg is very long
-                    msg = str(exc).split('\n')[0]
-                elif isinstance(exc, WorkflowFilesError):  # Expected error
-                    msg = str(exc)
-                else:  # Unexpected error
-                    msg = f"{type(exc).__name__}: {exc}"
-                    log.exception(msg)
-                return cls._error(msg)
+        # Convert tokens into string IDs
+        workflow_ids = [tokens.workflow_id for tokens in workflows]
+
+        # run cylc clean
+        log.info(f'Cleaning {" ".join(workflow_ids)}')
+        try:
+            await asyncio.get_event_loop().run_in_executor(
+                executor, _clean, workflow_ids, opts
+            )
+        except Exception as exc:
+            if isinstance(exc, ServiceFileError):  # Expected error
+                # The "workflow still running" msg is very long
+                msg = str(exc).split('\n')[0]
+            elif isinstance(exc, WorkflowFilesError):  # Expected error
+                msg = str(exc)
+            else:  # Unexpected error
+                msg = f"{type(exc).__name__}: {exc}"
+                log.exception(msg)
+            return cls._error(msg)
 
         # trigger a re-scan
         await workflows_mgr.scan()
