@@ -178,10 +178,10 @@ def _schema_opts_to_api_opts(
 
 
 def _clean(workflow_ids, opts):
-    """Helper funciton to call `cylc clean`.
+    """Helper function to call `cylc clean`.
 
     Execute this function inside of an "executor" (note this is why we have
-    to set up asynio here).
+    to set up asyncio here).
     """
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
