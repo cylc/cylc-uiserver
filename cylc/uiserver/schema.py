@@ -96,7 +96,7 @@ class CylcVersion(graphene.String):
 class Play(graphene.Mutation):
     class Meta:
         description = sstrip('''
-            Start, resume or un-pause a workflow run.
+            Start, resume or restart a workflow run.
         ''')
         resolver = partial(mutator, command='play')
 
@@ -151,7 +151,9 @@ class Play(graphene.Mutation):
                 Hold all tasks after this cycle point.
             ''')
         )
-        mode = RunMode()
+        mode = RunMode(
+            default_value=RunMode.Live.name  # type: ignore[attr-defined]
+        )
         host = graphene.String(
             description=sstrip('''
                 Specify the host on which to start-up the workflow. If not
@@ -223,11 +225,11 @@ class Clean(graphene.Mutation):
         rm = graphene.String(
             default_value='',
             description=sstrip('''
-                Only clean the specified subdirectories (or files) in
-                the run directory, rather than the whole run
+                Only clean the specified subdirectories or files in
+                the run directory, rather than the whole run.
 
-                Can be a colon separated list:
-                E.g. '.service/db:log:share:work'.
+                A colon separated list that accepts globs,
+                e.g. ``.service/db:log:share:work/2020*``.
             ''')
         )
         local_only = graphene.Boolean(
@@ -240,18 +242,6 @@ class Clean(graphene.Mutation):
             default_value=False,
             description=sstrip('''
                 Only clean on remote hosts (not the local filesystem).
-            ''')
-        )
-        debug = graphene.Boolean(
-            default_value=False,
-            description=sstrip('''
-                Output developer information and show exception tracebacks.
-            ''')
-        )
-        no_timestamp = graphene.Boolean(
-            default_value=False,
-            description=sstrip('''
-                Don't timestamp logged messages.
             ''')
         )
 

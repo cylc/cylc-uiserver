@@ -19,48 +19,42 @@ import asyncio
 from getpass import getuser
 import os
 from copy import deepcopy
-from functools import partial
 from subprocess import Popen, PIPE, DEVNULL
-from types import SimpleNamespace
 from typing import (
-    TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Union
+    TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Tuple, Union
 )
 
 from graphql.language.base import print_ast
 
 from cylc.flow.data_store_mgr import WORKFLOW
-from cylc.flow.exceptions import CylcError, ServiceFileError
+from cylc.flow.exceptions import (
+    ServiceFileError,
+    WorkflowFilesError,
+)
 from cylc.flow.network.resolvers import BaseResolvers
-from cylc.flow.workflow_files import init_clean
-
-
-class InvalidSchemaOptionError(CylcError):
-    ...
-
+from cylc.flow.scripts.clean import CleanOptions
+from cylc.flow.scripts.clean import run
 
 if TYPE_CHECKING:
+    from concurrent.futures import Executor
     from logging import Logger
+    from optparse import Values
     from graphql import ResolveInfo
     from cylc.flow.data_store_mgr import DataStoreMgr
     from cylc.flow.id import Tokens
+    from cylc.flow.option_parsers import Options
     from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
 # show traceback from cylc commands
 DEBUG = True
-CLEAN = 'clean'
-OPT_CONVERTERS: Dict[str, Dict[str, Union[Callable, None]]] = {
-    CLEAN: {
-        'rm': lambda opt, value: ('rm_dirs', [value]),
-        'local_only': None,
-        'remote_only': None,
-        'debug':
-            lambda opt, value:
-                ('verbosity', 2 if value is True else 0),
-        'no_timestamp': lambda opt, value: ('log_timestamp', not value),
+OPT_CONVERTERS: Dict['Options', Dict[
+    str, Callable[[object], Tuple[str, object]]
+]] = {
+    CleanOptions: {
+        'rm': lambda value: ('rm_dirs', [value] if value else None),
     }
 }
-WORKFLOW_RUNNING_MSG = 'You can\'t clean a running workflow'
 
 
 def snake_to_kebab(snake):
@@ -152,8 +146,8 @@ def _build_cmd(cmd: List, args: Dict) -> List:
 
 
 def _schema_opts_to_api_opts(
-    schema_opts: Dict, schema: str
-) -> SimpleNamespace:
+    schema_opts: Dict, schema: 'Options'
+) -> 'Values':
     """Convert Schema opts to api Opts
 
     Contains data SCHEMA_TO_API:
@@ -163,7 +157,7 @@ def _schema_opts_to_api_opts(
 
     Args:
         schema_opts: Opts as described by the schema.
-        schema: Name of schema for conversion - used to select
+        schema: Schema for conversion - used to select
             converter functions from SCHEMA_TO_API.
 
     Returns:
@@ -172,39 +166,35 @@ def _schema_opts_to_api_opts(
     converters = OPT_CONVERTERS[schema]
     api_opts = {}
     for opt, value in schema_opts.items():
-        # All valid options should be in SCHEMA_TO_API:
-        if opt not in converters:
-            raise InvalidSchemaOptionError(
-                f'{opt} is not a valid option for Cylc Clean'
-            )
-
-        # If converter is callable, call it on opt, value,
-        # else just copy them verbatim to api_opts
-        converter = converters[opt]
-        if callable(converter):
-            api_opt_name, api_opt_value = converter(opt, value)
+        # If option has a converter, call it with the value,
+        # else just copy verbatim to api_opts
+        converter = converters.get(opt)
+        if converter is not None:
+            api_opt_name, api_opt_value = converter(value)
             api_opts[api_opt_name] = api_opt_value
         else:
             api_opts[opt] = value
-    return SimpleNamespace(**api_opts)
+    return schema(**api_opts)
 
 
-def _clean(tokens, opts):
-    """Run Cylc Clean using `cylc.flow.workflow_files` api.
+def _clean(workflow_ids, opts):
+    """Helper function to call `cylc clean`.
+
+    Execute this function inside of an "executor" (note this is why we have
+    to set up asyncio here).
     """
-    try:
-        init_clean(tokens.pop('workflow'), opts)
-    except ServiceFileError as exc:
-        return str(exc).split('\n')[0]
-    else:
-        return 'Workflow cleaned'
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop.run_until_complete(
+        run(*workflow_ids, opts=opts)
+    )
 
 
 class Services:
     """Cylc services provided by the UI Server."""
 
     @staticmethod
-    def _error(message):
+    def _error(message: Union[Exception, str]):
         """Format error case response."""
         return [
             False,
@@ -212,7 +202,7 @@ class Services:
         ]
 
     @staticmethod
-    def _return(message):
+    def _return(message: str):
         """Format success case response."""
         return [
             True,
@@ -220,32 +210,42 @@ class Services:
         ]
 
     @classmethod
-    async def clean(cls, workflows, args, workflows_mgr, executor, log):
-        """Calls `init_clean`"""
+    async def clean(
+        cls,
+        workflows: Iterable['Tokens'],
+        args: dict,
+        workflows_mgr: 'WorkflowsManager',
+        executor: 'Executor',
+        log: 'Logger'
+    ):
+        """Calls `cylc clean`"""
         # Convert Schema options → cylc.flow.workflow_files.init_clean opts:
-        try:
-            opts = _schema_opts_to_api_opts(args, schema=CLEAN)
-        except Exception as exc:
-            return cls._error(exc)
-        # Hard set remote timeout.
-        opts.remote_timeout = "600"
+        opts = _schema_opts_to_api_opts(args, schema=CleanOptions)
+        opts.remote_timeout = "600"  # Hard set remote timeout.
+        opts.skip_interactive = True  # disable interactive prompts
 
-        # clean each requested flow
-        for tokens in workflows:
-            clean_func = partial(_clean, tokens, opts)
-            try:
-                log.info(f'Cleaning {tokens}')
-                future = await asyncio.wrap_future(executor.submit(clean_func))
-            except Exception as exc:
-                log.exception(exc)
-                return cls._error(exc)
-            else:
-                if future == WORKFLOW_RUNNING_MSG:
-                    log.error(ServiceFileError(WORKFLOW_RUNNING_MSG))
-                    return cls._error(WORKFLOW_RUNNING_MSG)
+        # Convert tokens into string IDs
+        workflow_ids = [tokens.workflow_id for tokens in workflows]
+
+        # run cylc clean
+        log.info(f'Cleaning {" ".join(workflow_ids)}')
+        try:
+            await asyncio.get_event_loop().run_in_executor(
+                executor, _clean, workflow_ids, opts
+            )
+        except Exception as exc:
+            if isinstance(exc, ServiceFileError):  # Expected error
+                # The "workflow still running" msg is very long
+                msg = str(exc).split('\n')[0]
+            elif isinstance(exc, WorkflowFilesError):  # Expected error
+                msg = str(exc)
+            else:  # Unexpected error
+                msg = f"{type(exc).__name__}: {exc}"
+                log.exception(msg)
+            return cls._error(msg)
 
         # trigger a re-scan
-        await workflows_mgr.update()
+        await workflows_mgr.scan()
         return cls._return("Workflow(s) cleaned")
 
     @classmethod
@@ -318,7 +318,7 @@ class Services:
                     'Workflow started'
                 )
         # trigger a re-scan
-        await workflows_mgr.update()
+        await workflows_mgr.scan()
         return response
 
 
