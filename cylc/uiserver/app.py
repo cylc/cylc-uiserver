@@ -54,7 +54,9 @@ Cylc specific configurations are documented here.
 """
 
 from concurrent.futures import ProcessPoolExecutor
+from contextlib import suppress
 import getpass
+import json
 import os
 from pathlib import Path, PurePath
 import sys
@@ -107,6 +109,9 @@ from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 INFO_FILES_DIR = Path(USER_CONF_ROOT / "info_files")
+
+
+API_INFO_FILE = f'{USER_CONF_ROOT / "api_info.json"}'
 
 
 class PathType(TraitType):
@@ -409,6 +414,10 @@ class CylcUIServer(ExtensionApp):
                 for key, value in self.config['CylcUIServer'].items()
             )
         )
+        # Make API token available to server's user.
+        # Do it here to avoid overwriting via server start attempt,
+        # when server already running.
+        self.write_api_info()
         # start the async scan task running (do this on server start not init)
         ioloop.IOLoop.current().add_callback(
             self.workflows_mgr.run
@@ -515,6 +524,22 @@ class CylcUIServer(ExtensionApp):
     def initialize_templates(self):
         """Change the jinja templating environment."""
 
+    def write_api_info(self):
+        api_info = self.serverapp.server_info()
+        api_token = os.environ.get("JUPYTERHUB_API_TOKEN")
+        api_url = os.environ.get("JUPYTERHUB_SERVICE_URL")
+        # Could be none, if server not launched by hub.
+        if api_token:
+            api_info['token'] = api_token
+        if api_url:
+            api_info['url'] = api_url
+        Path(API_INFO_FILE).parent.mkdir(parents=True, exist_ok=True)
+        with suppress(FileNotFoundError):
+            os.unlink(API_INFO_FILE)
+        fd = os.open(API_INFO_FILE, os.O_CREAT | os.O_WRONLY, mode=0o600)
+        os.write(fd, json.dumps(api_info).encode("utf-8"))
+        os.close(fd)
+
     @classmethod
     def launch_instance(cls, argv=None, workflow_id=None, **kwargs):
         if workflow_id:
@@ -530,6 +555,9 @@ class CylcUIServer(ExtensionApp):
         del os.environ["JUPYTER_RUNTIME_DIR"]
 
     async def stop_extension(self):
+        # Remove API token if hub spawned
+        with suppress(FileNotFoundError):
+            os.unlink(API_INFO_FILE)
         # stop the async scan task
         await self.workflows_mgr.stop()
         for sub in self.data_store_mgr.w_subs.values():
