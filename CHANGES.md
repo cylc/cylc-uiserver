@@ -13,7 +13,17 @@ ones in. -->
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.1.0 (<span actions:bind='release-date'>Upcoming</span>)__
 
-<!-- [Updated cylc-ui to X](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#X) -->
+[Updated cylc-ui to 1.3.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-130-released-2022-07-27)
+
+### Enhancements
+
+[#349](https://github.com/cylc/cylc-uiserver/pull/349) -
+Configure default logging. The UIServer log now goes to
+`~/.cylc/uiserver/uiserver.log` at the `INFO` level by default. See the
+Traitlets `logging_config` "trait" for more information.
+
+[#323](https://github.com/cylc/cylc-uiserver/pull/323) -
+`cylc clean` made available for runs and files within runs.
 
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.0.3 (<span actions:bind='release-date'>Released 2022-05-31</span>)__
@@ -26,23 +36,6 @@ ones in. -->
 [Updated cylc-ui to 1.2.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-120-released-2022-05-19)
 
 Internal changes, see https://github.com/cylc/cylc-uiserver/milestone/11?closed=1
-
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.1.0 (<span actions:bind='release-date'>Pending Release</span>)__
-
-### Enhancements
-
-[#349](https://github.com/cylc/cylc-uiserver/pull/349) -
-Configure default logging. The UIServer log now goes to
-`~/.cylc/uiserver/uiserver.log` at the `INFO` level by default. See the
-Traitlets `logging_config` "trait" for more information.
-
-## __cylc-uiserver-1.1.0 (<span actions:bind='release-date'></span>)__
-
-### Enhancements
-
-[#323](https://github.com/cylc/cylc-uiserver/pull/323) -
-`cylc clean` made available for runs and files within runs.
 
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.0.1 (<span actions:bind='release-date'>Released 2022-03-23</span>)__
