@@ -28,14 +28,14 @@ from getpass import getuser
 from pathlib import Path
 import sys
 from typing import (
-    TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Union
+    TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Union
 )
 
 import zmq.asyncio
 
 from cylc.flow.id import Tokens
 from cylc.flow.exceptions import ClientError, ClientTimeout
-from cylc.flow.network import API, MSG_TIMEOUT
+from cylc.flow.network import API
 from cylc.flow.network.client import WorkflowRuntimeClient
 from cylc.flow.network.scan import (
     api_version,
@@ -61,11 +61,10 @@ async def workflow_request(
     command: str,
     args: Optional[Dict[str, Any]] = None,
     timeout: Optional[float] = None,
-    req_context: Optional[str] = None,
     *,
     log: Optional['Logger'] = None,
     req_meta: Optional[Dict[str, Any]] = None
-) -> Tuple[str, object]:
+) -> Union[bytes, object]:
     """Workflow request command.
 
     Args:
@@ -73,30 +72,30 @@ async def workflow_request(
         command: Command/Endpoint name.
         args: Endpoint arguments.
         timeout: Client request timeout (secs).
-        req_context: A string to identifier.
         req_meta: Meta data related to request, e.g. auth_user
-
-    Returns:
-        tuple: (req_context, result)
     """
-    if req_context is None:
-        req_context = command
     try:
-        result = await client.async_request(
-            command, args, timeout, req_meta=req_meta)
-        return (req_context, result)
-    except ClientTimeout as exc:
+        return await client.async_request(
+            command, args, timeout, req_meta=req_meta
+        )
+    except (ClientTimeout, ClientError) as exc:
+        # Expected error
         if log:
-            log.exception(exc)
+            log.error(f"{type(exc).__name__}: {exc}")
         else:
             print(exc, file=sys.stderr)
-        return (req_context, MSG_TIMEOUT)
-    except ClientError as exc:
+        exc.workflow = client.workflow
+        raise exc
+    except Exception as exc:
+        # Unexpected error
+        msg = f"Error communicating with {client.workflow}"
         if log:
+            log.error(msg)
             log.exception(exc)
         else:
+            print(msg, file=sys.stderr)
             print(exc, file=sys.stderr)
-        return (req_context, None)
+        raise exc
 
 
 async def run_coros_in_order(*coros):
@@ -364,7 +363,7 @@ class WorkflowsManager:  # noqa: SIM119
         multi_args: Optional[Dict[str, Any]] = None,
         timeout=None,
         req_meta: Optional[Dict[str, Any]] = None
-    ) -> List[object]:
+    ) -> List[Union[bytes, object, Exception]]:
         """Send requests to multiple workflows."""
         if args is None:
             args = {}
@@ -372,43 +371,20 @@ class WorkflowsManager:  # noqa: SIM119
             multi_args = {}
         if req_meta is None:
             req_meta = {}
-        req_args = {
-            w_id: (
+        gathers = [
+            workflow_request(
                 self.workflows[w_id]['req_client'],
                 command,
                 multi_args.get(w_id, args),
                 timeout,
+                log=self.log,
+                req_meta=req_meta
             )
             for w_id in workflows
             # skip stopped workflows
             if self.workflows.get(w_id, {}).get('req_client')
-        }
-        gathers = [
-            workflow_request(
-                *request_args,
-                req_context=info,
-                log=self.log,
-                req_meta=req_meta
-            )
-            for info, request_args in req_args.items()
         ]
-        results = await asyncio.gather(*gathers, return_exceptions=True)
-        res = []
-        for result in results:
-            if isinstance(result, Exception):
-                self.log.exception(
-                    'Failed to send requests to multiple workflows',
-                    exc_info=result
-                )
-            else:
-                _, val = result
-                res.extend([
-                    msg_core
-                    for msg_core in list(val.values())[0].get('result')
-                    if isinstance(val, dict)
-                    and list(val.values())
-                ])
-        return res
+        return await asyncio.gather(*gathers, return_exceptions=True)
 
     async def scan(self):
         """Request a new workflow scan."""

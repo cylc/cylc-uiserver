@@ -38,9 +38,9 @@ from pathlib import Path
 import time
 from typing import Dict, Optional, Set
 
+from cylc.flow.exceptions import WorkflowStopped
 from cylc.flow.id import Tokens
 from cylc.flow.network.server import PB_METHOD_MAP
-from cylc.flow.network import MSG_TIMEOUT
 from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
 from cylc.flow.data_store_mgr import (
     EDGES, DATA_TEMPLATE, ALL_DELTAS, DELTAS_MAP, WORKFLOW,
@@ -330,7 +330,7 @@ class DataStoreMgr:
                     ),
                     self.loop
                 )
-                _, new_delta_msg = future.result(self.RECONCILE_TIMEOUT)
+                new_delta_msg = future.result(self.RECONCILE_TIMEOUT)
                 new_delta = DELTAS_MAP[topic]()
                 new_delta.ParseFromString(new_delta_msg)
                 self._clear_data_field(w_id, topic)
@@ -359,52 +359,41 @@ class DataStoreMgr:
 
         # Request new data
         req_method = 'pb_entire_workflow'
-        req_kwargs = (
-            {
-                'client': info['req_client'],
-                'command': req_method,
-                'req_context': w_id
-            }
+
+        requests = {
+            w_id: workflow_request(
+                client=info['req_client'], command=req_method, log=self.log
+            )
             for w_id, info in self.workflows_mgr.workflows.items()
             if info.get('req_client')  # skip stopped workflows
+            and (not ids or w_id in ids)
+        }
+        results = await asyncio.gather(
+            *requests.values(), return_exceptions=True
         )
-
-        gathers = [
-            workflow_request(**kwargs)
-            for kwargs in req_kwargs
-            if not ids or kwargs['req_context'] in ids
-        ]
-        items = await asyncio.gather(*gathers, return_exceptions=True)
-
         successes: Set[str] = set()
-        for item in items:
-            if isinstance(item, Exception):
-                self.log.exception(
-                    'Failed to update entire local data-store '
-                    'of a workflow', exc_info=item
-                )
-            else:
-                w_id, result = item
-                if result is not None and result != MSG_TIMEOUT:
-                    pb_data = PB_METHOD_MAP[req_method]()
-                    pb_data.ParseFromString(result)
-                    new_data = deepcopy(DATA_TEMPLATE)
-                    for field, value in pb_data.ListFields():
-                        if field.name == WORKFLOW:
-                            new_data[field.name].CopyFrom(value)
-                            new_data['delta_times'] = {
-                                key: value.last_updated
-                                for key in DATA_TEMPLATE
-                            }
-                            continue
-                        new_data[field.name] = {n.id: n for n in value}
-                    self.data[w_id] = new_data
-                    successes.add(w_id)
-                else:
+        for w_id, result in zip(requests, results):
+            if isinstance(result, Exception):
+                if not isinstance(result, WorkflowStopped):
                     self.log.error(
-                        f'Error: communicating with {w_id} - {result}'
+                        'Failed to update entire local data-store '
+                        f'of a workflow: {result}'
                     )
-
+                continue
+            pb_data = PB_METHOD_MAP[req_method]()
+            pb_data.ParseFromString(result)
+            new_data = deepcopy(DATA_TEMPLATE)
+            for field, value in pb_data.ListFields():
+                if field.name == WORKFLOW:
+                    new_data[field.name].CopyFrom(value)
+                    new_data['delta_times'] = {
+                        key: value.last_updated
+                        for key in DATA_TEMPLATE
+                    }
+                    continue
+                new_data[field.name] = {n.id: n for n in value}
+            self.data[w_id] = new_data
+            successes.add(w_id)
         return successes
 
     def _update_contact(
