@@ -470,12 +470,12 @@ class DataStoreMgr:
         if is_active:
             # this will get overridden when we sync with the workflow
             # set a sensible default here incase the sync takes a while
-            return 'Running'
+            return 'running'
         w_id = Tokens(w_id)['workflow']
         db_file = Path(get_workflow_srv_dir(w_id), WorkflowFiles.Service.DB)
         if db_file.exists():
             # the workflow has previously run
-            return 'Stopped'
+            return 'stopped'
         else:
             # the workflow has not yet run
-            return 'Not yet run'
+            return 'not yet run'
