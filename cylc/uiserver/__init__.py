@@ -22,9 +22,10 @@ from cylc.uiserver.app import CylcUIServer
 from cylc.uiserver.logging_util import RotatingUISFileHandler
 
 
-LOG = RotatingUISFileHandler()
-# set up uiserver log
-LOG.on_start()
+def init_log():
+    LOG = RotatingUISFileHandler()
+    # set up uiserver log
+    LOG.on_start()
 
 
 def _jupyter_server_extension_points():

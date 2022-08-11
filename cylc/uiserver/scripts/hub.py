@@ -24,11 +24,13 @@ from jupyterhub.app import main as hub_main
 
 from cylc.uiserver import (
     __version__,
-    __file__ as uis_pkg
+    __file__ as uis_pkg,
+    init_log
 )
 
 
 def main(*args):
+    init_log()
     for arg in args:
         if arg.startswith('-f') or arg.startswith('--config'):
             break
