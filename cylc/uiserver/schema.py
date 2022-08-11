@@ -78,7 +78,7 @@ async def mutator(
     )
     res = await resolvers.service(command, parsed_workflows, kwargs)
     return info.return_type.graphene_type(  # type: ignore[union-attr]
-        result=res
+        result=res # TODO: results
     )
 
 
@@ -109,7 +109,7 @@ class CylcVersion(graphene.String):
     """A Cylc version identifier e.g. 8.0.0"""
 
 
-class Play(graphene.Mutation):
+class Play(graphene.Mutation): # TODO: inherit from cylc.flow.network.schema.WorkflowsMutation?
     class Meta:
         description = sstrip('''
             Start, resume or restart a workflow run.

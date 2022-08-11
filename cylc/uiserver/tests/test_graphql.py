@@ -17,6 +17,7 @@ import json
 from textwrap import dedent
 
 import pytest
+from tornado.httpclient import HTTPClientError
 
 from cylc.flow.id import Tokens
 
@@ -47,12 +48,21 @@ def gql_query(jp_fetch):
             **headers,
             'Content-Type': 'application/json'
         }
-        return await jp_fetch(
-            *endpoint,
-            method='POST',
-            headers=headers,
-            body=json.dumps({'query': query}, indent=4),
-        )
+        try:
+            return await jp_fetch(
+                *endpoint,
+                method='POST',
+                headers=headers,
+                body=json.dumps({'query': query}, indent=4),
+            )
+        except HTTPClientError as exc:
+            # debug info
+            msg = f"{type(exc).__name__}: {exc}"
+            if exc.response:
+                body = json.loads(exc.response.body)
+                for err in body.get('errors', []):
+                    msg += f"\n\n{err}"
+            raise Exception(msg)
 
     return _fetch
 
@@ -122,13 +132,13 @@ async def test_multi(gql_query, monkeypatch, cylc_uis, dummy_workflow):
         query='''
             mutation {
                 hold(workflows: ["*"], tasks: []) {
-                    result
+                    results { workflowId, success }
                 }
                 pause(workflows: ["*"]) {
-                    result
+                    results { workflowId, success }
                 }
                 stop(workflows: ["*"]) {
-                    result
+                    results { workflowId, success }
                 }
             }
         ''',
@@ -141,7 +151,10 @@ async def test_multi(gql_query, monkeypatch, cylc_uis, dummy_workflow):
     assert calls[0][0][2]['request_string'] == dedent('''
         mutation {
           hold(workflows: ["*"], tasks: []) {
-            result
+            results {
+              workflowId
+              success
+            }
           }
         }
     ''').strip()
@@ -149,7 +162,10 @@ async def test_multi(gql_query, monkeypatch, cylc_uis, dummy_workflow):
     assert calls[1][0][2]['request_string'] == dedent('''
         mutation {
           pause(workflows: ["*"]) {
-            result
+            results {
+              workflowId
+              success
+            }
           }
         }
     ''').strip()
@@ -157,7 +173,10 @@ async def test_multi(gql_query, monkeypatch, cylc_uis, dummy_workflow):
     assert calls[2][0][2]['request_string'] == dedent('''
         mutation {
           stop(workflows: ["*"]) {
-            result
+            results {
+              workflowId
+              success
+            }
           }
         }
     ''').strip()
