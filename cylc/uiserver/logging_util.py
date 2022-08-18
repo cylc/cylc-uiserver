@@ -45,12 +45,11 @@ class RotatingUISFileHandler(logging.handlers.RotatingFileHandler):
             self.file_path, f"[0-9]*{self.LOG_NAME_EXTENSION}")), reverse=True)
         while len(log_files) > 4:
             os.unlink(log_files.pop(0))
+        # rename logs, logs sent in descending order to prevent conflicts
         self.rename_logs(log_files)
 
     def rename_logs(self, log_files: List[str]):
         """Increment the log number by one for each log"""
-        # increments each log number, done in descending order to avoid
-        # filename conflicts
         for file in log_files:
             log_num = int(Path(file).name.partition('-')[0]) + 1
             new_file_name = Path(
