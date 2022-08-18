@@ -19,6 +19,8 @@ import logging
 import os
 from pathlib import Path
 
+from typing import List
+
 from cylc.uiserver.app import USER_CONF_ROOT
 
 
@@ -34,25 +36,21 @@ class RotatingUISFileHandler(logging.handlers.RotatingFileHandler):
         """Set up logging"""
         self.file_path.mkdir(parents=True, exist_ok=True)
         self.delete_symlink()
-        self.rename_logs()
-        self.setup_new_log()
         self.update_log_archive()
+        self.setup_new_log()
 
     def update_log_archive(self):
         """Ensure log archive retains only 5 logs"""
-        log_files = sorted(
-            glob(os.path.join(
-                self.file_path, f"*{self.LOG_NAME_EXTENSION}")
-            ), reverse=True)
-        while len(log_files) > 5:
+        log_files = sorted(glob(os.path.join(
+            self.file_path, f"[0-9]*{self.LOG_NAME_EXTENSION}")), reverse=True)
+        while len(log_files) > 4:
             os.unlink(log_files.pop(0))
+        self.rename_logs(log_files)
 
-    def rename_logs(self):
+    def rename_logs(self, log_files: List[str]):
         """Increment the log number by one for each log"""
         # increments each log number, done in descending order to avoid
         # filename conflicts
-        log_files = sorted(glob(os.path.join(
-            self.file_path, f"*{self.LOG_NAME_EXTENSION}")), reverse=True)
         for file in log_files:
             log_num = int(Path(file).name.partition('-')[0]) + 1
             new_file_name = Path(

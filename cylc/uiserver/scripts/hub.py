@@ -24,7 +24,7 @@ from jupyterhub.app import main as hub_main
 
 from cylc.uiserver import (
     __version__,
-    __file__ as uis_pkg,
+    __file__ as uis_pkg
 )
 
 

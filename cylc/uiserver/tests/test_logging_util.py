@@ -38,42 +38,17 @@ def test_update_log_archive(tmp_path):
     ]:
         log_file = LOG.file_path.joinpath(file)
         log_file.touch()
-        # now log files are set up to test.
 
     LOG.update_log_archive()
-    log_files = glob(os.path.join(LOG.file_path, f"*.log"))
+    log_files = glob(os.path.join(LOG.file_path, f"[0-9]*.log"))
     expected_files = [
         f'{LOG.file_path}/05-uiserver.log',
         f'{LOG.file_path}/04-uiserver.log',
         f'{LOG.file_path}/03-uiserver.log',
         f'{LOG.file_path}/02-uiserver.log',
-        f'{LOG.file_path}/01-uiserver.log']
-    assert len(log_files) == 5
+    ]
+    assert len(log_files) == 4
     assert sorted(log_files) == sorted(expected_files)
-
-
-def test_rename_files(tmp_path):
-    """Test logs are renamed correctly"""
-    LOG = RotatingUISFileHandler()
-    LOG.file_path = Path(tmp_path/'.cylc'/'uiserver'/'log')
-    LOG.file_path.mkdir(parents=True, exist_ok=True)
-    for file in [
-        '01-uiserver.log',
-        '02-uiserver.log',
-        ]:
-        log_file = LOG.file_path.joinpath(file)
-        log_file.touch()
-        log_file.write_text(f"File: {file}")
-        # now log files are set up to test.
-
-    LOG.rename_logs()
-    log_files = glob(os.path.join(LOG.file_path, f"*.log"))
-    expected_files = [
-        f'{LOG.file_path}/03-uiserver.log',
-        f'{LOG.file_path}/02-uiserver.log']
-    assert sorted(log_files) == sorted(expected_files)
-    actual_output = Path(LOG.file_path/'03-uiserver.log').read_text() # LOG.file_path/{03-uiserver.log}
-    assert actual_output == f"File: 02-uiserver.log"
 
 
 def test_setup_new_log(tmp_path):
@@ -83,8 +58,37 @@ def test_setup_new_log(tmp_path):
     LOG.file_path.mkdir(parents=True, exist_ok=True)
     LOG.setup_new_log()
     new_log = Path(LOG.file_path / '01-uiserver.log')
-    symlink_log =  Path(LOG.file_path / 'log' )
+    symlink_log = Path(LOG.file_path / 'log')
     assert new_log.exists()
     assert symlink_log.is_symlink()
     assert symlink_log.resolve() == new_log
 
+
+def test_first_init_log(tmp_path):
+    """Check initial setup, no previous logs present"""
+    LOG = RotatingUISFileHandler()
+    LOG.file_path = Path(tmp_path/'.cylc'/'uiserver'/'log')
+    LOG.on_start()
+    assert LOG.file_path.exists()
+    assert Path(LOG.file_path / 'log').is_symlink()
+    assert Path(LOG.file_path / 'log').resolve() == Path(
+        LOG.file_path / '01-uiserver.log')
+
+
+def test_init_log_with_established_setup(tmp_path):
+    """Tests the entire logging init with a typically full logging dir"""
+    LOG = RotatingUISFileHandler()
+    LOG.file_path = Path(tmp_path/'.cylc'/'uiserver'/'log')
+    LOG.file_path.mkdir(parents=True, exist_ok=True)
+    for i in range(1, 5):
+        file = (LOG.file_path / f'{i:02d}-uiserver.log')
+        file.touch()
+        file.write_text(f"This file started as: {file}")
+    symlink_log = Path(LOG.file_path / 'log')
+    symlink_log.symlink_to(LOG.file_path / f'01-uiserver.log')
+    LOG.on_start()
+    log_files = glob(os.path.join(LOG.file_path, f"*.log"))
+    assert len(log_files) == 5
+    actual_output = Path(LOG.file_path/'05-uiserver.log').read_text()
+    expected_output = f"This file started as: {LOG.file_path}/04-uiserver.log"
+    assert actual_output == expected_output
