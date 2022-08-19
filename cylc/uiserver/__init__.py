@@ -17,8 +17,15 @@ __version__ = "1.2.0.dev"
 
 import os
 from typing import Dict
-
 from cylc.uiserver.app import CylcUIServer
+
+from cylc.uiserver.logging_util import RotatingUISFileHandler
+
+
+def init_log():
+    LOG = RotatingUISFileHandler()
+    # set up uiserver log
+    LOG.on_start()
 
 
 def _jupyter_server_extension_points():
