@@ -35,6 +35,18 @@ def launch_instance(cls, argv=None):
 
     At JupyterHub 3.0.0 this incorrectly passes our config file path as second
     arg of Tornado run_sync, which is supposed to be a timeout value.
+
+    Acknowledgment:
+       Code derived from the JupyterHub source (revised BSD license):
+       https://github.com/jupyterhub/jupyterhub/blob/main/jupyterhub/app.py
+       | Copyright (c) Jupyter Development Team.
+       | Distributed under the terms of the Modified BSD License.
+
+    TODO: this can be removed once cylc-uiserver depends on jupyter >= 3.0.1
+    Bug fix:
+        https://github.com/jupyterhub/jupyterhub/pull/4039
+    Reviewer: Will do a 3.0.1 pretty soon after some more 3.0 feedback.
+
     """
     self = cls.instance()
     self._init_asyncio_patch()
