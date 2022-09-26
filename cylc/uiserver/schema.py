@@ -75,7 +75,7 @@ async def subscriber(
     workflows: Optional[List[str]] = None,
     **kwargs: Any,
 ):
-    print('# subscriber')
+    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1# subscriber')
     if workflows is None:
         workflows = []
     parsed_workflows = [Tokens(w_id) for w_id in workflows]
@@ -280,9 +280,13 @@ class Clean(graphene.Mutation):
 
     result = GenericScalar()
 
+async def partial(fcn, *wargs, **wkwargs):
+    async def _inner(*args, **kwargs):
+        nonlocal fcn
+        return await fcn(*wargs, *args, **wkwargs, **kwargs)
+    return _inner
 
 class UISSubscriptions(Subscriptions):
-
     logs = graphene.List(
         graphene.String,
         description=sstrip('''
@@ -298,6 +302,7 @@ class UISSubscriptions(Subscriptions):
         ),
         resolver=partial(subscriber, command='cat_log'),
     )
+    
 
 
 class UISMutations(Mutations):

@@ -323,6 +323,8 @@ class Services:
 
     @classmethod
     async def cat_log(cls, log, workflow, task=None):
+        print("!!!!!!!!!!!!!!!!!!cat log!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
         print('###1')
         cmd = ['cylc', 'cat-log', '-m', 't', f'{workflow.id}//']
         if task:
@@ -455,6 +457,7 @@ class Resolvers(BaseResolvers):
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any]
     ):
+        print("!!!!!!!!!!!!!!!!!!in sub service!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         self.log.info('# subscription_service')
         async for ret in Services.cat_log(
             self.log,
