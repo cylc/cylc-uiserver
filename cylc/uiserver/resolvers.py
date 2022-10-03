@@ -330,6 +330,7 @@ class Services:
         if task:
             cmd += [task]
         log.info('$ ' + ' '.join(cmd))
+        print(f"{cmd}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<cmd is here")
         proc = Popen(
             cmd,
             stdin=DEVNULL,

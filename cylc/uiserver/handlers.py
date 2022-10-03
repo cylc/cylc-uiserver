@@ -348,11 +348,16 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
     @web.authenticated  # type: ignore[arg-type]
     async def execute(self, *args, **kwargs) -> 'ExecutionResult':
         # Use own backend, and TornadoGraphQLHandler already does validation.
+        # subscription = 'subscription { logs }'
+        # result = await self.schema.subscribe(subscription)
+        # async for item in result:
+        #     print(item.data['logs'])
         return await self.schema.execute(
             *args,
             backend=self.backend,
             variable_values=kwargs.get('variables'),
             validate=False,
+            allow_subscriptions=True,
             **kwargs,
         )
 
@@ -364,10 +369,12 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     """Endpoint for performing GraphQL subscriptions."""
     # No authorization decorators here, auth handled in AuthorizationMiddleware
-    def initialize(self, sub_server, resolvers):
+    def initialize(self, sub_server, resolvers,  backend=None, schema=None):
         self.queue = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
+        self.backend = backend or get_default_backend()
+        self.schema = schema
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
@@ -385,7 +392,7 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
             self.context,
         )
 
-    async def on_message(self, message):
+    async def on_message(self, message):     
         await self.queue.put(message)
 
     async def recv(self):

@@ -26,7 +26,4 @@ from cylc.uiserver.app import CylcUIServer
 
 def main(*argv):
     init_log()
-    print("$$$$$$$$$$$$$$$    show me the money   $$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-    import mdb
-    mdb.debug(ui_server=True)
     return CylcUIServer.launch_instance(argv or None)

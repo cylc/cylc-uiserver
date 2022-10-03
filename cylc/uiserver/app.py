@@ -52,7 +52,6 @@ Cylc specific configurations are documented here.
    ``/etc/cylc/uiserver/jupyter_config.py``, or, alternatively, via
    the environment variable ``CYLC_SITE_CONF_PATH``.
 """
-
 from concurrent.futures import ProcessPoolExecutor
 import getpass
 from pathlib import Path, PurePath
@@ -82,6 +81,7 @@ from cylc.flow.network.graphql import (
 from cylc.uiserver import (
     __file__ as uis_pkg,
 )
+print("top if the app file")
 from cylc.uiserver.authorise import (
     Authorization,
     AuthorizationMiddleware
@@ -400,6 +400,8 @@ class CylcUIServer(ExtensionApp):
                 for key, value in self.config['CylcUIServer'].items()
             )
         )
+        import mdb
+        mdb.debug(ui_server=True)
         # start the async scan task running (do this on server start not init)
         ioloop.IOLoop.current().add_callback(
             self.workflows_mgr.run
@@ -455,6 +457,8 @@ class CylcUIServer(ExtensionApp):
                 {
                     'sub_server': self.subscription_server,
                     'resolvers': self.resolvers,
+                    'backend': CylcGraphQLBackend(),
+                    'schema': schema
                 }
             ),
             (

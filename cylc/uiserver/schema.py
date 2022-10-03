@@ -20,7 +20,7 @@ extra functionality specific to the UIS.
 """
 
 from functools import partial
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, AsyncGenerator
 
 import graphene
 from graphene.types.generic import GenericScalar
@@ -36,8 +36,12 @@ from cylc.flow.network.schema import (
     WorkflowID,
     _mut_field,
     sstrip,
+    delta_subs
 )
 from cylc.uiserver.resolvers import Resolvers, Services
+
+from subprocess import (Popen, PIPE, DEVNULL)
+import asyncio
 
 if TYPE_CHECKING:
     from graphql import ResolveInfo
@@ -53,6 +57,8 @@ async def mutator(
 ):
     """Call the resolver method that act on the workflow service
     via the internal command queue."""
+    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1# mutatuoer')
+
     if workflows is None:
         workflows = []
     parsed_workflows = [Tokens(w_id) for w_id in workflows]
@@ -65,38 +71,6 @@ async def mutator(
     )
     res = await resolvers.service(info, command, parsed_workflows, kwargs)
     return GenericResponse(result=res)
-
-
-async def subscriber(
-    root: Optional[Any],
-    info: 'ResolveInfo',
-    *,
-    command: str,
-    workflows: Optional[List[str]] = None,
-    **kwargs: Any,
-):
-    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1# subscriber')
-    if workflows is None:
-        workflows = []
-    parsed_workflows = [Tokens(w_id) for w_id in workflows]
-    if kwargs.get('args', False):
-        kwargs.update(kwargs.get('args', {}))
-        kwargs.pop('args')
-
-    resolvers: 'Resolvers' = (
-        info.context.get('resolvers')  # type: ignore[union-attr]
-    )
-    ret = resolvers.subscription_service(
-        info,
-        command,
-        parsed_workflows,
-        kwargs,
-    )
-    print(f'# subscriber({ret})')
-    # return ret
-    async for item in ret:
-        yield item
-    print('# [exit] subscriber')
 
 
 class RunMode(graphene.Enum):
@@ -279,39 +253,84 @@ class Clean(graphene.Mutation):
         )
 
     result = GenericScalar()
+# async def async_partial(fcn, *wargs, **wkwargs):
+#     print("here i hte in the partial 286 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+#     async def _inner(*args, **kwargs):
+#         nonlocal fcn
+#         return await fcn(*wargs, *args, **wkwargs, **kwargs)
+#     return _inner
 
-async def partial(fcn, *wargs, **wkwargs):
-    async def _inner(*args, **kwargs):
-        nonlocal fcn
-        return await fcn(*wargs, *args, **wkwargs, **kwargs)
-    return _inner
+
+def subscriber(
+    root: Optional[Any],
+    info: 'ResolveInfo',
+    *,
+    # command: "cat_log
+    workflows: Optional[List[str]] = None,
+    **kwargs: Any,
+) -> AsyncGenerator[Any, None]:
+    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1# subscriber')
+    if workflows is None:
+        workflows = []
+    parsed_workflows = [Tokens(w_id) for w_id in workflows]
+    if kwargs.get('args', False):
+        kwargs.update(kwargs.get('args', {}))
+        kwargs.pop('args')
+
+    resolvers: 'Resolvers' = (
+        info.context.get('resolvers')  # type: ignore[union-attr]
+    )
+    ret = resolvers.subscription_service(
+        info,
+        'cat_log',
+        parsed_workflows,
+        kwargs,
+    )
+    print(f'# subscriber({ret})')
+    # return ret
+    for item in ret:
+        print (f">>>>>>>>item is here.....{item}")
+        yield item
+    print('# [exit] subscriber')
+
+
+def my_delta_subs(root, info, **args) -> AsyncGenerator[Any, None]:
+    """Generates the root data from the async gen resolver."""
+    return info.context.get('resolvers').subscribe_delta(root, info, args)
+
 
 class UISSubscriptions(Subscriptions):
-    logs = graphene.List(
+#     # logs = graphene.String()
+
+#     # async def resolve_logs(root, info):
+#     #     print("!!!!!!!!!!!!!!!!!!cat log!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+#     #     yield "moo"
+#     #     await asyncio.sleep(1)
+
+    looogs = graphene.Field(
         graphene.String,
-        description=sstrip('''
-            Workflow / job logs.
-        '''),
+        # description=sstrip('''
+        #     Workflow / job logs.
+        # '''),
+        description=""""Family definitions.""",
         workflows=graphene.List(
-            WorkflowID,
-            required=True,
+            graphene.ID, description="List of full ID, i.e. `~user/workflow_id`"
         ),
-        tasks=graphene.List(
-            NamespaceIDGlob,
-            required=False,
-        ),
-        resolver=partial(subscriber, command='cat_log'),
+        # workflows=graphene.List(
+        #     WorkflowID,
+        #     required=True,
+        # ),
+        # tasks=graphene.List(
+        #     NamespaceIDGlob,
+        #     required=False,
+        # ),
+        resolver=subscriber
     )
-    
 
 
 class UISMutations(Mutations):
-
     play = _mut_field(Play)
     clean = _mut_field(Clean)
-
-
-
 
 
 schema = graphene.Schema(
