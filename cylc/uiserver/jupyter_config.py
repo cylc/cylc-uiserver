@@ -21,8 +21,7 @@ import pkg_resources
 
 from cylc.uiserver import (
     __file__ as uis_pkg,
-    getenv,
-)
+    getenv)
 from cylc.uiserver.app import USER_CONF_ROOT
 
 
@@ -72,7 +71,7 @@ c.CylcUIServer.logging_config = {
         'file': {
             'class': 'logging.handlers.RotatingFileHandler',
             'level': 'INFO',
-            'filename': str(USER_CONF_ROOT / 'uiserver.log'),
+            'filename': str(USER_CONF_ROOT / 'log' / 'log'),
             'mode': 'a',
             'backupCount': 5,
             'maxBytes': 10485760,
