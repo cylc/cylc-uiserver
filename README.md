@@ -8,8 +8,8 @@
 
 # Cylc UI Server
 
-This project contains the Cylc UI Server which provides the Cylc GUI
-used to serve the Cylc UI, and to communicate with running Cylc Schedulers.
+This project contains the Cylc UI Server which serves the Cylc UI
+and communicates with running Cylc Schedulers. It also bundles the GUI.
 
 [Cylc Website](https://cylc.org/) |
 [Contributing](CONTRIBUTING.md) |
@@ -56,22 +56,26 @@ see the
 
 ### For Single-User Setups
 
-```console
-# via conda (preferred)
-$ conda install cylc-uiserver
+Via conda (preferred):
+```bash
+conda install cylc-uiserver
+```
 
-# via pip
-$ pip install cylc-uiserver
+Via pip:
+```bash
+pip install cylc-uiserver
 ```
 
 ### For Multi-User Setups
 
-```console
-# via conda (preferred)
-$ conda install cylc-uiserver-hub
+Via conda (preferred):
+```bash
+conda install cylc-uiserver-hub
+```
 
-# via pip (consult jupyterhub documentation)
-$ pip install cylc-uiserver[hub]
+Via pip (consult jupyterhub documentation):
+```bash
+pip install cylc-uiserver[hub]
 ```
 
 
@@ -87,16 +91,16 @@ Run as a standalone server using a URL token for authentication:
 
 ```bash
 # launch the Cylc GUI and open a browser tab
-cylc gui
+$ cylc gui
 
 # alternatively the same app can be opened with the jupyter command
 $ jupyter cylc
 ```
 
-> By default authentication is provided by the URL token, alternatively a
+> By default, authentication is provided by the URL token. Alternatively, a
 > password can be configured (see Jupyter Server docs).
 >
-> There is no per-user authorisation so anyone who has the URL token has full
+> There is no per-user authorisation, so anyone who has the URL token has full
 > access to the server.
 
 ### For Multi-User Setups
@@ -108,7 +112,7 @@ other users.
 ```bash
 # launch the Cylc Hub
 # (the default URL is http://localhost:8000)
-cylc hub
+$ cylc hub
 ```
 
 > Users then authenticate with the hub which launches and manages their UI
@@ -142,13 +146,13 @@ The Cylc Hub will load the following files in order:
 
 Alternatively a single config file can be provided on the command line.
 
-```console
-$ cylc hub --config
+```bash
+cylc hub --config
 ```
 
 > **Warning:**
 >
-> If specifying a config file on the command line the system config containing
+> If specifying a config file on the command line, the system config containing
 > the hardcoded Cylc default will **not** be loaded.
 
 > **Note:**
@@ -203,8 +207,8 @@ Contributions welcome:
 
 1) Install from source into your Python environment:
 
-   ```console
-   $ pip install -e .[all]
+   ```bash
+   pip install -e .[all]
    ```
 
    > **Note:**
