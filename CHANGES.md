@@ -10,15 +10,26 @@ creating a new release entry be sure to copy & paste the span tag with the
 `actions:bind` attribute, which is used by a regex to find the text to be
 updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
-
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.2.0 (<span actions:bind='release-date'>Upcoming</span>)__
+
+<!-- [Updated cylc-ui to x.y.z](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md) -->
 
 ### Enhancements
 
 [#376](https://github.com/cylc/cylc-uiserver/pull/376) -
 UIServer logs are now archived. The five most recent logs are retained (located
 in `~/.cylc/uiserver/log/`). A new log is created with each UIServer instance.
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.1.1 (<span actions:bind='release-date'>Upcoming</span>)__
+
+Maintenance release.
+
+### Fixes
+
+[#386](https://github.com/cylc/cylc-uiserver/pull/386) - Work around bug in
+JupyterHub 3.0.0 that prevents `cylc hub` from starting.
 
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.1.0 (<span actions:bind='release-date'>Released 2022-07-28</span>)__

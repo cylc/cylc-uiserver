@@ -385,8 +385,8 @@ class WorkflowsManager:  # noqa: SIM119
         }
         gathers = [
             workflow_request(
-                req_context=info,
                 *request_args,
+                req_context=info,
                 log=self.log,
                 req_meta=req_meta
             )

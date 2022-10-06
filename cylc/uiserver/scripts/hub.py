@@ -18,9 +18,11 @@ Launch the Cylc hub for running the Cylc Web GUI.
 """
 
 import os
+import sys
+from unittest.mock import patch
 from pathlib import Path
 
-from jupyterhub.app import main as hub_main
+from jupyterhub.app import JupyterHub
 
 from cylc.uiserver import (
     __version__,
@@ -38,6 +40,14 @@ def main(*args):
     # set an env var flag to help load the config
     os.environ['CYLC_HUB_VERSION'] = __version__
     try:
-        hub_main(args)
+        # JupyterHub 3.0.0 incorrectly passes our config file path as second
+        # arg of Tornado run_sync, which is supposed to be a timeout value.
+        #   https://github.com/jupyterhub/jupyterhub/pull/4039
+        # Reviewer: "Will do a 3.0.1 pretty soon after some more 3.0 feedback."
+        # TODO: once we depend on jupyter >= 3.0.1 can revert to this:
+        #   JupyterHub.launch_instance(args)
+        with patch.object(sys, "argv", [sys.argv[0]] + list(args)):
+            # Patch works via traitlets.config.Application.parse_command_line
+            JupyterHub.launch_instance()
     finally:
         del os.environ['CYLC_HUB_VERSION']
