@@ -36,7 +36,12 @@ from cylc.flow.network.schema import (
     WorkflowID,
     _mut_field,
     sstrip,
-    delta_subs
+    Workflow,
+    Boolean,
+    ID,
+    String,
+    DELTA_ADDED,
+    Float
 )
 from cylc.uiserver.resolvers import Resolvers, Services
 
@@ -57,8 +62,6 @@ async def mutator(
 ):
     """Call the resolver method that act on the workflow service
     via the internal command queue."""
-    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1# mutatuoer')
-
     if workflows is None:
         workflows = []
     parsed_workflows = [Tokens(w_id) for w_id in workflows]
@@ -253,79 +256,57 @@ class Clean(graphene.Mutation):
         )
 
     result = GenericScalar()
-# async def async_partial(fcn, *wargs, **wkwargs):
-#     print("here i hte in the partial 286 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-#     async def _inner(*args, **kwargs):
-#         nonlocal fcn
-#         return await fcn(*wargs, *args, **wkwargs, **kwargs)
-#     return _inner
-
-
-def subscriber(
-    root: Optional[Any],
-    info: 'ResolveInfo',
-    *,
-    # command: "cat_log
-    workflows: Optional[List[str]] = None,
-    **kwargs: Any,
-) -> AsyncGenerator[Any, None]:
-    print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1# subscriber')
-    if workflows is None:
-        workflows = []
-    parsed_workflows = [Tokens(w_id) for w_id in workflows]
-    if kwargs.get('args', False):
-        kwargs.update(kwargs.get('args', {}))
-        kwargs.pop('args')
-
-    resolvers: 'Resolvers' = (
-        info.context.get('resolvers')  # type: ignore[union-attr]
-    )
-    ret = resolvers.subscription_service(
-        info,
-        'cat_log',
-        parsed_workflows,
-        kwargs,
-    )
-    print(f'# subscriber({ret})')
-    # return ret
-    for item in ret:
-        print (f">>>>>>>>item is here.....{item}")
-        yield item
-    print('# [exit] subscriber')
-
-
-def my_delta_subs(root, info, **args) -> AsyncGenerator[Any, None]:
-    """Generates the root data from the async gen resolver."""
-    return info.context.get('resolvers').subscribe_delta(root, info, args)
 
 
 class UISSubscriptions(Subscriptions):
-#     # logs = graphene.String()
-
-#     # async def resolve_logs(root, info):
-#     #     print("!!!!!!!!!!!!!!!!!!cat log!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-#     #     yield "moo"
-#     #     await asyncio.sleep(1)
-
-    looogs = graphene.Field(
+# subscription {
+#   logs(workflows:["foo"])
+# }
+    logs = graphene.List(
         graphene.String,
-        # description=sstrip('''
-        #     Workflow / job logs.
-        # '''),
-        description=""""Family definitions.""",
+        description=sstrip('''
+            Workflow / job logs.
+        '''),
         workflows=graphene.List(
-            graphene.ID, description="List of full ID, i.e. `~user/workflow_id`"
+            WorkflowID,
+            required=True
         ),
-        # workflows=graphene.List(
-        #     WorkflowID,
-        #     required=True,
-        # ),
-        # tasks=graphene.List(
-        #     NamespaceIDGlob,
-        #     required=False,
-        # ),
-        resolver=subscriber
+        tasks=graphene.List(
+            NamespaceIDGlob,
+            required=False
+        )
     )
+
+    async def resolve_logs(
+        root: Optional[Any],
+        info: 'ResolveInfo',
+        *,
+        command='cat_log',
+        workflows: Optional[List[str]] = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[Any, None]:
+        """Cat Log Resolver
+        Expands workflow provided subscription query.
+        """
+
+        if workflows is None:
+            # TODO: Return error here
+            workflows = []
+        parsed_workflows = [Tokens(w_id) for w_id in workflows]
+        if kwargs.get('args', False):
+            kwargs.update(kwargs.get('args', {}))
+            kwargs.pop('args')
+        print(f".............KWARGS ARE HERE: {kwargs}")
+        resolvers: 'Resolvers' = (
+            info.context.get('resolvers')  # type: ignore[union-attr]
+        )
+        async for item in resolvers.subscription_service(
+            info,
+            command,
+            parsed_workflows,
+            kwargs,
+        ):
+            yield item
 
 
 class UISMutations(Mutations):

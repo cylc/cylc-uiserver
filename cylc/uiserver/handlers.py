@@ -348,16 +348,11 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
     @web.authenticated  # type: ignore[arg-type]
     async def execute(self, *args, **kwargs) -> 'ExecutionResult':
         # Use own backend, and TornadoGraphQLHandler already does validation.
-        # subscription = 'subscription { logs }'
-        # result = await self.schema.subscribe(subscription)
-        # async for item in result:
-        #     print(item.data['logs'])
         return await self.schema.execute(
             *args,
             backend=self.backend,
             variable_values=kwargs.get('variables'),
             validate=False,
-            allow_subscriptions=True,
             **kwargs,
         )
 
@@ -386,13 +381,19 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
 
     @websockets_authenticated  # noqa: A003
     def open(self, *args, **kwargs):  # noqa: A003
+        print("opening web socket!!!!!!!!!!!!!!!")
         IOLoop.current().spawn_callback(
             self.subscription_server.handle,
             self,
             self.context,
         )
 
-    async def on_message(self, message):     
+    def on_close(self):
+        print("closing web socket!!!!!!!!!!!!!!!")
+
+        print("HEre Is Me in Da Close")
+
+    async def on_message(self, message):
         await self.queue.put(message)
 
     async def recv(self):

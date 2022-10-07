@@ -323,46 +323,48 @@ class Services:
 
     @classmethod
     async def cat_log(cls, log, workflow, task=None):
-        print("!!!!!!!!!!!!!!!!!!cat log!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        """Calls `cat log`.
 
-        print('###1')
-        cmd = ['cylc', 'cat-log', '-m', 't', f'{workflow.id}//']
+        Used for log subscriptions.
+        """
+        command_id = f'{workflow.workflow_id}//'
         if task:
-            cmd += [task]
+            command_id += task
+        cmd = ['cylc', 'cat-log', '-m', 't', command_id]
         log.info('$ ' + ' '.join(cmd))
-        print(f"{cmd}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<cmd is here")
         proc = Popen(
             cmd,
             stdin=DEVNULL,
             stdout=PIPE,
             stderr=PIPE,
             text=True,
-            bufsize=0,  # unbuffered
-            # bufsize=1,  # line buffered
-            # universal_newlines=True,
+            bufsize=0
         )
-        print('###2')
+        print(f"!!!!!11process id {proc.pid} of the cat log")
         buffer = []
         while True:
-            # TODO proc.poll
+            if proc.poll() is not None:
+                # process is no longer running
+                break
             # TODO pass down subscription close context
-            print('.')
             line = proc.stdout.readline()
+            await asyncio.sleep(0)
             if line:
-                # read a new line
-                buffer.append(line)
-                if len(buffer) > 20:
-                    yield list(buffer)
-                    await asyncio.sleep(0)
-                    buffer.clear()
-            else:
-                # nothing new to read
-                if buffer:
-                    yield list(buffer)
-                    await asyncio.sleep(0)
-                    buffer.clear()
-                # wait for more stuff to appear
-                await asyncio.sleep(1)
+                yield list([line])
+            #     # read a new line
+            #     buffer.append(line)
+            #     if len(buffer) > 20:
+            #         yield list(buffer)
+            #         await asyncio.sleep(0)
+            #         buffer.clear()
+            # else:
+            #     # nothing new to read
+            #     if buffer:
+            #         yield list(buffer)
+            #         await asyncio.sleep(0)
+            #         buffer.clear()
+            #     # wait for more stuff to appear
+            #     await asyncio.sleep(1)
         log.info('[EXIT] ' + ' '.join(cmd))
 
 
@@ -458,8 +460,7 @@ class Resolvers(BaseResolvers):
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any]
     ):
-        print("!!!!!!!!!!!!!!!!!!in sub service!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        self.log.info('# subscription_service')
+       # self.log.info('# subscription_service')
         async for ret in Services.cat_log(
             self.log,
             workflows[0],

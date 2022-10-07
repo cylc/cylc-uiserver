@@ -81,7 +81,6 @@ from cylc.flow.network.graphql import (
 from cylc.uiserver import (
     __file__ as uis_pkg,
 )
-print("top if the app file")
 from cylc.uiserver.authorise import (
     Authorization,
     AuthorizationMiddleware
@@ -400,8 +399,8 @@ class CylcUIServer(ExtensionApp):
                 for key, value in self.config['CylcUIServer'].items()
             )
         )
-        import mdb
-        mdb.debug(ui_server=True)
+        # import mdb
+        # mdb.debug(ui_server=True)
         # start the async scan task running (do this on server start not init)
         ioloop.IOLoop.current().add_callback(
             self.workflows_mgr.run
