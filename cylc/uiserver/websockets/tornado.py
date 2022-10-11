@@ -121,7 +121,7 @@ class TornadoSubscriptionServer(BaseAsyncSubscriptionServer):
         await self.on_close(connection_context)
 
     async def handle(self, ws, request_context=None):
-        await shield(self._handle(ws, request_context), loop=self.loop)
+        await shield(self._handle(ws, request_context))
 
     async def on_start(self, connection_context, op_id, params):
         # Attempt to unsubscribe first in case we already have a subscription
