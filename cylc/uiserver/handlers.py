@@ -382,6 +382,8 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     @websockets_authenticated  # noqa: A003
     def open(self, *args, **kwargs):  # noqa: A003
         print("opening web socket!!!!!!!!!!!!!!!")
+        from traceback import print_stack
+        # print(f">>>>>>>>>>>>>>>>>>>>>>>>>{print_stack()}")
         IOLoop.current().spawn_callback(
             self.subscription_server.handle,
             self,
