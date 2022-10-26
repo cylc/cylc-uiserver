@@ -58,6 +58,7 @@ import getpass
 import os
 from pathlib import Path, PurePath
 import sys
+from textwrap import dedent
 from typing import List
 
 from pkg_resources import parse_version
@@ -133,14 +134,13 @@ class CylcUIServer(ExtensionApp):
     description = '''
     Cylc gui - A user interface for monitoring and controlling Cylc workflows.
     '''  # type: ignore[assignment]
-    examples = '''
-        cylc gui                  # Start the Cylc GUI (At the dashboard page)
-cylc gui [workflow]       # Start the Cylc GUI (at the workflow page),
-cylc gui --new [workflow] # Start the Cylc GUI (at the workflow page), with a
-                            new instance. By default, if there is an existing
-                            gui instance, Cylc will use that.
+    examples = dedent('''
+    cylc gui                  # Start the Cylc GUI (At the dashboard page)
+    cylc gui [workflow]       # Start the Cylc GUI (at the workflow page)
+    cylc gui --new [workflow] # Start the Cylc GUI (at the workflow page), with
+                                a new instance.
 
-    '''  # type: ignore[assignment]
+    ''')  # type: ignore[assignment]
     config_file_paths = get_conf_dir_hierarchy(
         [
             SITE_CONF_ROOT,  # site configuration
