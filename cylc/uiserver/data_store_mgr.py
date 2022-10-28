@@ -167,16 +167,17 @@ class DataStoreMgr:
             self._update_contact(w_id, contact_data)
 
     @log_call
-    def disconnect_workflow(self, w_id):
+    def disconnect_workflow(self, w_id, update_contact=True):
         """Terminate workflow subscriptions.
 
         Call this when a workflow has stopped.
         """
-        self._update_contact(
-            w_id,
-            status=WorkflowStatus.STOPPED.value,
-            status_msg=self._get_status_msg(w_id, False),
-        )
+        if update_contact:
+            self._update_contact(
+                w_id,
+                status=WorkflowStatus.STOPPED.value,
+                status_msg=self._get_status_msg(w_id, False),
+            )
         if w_id in self.w_subs:
             self.w_subs[w_id].stop()
             del self.w_subs[w_id]
@@ -202,7 +203,9 @@ class DataStoreMgr:
     @log_call
     def _purge_workflow(self, w_id):
         """Purge the manager of a workflow's subscription and data."""
-        self.disconnect_workflow(w_id)
+        # Ensure no old/new subscriptions exist on purge,
+        # this shouldn't happen if disconnect is run before unregister.
+        self.disconnect_workflow(w_id, update_contact=False)
         if w_id in self.data:
             del self.data[w_id]
         if w_id in self.delta_queues:
