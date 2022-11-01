@@ -35,18 +35,9 @@ from cylc.flow.network.schema import (
     Subscriptions,
     WorkflowID,
     _mut_field,
-    sstrip,
-    Workflow,
-    Boolean,
-    ID,
-    String,
-    DELTA_ADDED,
-    Float
+    sstrip
 )
-from cylc.uiserver.resolvers import Resolvers, Services
-
-from subprocess import (Popen, PIPE, DEVNULL)
-import asyncio
+from cylc.uiserver.resolvers import Resolvers
 
 if TYPE_CHECKING:
     from graphql import ResolveInfo
@@ -259,9 +250,9 @@ class Clean(graphene.Mutation):
 
 
 class UISSubscriptions(Subscriptions):
-# subscription {
-#   logs(workflows:["foo"])
-# }
+    # subscription {
+    #   logs(workflows:["foo"])
+    # }
     logs = graphene.List(
         graphene.String,
         description=sstrip('''
@@ -296,7 +287,6 @@ class UISSubscriptions(Subscriptions):
         if kwargs.get('args', False):
             kwargs.update(kwargs.get('args', {}))
             kwargs.pop('args')
-        print(f".............KWARGS ARE HERE: {kwargs}")
         resolvers: 'Resolvers' = (
             info.context.get('resolvers')  # type: ignore[union-attr]
         )

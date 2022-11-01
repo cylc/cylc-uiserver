@@ -364,7 +364,7 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     """Endpoint for performing GraphQL subscriptions."""
     # No authorization decorators here, auth handled in AuthorizationMiddleware
-    def initialize(self, sub_server, resolvers,  backend=None, schema=None):
+    def initialize(self, sub_server, resolvers, backend=None, schema=None):
         self.queue = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
@@ -381,9 +381,6 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
 
     @websockets_authenticated  # noqa: A003
     def open(self, *args, **kwargs):  # noqa: A003
-        print("opening web socket!!!!!!!!!!!!!!!")
-        from traceback import print_stack
-        # print(f">>>>>>>>>>>>>>>>>>>>>>>>>{print_stack()}")
         IOLoop.current().spawn_callback(
             self.subscription_server.handle,
             self,
@@ -392,8 +389,6 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
 
     def on_close(self):
         print("closing web socket!!!!!!!!!!!!!!!")
-
-        print("HEre Is Me in Da Close")
 
     async def on_message(self, message):
         await self.queue.put(message)

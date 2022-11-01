@@ -340,31 +340,32 @@ class Services:
             text=True,
             bufsize=0
         )
-        print(f"!!!!!11process id {proc.pid} of the cat log")
-        buffer = []
+        # print(f"!!!!!11process id {proc.pid} of the cat log")
+        # buffer = []
         while True:
             if proc.poll() is not None:
                 # process is no longer running
                 break
             # TODO pass down subscription close context
-            line = proc.stdout.readline()
             await asyncio.sleep(0)
+            line = proc.stdout.readline()
             if line:
-                yield list([line])
-            #     # read a new line
-            #     buffer.append(line)
-            #     if len(buffer) > 20:
-            #         yield list(buffer)
-            #         await asyncio.sleep(0)
-            #         buffer.clear()
-            # else:
-            #     # nothing new to read
-            #     if buffer:
-            #         yield list(buffer)
-            #         await asyncio.sleep(0)
-            #         buffer.clear()
-            #     # wait for more stuff to appear
-            #     await asyncio.sleep(1)
+                yield [line]
+                # read a new line
+                # buffer.append(line)
+                # line = ''
+                # if len(buffer) > 20:
+                #     yield list(buffer)
+                #     await asyncio.sleep(0)
+                #     buffer.clear()
+            else:
+                # nothing new to read
+                # if buffer:
+                # yield list(buffer)
+                # await asyncio.sleep(0)
+                # buffer.clear()
+                # wait for more stuff to appear
+                await asyncio.sleep(1)
         log.info('[EXIT] ' + ' '.join(cmd))
 
 
@@ -460,7 +461,6 @@ class Resolvers(BaseResolvers):
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any]
     ):
-       # self.log.info('# subscription_service')
         async for ret in Services.cat_log(
             self.log,
             workflows[0],
