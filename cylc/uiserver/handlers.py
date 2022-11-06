@@ -388,9 +388,11 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         )
 
     def on_close(self):
-        print("closing web socket!!!!!!!!!!!!!!!")
+      #  print("closing web socket!!!!!!!!!!!!!!!")
+        pass
 
     async def on_message(self, message):
+       # print(f"on message web socket!!!!!!!!!!!!!!!")
         await self.queue.put(message)
 
     async def recv(self):

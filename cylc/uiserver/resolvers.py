@@ -19,6 +19,7 @@ import asyncio
 from getpass import getuser
 import os
 from copy import deepcopy
+import select
 from subprocess import Popen, PIPE, DEVNULL
 from typing import (
     TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Tuple, Union
@@ -320,7 +321,12 @@ class Services:
         # trigger a re-scan
         await workflows_mgr.scan()
         return response
-
+   
+    @classmethod
+    async def enqueue(cls, stream, queue):
+        async for line in stream:
+            await queue.put(line)
+    
     @classmethod
     async def cat_log(cls, log, workflow, task=None):
         """Calls `cat log`.
@@ -331,41 +337,80 @@ class Services:
         if task:
             command_id += task
         cmd = ['cylc', 'cat-log', '-m', 't', command_id]
-        log.info('$ ' + ' '.join(cmd))
-        proc = Popen(
-            cmd,
-            stdin=DEVNULL,
-            stdout=PIPE,
-            stderr=PIPE,
-            text=True,
-            bufsize=0
-        )
-        # print(f"!!!!!11process id {proc.pid} of the cat log")
-        # buffer = []
+
+        proc = await asyncio.subprocess.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE)
+        buffer = []
+
+        ### Solution 2 ###
+
+        queue = asyncio.Queue()
+        # Farm out reading from stdout stream to a background task
+        # This is to get around problem where stream is not EOF until subprocess ends
+        # See solution 1 for workaround if we did work on stdout directlly
+        asyncio.create_task(cls.enqueue(proc.stdout, queue))
+
         while True:
-            if proc.poll() is not None:
-                # process is no longer running
-                break
-            # TODO pass down subscription close context
-            await asyncio.sleep(0)
-            line = proc.stdout.readline()
-            if line:
-                yield [line]
-                # read a new line
-                # buffer.append(line)
-                # line = ''
-                # if len(buffer) > 20:
-                #     yield list(buffer)
-                #     await asyncio.sleep(0)
-                #     buffer.clear()
+            print("1111111111111111111111111111")
+            if queue.empty() and buffer:
+                print("22222222222222222222222222222")
+                yield list(buffer)
+                buffer.clear()
+                await asyncio.sleep(1) # or 0 which is sure to let another function execute
+                print("3333333333333333333333333333")
             else:
-                # nothing new to read
-                # if buffer:
-                # yield list(buffer)
-                # await asyncio.sleep(0)
-                # buffer.clear()
-                # wait for more stuff to appear
-                await asyncio.sleep(1)
+                line = await queue.get()
+                buffer.append(line)
+                if len(buffer) >= 20:
+                    yield list(buffer)
+                    buffer.clear()
+                
+                # We could use synchronous get_nowait() so we know when to
+                # stop buffering, through a asyncio.QueueEmpty exception.
+                # But needs loop sleeps to stop excessive calls to dequeue,
+                # which then just slows overall receiving of logs.
+                #
+                # Use async get() to wait if list is empty and instead, check
+                # if list is empty on loop.
+               
+        # Solution 2 (older exception logic - too fast see above)
+        #
+        # while True:               
+        #     try:   
+        #         line = queue.get_nowait() # dequeue as first as CPU allows !!
+        ## old Queue lib was better as you could sai block and wait X seconds if none
+        #         buffer.append(line)
+        #         if len(buffer) >= 20:
+        #             yield list(buffer)
+        #             buffer.clear()
+        #     except asyncio.QueueEmpty:
+        #         if buffer:
+        #             yield list(buffer)
+        #             buffer.clear()
+                    
+        #     await asyncio.sleep(0)
+            
+        ### Solution 1 ###
+        
+        # count = 0
+        # while True:
+        #     if len(proc.stdout._buffer) == 0 and count > 0:
+        #         if (buffer):
+        #             yield list(buffer)
+        #             buffer.clear()
+        #     else:
+        #         line = await proc.stdout.readline()
+        #         buffer.append(line)
+        #         if len(buffer) >= 20:
+        #             yield list(buffer)
+        #             buffer.clear()
+        #     count = count + 1
+        #     await asyncio.sleep(0)
+
+            # # TODO pass down subscription close context
+         
+
         log.info('[EXIT] ' + ' '.join(cmd))
 
 
@@ -466,6 +511,7 @@ class Resolvers(BaseResolvers):
             workflows[0],
             kwargs.get('tasks', [None])[0],
         ):
-            self.log.info(f'# subscription_service: {ret}')
+            print(f"@@@@@@@@@@@@@@@@@@ {ret}")
+           # self.log.info(f'# subscription_service: {ret}')
             yield ret
         self.log.info('# [exit] subscription_service')
