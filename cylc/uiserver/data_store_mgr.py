@@ -172,11 +172,21 @@ class DataStoreMgr:
 
         Call this when a workflow has stopped.
         """
-        if update_contact:
+        disconnect_msg = self._get_status_msg(w_id, False)
+        if (
+            update_contact
+            and w_id in self.data
+            and (
+                self.data[w_id][WORKFLOW].status != (
+                    WorkflowStatus.STOPPED.value
+                )
+                or self.data[w_id][WORKFLOW].status_msg != disconnect_msg
+            )
+        ):
             self._update_contact(
                 w_id,
                 status=WorkflowStatus.STOPPED.value,
-                status_msg=self._get_status_msg(w_id, False),
+                status_msg=disconnect_msg,
             )
         if w_id in self.w_subs:
             self.w_subs[w_id].stop()
@@ -254,12 +264,6 @@ class DataStoreMgr:
                 continue
         if topic == 'shutdown':
             self._delta_store_to_queues(w_id, topic, delta)
-            # update the status to stopped and set the status message
-            self._update_contact(
-                w_id,
-                status=WorkflowStatus.STOPPED.value,
-                status_msg=self._get_status_msg(w_id, False),
-            )
             # close connections
             self.disconnect_workflow(w_id)
             return
