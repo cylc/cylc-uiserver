@@ -4,6 +4,7 @@
 # The file was copied from this revision:
 # https://github.com/graphql-python/graphql-ws/blob/cf560b9a5d18d4a3908dc2cfe2199766cc988fef/graphql_ws/tornado.py
 
+from contextlib import suppress
 import getpass
 from inspect import isawaitable, isclass
 import socket
@@ -114,6 +115,13 @@ class TornadoSubscriptionServer(BaseAsyncSubscriptionServer):
             except ConnectionClosedException:
                 break
             if message:
+                with suppress(ValueError):
+                    import ast
+                    message_dict = ast.literal_eval(message)
+
+                # if message_dict['type'] == 'stop':
+                #     op_id = message_dict["id"]
+                #     await connection_context.unsubscribe(op_id)
                 self.on_message(connection_context, message)
             else:
                 await sleep(NO_MSG_DELAY)

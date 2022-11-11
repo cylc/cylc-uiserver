@@ -375,6 +375,7 @@ class CylcUIServer(ExtensionApp):
         self.executor = ProcessPoolExecutor(max_workers=self.max_workers)
         self.workflows_mgr = WorkflowsManager(self, log=self.log)
         self.data_store_mgr = DataStoreMgr(self.workflows_mgr, self.log)
+        self.sub_statuses = {'blah':'moo'}
         self.resolvers = Resolvers(
             self.data_store_mgr,
             log=self.log,
@@ -457,7 +458,8 @@ class CylcUIServer(ExtensionApp):
                     'sub_server': self.subscription_server,
                     'resolvers': self.resolvers,
                     'backend': CylcGraphQLBackend(),
-                    'schema': schema
+                    'schema': schema,
+                    'sub_statuses': self.sub_statuses
                 }
             ),
             (

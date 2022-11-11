@@ -14,6 +14,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from asyncio import Queue
+from contextlib import suppress
 from functools import wraps
 import json
 import getpass
@@ -364,12 +365,13 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     """Endpoint for performing GraphQL subscriptions."""
     # No authorization decorators here, auth handled in AuthorizationMiddleware
-    def initialize(self, sub_server, resolvers, backend=None, schema=None):
+    def initialize(self, sub_server, resolvers, backend=None, schema=None, sub_statuses=None):
         self.queue = Queue(100)
         self.subscription_server = sub_server
         self.resolvers = resolvers
         self.backend = backend or get_default_backend()
         self.schema = schema
+        self.sub_statuses = sub_statuses
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
@@ -392,7 +394,24 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         pass
 
     async def on_message(self, message):
-       # print(f"on message web socket!!!!!!!!!!!!!!!")
+        # print(f"on message web socket!!!!!!!{message}!!!!!!!!")
+        with suppress(ValueError):
+            import ast
+            message_dict = ast.literal_eval(message)
+            op_name = ''
+            with suppress(KeyError):
+                op_name = message_dict['operationName']
+            if (message_dict['type'] == 'start' and
+                op_name and
+                    message_dict['operationName'] == 'LogData'):
+                print(f"updated {op_id}....in onmessage..{self.sub_statuses}")
+                op_id = message_dict["id"]
+                self.sub_statuses[op_id] = 'start'
+                print(f"in start and status is now {self.sub_statuses}")
+            if message_dict['type'] == 'stop':
+                op_id = message_dict["id"]
+                self.sub_statuses[op_id] = 'stop'
+                print(f"on message: {self.sub_statuses}")
         await self.queue.put(message)
 
     async def recv(self):
@@ -411,4 +430,5 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
                 self.get_current_user()
             ).get('name'),
             'ops_queue': {},
+            'sub_statuses': self.sub_statuses
         }

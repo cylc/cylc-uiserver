@@ -20,6 +20,7 @@ from getpass import getuser
 import os
 from copy import deepcopy
 import select
+import signal
 from subprocess import Popen, PIPE, DEVNULL
 from typing import (
     TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Tuple, Union
@@ -321,14 +322,14 @@ class Services:
         # trigger a re-scan
         await workflows_mgr.scan()
         return response
-   
+
     @classmethod
     async def enqueue(cls, stream, queue):
         async for line in stream:
-            await queue.put(line)
-    
+            await queue.put(line.decode())
+
     @classmethod
-    async def cat_log(cls, log, workflow, task=None):
+    async def cat_log(cls,  log, workflow, info, task=None):
         """Calls `cat log`.
 
         Used for log subscriptions.
@@ -340,32 +341,39 @@ class Services:
 
         proc = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
-            stdout=asyncio.subprocess.PIPE)
+            stdout=asyncio.subprocess.PIPE,
+            shell=False)
         buffer = []
-
+        print(f"cat pid : {proc.pid}")
         ### Solution 2 ###
-
+        # aiofiles wrap.
         queue = asyncio.Queue()
         # Farm out reading from stdout stream to a background task
-        # This is to get around problem where stream is not EOF until subprocess ends
-        # See solution 1 for workaround if we did work on stdout directlly
+        # This is to get around problem where stream is not EOF until
+        # subprocess ends
+        # See solution 1 for workaround if we did work on stdout directly
         asyncio.create_task(cls.enqueue(proc.stdout, queue))
 
+        op_id = info.root_value
         while True:
-            print("1111111111111111111111111111")
+            status = info.context['sub_statuses'].get(op_id)
+            print(f"cat log ...{info.context['sub_statuses']}")
+            # if status == 'stop':
+            #     print("here in the stop .....")
+            #     log.debug(f"Log subscription stopped for {command_id}")
+            #     os.kill(proc.pid, signal.SIGKILL)
+            # remove the op_id from the sub_statuses    
+            # return
             if queue.empty() and buffer:
-                print("22222222222222222222222222222")
                 yield list(buffer)
                 buffer.clear()
-                await asyncio.sleep(1) # or 0 which is sure to let another function execute
-                print("3333333333333333333333333333")
+                await asyncio.sleep(0)
             else:
                 line = await queue.get()
                 buffer.append(line)
                 if len(buffer) >= 20:
                     yield list(buffer)
                     buffer.clear()
-                
                 # We could use synchronous get_nowait() so we know when to
                 # stop buffering, through a asyncio.QueueEmpty exception.
                 # But needs loop sleeps to stop excessive calls to dequeue,
@@ -506,12 +514,15 @@ class Resolvers(BaseResolvers):
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any]
     ):
+       # info.context['sub_statuses'][info.root_value] = "started"
+        print(f">>>>>>>>>{info.root_value}")
         async for ret in Services.cat_log(
             self.log,
             workflows[0],
+            info,
             kwargs.get('tasks', [None])[0],
         ):
-            print(f"@@@@@@@@@@@@@@@@@@ {ret}")
+           # print(f"@@@@@@@@@@@@@@@@@@ {ret}")
            # self.log.info(f'# subscription_service: {ret}')
             yield ret
         self.log.info('# [exit] subscription_service')
