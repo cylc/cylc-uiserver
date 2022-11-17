@@ -399,19 +399,27 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
             import ast
             message_dict = ast.literal_eval(message)
             op_name = ''
+            print(f"message_dict['type'] = {message_dict['type']}")
             with suppress(KeyError):
-                op_name = message_dict['operationName']
+                op_name = message_dict['payload']['operationName']
+                print(f"op_name = {op_name}")
+                print(f"message_dict['payload']['operationName'] = {message_dict['payload']['operationName']}")
             if (message_dict['type'] == 'start' and
                 op_name and
-                    message_dict['operationName'] == 'LogData'):
-                print(f"updated {op_id}....in onmessage..{self.sub_statuses}")
+                    message_dict['payload']['operationName'] == 'LogData'):
                 op_id = message_dict["id"]
+                print(f"updated {op_id}....in onmessage..{self.sub_statuses}")
                 self.sub_statuses[op_id] = 'start'
                 print(f"in start and status is now {self.sub_statuses}")
             if message_dict['type'] == 'stop':
                 op_id = message_dict["id"]
-                self.sub_statuses[op_id] = 'stop'
-                print(f"on message: {self.sub_statuses}")
+                # self.sub_statuses[op_id]
+                print(f"on message: {self.sub_statuses[op_id]}")
+                import signal
+                os.kill(self.sub_statuses[op_id], signal.SIGKILL)
+                self.sub_statuses.pop(op_id)
+                print(f"Log subscription stopped")
+
         await self.queue.put(message)
 
     async def recv(self):

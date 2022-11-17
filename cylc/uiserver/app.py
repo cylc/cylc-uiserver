@@ -375,7 +375,7 @@ class CylcUIServer(ExtensionApp):
         self.executor = ProcessPoolExecutor(max_workers=self.max_workers)
         self.workflows_mgr = WorkflowsManager(self, log=self.log)
         self.data_store_mgr = DataStoreMgr(self.workflows_mgr, self.log)
-        self.sub_statuses = {'blah':'moo'}
+        self.sub_statuses = {'blah':'initial'}
         self.resolvers = Resolvers(
             self.data_store_mgr,
             log=self.log,

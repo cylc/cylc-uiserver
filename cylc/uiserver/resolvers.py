@@ -338,7 +338,8 @@ class Services:
         if task:
             command_id += task
         cmd = ['cylc', 'cat-log', '-m', 't', command_id]
-
+        import random
+        unique_id = random.random()
         proc = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -353,17 +354,29 @@ class Services:
         # subprocess ends
         # See solution 1 for workaround if we did work on stdout directly
         asyncio.create_task(cls.enqueue(proc.stdout, queue))
-
+        # track = ''
         op_id = info.root_value
+    
+        print(f"+++++++++ unique new york: {unique_id}")
         while True:
+            # print(f"cat log ...{info.context['sub_statuses']}")
+            # print(f"---op id------ {op_id}")                     
+            # print(f"---sub status for opid--- {info.context['sub_statuses'].get(op_id)}")
+            info.context['sub_statuses'][op_id] = proc.pid
             status = info.context['sub_statuses'].get(op_id)
-            print(f"cat log ...{info.context['sub_statuses']}")
-            # if status == 'stop':
-            #     print("here in the stop .....")
-            #     log.debug(f"Log subscription stopped for {command_id}")
-            #     os.kill(proc.pid, signal.SIGKILL)
-            # remove the op_id from the sub_statuses    
-            # return
+            print(f"{status}<<<<<status for op_id {op_id}")
+            # just for debugging ease   
+            # if track != info.context['sub_statuses']: 
+            #     track = info.context['sub_statuses']
+            #print(f"{status}<<<<<<<<<<<<<<<<<<<<<<<<<<<<status")
+            if status == 'stop':
+                info.context['sub_statuses']
+                print(f"here in the stop ..... {op_id}")
+                log.debug(f"Log subscription stopped for {command_id}")
+                # proc.kill()
+                #os.kill(proc.pid, signal.SIGKILL)
+               # info.context['sub_statuses'].pop(op_id)
+                break
             if queue.empty() and buffer:
                 yield list(buffer)
                 buffer.clear()
@@ -416,8 +429,7 @@ class Services:
         #     count = count + 1
         #     await asyncio.sleep(0)
 
-            # # TODO pass down subscription close context
-         
+            # # TODO pass down subscription close context     
 
         log.info('[EXIT] ' + ' '.join(cmd))
 

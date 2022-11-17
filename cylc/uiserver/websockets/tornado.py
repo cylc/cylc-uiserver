@@ -115,9 +115,7 @@ class TornadoSubscriptionServer(BaseAsyncSubscriptionServer):
             except ConnectionClosedException:
                 break
             if message:
-                with suppress(ValueError):
-                    import ast
-                    message_dict = ast.literal_eval(message)
+                
 
                 # if message_dict['type'] == 'stop':
                 #     op_id = message_dict["id"]
