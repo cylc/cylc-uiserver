@@ -8,8 +8,8 @@
 
 # Cylc UI Server
 
-This project contains the Cylc UI Server which provides the Cylc GUI
-used to serve the Cylc UI, and to communicate with running Cylc Schedulers.
+This project contains the Cylc UI Server which serves the Cylc UI
+and communicates with running Cylc Schedulers. It also bundles the GUI.
 
 [Cylc Website](https://cylc.org/) |
 [Contributing](CONTRIBUTING.md) |
@@ -56,22 +56,26 @@ see the
 
 ### For Single-User Setups
 
-```console
-# via conda (preferred)
-$ conda install cylc-uiserver
+Via conda (preferred):
+```bash
+conda install cylc-uiserver
+```
 
-# via pip
-$ pip install cylc-uiserver
+Via pip:
+```bash
+pip install cylc-uiserver
 ```
 
 ### For Multi-User Setups
 
-```console
-# via conda (preferred)
-$ conda install cylc-uiserver-hub
+Via conda (preferred):
+```bash
+conda install cylc-uiserver-hub
+```
 
-# via pip (consult jupyterhub documentation)
-$ pip install cylc-uiserver[hub]
+Via pip (consult jupyterhub documentation):
+```bash
+pip install cylc-uiserver[hub]
 ```
 
 
@@ -87,16 +91,16 @@ Run as a standalone server using a URL token for authentication:
 
 ```bash
 # launch the Cylc GUI and open a browser tab
-cylc gui
+$ cylc gui
 
 # alternatively the same app can be opened with the jupyter command
 $ jupyter cylc
 ```
 
-> By default authentication is provided by the URL token, alternatively a
+> By default, authentication is provided by the URL token. Alternatively, a
 > password can be configured (see Jupyter Server docs).
 >
-> There is no per-user authorisation so anyone who has the URL token has full
+> There is no per-user authorisation, so anyone who has the URL token has full
 > access to the server.
 
 ### For Multi-User Setups
@@ -108,7 +112,7 @@ other users.
 ```bash
 # launch the Cylc Hub
 # (the default URL is http://localhost:8000)
-cylc hub
+$ cylc hub
 ```
 
 > Users then authenticate with the hub which launches and manages their UI
@@ -132,23 +136,23 @@ The Cylc Hub will load the following files in order:
    This file configures the Hub/UIS for all users. The default path can be
    changed by the ``CYLC_SITE_CONF_PATH`` environment variable.
 
-   (`/etc/cylc/hub/jupyter_config.py`)
+   (`/etc/cylc/uiserver/jupyter_config.py`)
 
 3) User Config
 
    This file
 
-   (`~/.cylc/hub/jupyter_config.py`)
+   (`~/.cylc/uiserver/jupyter_config.py`)
 
 Alternatively a single config file can be provided on the command line.
 
-```console
-$ cylc hub --config
+```bash
+cylc hub --config
 ```
 
 > **Warning:**
 >
-> If specifying a config file on the command line the system config containing
+> If specifying a config file on the command line, the system config containing
 > the hardcoded Cylc default will **not** be loaded.
 
 > **Note:**
@@ -156,26 +160,26 @@ $ cylc hub --config
 > The hub can also be run using the ``jupyterhub`` command, however, you
 > must source the configuration files manually on the command line.
 
-See the Jupyterhub documentation for details on configuration options.
+See the JupyterHub documentation for details on configuration options.
 
 ### UI Server
 
-The UI Server is also configured from the same configuration file(s) as the hub
-using the `UIServer` namespace.
-
-Currently the UI Server accepts these configurations:
-
-* `c.CylcUIServer.ui_build_dir`
-* `c.CylcUIServer.ui_version`
-* `c.CylcUIServer.scan_iterval`
-
-See the `cylc.uiserver.app.UIServer` file for details.
+See the [Cylc documentation](
+https://cylc.github.io/cylc-doc/latest/html/reference/config/ui-server.html)
+for all Cylc-specific configuration options.
 
 The Cylc UI Server is a
 [Jupyter Server](https://github.com/jupyter-server/jupyter_server) extension.
 Jupyter Server can run multiple extensions. To control the extensions that
-are run use the `ServerApp.jpserver_extensions` configuration, see the 
+are run use the `ServerApp.jpserver_extensions` configuration, see the
 [Jupyter Server configuration documentation](https://jupyter-server.readthedocs.io/en/latest/other/full-config.html#other-full-config).
+
+By default the Cylc part of the UI Server log is written to
+`~/.cylc/uiserver/uiserver.log`.
+
+<!--
+TODO: Link to Jupyter Server logging_config docs when published
+-->
 
 ### UI
 
@@ -203,8 +207,8 @@ Contributions welcome:
 
 1) Install from source into your Python environment:
 
-   ```console
-   $ pip install -e .[all]
+   ```bash
+   pip install -e .[all]
    ```
 
    > **Note:**
@@ -218,13 +222,19 @@ Contributions welcome:
    (rather than the default bundled UI build):
 
    ```python
-   # ~/.cylc/hub/jupyter_config.py
+   # ~/.cylc/uiserver/jupyter_config.py
    c.CylcUIServer.ui_build_dir = '~/cylc-ui/dist'  # path to build
    ```
 
+Note about testing: unlike cylc-flow, cylc-uiserver uses the
+[pytest-tornasync](https://github.com/eukaryote/pytest-tornasync/) plugin
+instead of [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio).
+This means you should not decorate async test functions with
+`@pytest.mark.asyncio`.
+
 ## Copyright and Terms of Use
 
-Copyright (C) 2019-<span actions:bind='current-year'>2021</span> NIWA & British Crown (Met Office) & Contributors.
+Copyright (C) 2019-<span actions:bind='current-year'>2022</span> NIWA & British Crown (Met Office) & Contributors.
 
 Cylc is free software: you can redistribute it and/or modify it under the terms
 of the GNU General Public License as published by the Free Software Foundation,

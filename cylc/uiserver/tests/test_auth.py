@@ -18,30 +18,7 @@
 from functools import partial
 
 import pytest
-
 from tornado.httpclient import HTTPClientError
-
-
-@pytest.fixture
-def jp_server_config(jp_template_dir):
-    """Config to turn the CylcUIServer extension on."""
-    config = {
-        "ServerApp": {
-            "jpserver_extensions": {
-                'cylc.uiserver': True
-            },
-        }
-    }
-    return config
-
-
-@pytest.fixture
-def patch_conf_files(monkeypatch):
-    """Auto-patches the CylcUIServer to prevent it loading config files."""
-    monkeypatch.setattr(
-        'cylc.uiserver.app.CylcUIServer.config_file_paths', []
-    )
-    yield
 
 
 @pytest.mark.integration
@@ -101,7 +78,7 @@ async def test_authorised_and_authenticated(
         pytest.param(
             ('cylc', 'graphql'),
             403,
-            'Forbidden',
+            'login redirect replaced by 403 for test purposes',
             None,
             id='cylc/graphql',
         ),
@@ -115,7 +92,7 @@ async def test_authorised_and_authenticated(
         pytest.param(
             ('cylc', 'userprofile'),
             403,
-            'Forbidden',
+            'login redirect replaced by 403 for test purposes',
             None,
             id='cylc/userprofile',
         )
@@ -138,23 +115,25 @@ async def test_unauthenticated(
     'endpoint,code,message,body',
     [
         pytest.param(
+            # should pass through authentication but fail as there is no query
             ('cylc', 'graphql'),
-            403,
-            'authorisation insufficient',
+            400,
+            'Bad Request',
             None,
             id='cylc/graphql',
         ),
         pytest.param(
+            # should pass through authentication but fail as there is no query
             ('cylc', 'subscriptions'),
-            403,
-            'authorisation insufficient',
+            400,
+            'Bad Request',
             None,
             id='cylc/subscriptions',
         ),
         pytest.param(
             ('cylc', 'userprofile'),
             403,
-            'authorisation insufficient',
+            'authorization insufficient',
             None,
             id='cylc/userprofile',
         )
@@ -171,6 +150,27 @@ async def test_unauthorised(
     await _test(jp_fetch, endpoint, code, message, body)
 
 
+@pytest.fixture
+def authorisation_middleware_instances(monkeypatch):
+    """Captures instances of the AuthorizationMiddleware class.
+
+    Returns a list which is updated with instances of AuthorizationMiddleware
+    created within the lifetime of the test function.
+    """
+    instances = []
+
+    def _init(self):
+        nonlocal instances
+        instances.append(self)
+
+    monkeypatch.setattr(
+        'cylc.uiserver.authorise.AuthorizationMiddleware.__init__',
+        _init
+    )
+
+    return instances
+
+
 async def _test(jp_fetch, endpoint, code, message, body):
     """Test 400 HTTP response (upgrade to websocket)."""
     fetch = partial(jp_fetch, *endpoint)
@@ -185,7 +185,7 @@ async def _test(jp_fetch, endpoint, code, message, body):
         if body:
             assert body in exc.response.body
     else:
-        # succees cases, test the response
+        # success cases, test the response
         response = await fetch()
         assert code == response.code
         if message:

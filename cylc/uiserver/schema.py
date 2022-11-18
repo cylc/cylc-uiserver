@@ -20,17 +20,12 @@ extra functionality specific to the UIS.
 """
 
 from functools import partial
+from typing import TYPE_CHECKING, Any, List, Optional
 
-from graphene import (
-    Boolean,
-    Enum,
-    List,
-    Mutation,
-    Schema,
-    String,
-)
+import graphene
 from graphene.types.generic import GenericScalar
 
+from cylc.flow.id import Tokens
 from cylc.flow.network.schema import (
     CyclePoint,
     GenericResponse,
@@ -39,32 +34,39 @@ from cylc.flow.network.schema import (
     Subscriptions,
     WorkflowID,
     _mut_field,
-    parse_workflow_id,
     sstrip,
 )
 
+if TYPE_CHECKING:
+    from graphql import ResolveInfo
+    from cylc.uiserver.resolvers import Resolvers
 
-async def mutator(root, info, command=None, workflows=None,
-                  exworkflows=None, **args):
+
+async def mutator(
+    root: Optional[Any],
+    info: 'ResolveInfo',
+    *,
+    command: str,
+    workflows: Optional[List[str]] = None,
+    **kwargs: Any
+):
     """Call the resolver method that act on the workflow service
     via the internal command queue."""
     if workflows is None:
         workflows = []
-    if exworkflows is None:
-        exworkflows = []
-    w_args = {}
-    w_args['workflows'] = [parse_workflow_id(w_id) for w_id in workflows]
-    w_args['exworkflows'] = [parse_workflow_id(w_id) for w_id in exworkflows]
-    if args.get('args', False):
-        args.update(args.get('args', {}))
-        args.pop('args')
+    parsed_workflows = [Tokens(w_id) for w_id in workflows]
+    if kwargs.get('args', False):
+        kwargs.update(kwargs.get('args', {}))
+        kwargs.pop('args')
 
-    resolvers = info.context.get('resolvers')
-    res = await resolvers.service(info, command, w_args, args)
+    resolvers: 'Resolvers' = (
+        info.context.get('resolvers')  # type: ignore[union-attr]
+    )
+    res = await resolvers.service(info, command, parsed_workflows, kwargs)
     return GenericResponse(result=res)
 
 
-class RunMode(Enum):
+class RunMode(graphene.Enum):
     """The mode to run a workflow in."""
 
     Live = 'live'
@@ -87,19 +89,19 @@ class RunMode(Enum):
             return 'Simulates job submission, does not run anything at all.'
 
 
-class CylcVersion(String):
+class CylcVersion(graphene.String):
     """A Cylc version identifier e.g. 8.0.0"""
 
 
-class Play(Mutation):
+class Play(graphene.Mutation):
     class Meta:
         description = sstrip('''
-            Start, resume or un-pause a workflow run.
+            Start, resume or restart a workflow run.
         ''')
         resolver = partial(mutator, command='play')
 
     class Arguments:
-        workflows = List(WorkflowID, required=True)
+        workflows = graphene.List(WorkflowID, required=True)
         cylc_version = CylcVersion(
             description=sstrip('''
                 Set the Cylc version that the workflow starts with.
@@ -139,7 +141,7 @@ class Play(Mutation):
                 option `[scheduling]stop after cycle point`.
             ''')
         )
-        pause = Boolean(
+        pause = graphene.Boolean(
             description=sstrip('''
                 Pause workflow immediately on starting.
             ''')
@@ -149,42 +151,44 @@ class Play(Mutation):
                 Hold all tasks after this cycle point.
             ''')
         )
-        mode = RunMode()
-        host = String(
+        mode = RunMode(
+            default_value=RunMode.Live.name  # type: ignore[attr-defined]
+        )
+        host = graphene.String(
             description=sstrip('''
                 Specify the host on which to start-up the workflow. If not
                 specified, a host will be selected using the
                 `[scheduler]run hosts` global config.
             ''')
         )
-        main_loop = List(
-            String,
+        main_loop = graphene.List(
+            graphene.String,
             description=sstrip('''
                 Specify an additional plugin to run in the main loop. These
                 are used in combination with those specified in
                 `[scheduler][main loop]plugins`. Can be used multiple times.
             ''')
         )
-        abort_if_any_task_fails = Boolean(
+        abort_if_any_task_fails = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 If set workflow will abort with status 1 if any task fails.
             ''')
         )
-        debug = Boolean(
+        debug = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 Output developer information and show exception tracebacks.
             ''')
         )
-        no_timestamp = Boolean(
+        no_timestamp = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 Don't timestamp logged messages.
             ''')
         )
-        set = List(  # noqa: A003 (graphql field name)
-            String,
+        set = graphene.List(  # noqa: A003 (graphql field name)
+            graphene.String,
             description=sstrip('''
                 Set the value of a Jinja2 template variable in the workflow
                 definition. Values should be valid Python literals so strings
@@ -195,7 +199,7 @@ class Play(Mutation):
                 overridden.
             ''')
         )
-        set_file = String(
+        set_file = graphene.String(
             description=sstrip('''
                 Set the value of Jinja2 template variables in the workflow
                 definition from a file containing NAME=VALUE pairs (one per
@@ -209,12 +213,48 @@ class Play(Mutation):
     result = GenericScalar()
 
 
+class Clean(graphene.Mutation):
+    class Meta:
+        description = sstrip('''
+            Clean a workflow from the run directory.
+        ''')
+        resolver = partial(mutator, command='clean')
+
+    class Arguments:
+        workflows = graphene.List(WorkflowID, required=True)
+        rm = graphene.String(
+            default_value='',
+            description=sstrip('''
+                Only clean the specified subdirectories or files in
+                the run directory, rather than the whole run.
+
+                A colon separated list that accepts globs,
+                e.g. ``.service/db:log:share:work/2020*``.
+            ''')
+        )
+        local_only = graphene.Boolean(
+            default_value=False,
+            description=sstrip('''
+                Only clean on the local filesystem (not remote hosts).
+            ''')
+        )
+        remote_only = graphene.Boolean(
+            default_value=False,
+            description=sstrip('''
+                Only clean on remote hosts (not the local filesystem).
+            ''')
+        )
+
+    result = GenericScalar()
+
+
 class UISMutations(Mutations):
 
     play = _mut_field(Play)
+    clean = _mut_field(Clean)
 
 
-schema = Schema(
+schema = graphene.Schema(
     query=Queries,
     subscription=Subscriptions,
     mutation=UISMutations

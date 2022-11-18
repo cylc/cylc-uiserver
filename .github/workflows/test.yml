@@ -10,8 +10,6 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
-    env:
-      PYTHON_COVERAGE_ENABLED: '3.8'
     strategy:
       matrix:
         os: ['ubuntu-latest']
@@ -19,45 +17,43 @@ jobs:
         include:
           - os: 'macos-latest'
             python: '3.7'
-          - os: 'ubuntu-latest'
-            python: '3.10'
-            experimental: true
+    env:
+      PYTEST_ADDOPTS: --cov --color=yes
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 2  # required by codecov
+        uses: actions/checkout@v3
 
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python }}
 
-      # NOTE: We install in both editable, and non-editable mode. The former is
-      # necessary to produce coverage reports with the correct numbers.
-      # https://github.com/cylc/cylc-uiserver/issues/179
+      # NOTE: Install cylc-uiserver in editable mode for correct coverage results
       - name: Install cylc-uiserver & dependencies
         run: |
           pip install git+https://github.com/cylc/cylc-flow@master
-          if [ "${{ matrix.python }}" == "${{ env.PYTHON_COVERAGE_ENABLED }}" ]; then
-            pip install -e .[all]
-          else
-            pip install .[all]
-          fi
+          pip install -e .[all]
 
+      - name: (Debug - pip list)
+        run: pip list --format=freeze
 
       - name: Style test
         run: flake8
 
-      - name: mypy
-        run: mypy --explicit-package-bases
+      - name: Type checking
+        run: mypy
 
       - name: Test
-        run: pytest --cov
+        run: pytest
 
-      - name: Coverage
-        if: ${{ success() &&  matrix.python == env.PYTHON_COVERAGE_ENABLED }}
+      - name: Coverage report
         run: |
           coverage xml --ignore-errors
-          bash <(curl -s https://codecov.io/bash)
+          coverage report
+
+      - name: Codecov upload
+        uses: codecov/codecov-action@v3
+        with:
+          name: '${{ matrix.os }} py-${{ matrix.python }}'
+          fail_ci_if_error: false

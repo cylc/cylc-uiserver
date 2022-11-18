@@ -10,13 +10,94 @@ creating a new release entry be sure to copy & paste the span tag with the
 `actions:bind` attribute, which is used by a regex to find the text to be
 updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.2.0 (<span actions:bind='release-date'>Upcoming</span>)__
+
+<!-- [Updated cylc-ui to x.y.z](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md) -->
+
+### Enhancements
+
+[#376](https://github.com/cylc/cylc-uiserver/pull/376) -
+UIServer logs are now archived. The five most recent logs are retained (located
+in `~/.cylc/uiserver/log/`). A new log is created with each UIServer instance.
 
 -------------------------------------------------------------------------------
-## __cylc-uiserver-0.6.0 (<span actions:bind='release-date'>Released 2021-??-??</span>)__
+## __cylc-uiserver-1.1.1 (<span actions:bind='release-date'>Upcoming</span>)__
+
+Maintenance release.
+
+### Fixes
+
+[#386](https://github.com/cylc/cylc-uiserver/pull/386) - Work around bug in
+JupyterHub 3.0.0 that prevents `cylc hub` from starting.
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.1.0 (<span actions:bind='release-date'>Released 2022-07-28</span>)__
+
+[Updated cylc-ui to 1.3.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-130-released-2022-07-27)
+
+### Enhancements
+
+[#349](https://github.com/cylc/cylc-uiserver/pull/349) -
+Configure default logging. The UIServer log now goes to
+`~/.cylc/uiserver/uiserver.log` at the `INFO` level by default. See the
+Traitlets `logging_config` "trait" for more information.
+
+[#323](https://github.com/cylc/cylc-uiserver/pull/323) -
+`cylc clean` made available for runs and files within runs.
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.0.3 (<span actions:bind='release-date'>Released 2022-05-31</span>)__
+
+[Updated cylc-ui to 1.2.1](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-121-released-2022-05-30)
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.0.2 (<span actions:bind='release-date'>Released 2022-05-20</span>)__
+
+[Updated cylc-ui to 1.2.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-120-released-2022-05-19)
+
+Internal changes, see https://github.com/cylc/cylc-uiserver/milestone/11?closed=1
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.0.1 (<span actions:bind='release-date'>Released 2022-03-23</span>)__
+
+[Updated cylc-ui to 1.1.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-110-released-2022-03-23)
+
+### Fixes
+
+[#324](https://github.com/cylc/cylc-uiserver/pull/324) -
+Fix issues where workflow status could be incorrect.
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.0.0 (<span actions:bind='release-date'>Released 2022-02-17</span>)__
+
+[Updated cylc-ui to 1.0.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-100-released-2022-02-17)
+
+### Enhancements
+
+[#301](https://github.com/cylc/cylc-uiserver/pull/301) -
+Version hierarchy added to jupyter_config.py files, to match cylc-flow. Config
+files are now sourced from `.cylc/uiserver/<version>` rather than `.cylc/hub`.
+
+[#297](https://github.com/cylc/cylc-uiserver/pull/297) -
+Updated for the new Global Universal ID.
+
+### Fixes
+
+[#304](https://github.com/cylc/cylc-uiserver/pull/304) -
+Suppressed client connection traceback.
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-0.6.0 (<span actions:bind='release-date'>Released 2021-11-11</span>)__
 
 Multi-user functionality implemented.
 
+[Updated cylc-ui to 0.6.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-06-released-2021-11-10)
+
 ### Enhancements
+
+[#204](https://github.com/cylc/cylc-uiserver/pull/**204**) -
+Implementation of configurable multi user authorisation.
 
 [#230](https://github.com/cylc/cylc-uiserver/pull/230) -
 Convert the UI Server to a jupyter_server extension.
@@ -28,6 +109,10 @@ Fix traceback which could appear when workflows are removed.
 
 [#241](https://github.com/cylc/cylc-uiserver/pull/241) -
 Update old, broken hold options for playing workflows.
+
+[#272](https://github.com/cylc/cylc-uiserver/pull/272) -
+Allowed broken entries in the group id database to be
+ignored and logged without causing total failure.
 
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-0.5.0 (<span actions:bind='release-date'>Released 2021-07-28</span>)__

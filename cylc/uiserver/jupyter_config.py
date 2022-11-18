@@ -21,8 +21,8 @@ import pkg_resources
 
 from cylc.uiserver import (
     __file__ as uis_pkg,
-    getenv,
-)
+    getenv)
+from cylc.uiserver.app import USER_CONF_ROOT
 
 
 # the command the hub should spawn (i.e. the cylc uiserver itself)
@@ -56,8 +56,38 @@ c.JupyterHub.template_paths = [
     )
 ]
 
-# store the JupyterHub runtime files in ~/.cylc/hub
-RUNTIME_PATH = Path('~/.cylc/hub').expanduser()
-c.JupyterHub.cookie_secret_file = f'{RUNTIME_PATH / "cookie_secret"}'
-c.JupyterHub.db_url = f'{RUNTIME_PATH / "jupyterhub.sqlite"}'
-c.ConfigurableHTTPProxy.pid_file = f'{RUNTIME_PATH / "jupyterhub-proxy.pid"}'
+# store JupyterHub runtime files in the user config directory
+USER_CONF_ROOT.mkdir(parents=True, exist_ok=True)
+c.JupyterHub.cookie_secret_file = f'{USER_CONF_ROOT / "cookie_secret"}'
+c.JupyterHub.db_url = f'{USER_CONF_ROOT / "jupyterhub.sqlite"}'
+c.ConfigurableHTTPProxy.pid_file = f'{USER_CONF_ROOT / "jupyterhub-proxy.pid"}'
+
+# write Cylc logging to the user config directory
+# NOTE: Parallel UIS instances will conflict over this file.
+#       See https://github.com/cylc/cylc-uiserver/issues/240
+c.CylcUIServer.logging_config = {
+    'version': 1,
+    'handlers': {
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'level': 'INFO',
+            'filename': str(USER_CONF_ROOT / 'log' / 'log'),
+            'mode': 'a',
+            'backupCount': 5,
+            'maxBytes': 10485760,
+            'formatter': 'file_fmt',
+        },
+    },
+    'loggers': {
+        'CylcUIServer': {
+            'level': 'INFO',
+            'handlers': ['console', 'file'],
+        },
+    },
+    'formatters': {
+        'file_fmt': {
+            'format': '%(asctime)s %(levelname)-8s %(message)s',
+            'datefmt': '%Y-%m-%dT%H:%M:%S',
+        }
+    },
+}

@@ -10,7 +10,10 @@ build-backend = "setuptools.build_meta"
 addopts = """
     --doctest-modules
     --doctest-continue-on-failure
+    -p no:asyncio
 """
+# Note: disabled pytest-asyncio to avoid conflict with pytest-tornasync
+# The latter should be capable of running the async tests anyway
 doctest_optionflags = """
     NORMALIZE_WHITESPACE
     IGNORE_EXCEPTION_DETAIL

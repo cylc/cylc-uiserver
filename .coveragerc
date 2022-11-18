@@ -42,10 +42,20 @@ timid = False
 exclude_lines =
     pragma: no cover
     def __repr__
+    # Don't complain if tests don't hit defensive assertion code:
     raise NotImplementedError
+    return NotImplemented
+
     if __name__ == .__main__.:
     def parse_args
     def main
+
+    # Ignore type checking code:
+    if (typing\.)?TYPE_CHECKING:
+    @overload( |$)
+
+    # Don't complain about ellipsis (exception classes, typing overloads etc):
+    \.\.\.
 fail_under=0
 ignore_errors = False
 omit =

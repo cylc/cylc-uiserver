@@ -15,16 +15,46 @@
 
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
-import getpass
+import asyncio
+from getpass import getuser
 import os
+from copy import deepcopy
 from subprocess import Popen, PIPE, DEVNULL
+from typing import (
+    TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Tuple, Union
+)
 
-from cylc.flow.network.resolvers import BaseResolvers
+from graphql.language.base import print_ast
+
 from cylc.flow.data_store_mgr import WORKFLOW
+from cylc.flow.exceptions import (
+    ServiceFileError,
+    WorkflowFilesError,
+)
+from cylc.flow.network.resolvers import BaseResolvers
+from cylc.flow.scripts.clean import CleanOptions
+from cylc.flow.scripts.clean import run
+
+if TYPE_CHECKING:
+    from concurrent.futures import Executor
+    from logging import Logger
+    from optparse import Values
+    from graphql import ResolveInfo
+    from cylc.flow.data_store_mgr import DataStoreMgr
+    from cylc.flow.id import Tokens
+    from cylc.flow.option_parsers import Options
+    from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
 # show traceback from cylc commands
 DEBUG = True
+OPT_CONVERTERS: Dict['Options', Dict[
+    str, Callable[[object], Tuple[str, object]]
+]] = {
+    CleanOptions: {
+        'rm': lambda value: ('rm_dirs', [value] if value else None),
+    }
+}
 
 
 def snake_to_kebab(snake):
@@ -67,11 +97,104 @@ def check_cylc_version(version):
     return ret or out.strip() == version
 
 
+def _build_cmd(cmd: List, args: Dict) -> List:
+    """Add args to command.
+
+    Args:
+        cmd: A base command.
+        args: Args to append to base command.
+
+    Returns: An elaborated command.
+
+    Examples:
+        It adds one arg to a command:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': 'qux'})
+            ['foo', 'bar', '--set-baz', 'qux']
+
+        It adds one integer arg to a command:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': 42})
+            ['foo', 'bar', '--set-baz', '42']
+
+        It adds a list of the same arg to a command:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': ['qux', 'quiz']})
+            ['foo', 'bar', '--set-baz', 'qux', '--set-baz', 'quiz']
+
+        It doesn't append args == False:
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': False})
+            ['foo', 'bar']
+
+        It doesn't add boolean values, just the switch
+            >>> _build_cmd(['foo', 'bar'], {'set_baz': True})
+            ['foo', 'bar', '--set-baz']
+    """
+    for key, value in args.items():
+        if value is False:
+            # don't add binary flags
+            continue
+        key = snake_to_kebab(key)
+        if not isinstance(value, list):
+            if isinstance(value, int) and not isinstance(value, bool):
+                # Any integer items need converting to strings:
+                value = str(value)
+            value = [value]
+        for item in value:
+            cmd.append(key)
+            if item is not True:
+                # don't provide values for binary flags
+                cmd.append(item)
+    return cmd
+
+
+def _schema_opts_to_api_opts(
+    schema_opts: Dict, schema: 'Options'
+) -> 'Values':
+    """Convert Schema opts to api Opts
+
+    Contains data SCHEMA_TO_API:
+        A mapping of schema options to functions in the form:
+        def func(schema_key, schema_value):
+            return (option_key, option _value)
+
+    Args:
+        schema_opts: Opts as described by the schema.
+        schema: Schema for conversion - used to select
+            converter functions from SCHEMA_TO_API.
+
+    Returns:
+        Namespace for use as options.
+    """
+    converters = OPT_CONVERTERS[schema]
+    api_opts = {}
+    for opt, value in schema_opts.items():
+        # If option has a converter, call it with the value,
+        # else just copy verbatim to api_opts
+        converter = converters.get(opt)
+        if converter is not None:
+            api_opt_name, api_opt_value = converter(value)
+            api_opts[api_opt_name] = api_opt_value
+        else:
+            api_opts[opt] = value
+    return schema(**api_opts)
+
+
+def _clean(workflow_ids, opts):
+    """Helper function to call `cylc clean`.
+
+    Execute this function inside of an "executor" (note this is why we have
+    to set up asyncio here).
+    """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop.run_until_complete(
+        run(*workflow_ids, opts=opts)
+    )
+
+
 class Services:
     """Cylc services provided by the UI Server."""
 
     @staticmethod
-    def _error(message):
+    def _error(message: Union[Exception, str]):
         """Format error case response."""
         return [
             False,
@@ -79,7 +202,7 @@ class Services:
         ]
 
     @staticmethod
-    def _return(message):
+    def _return(message: str):
         """Format success case response."""
         return [
             True,
@@ -87,10 +210,48 @@ class Services:
         ]
 
     @classmethod
+    async def clean(
+        cls,
+        workflows: Iterable['Tokens'],
+        args: dict,
+        workflows_mgr: 'WorkflowsManager',
+        executor: 'Executor',
+        log: 'Logger'
+    ):
+        """Calls `cylc clean`"""
+        # Convert Schema options → cylc.flow.workflow_files.init_clean opts:
+        opts = _schema_opts_to_api_opts(args, schema=CleanOptions)
+        opts.remote_timeout = "600"  # Hard set remote timeout.
+        opts.skip_interactive = True  # disable interactive prompts
+
+        # Convert tokens into string IDs
+        workflow_ids = [tokens.workflow_id for tokens in workflows]
+
+        # run cylc clean
+        log.info(f'Cleaning {" ".join(workflow_ids)}')
+        try:
+            await asyncio.get_event_loop().run_in_executor(
+                executor, _clean, workflow_ids, opts
+            )
+        except Exception as exc:
+            if isinstance(exc, ServiceFileError):  # Expected error
+                # The "workflow still running" msg is very long
+                msg = str(exc).split('\n')[0]
+            elif isinstance(exc, WorkflowFilesError):  # Expected error
+                msg = str(exc)
+            else:  # Unexpected error
+                msg = f"{type(exc).__name__}: {exc}"
+                log.exception(msg)
+            return cls._error(msg)
+
+        # trigger a re-scan
+        await workflows_mgr.scan()
+        return cls._return("Workflow(s) cleaned")
+
+    @classmethod
     async def play(cls, workflows, args, workflows_mgr, log):
         """Calls `cylc play`."""
         response = []
-
         # get ready to run the command
         try:
             # check that the request cylc version is available
@@ -106,34 +267,21 @@ class Services:
 
             # build the command
             cmd = ['cylc', 'play', '--color=never']
-            for key, value in args.items():
-                if value is False:
-                    # don't add binary flags
-                    continue
-                key = snake_to_kebab(key)
-                if not isinstance(value, list):
-                    value = [value]
-                for item in value:
-                    cmd.append(key)
-                    if item is not True:
-                        # don't provide values for binary flags
-                        cmd.append(item)
+            cmd = _build_cmd(cmd, args)
 
         except Exception as exc:
             # oh noes, something went wrong, send back confirmation
             return cls._error(exc)
-
         # start each requested flow
-        me = getpass.getuser()
-        for user, flow, _ in workflows:
+        for tokens in workflows:
             try:
-                if user and user != me:
-                    # TODO: multi-user support
-                    # forward this request to the other users UIS
-                    raise ValueError(f'Cannot start flow for user: {user}')
-
+                if tokens['user'] and tokens['user'] != getuser():
+                    return cls._error(
+                        'Cannot start workflows for other users.'
+                    )
+                # Note: authorisation has already taken place.
                 # add the workflow to the command
-                cmd = [*cmd, flow]
+                cmd = [*cmd, tokens['workflow']]
 
                 # get a representation of the command being run
                 cmd_repr = ' '.join(cmd)
@@ -155,7 +303,7 @@ class Services:
                     # command failed
                     _, err = proc.communicate()
                     raise Exception(
-                        f'Could not start {flow} - {cmd_repr}'
+                        f'Could not start {tokens["workflow"]} - {cmd_repr}'
                         # suppress traceback unless in debug mode
                         + (f' - {err}' if DEBUG else '')
                     )
@@ -169,20 +317,26 @@ class Services:
                 return cls._return(
                     'Workflow started'
                 )
-
         # trigger a re-scan
-        await workflows_mgr.update()
+        await workflows_mgr.scan()
         return response
 
 
 class Resolvers(BaseResolvers):
     """UI Server context GraphQL query and mutation resolvers."""
 
-    workflows_mgr = None
-
-    def __init__(self, data, log, **kwargs):
+    def __init__(
+        self,
+        data: 'DataStoreMgr',
+        log: 'Logger',
+        workflows_mgr: 'WorkflowsManager',
+        executor,
+        **kwargs
+    ):
         super().__init__(data)
         self.log = log
+        self.workflows_mgr = workflows_mgr
+        self.executor = executor
 
         # Set extra attributes
         for key, value in kwargs.items():
@@ -190,42 +344,63 @@ class Resolvers(BaseResolvers):
                 setattr(self, key, value)
 
     # Mutations
-    async def mutator(self, info, *m_args):
+    async def mutator(
+        self,
+        info: 'ResolveInfo',
+        command: str,
+        w_args: Dict[str, Any],
+        _kwargs: Dict[str, Any],
+        _meta: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Mutate workflow."""
-        _, w_args, _ = m_args
-        w_ids = [
-            flow[WORKFLOW].id
-            for flow in await self.get_workflows_data(w_args)]
-        # Pass the request to the workflow GraphQL endpoints
-        req_str, variables, _, _ = info.context.get('graphql_params')
-        graphql_args = {
-            'request_string': req_str,
-            'variables': variables,
+        req_meta = {
+            'auth_user': info.context.get(  # type: ignore[union-attr]
+                'current_user', 'unknown user'
+            )
         }
-        return self.workflows_mgr.multi_request('graphql', w_ids, graphql_args)
-
-    async def service(self, info, *m_args):
-        return await Services.play(
-            m_args[1]['workflows'],
-            m_args[2],
-            self.workflows_mgr,
-            log=self.log
-        )
-
-    async def nodes_mutator(self, info, *m_args):
-        """Mutate node items of associated workflows."""
-        _, _, w_args, _ = m_args
         w_ids = [
             flow[WORKFLOW].id
             for flow in await self.get_workflows_data(w_args)]
         if not w_ids:
-            return 'Error: No matching Workflow'
-        # Pass the multi-node request to the workflow GraphQL endpoints
-        req_str, variables, _, _ = info.context.get('graphql_params')
+            return [{
+                'response': (False, 'No matching workflows')}]
+        # Pass the request to the workflow GraphQL endpoints
+        _, variables, _, _ = info.context.get(  # type: ignore[union-attr]
+            'graphql_params'
+        )
+        # Create a modified request string,
+        # containing only the current mutation/field.
+        operation_ast = deepcopy(info.operation)
+        operation_ast.selection_set.selections = info.field_asts
+
         graphql_args = {
-            'request_string': req_str,
+            'request_string': print_ast(operation_ast),
             'variables': variables,
         }
-        multi_args = {w_id: graphql_args for w_id in w_ids}
-        return self.workflows_mgr.multi_request(
-            'graphql', w_ids, multi_args=multi_args)
+        return await self.workflows_mgr.multi_request(  # type: ignore # TODO
+            'graphql', w_ids, graphql_args, req_meta=req_meta
+        )
+
+    async def service(
+        self,
+        info: 'ResolveInfo',
+        command: str,
+        workflows: Iterable['Tokens'],
+        kwargs: Dict[str, Any]
+    ) -> List[Union[bool, str]]:
+        if command == 'clean':
+            return await Services.clean(
+                workflows,
+                kwargs,
+                self.workflows_mgr,
+                log=self.log,
+                executor=self.executor
+            )
+
+        else:
+            return await Services.play(
+                workflows,
+                kwargs,
+                self.workflows_mgr,
+                log=self.log
+            )

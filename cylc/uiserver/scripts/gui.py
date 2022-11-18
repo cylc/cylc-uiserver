@@ -20,8 +20,10 @@ Launch the Cylc GUI as a standalone web app for local use.
 For a multi-user system see `cylc hub`.
 """
 
+from cylc.uiserver import init_log
 from cylc.uiserver.app import CylcUIServer
 
 
 def main(*argv):
+    init_log()
     return CylcUIServer.launch_instance(argv or None)

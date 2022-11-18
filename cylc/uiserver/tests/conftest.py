@@ -24,21 +24,25 @@ from socket import gethostname
 from tempfile import TemporaryDirectory
 
 import pytest
+from tornado.web import HTTPError
 from traitlets.config import Config
 import zmq
 
+from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
+from cylc.flow.id import Tokens
 from cylc.flow.data_messages_pb2 import (  # type: ignore
     PbEntireWorkflow,
     PbWorkflow,
     PbFamilyProxy,
 )
-from cylc.flow.network import ZMQSocketBase
+from cylc.flow.network.client import WorkflowRuntimeClient
+from cylc.flow.workflow_files import ContactFileFields as CFF
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
-class AsyncClientFixture(ZMQSocketBase):
+class AsyncClientFixture(WorkflowRuntimeClient):
     pattern = zmq.REQ
     host = ''
     port = 0
@@ -49,7 +53,9 @@ class AsyncClientFixture(ZMQSocketBase):
     def will_return(self, returns):
         self.returns = returns
 
-    async def async_request(self, command, args=None, timeout=None):
+    async def async_request(
+        self, command, args=None, timeout=None, req_meta=None
+    ):
         if (
             inspect.isclass(self.returns)
             and issubclass(self.returns, Exception)
@@ -64,19 +70,6 @@ class AsyncClientFixture(ZMQSocketBase):
 @pytest.fixture
 def async_client():
     return AsyncClientFixture()
-
-
-@pytest.fixture
-def event_loop():
-    """This fixture defines the event loop used for each test."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    # gracefully exit async generators
-    loop.run_until_complete(loop.shutdown_asyncgens())
-    # cancel any tasks still running in this event loop
-    for task in asyncio.all_tasks(loop):
-        task.cancel()
-    loop.close()
 
 
 @pytest.fixture
@@ -111,7 +104,9 @@ def make_entire_workflow():
 def one_workflow_aiter():
     """An async generator fixture that returns a single workflow.
     """
-    async def _create_aiter(*args, **kwargs):
+    async def _create_aiter(*args, none=False, **kwargs):
+        if none:
+            return
         yield kwargs
 
     return _create_aiter
@@ -189,13 +184,22 @@ def mock_config(monkeypatch):
 def authorisation_true(monkeypatch):
     """Disabled request authorisation for test purposes."""
     monkeypatch.setattr(
-        'cylc.uiserver.handlers._authorised',
+        'cylc.uiserver.handlers._authorise',
         lambda x: True
     )
 
 
 @pytest.fixture
-def mock_authentication(monkeypatch):
+def authorisation_false(monkeypatch):
+    """Disabled request authorisation for test purposes."""
+    monkeypatch.setattr(
+        'cylc.uiserver.handlers._authorise',
+        lambda x: False
+    )
+
+
+@pytest.fixture
+def mock_authentication(monkeypatch: pytest.MonkeyPatch):
 
     def _mock_authentication(user=None, server=None, none=False):
         ret = {
@@ -203,10 +207,37 @@ def mock_authentication(monkeypatch):
             'server': server or gethostname()
         }
         if none:
-            ret = 'anonymous'
+            ret = None
+            monkeypatch.setattr(
+                'cylc.uiserver.handlers.parse_current_user',
+                lambda x: {
+                    'kind': 'user',
+                    'name': None,
+                    'server': 'some_server'
+                }
+            )
+
+            def mock_redirect(*args):
+                # normally tornado would attempt to redirect us to the login
+                # page - for testing purposes we will skip this and raise
+                # a 403 with an explanatory reason
+                raise HTTPError(
+                    403,
+                    reason='login redirect replaced by 403 for test purposes'
+                )
+
+            monkeypatch.setattr(
+                'cylc.uiserver.handlers.CylcAppHandler.redirect',
+                mock_redirect
+            )
+
         monkeypatch.setattr(
             'cylc.uiserver.handlers.CylcAppHandler.get_current_user',
             lambda x: ret
+        )
+        monkeypatch.setattr(
+            'cylc.uiserver.handlers.CylcAppHandler.get_login_url',
+            lambda x: "http://cylc"
         )
 
     _mock_authentication()
@@ -222,3 +253,136 @@ def mock_authentication_yossarian(mock_authentication):
 @pytest.fixture
 def mock_authentication_none(mock_authentication):
     mock_authentication(none=True)
+
+
+@pytest.fixture
+def jp_server_config(jp_template_dir):
+    """Config to turn the CylcUIServer extension on.
+
+    Auto-loading, add as an argument in the test function to activate.
+    """
+    config = {
+        "ServerApp": {
+            "jpserver_extensions": {
+                'cylc.uiserver': True
+            },
+        }
+    }
+    return config
+
+
+@pytest.fixture
+def patch_conf_files(monkeypatch):
+    """Auto-patches the CylcUIServer to prevent it loading config files.
+
+    Auto-loading, add as an argument in the test function to activate.
+    """
+    monkeypatch.setattr(
+        'cylc.uiserver.app.CylcUIServer.config_file_paths', []
+    )
+
+
+@pytest.fixture
+def cylc_uis(jp_serverapp):
+    """Return the UIS extension for the JupyterServer ServerApp."""
+    return [
+        *jp_serverapp.extension_manager.extension_apps['cylc.uiserver']
+    ][0]
+
+
+@pytest.fixture
+def cylc_workflows_mgr(cylc_uis):
+    """Return the workflows manager for the UIS extension."""
+    return cylc_uis.workflows_mgr
+
+
+@pytest.fixture
+def cylc_data_store_mgr(cylc_uis):
+    """Return the data store manager for the UIS extension."""
+    return cylc_uis.data_store_mgr
+
+
+@pytest.fixture
+def disable_workflows_update(cylc_workflows_mgr, monkeypatch):
+    """Prevent the workflow manager from scanning for workflows.
+
+    Auto-loading, add as an argument in the test function to activate.
+    """
+    monkeypatch.setattr(cylc_workflows_mgr, 'update', lambda: None)
+
+
+@pytest.fixture
+def disable_workflow_connection(cylc_data_store_mgr, monkeypatch):
+    """Prevent the data store manager from connecting to workflows.
+
+    Auto-loading, add as an argument in the test function to activate.
+    """
+
+    async def _null(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(
+        cylc_data_store_mgr,
+        'connect_workflow',
+        _null
+    )
+
+
+@pytest.fixture
+def dummy_workflow(
+    cylc_workflows_mgr,
+    disable_workflow_connection,
+    disable_workflows_update,
+    monkeypatch,
+):
+    """Register a dummy workflow with the workflow manager / data store.
+
+    Use like so:
+
+      dummy_workflow('id')
+
+    Workflows registered in this way will appear as stopped but will contain
+    contact info as if they were running (change this later as required).
+
+    No connection will be made to the schedulers (because they don't exist).
+
+    """
+
+    async def _register(name):
+        await cylc_workflows_mgr._register(
+            Tokens(user='me', workflow=name).id,
+            {
+                'name': name,
+                'owner': 'me',
+                CFF.HOST: 'localhost',
+                CFF.PORT: 1234,
+                CFF.API: 1,
+            },
+            True,
+        )
+
+    return _register
+
+
+@pytest.fixture
+def uis_caplog():
+    """Patch the UIS logging to allow caplog to do its job.
+
+    Use like so:
+        uiserver = CylcUIServer()
+        uis_caplog(caplog, uiserver, logging.<level>)
+        # continue using caplog as normal
+
+    See test_fixtures for example.
+
+    """
+    def _caplog(caplog, uiserver, level=logging.INFO):
+        uiserver.log.handlers = [caplog.handler]
+        caplog.set_level(level, uiserver.log.name)
+
+    return _caplog
+
+
+@pytest.fixture(scope='session')
+def port_range():
+    return glbl_cfg().get(['scheduler', 'run hosts', 'ports'])
