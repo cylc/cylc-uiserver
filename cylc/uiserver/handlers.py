@@ -20,9 +20,10 @@ import json
 import getpass
 import os
 import socket
-from typing import TYPE_CHECKING, Callable, Union
+from typing import TYPE_CHECKING, Callable, Union, Dict
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
+from graphene.types.schema import Schema
 from graphql import get_default_backend
 from graphql_ws.constants import GRAPHQL_WS
 from jupyter_server.base.handlers import JupyterHandler
@@ -33,10 +34,12 @@ from cylc.flow.scripts.cylc import (
     get_version as get_cylc_version,
     list_plugins as list_cylc_plugins,
 )
+from cylc.flow.network.graphql import CylcGraphQLBackend
 
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
+from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
-
+from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 if TYPE_CHECKING:
     from graphql.execution import ExecutionResult
 
@@ -365,13 +368,14 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     """Endpoint for performing GraphQL subscriptions."""
     # No authorization decorators here, auth handled in AuthorizationMiddleware
-    def initialize(self, sub_server, resolvers, backend=None, schema=None, sub_statuses=None):
-        self.queue = Queue(100)
-        self.subscription_server = sub_server
-        self.resolvers = resolvers
-        self.backend = backend or get_default_backend()
-        self.schema = schema
-        self.sub_statuses = sub_statuses
+    def initialize(self, sub_server, resolvers,
+                   backend=None, schema=None, sub_statuses=None):
+        self.queue: Queue = Queue(100)
+        self.subscription_server: TornadoSubscriptionServer = sub_server
+        self.resolvers: Resolvers = resolvers
+        self.backend: CylcGraphQLBackend = backend or get_default_backend()
+        self.schema: Schema = schema
+        self.sub_statuses: Dict = sub_statuses
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
@@ -389,36 +393,21 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
             self.context,
         )
 
-    def on_close(self):
-      #  print("closing web socket!!!!!!!!!!!!!!!")
-        pass
-
     async def on_message(self, message):
-        # print(f"on message web socket!!!!!!!{message}!!!!!!!!")
-        with suppress(ValueError):
+        with suppress(ValueError, SyntaxError):
             import ast
             message_dict = ast.literal_eval(message)
             op_name = ''
-            print(f"message_dict['type'] = {message_dict['type']}")
             with suppress(KeyError):
                 op_name = message_dict['payload']['operationName']
-                print(f"op_name = {op_name}")
-                print(f"message_dict['payload']['operationName'] = {message_dict['payload']['operationName']}")
-            if (message_dict['type'] == 'start' and
-                op_name and
-                    message_dict['payload']['operationName'] == 'LogData'):
+            if (message_dict['type'] == 'start'
+                and op_name
+                    and message_dict['payload']['operationName'] == 'LogData'):
                 op_id = message_dict["id"]
-                print(f"updated {op_id}....in onmessage..{self.sub_statuses}")
                 self.sub_statuses[op_id] = 'start'
-                print(f"in start and status is now {self.sub_statuses}")
             if message_dict['type'] == 'stop':
                 op_id = message_dict["id"]
-                # self.sub_statuses[op_id]
-                print(f"on message: {self.sub_statuses[op_id]}")
-                import signal
-                os.kill(self.sub_statuses[op_id], signal.SIGKILL)
-                self.sub_statuses.pop(op_id)
-                print(f"Log subscription stopped")
+                self.sub_statuses[op_id] = 'stop'
 
         await self.queue.put(message)
 
