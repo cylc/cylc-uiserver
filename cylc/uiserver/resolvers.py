@@ -43,7 +43,6 @@ if TYPE_CHECKING:
     from optparse import Values
     from graphql import ResolveInfo
     from cylc.flow.data_store_mgr import DataStoreMgr
-    from cylc.flow.id import Tokens
     from cylc.flow.option_parsers import Options
     from cylc.uiserver.workflows_mgr import WorkflowsManager
 

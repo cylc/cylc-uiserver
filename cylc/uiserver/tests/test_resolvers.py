@@ -92,4 +92,3 @@ async def test_cat_log(workflow_run_dir):
                     info.context['sub_statuses'][2] = 'stop'
             await asyncio.sleep(0)
     assert actual.rstrip() == expected.rstrip()
-    
