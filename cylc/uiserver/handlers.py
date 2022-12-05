@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import ast
 from asyncio import Queue
 from contextlib import suppress
 from functools import wraps
@@ -395,7 +396,6 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
 
     async def on_message(self, message):
         with suppress(ValueError, SyntaxError):
-            import ast
             message_dict = ast.literal_eval(message)
             op_name = ''
             with suppress(KeyError):

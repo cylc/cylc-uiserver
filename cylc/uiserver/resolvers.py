@@ -334,7 +334,10 @@ class Services:
 
         Used for log subscriptions.
         """
-        cmd = cls.build_cmd(workflow, task)
+        command_id = f'{workflow.workflow_id}//'
+        if task:
+            command_id += task
+        cmd = ['cylc', 'cat-log', '-m', 't', command_id]
         # For info, below subprocess is safe (uses shell=false by default)
         proc = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
@@ -370,15 +373,6 @@ class Services:
                     buffer.clear()
 
             await asyncio.sleep(0.1)
-
-    @classmethod
-    def build_cmd(cls, workflow, task):
-        """"""
-        command_id = f'{workflow.workflow_id}//'
-        if task:
-            command_id += task
-        cmd = ['cylc', 'cat-log', '-m', 't', command_id]
-        return cmd
 
 
 class Resolvers(BaseResolvers):

@@ -1,6 +1,9 @@
 import pytest
 from unittest import mock
+from async_timeout import timeout
+import asyncio
 
+from cylc.flow.id import Tokens
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.uiserver.resolvers import (
     _schema_opts_to_api_opts,
@@ -41,40 +44,52 @@ def test_Services_anciliary_methods(func, message, expect):
     assert func(message) == expect
 
 
-@mock.patch("build_cmd")
-def test_cat_log(tmp_path, mocked_build_cmd):
-    Path(tmp_path).mkdir(exist_ok=True)
-    tmp_log_file = (tmp_path / 'log').touch()
-    log_file_content = """
-    2022-11-08T11:10:05Z DEBUG - Starting
-    2022-11-08T11:10:05Z DEBUG - auth received API command b'CURVE'
-    2022-11-08T11:10:05Z DEBUG - Processing with Jinja2
-    2022-11-08T11:10:05Z DEBUG - Expanding [runtime] namespace lists and parameters
-    2022-11-08T11:10:05Z DEBUG - Parsing the runtime namespace hierarchy
-    2022-11-08T11:10:05Z DEBUG - Parsing [special tasks]
-    2022-11-08T11:10:05Z DEBUG - Parsing the dependency graph
-    2022-11-08T11:10:05Z INFO - Run: (re)start number=1, log rollover=1
-    2022-11-08T11:10:05Z INFO - Cylc version: 8.0.4.dev
-    2022-11-08T11:10:05Z INFO - Run mode: live
-    2022-11-08T11:10:05Z INFO - Initial point: 20200202T0202Z
-    2022-11-08T11:10:05Z INFO - Final point: 20200202T0202Z
-    2022-11-08T11:10:05Z INFO - Cold start from 20200202T0202Z
-    2022-11-08T11:11:08Z DEBUG - PT3M inactivity timer starts NOW
-    2022-11-08T11:11:08Z INFO - [20200202T0202Z/t1 succeeded job:03 flows:1] (polled)succeeded at 2022-11-08T11:11:04Z
-    2022-11-08T11:14:08Z WARNING - inactivity timer timed out after PT3M
-    2022-11-08T11:14:08Z ERROR - Workflow shutting down - "abort on inactivity timeout" is set
-    2022-11-08T11:14:08Z WARNING - Orphaned task jobs:
-        * 20200202T0202Z/t2 (submitted)
-    2022-11-08T11:14:09Z DEBUG - stopping zmq replier...
-    2022-11-08T11:14:09Z DEBUG - ...stopped
-    2022-11-08T11:14:09Z DEBUG - stopping zmq publisher...
-    2022-11-08T11:14:09Z DEBUG - ...stopped
-    2022-11-08T11:14:09Z DEBUG - auth received API command b'TERMINATE'
-    2022-11-08T11:14:09Z DEBUG - Removing authentication keys from scheduler
-    2022-11-08T11:14:11Z INFO - DONE"""
-    tmp_log_file.write(log_file_content)
-    mocked_build_cmd.return_value = ['tail', "-f", tmp_log_file]
+async def test_cat_log(workflow_run_dir):
+    """This is a functional test for cat_log subscription resolver.
+
+    It creates a log file and then runs the cat_log service. Checking it
+    returns all the logs. Note the log content should be over 20 lines to check
+    the buffer logic.
+    """
+    (flow_name, log_dir) = workflow_run_dir
+    log_file_content = """2022-11-08T11:10:05Z DEBUG - Starting
+    2022-11-08T11:10:05Z DEBUG -
+    2022-11-08T11:10:05Z DEBUG -
+    2022-11-08T11:10:05Z DEBUG -
+    2022-11-08T11:10:05Z DEBUG -
+    2022-11-08T11:10:05Z DEBUG -
+    2022-11-08T11:10:05Z DEBUG -
+    2022-11-08T11:10:05Z INFO -
+    2022-11-08T11:10:05Z INFO -
+    2022-11-08T11:10:05Z INFO -
+    2022-11-08T11:10:05Z INFO -
+    2022-11-08T11:10:05Z INFO -
+    2022-11-08T11:10:05Z INFO -
+    2022-11-08T11:11:08Z DEBUG -
+    2022-11-08T11:11:08Z INFO -
+    2022-11-08T11:14:08Z WARNING -
+    2022-11-08T11:14:08Z ERROR -
+    2022-11-08T11:14:08Z WARNING -
+    2022-11-08T11:14:09Z DEBUG -
+    2022-11-08T11:14:09Z DEBUG -
+    2022-11-08T11:14:11Z INFO - DONE
+    """
+    log_file = log_dir / 'log'
+    log_file.write_text(log_file_content)
+    expected = log_file.read_text()
     info = mock.MagicMock()
-    ret = services.Services.cat_log('workflow',info)
-    assert ret == "blah"
-    print("mel!")
+    info.root_value = 2
+    # mock the context
+    info.context = {'sub_statuses': {2: "start"}}
+    workflow = Tokens(flow_name)
+    async with timeout(10):
+        ret = services.cat_log(workflow, info)
+        actual = str()
+        async for buffered_return in ret:
+            for line in buffered_return:
+                actual += line
+                if "DONE" in line:
+                    info.context['sub_statuses'][2] = 'stop'
+            await asyncio.sleep(0)
+    assert actual.rstrip() == expected.rstrip()
+    

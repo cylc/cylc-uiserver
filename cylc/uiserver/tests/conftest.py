@@ -20,8 +20,10 @@ import inspect
 import logging
 from pathlib import Path
 from shutil import rmtree
+import shutil
 from socket import gethostname
 from tempfile import TemporaryDirectory
+from uuid import uuid4
 
 import pytest
 from tornado.web import HTTPError
@@ -386,3 +388,16 @@ def uis_caplog():
 @pytest.fixture(scope='session')
 def port_range():
     return glbl_cfg().get(['scheduler', 'run hosts', 'ports'])
+
+
+@pytest.fixture()
+def workflow_run_dir(request):
+    "Set up workflow run dir, with log_dirs"
+    flow_name = f'cylctb-uiserver-{str(uuid4())[:8]}'
+    run_dir = Path('~/cylc-run' / Path(flow_name)).expanduser().resolve()
+    run_dir.mkdir(parents=True, exist_ok=True)
+    log_dir = Path(run_dir / 'log' / 'scheduler')
+    log_dir.mkdir(parents=True, exist_ok=True)
+    yield flow_name, log_dir
+    if not request.session.testsfailed:
+        shutil.rmtree(run_dir)
