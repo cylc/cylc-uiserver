@@ -29,6 +29,7 @@ from cylc.flow.id import Tokens
 from cylc.flow.network.schema import (
     CyclePoint,
     GenericResponse,
+    ID,
     Mutations,
     NamespaceIDGlob,
     Queries,
@@ -250,23 +251,6 @@ class Clean(graphene.Mutation):
 
 
 class UISSubscriptions(Subscriptions):
-    # subscription {
-    #   logs(workflows:["foo"])
-    # }
-    logs = graphene.List(
-        graphene.String,
-        description=sstrip('''
-            Workflow / job logs.
-        '''),
-        workflows=graphene.List(
-            WorkflowID,
-            required=True
-        ),
-        tasks=graphene.List(
-            NamespaceIDGlob,
-            required=False
-        )
-    )
 
     async def resolve_logs(
         root: Optional[Any],
@@ -279,7 +263,6 @@ class UISSubscriptions(Subscriptions):
         """Cat Log Resolver
         Expands workflow provided subscription query.
         """
-
         if workflows is None:
             # TODO: Return error here
             workflows = []
@@ -297,6 +280,19 @@ class UISSubscriptions(Subscriptions):
             kwargs,
         ):
             yield item
+
+    logs = graphene.Field(
+        graphene.List(graphene.String),
+        description='Workflow & job logs',
+        workflows=graphene.List(
+            ID,
+            required=True,
+            description="List of full ID, i.e. `~user/workflow_id`"
+        ),
+        resolver=resolve_logs
+    )
+
+    resolver = resolve_logs
 
 
 class UISMutations(Mutations):
