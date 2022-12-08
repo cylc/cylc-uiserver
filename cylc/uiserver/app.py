@@ -52,6 +52,7 @@ Cylc specific configurations are documented here.
    ``/etc/cylc/uiserver/jupyter_config.py``, or, alternatively, via
    the environment variable ``CYLC_SITE_CONF_PATH``.
 """
+
 from concurrent.futures import ProcessPoolExecutor
 import getpass
 from pathlib import Path, PurePath
@@ -456,8 +457,6 @@ class CylcUIServer(ExtensionApp):
                 {
                     'sub_server': self.subscription_server,
                     'resolvers': self.resolvers,
-                    'backend': CylcGraphQLBackend(),
-                    'schema': schema,
                     'sub_statuses': self.sub_statuses
                 }
             ),

@@ -24,7 +24,6 @@ import socket
 from typing import TYPE_CHECKING, Callable, Union, Dict
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
-from graphene.types.schema import Schema
 from graphql import get_default_backend
 from graphql_ws.constants import GRAPHQL_WS
 from jupyter_server.base.handlers import JupyterHandler
@@ -35,7 +34,6 @@ from cylc.flow.scripts.cylc import (
     get_version as get_cylc_version,
     list_plugins as list_cylc_plugins,
 )
-from cylc.flow.network.graphql import CylcGraphQLBackend
 
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
 from cylc.uiserver.resolvers import Resolvers
@@ -369,13 +367,10 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     """Endpoint for performing GraphQL subscriptions."""
     # No authorization decorators here, auth handled in AuthorizationMiddleware
-    def initialize(self, sub_server, resolvers,
-                   backend=None, schema=None, sub_statuses=None):
+    def initialize(self, sub_server, resolvers, sub_statuses=None):
         self.queue: Queue = Queue(100)
         self.subscription_server: TornadoSubscriptionServer = sub_server
         self.resolvers: Resolvers = resolvers
-        self.backend: CylcGraphQLBackend = backend or get_default_backend()
-        self.schema: Schema = schema
         self.sub_statuses: Dict = sub_statuses
 
     def select_subprotocol(self, subprotocols):
@@ -398,17 +393,15 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         with suppress(ValueError, SyntaxError):
             message_dict = ast.literal_eval(message)
             op_name = ''
+            op_id = message_dict.get("id", None)
             with suppress(KeyError):
                 op_name = message_dict['payload']['operationName']
             if (message_dict['type'] == 'start'
                 and op_name
                     and message_dict['payload']['operationName'] == 'LogData'):
-                op_id = message_dict["id"]
                 self.sub_statuses[op_id] = 'start'
-            if message_dict['type'] == 'stop':
-                op_id = message_dict["id"]
+            if message_dict['type'] == 'stop' and op_id in self.sub_statuses:
                 self.sub_statuses[op_id] = 'stop'
-
         await self.queue.put(message)
 
     async def recv(self):

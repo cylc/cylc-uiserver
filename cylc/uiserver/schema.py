@@ -250,6 +250,7 @@ class Clean(graphene.Mutation):
 
 
 class UISSubscriptions(Subscriptions):
+    # Example subscription:
     # subscription {
     #   logs(workflows:["foo"])
     # }
