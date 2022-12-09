@@ -328,15 +328,15 @@ class Services:
             await queue.put(line.decode())
 
     @classmethod
-    async def cat_log(cls, workflow: Tokens, info, task=None):
+    async def cat_log(cls, workflow: Tokens, log, info, task=None):
         """Calls `cat log`.
 
         Used for log subscriptions.
         """
-        command_id = f'{workflow.workflow_id}//'
-        if task:
-            command_id += task
-        cmd = ['cylc', 'cat-log', '-m', 't', command_id]
+        tokens = workflow.duplicate(task=task)
+        cmd = ['cylc', 'cat-log', '-m', 't', tokens.id]
+        log.info(f'$ {" ".join(cmd)}')
+
         # For info, below subprocess is safe (uses shell=false by default)
         proc = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
@@ -353,9 +353,11 @@ class Services:
             # subscription started in graphiql, add to dict
             info.context['sub_statuses'][op_id] = 'start'
         while True:
-            if op_id not in info.context['sub_statuses']:
-                break
-            if info.context['sub_statuses'][op_id] == 'stop':
+            if (
+                op_id in info.context['sub_statuses']
+                and info.context['sub_statuses'][op_id] == 'stop'
+            ):
+                print('$$$ stop')
                 with suppress(psutil.Error):
                     cat_log_proc = psutil.Process(proc.pid)
                     # cat-log process will terminate on tail termination
@@ -363,18 +365,22 @@ class Services:
                         tail_proc.terminate()
                 # clean the subscription from the status dict
                 info.context['sub_statuses'].pop(op_id)
+                break
 
-            if queue.empty() and buffer:
-                yield list(buffer)
-                buffer.clear()
+            if queue.empty():
+                if buffer:
+                    print('yield')
+                    yield list(buffer)
+                    buffer.clear()
+                await asyncio.sleep(0.1)
             else:
                 line = await queue.get()
+                print('add-to-buffer', line)
                 buffer.append(line)
                 if len(buffer) >= 20:
                     yield list(buffer)
                     buffer.clear()
-
-            await asyncio.sleep(0.1)
+                    await asyncio.sleep(0)
 
 
 class Resolvers(BaseResolvers):
@@ -471,6 +477,7 @@ class Resolvers(BaseResolvers):
     ):
         async for ret in Services.cat_log(
             workflows[0],
+            self.log,
             info,
             kwargs.get('tasks', [None])[0],
         ):
