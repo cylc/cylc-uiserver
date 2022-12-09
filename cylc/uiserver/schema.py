@@ -31,7 +31,6 @@ from cylc.flow.network.schema import (
     GenericResponse,
     ID,
     Mutations,
-    NamespaceIDGlob,
     Queries,
     Subscriptions,
     WorkflowID,
