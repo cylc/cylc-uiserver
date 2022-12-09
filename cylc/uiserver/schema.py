@@ -251,6 +251,10 @@ class Clean(graphene.Mutation):
 
 
 class UISSubscriptions(Subscriptions):
+    # Example subscription:
+    # subscription {
+    #   logs(workflows:["foo"])
+    # }
 
     async def resolve_logs(
         root: Optional[Any],

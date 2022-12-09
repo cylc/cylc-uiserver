@@ -349,9 +349,10 @@ class Services:
         # subprocess ends
         asyncio.create_task(cls.enqueue(proc.stdout, queue))
         op_id = info.root_value
-
+        if op_id not in info.context['sub_statuses']:
+            # subscription started in graphiql, add to dict
+            info.context['sub_statuses'][op_id] = 'start'
         while True:
-            # TODO detect if subscription has stopped?
             if (
                 op_id in info.context['sub_statuses']
                 and info.context['sub_statuses'][op_id] == 'stop'

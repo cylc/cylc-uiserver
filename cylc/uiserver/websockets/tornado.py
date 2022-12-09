@@ -115,11 +115,6 @@ class TornadoSubscriptionServer(BaseAsyncSubscriptionServer):
             except ConnectionClosedException:
                 break
             if message:
-                
-
-                # if message_dict['type'] == 'stop':
-                #     op_id = message_dict["id"]
-                #     await connection_context.unsubscribe(op_id)
                 self.on_message(connection_context, message)
             else:
                 await sleep(NO_MSG_DELAY)
