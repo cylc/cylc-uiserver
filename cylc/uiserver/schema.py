@@ -27,13 +27,19 @@ from graphene.types.generic import GenericScalar
 
 from cylc.flow.id import Tokens
 from cylc.flow.network.schema import (
+    ALL_JOB_ARGS,
     CyclePoint,
     GenericResponse,
+    ID,
+    Job,
     Mutations,
     Queries,
+    process_resolver_info,
+    STRIP_NULL_DEFAULT,
     Subscriptions,
     WorkflowID,
     _mut_field,
+    get_nodes_all,
     sstrip,
 )
 
@@ -248,6 +254,98 @@ class Clean(graphene.Mutation):
     result = GenericScalar()
 
 
+async def get_jobs(root, info, **args):
+    if args['live']:
+        return await get_nodes_all(root, info, **args)
+
+    _, field_ids = process_resolver_info(root, info, args)
+
+    if hasattr(args, 'id'):
+        args['ids'] = [args.get('id')]
+    if field_ids:
+        if isinstance(field_ids, str):
+            field_ids = [field_ids]
+        elif isinstance(field_ids, dict):
+            field_ids = list(field_ids)
+        args['ids'] = field_ids
+    elif field_ids == []:
+        return []
+
+    for arg in ('ids', 'exids'):
+        # live objects can be represented by a universal ID
+        args[arg] = [Tokens(n_id, relative=True) for n_id in args[arg]]
+    args['workflows'] = [
+        Tokens(w_id) for w_id in args['workflows']]
+    args['exworkflows'] = [
+        Tokens(w_id) for w_id in args['exworkflows']]
+
+    return await list_jobs(args)
+
+
+async def list_jobs(args):
+    if not args['workflows']:
+        raise Exception('At least one workflow must be provided.')
+    from cylc.flow.workflow_db_mgr import WorkflowDatabaseManager
+    from pathlib import Path
+    from cylc.flow.workflow_files import get_workflow_srv_dir
+
+    jobs = []
+    for workflow in args['workflows']:
+        db_file = Path(get_workflow_srv_dir(workflow['workflow']), 'db')
+        wdbm = WorkflowDatabaseManager(db_file.parent)
+        with wdbm.get_pri_dao() as pri_dao:
+            # TODO: support all arguments including states
+            for row in pri_dao.connect().execute('''
+                SELECT
+                    name,
+                    cycle,
+                    submit_num,
+                    submit_status,
+                    time_run,
+                    time_run_exit,
+                    run_status,
+                    job_runner_name,
+                    job_id,
+                    platform_name,
+                    time_submit,
+                    time_submit_exit
+                FROM
+                    task_jobs
+            '''):
+                print('#', row)
+                jobs.append({
+                    'id': workflow.duplicate(
+                        cycle=row[1],
+                        task=row[0],
+                        job=row[2]
+                    ),
+                    'cycle_point': row[1],
+                    'name': row[0],
+                    'state': row[3],
+                    'job_ID': row[8],
+                    'platform': row[9],
+                    'submit_num': row[2],
+                    'started_time': row[4],
+                    'finished_time': row[5],
+                    'submitted_time': row[10],
+                    # TODO submitted exit time???
+                    'job_runner_name': row[7],
+                })
+    return jobs
+
+
+class UISQueries(Queries):
+
+    jobs = graphene.List(
+        Job,
+        description=Job._meta.description,
+        live=graphene.Boolean(default_value=True),
+        strip_null=STRIP_NULL_DEFAULT,
+        resolver=get_jobs,
+        **ALL_JOB_ARGS,
+    )
+
+
 class UISMutations(Mutations):
 
     play = _mut_field(Play)
@@ -255,7 +353,7 @@ class UISMutations(Mutations):
 
 
 schema = graphene.Schema(
-    query=Queries,
+    query=UISQueries,
     subscription=Subscriptions,
     mutation=UISMutations
 )
