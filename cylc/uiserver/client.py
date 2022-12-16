@@ -16,14 +16,18 @@
 
 import json
 import os
-import requests
 from shutil import which
 import socket
 import sys
 from typing import Any, Optional, Union, Dict
+from tornado.httpclient import (
+    AsyncHTTPClient,
+    HTTPRequest,
+    HTTPClientError
+)
 
 from cylc.flow import LOG
-from cylc.flow.exceptions import ClientError, ClientTimeout
+from cylc.flow.exceptions import ClientError
 from cylc.flow.network import encode_
 from cylc.flow.network.client import WorkflowRuntimeClientBase
 from cylc.flow.network.client_factory import CommsMeth
@@ -43,7 +47,7 @@ class WorkflowRuntimeClient(WorkflowRuntimeClientBase):
         port: Union[int, str, None] = None,
         timeout: Union[float, str, None] = None,
     ):
-        self.timeout = timeout
+        self.timeout = timeout or self.DEFAULT_TIMEOUT
         # gather header info post start
         self.header = self.get_header()
 
@@ -72,36 +76,34 @@ class WorkflowRuntimeClient(WorkflowRuntimeClientBase):
         if req_meta:
             msg['meta'].update(req_meta)
 
-        LOG.debug('http:send %s', msg)
+        LOG.debug('https:send %s', msg)
 
         try:
-            res = requests.post(
-                api_info["url"] + 'cylc/graphql',
+            request = HTTPRequest(
+                url=api_info["url"] + 'cylc/graphql',
+                method='POST',
                 headers={
                     'Authorization': f'token {api_info["token"]}',
+                    'Content-Type': 'application/json',
                     'meta': encode_(msg.get('meta', {})),
                 },
-                json={
-                    'query': args['request_string'],
-                    'variables': args.get('variables', {}),
-                },
-                timeout=self.timeout
+                body=json.dumps(
+                    {
+                        'query': args['request_string'],
+                        'variables': args.get('variables', {}),
+                    }
+                ),
+                request_timeout=float(self.timeout)
             )
-            res.raise_for_status()
-        except requests.ConnectTimeout:
-            raise ClientTimeout(
-                'Timeout waiting for server response.'
-                ' This could be due to network or server issues.'
-                ' Check the UI Server log.'
-            )
-        except requests.ConnectionError as exc:
+            res = await AsyncHTTPClient().fetch(request)
+        except HTTPClientError as exc:
             raise ClientError(
-                'Unable to connect to UI Server or Hub.',
+                'Client error with Hub/UI-Server request.',
                 f'{exc}'
             )
 
-        response = res.json()
-        LOG.debug('http:recv %s', response)
+        response = json.loads(res.body)
+        LOG.debug('https:recv %s', response)
 
         try:
             return response['data']
