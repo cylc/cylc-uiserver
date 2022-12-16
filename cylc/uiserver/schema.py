@@ -260,16 +260,15 @@ class UISSubscriptions(Subscriptions):
         info: 'ResolveInfo',
         *,
         command='cat_log',
-        workflows: Optional[List[str]] = None,
+        workflow: str,
+        task=None,
+        file=None,
         **kwargs: Any,
     ) -> AsyncGenerator[Any, None]:
         """Cat Log Resolver
         Expands workflow provided subscription query.
         """
-        if workflows is None:
-            # TODO: Return error here
-            workflows = []
-        parsed_workflows = [Tokens(w_id) for w_id in workflows]
+        parsed_workflows = [Tokens(workflow)]
         if kwargs.get('args', False):
             kwargs.update(kwargs.get('args', {}))
             kwargs.pop('args')
@@ -280,22 +279,27 @@ class UISSubscriptions(Subscriptions):
             info,
             command,
             parsed_workflows,
-            kwargs,
+            task,
+            file
         ):
             yield item
 
     logs = graphene.Field(
         graphene.List(graphene.String),
         description='Workflow & job logs',
-        workflows=graphene.List(
-            ID,
-            required=True,
-            description="List of full ID, i.e. `~user/workflow_id`"
+        workflow=graphene.Argument(
+            ID
+        ),
+        task=graphene.Argument(
+            graphene.String,
+            required=False
+        ),
+        file=graphene.Argument(
+            graphene.String,
+            required=False
         ),
         resolver=resolve_logs
-    )
-
-    resolver = resolve_logs
+        )
 
 
 class UISMutations(Mutations):

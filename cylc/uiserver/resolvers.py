@@ -58,6 +58,15 @@ OPT_CONVERTERS: Dict['Options', Dict[
 }
 
 
+LOG_FILE_MAPPINGS = {
+    'job': 'j',
+    'job.out': 'o',
+    'job.err': 'e',
+    'job-activity.log': 'a',
+    'job.status': 's',
+    'job.xtrace': 'x'
+}
+
 def snake_to_kebab(snake):
     """Convert snake_case text to --kebab-case text.
 
@@ -328,13 +337,20 @@ class Services:
             await queue.put(line.decode())
 
     @classmethod
-    async def cat_log(cls, workflow: Tokens, log, info, task=None):
+    async def cat_log(cls, workflow: Tokens, log, info, task=None, file=None):
         """Calls `cat log`.
 
         Used for log subscriptions.
         """
-        tokens = workflow.duplicate(task=task)
-        cmd = ['cylc', 'cat-log', '-m', 't', tokens.id]
+        full_workflow = workflow
+        if file and task:
+            full_workflow = Tokens(f"{workflow.workflow_id}//{task}")
+        cmd = ['cylc', 'cat-log']
+        if file:
+            cmd += ['-f', file]
+        else:
+            cmd += ['-m', 't']
+        cmd.append(full_workflow.id)
         log.info(f'$ {" ".join(cmd)}')
 
         # For info, below subprocess is safe (uses shell=false by default)
@@ -357,7 +373,6 @@ class Services:
                 op_id in info.context['sub_statuses']
                 and info.context['sub_statuses'][op_id] == 'stop'
             ):
-                print('$$$ stop')
                 with suppress(psutil.Error):
                     cat_log_proc = psutil.Process(proc.pid)
                     # cat-log process will terminate on tail termination
@@ -369,13 +384,11 @@ class Services:
 
             if queue.empty():
                 if buffer:
-                    print('yield')
                     yield list(buffer)
                     buffer.clear()
                 await asyncio.sleep(0.1)
             else:
                 line = await queue.get()
-                print('add-to-buffer', line)
                 buffer.append(line)
                 if len(buffer) >= 20:
                     yield list(buffer)
@@ -473,12 +486,16 @@ class Resolvers(BaseResolvers):
         info: 'ResolveInfo',
         _command: str,
         workflows: List[Tokens],
-        kwargs: Dict[str, Any]
+        task=None,
+        file=None
     ):
+        if file:
+            file = LOG_FILE_MAPPINGS.get(file, file)
         async for ret in Services.cat_log(
             workflows[0],
             self.log,
             info,
-            kwargs.get('tasks', [None])[0],
+            task,
+            file
         ):
             yield ret
