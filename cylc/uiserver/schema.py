@@ -299,7 +299,7 @@ class UISSubscriptions(Subscriptions):
             required=False
         ),
         resolver=resolve_logs
-        )
+    )
 
 
 class UISMutations(Mutations):

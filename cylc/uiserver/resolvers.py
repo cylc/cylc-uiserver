@@ -67,6 +67,7 @@ LOG_FILE_MAPPINGS = {
     'job.xtrace': 'x'
 }
 
+
 def snake_to_kebab(snake):
     """Convert snake_case text to --kebab-case text.
 
