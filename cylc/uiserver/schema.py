@@ -250,9 +250,9 @@ class Clean(graphene.Mutation):
 
 
 class UISSubscriptions(Subscriptions):
-    # Example subscription:
+    # Example graphiql workflow log subscription:
     # subscription {
-    #   logs(workflows:["foo"])
+    #   logs(workflow: "foo")
     # }
 
     async def resolve_logs(

@@ -392,15 +392,11 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     async def on_message(self, message):
         with suppress(ValueError, SyntaxError):
             message_dict = ast.literal_eval(message)
-            op_name = ''
             op_id = message_dict.get("id", None)
-            with suppress(KeyError):
-                op_name = message_dict['payload']['operationName']
-            if (message_dict['type'] == 'start'
-                and op_name
-                    and message_dict['payload']['operationName'] == 'LogData'):
+            if (message_dict['type'] == 'start'):
                 self.sub_statuses[op_id] = 'start'
-            if message_dict['type'] == 'stop' and op_id in self.sub_statuses:
+            if (message_dict['type'] == 'stop' and
+                    op_id in self.sub_statuses):
                 self.sub_statuses[op_id] = 'stop'
         await self.queue.put(message)
 

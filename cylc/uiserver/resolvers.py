@@ -19,23 +19,25 @@ import asyncio
 from contextlib import suppress
 from getpass import getuser
 import os
-import psutil
 from copy import deepcopy
 from subprocess import Popen, PIPE, DEVNULL
 from typing import (
     TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Tuple, Union
 )
-from cylc.flow.id import Tokens
+
 from graphql.language.base import print_ast
+import psutil
 
 from cylc.flow.data_store_mgr import WORKFLOW
 from cylc.flow.exceptions import (
     ServiceFileError,
     WorkflowFilesError,
 )
+from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.flow.scripts.clean import run
+from cylc.flow.task_job_logs import JOB_LOG_OPTS
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
@@ -55,16 +57,6 @@ OPT_CONVERTERS: Dict['Options', Dict[
     CleanOptions: {
         'rm': lambda value: ('rm_dirs', [value] if value else None),
     }
-}
-
-
-LOG_FILE_MAPPINGS = {
-    'job': 'j',
-    'job.out': 'o',
-    'job.err': 'e',
-    'job-activity.log': 'a',
-    'job.status': 's',
-    'job.xtrace': 'x'
 }
 
 
@@ -358,13 +350,14 @@ class Services:
         proc = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
         buffer: List[str] = []
         queue: asyncio.Queue = asyncio.Queue()
         # Farm out reading from stdout stream to a background task
         # This is to get around problem where stream is not EOF until
         # subprocess ends
-        asyncio.create_task(cls.enqueue(proc.stdout, queue))
+        enqueue_task = asyncio.create_task(cls.enqueue(proc.stdout, queue))
         op_id = info.root_value
         if op_id not in info.context['sub_statuses']:
             # subscription started in graphiql, add to dict
@@ -379,14 +372,19 @@ class Services:
                     # cat-log process will terminate on tail termination
                     for tail_proc in cat_log_proc.children():
                         tail_proc.terminate()
-                # clean the subscription from the status dict
-                info.context['sub_statuses'].pop(op_id)
+                    enqueue_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await enqueue_task
                 break
-
             if queue.empty():
                 if buffer:
                     yield list(buffer)
                     buffer.clear()
+                if proc.returncode not in [None, 0]:
+                    (_, stderr) = await proc.communicate()
+                    # pass any error onto ui
+                    yield [stderr.decode()]
+                    break
                 await asyncio.sleep(0.1)
             else:
                 line = await queue.get()
@@ -480,7 +478,7 @@ class Resolvers(BaseResolvers):
                 log=self.log
             )
 
-        raise Exception()
+        raise NotImplementedError()
 
     async def subscription_service(
         self,
@@ -491,7 +489,10 @@ class Resolvers(BaseResolvers):
         file=None
     ):
         if file:
-            file = LOG_FILE_MAPPINGS.get(file, file)
+            # set the correct option for cat log from cylc flow
+            for key, value in JOB_LOG_OPTS.items():
+                if value == file:
+                    file = key
         async for ret in Services.cat_log(
             workflows[0],
             self.log,

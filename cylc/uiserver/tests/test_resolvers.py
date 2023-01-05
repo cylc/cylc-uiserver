@@ -83,7 +83,7 @@ async def test_cat_log(workflow_run_dir):
     # mock the context
     info.context = {'sub_statuses': {2: "start"}}
     workflow = Tokens(flow_name)
-    log=logging.getLogger('cylc')
+    log = logging.getLogger('cylc')
     async with timeout(10):
         ret = services.cat_log(workflow, log, info)
         actual = str()

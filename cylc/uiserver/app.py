@@ -376,7 +376,7 @@ class CylcUIServer(ExtensionApp):
         self.executor = ProcessPoolExecutor(max_workers=self.max_workers)
         self.workflows_mgr = WorkflowsManager(self, log=self.log)
         self.data_store_mgr = DataStoreMgr(self.workflows_mgr, self.log)
-        # sub_status dictionary storing status of log view subscriptions
+        # sub_status dictionary storing status of subscriptions
         self.sub_statuses = {}
         self.resolvers = Resolvers(
             self.data_store_mgr,
@@ -491,7 +491,7 @@ class CylcUIServer(ExtensionApp):
                 IgnoreFieldMiddleware,
                 AuthorizationMiddleware,
             ],
-            auth=self.authobj
+            auth=self.authobj,
         )
 
     def set_auth(self):

@@ -150,6 +150,11 @@ class TornadoSubscriptionServer(BaseAsyncSubscriptionServer):
         await connection_context.unsubscribe(op_id)
         await self.on_operation_complete(connection_context, op_id)
 
+    async def on_operation_complete(self, connection_context, op_id):
+        # remove the subscription from the sub_statuses dict
+        with suppress(KeyError):
+            connection_context.request_context['sub_statuses'].pop(op_id)
+
     async def send_execution_result(self, connection_context, op_id, execution_result):
         # Resolve any pending promises
         if execution_result.data and 'logs' not in execution_result.data:
