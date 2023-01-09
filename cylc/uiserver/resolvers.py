@@ -383,13 +383,14 @@ class Services:
                 if proc.returncode not in [None, 0]:
                     (_, stderr) = await proc.communicate()
                     # pass any error onto ui
-                    yield [stderr.decode()]
+                    yield stderr.decode().splitlines()
                     break
-                await asyncio.sleep(0.1)
+                # sleep set at 1, which matches the `tail` default interval
+                await asyncio.sleep(1)
             else:
                 line = await queue.get()
                 buffer.append(line)
-                if len(buffer) >= 20:
+                if len(buffer) >= 75:
                     yield list(buffer)
                     buffer.clear()
                     await asyncio.sleep(0)
@@ -488,11 +489,6 @@ class Resolvers(BaseResolvers):
         task=None,
         file=None
     ):
-        if file:
-            # set the correct option for cat log from cylc flow
-            for key, value in JOB_LOG_OPTS.items():
-                if value == file:
-                    file = key
         async for ret in Services.cat_log(
             workflows[0],
             self.log,
