@@ -37,7 +37,6 @@ from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.flow.scripts.clean import run
-from cylc.flow.task_job_logs import JOB_LOG_OPTS
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
