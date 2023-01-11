@@ -21,11 +21,6 @@ ones in. -->
 UIServer logs are now archived. The five most recent logs are retained (located
 in `~/.cylc/uiserver/log/`). A new log is created with each UIServer instance.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.1.1 (<span actions:bind='release-date'>Upcoming</span>)__
-
-Maintenance release.
-
 ### Fixes
 
 [#386](https://github.com/cylc/cylc-uiserver/pull/386) - Work around bug in
