@@ -84,6 +84,7 @@ async def test_cat_log(workflow_run_dir):
     info.context = {'sub_statuses': {2: "start"}}
     workflow = Tokens(flow_name)
     log = logging.getLogger('cylc')
+    # note - timeout tests that the cat-log process is being stopped correctly
     async with timeout(10):
         ret = services.cat_log(workflow, log, info)
         actual = str()

@@ -340,8 +340,7 @@ class Services:
         cmd = ['cylc', 'cat-log']
         if file:
             cmd += ['-f', file]
-        else:
-            cmd += ['-m', 't']
+        cmd += ['-m', 't']
         cmd.append(full_workflow.id)
         log.info(f'$ {" ".join(cmd)}')
 
@@ -358,41 +357,36 @@ class Services:
         # subprocess ends
         enqueue_task = asyncio.create_task(cls.enqueue(proc.stdout, queue))
         op_id = info.root_value
-        if op_id not in info.context['sub_statuses']:
-            # subscription started in graphiql, add to dict
-            info.context['sub_statuses'][op_id] = 'start'
-        while True:
-            if (
-                op_id in info.context['sub_statuses']
-                and info.context['sub_statuses'][op_id] == 'stop'
-            ):
-                with suppress(psutil.Error):
-                    cat_log_proc = psutil.Process(proc.pid)
-                    # cat-log process will terminate on tail termination
-                    for tail_proc in cat_log_proc.children():
-                        tail_proc.terminate()
-                    enqueue_task.cancel()
-                    with suppress(asyncio.CancelledError):
-                        await enqueue_task
-                break
-            if queue.empty():
-                if buffer:
-                    yield list(buffer)
-                    buffer.clear()
-                if proc.returncode not in [None, 0]:
-                    (_, stderr) = await proc.communicate()
-                    # pass any error onto ui
-                    yield stderr.decode().splitlines()
-                    break
-                # sleep set at 1, which matches the `tail` default interval
-                await asyncio.sleep(1)
-            else:
-                line = await queue.get()
-                buffer.append(line)
-                if len(buffer) >= 75:
-                    yield list(buffer)
-                    buffer.clear()
-                    await asyncio.sleep(0)
+        try:
+            while (op_id in info.context['sub_statuses']
+                    and info.context['sub_statuses'][op_id] != 'stop'):
+                if queue.empty():
+                    if buffer:
+                        yield list(buffer)
+                        buffer.clear()
+                    if proc.returncode not in [None, 0]:
+                        (_, stderr) = await proc.communicate()
+                        # pass any error onto ui
+                        yield stderr.decode().splitlines()
+                        break
+                    # sleep set at 1, which matches the `tail` default interval
+                    await asyncio.sleep(1)
+                else:
+                    line = await queue.get()
+                    buffer.append(line)
+                    if len(buffer) >= 75:
+                        yield list(buffer)
+                        buffer.clear()
+                        await asyncio.sleep(0)
+        finally:
+            with suppress(psutil.Error):
+                cat_log_proc = psutil.Process(proc.pid)
+                # cat-log process will auto-terminate on tail termination
+                for tail_proc in cat_log_proc.children():
+                    tail_proc.terminate()
+                enqueue_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await enqueue_task
 
 
 class Resolvers(BaseResolvers):

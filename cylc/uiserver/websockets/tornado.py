@@ -131,21 +131,22 @@ class TornadoSubscriptionServer(BaseAsyncSubscriptionServer):
 
         params['root_value'] = op_id
         execution_result = self.execute(params)
-
-        if isawaitable(execution_result):
-            execution_result = await execution_result
-
-        if not hasattr(execution_result, '__aiter__'):
-            await self.send_execution_result(
-                connection_context, op_id, execution_result)
-        else:
-            iterator = await execution_result.__aiter__()
-            connection_context.register_operation(op_id, iterator)
-            async for single_result in iterator:
-                if not connection_context.has_operation(op_id):
-                    break
+        try:
+            if isawaitable(execution_result):
+                execution_result = await execution_result
+            if not hasattr(execution_result, '__aiter__'):
                 await self.send_execution_result(
-                    connection_context, op_id, single_result)
+                    connection_context, op_id, execution_result)
+            else:
+                iterator = await execution_result.__aiter__()
+                connection_context.register_operation(op_id, iterator)
+                async for single_result in iterator:
+                    if not connection_context.has_operation(op_id):
+                        break
+                    await self.send_execution_result(
+                        connection_context, op_id, single_result)
+        except Exception as e:
+            await self.send_error(connection_context, op_id, e)
         await self.send_message(connection_context, op_id, GQL_COMPLETE)
         await connection_context.unsubscribe(op_id)
         await self.on_operation_complete(connection_context, op_id)
@@ -154,6 +155,7 @@ class TornadoSubscriptionServer(BaseAsyncSubscriptionServer):
         # remove the subscription from the sub_statuses dict
         with suppress(KeyError):
             connection_context.request_context['sub_statuses'].pop(op_id)
+
 
     async def send_execution_result(self, connection_context, op_id, execution_result):
         # Resolve any pending promises

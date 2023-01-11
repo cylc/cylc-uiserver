@@ -13,9 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import ast
 from asyncio import Queue
-from contextlib import suppress
 from functools import wraps
 import json
 import getpass
@@ -390,14 +388,15 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         )
 
     async def on_message(self, message):
-        with suppress(ValueError, SyntaxError):
-            message_dict = ast.literal_eval(message)
+        try:
+            message_dict = json.loads(message)
             op_id = message_dict.get("id", None)
             if (message_dict['type'] == 'start'):
                 self.sub_statuses[op_id] = 'start'
-            if (message_dict['type'] == 'stop' and
-                    op_id in self.sub_statuses):
+            if (message_dict['type'] == 'stop'):
                 self.sub_statuses[op_id] = 'stop'
+        except (KeyError, ValueError):
+            pass
         await self.queue.put(message)
 
     async def recv(self):
