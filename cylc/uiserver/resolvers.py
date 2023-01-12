@@ -358,8 +358,7 @@ class Services:
         enqueue_task = asyncio.create_task(cls.enqueue(proc.stdout, queue))
         op_id = info.root_value
         try:
-            while (op_id in info.context['sub_statuses']
-                    and info.context['sub_statuses'][op_id] != 'stop'):
+            while info.context['sub_statuses'].get(op_id) != 'stop':
                 if queue.empty():
                     if buffer:
                         yield list(buffer)
