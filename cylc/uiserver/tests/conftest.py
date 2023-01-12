@@ -399,4 +399,4 @@ def workflow_run_dir(request):
     log_dir.mkdir(parents=True, exist_ok=True)
     yield flow_name, log_dir
     if not request.session.testsfailed:
-        shutil.rmtree(run_dir)
+        rmtree(run_dir)
