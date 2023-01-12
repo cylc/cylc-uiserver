@@ -252,7 +252,9 @@ class Clean(graphene.Mutation):
 class UISSubscriptions(Subscriptions):
     # Example graphiql workflow log subscription:
     # subscription {
-    #   logs(workflow: "foo")
+    #   logs(workflow: "foo") {
+    #     lines
+    #   }
     # }
 
     async def resolve_logs(
@@ -282,21 +284,28 @@ class UISSubscriptions(Subscriptions):
             task,
             file
         ):
-            yield item
+            obj = UISSubscriptions.Logs()
+            obj.lines = item
+            yield obj
+
+    class Logs(graphene.ObjectType):
+        lines = graphene.List(graphene.String)
 
     logs = graphene.Field(
-        graphene.List(graphene.String),
+        Logs,
         description='Workflow & job logs',
         workflow=graphene.Argument(
             ID
         ),
         task=graphene.Argument(
             graphene.String,
-            required=False
+            required=False,
+            description='cylc/task/job ID'
         ),
         file=graphene.Argument(
             graphene.String,
-            required=False
+            required=False,
+            description='File name of job log to fetch, e.g. job.out'
         ),
         resolver=resolve_logs
     )
