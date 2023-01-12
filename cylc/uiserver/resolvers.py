@@ -58,6 +58,9 @@ OPT_CONVERTERS: Dict['Options', Dict[
     }
 }
 
+# the maximum number of log lines to yield before truncating the file
+MAX_LINES = 5000
+
 
 def snake_to_kebab(snake):
     """Convert snake_case text to --kebab-case text.
@@ -357,6 +360,7 @@ class Services:
         # subprocess ends
         enqueue_task = asyncio.create_task(cls.enqueue(proc.stdout, queue))
         op_id = info.root_value
+        line_count = 0
         try:
             while (op_id in info.context['sub_statuses']
                     and info.context['sub_statuses'][op_id] != 'stop'):
@@ -372,7 +376,18 @@ class Services:
                     # sleep set at 1, which matches the `tail` default interval
                     await asyncio.sleep(1)
                 else:
+                    if line_count > MAX_LINES:
+                        yield buffer
+                        yield [
+                            '\n\n' + ('-' * 80) + '\n',
+                            (
+                                'This file has been truncated because'
+                                f' it is over {MAX_LINES} lines long.\n'
+                            ),
+                        ]
+                        break
                     line = await queue.get()
+                    line_count += 1
                     buffer.append(line)
                     if len(buffer) >= 75:
                         yield list(buffer)
