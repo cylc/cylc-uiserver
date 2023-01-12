@@ -323,8 +323,8 @@ class Services:
         await workflows_mgr.scan()
         return response
 
-    @classmethod
-    async def enqueue(cls, stream, queue):
+    @staticmethod
+    async def enqueue(stream, queue):
         async for line in stream:
             await queue.put(line.decode())
 
