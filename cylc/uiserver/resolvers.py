@@ -384,9 +384,9 @@ class Services:
                 # cat-log process will auto-terminate on tail termination
                 for tail_proc in cat_log_proc.children():
                     tail_proc.terminate()
-                enqueue_task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await enqueue_task
+            enqueue_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await enqueue_task
 
 
 class Resolvers(BaseResolvers):
