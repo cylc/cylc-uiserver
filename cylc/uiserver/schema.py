@@ -284,9 +284,7 @@ class UISSubscriptions(Subscriptions):
             task,
             file
         ):
-            obj = UISSubscriptions.Logs()
-            obj.lines = item
-            yield obj
+            yield {'lines': item}
 
     class Logs(graphene.ObjectType):
         lines = graphene.List(graphene.String)
