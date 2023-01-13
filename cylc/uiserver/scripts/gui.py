@@ -50,7 +50,6 @@ CLI_OPT_NEW = "--new"
 
 def main(*argv):
     init_log()
-    new_gui = CLI_OPT_NEW in argv
     jp_server_opts, new_gui, workflow_id = parse_args_opts()
     if '--help' not in sys.argv:
         # get existing jpserver-<pid>-open.html files
