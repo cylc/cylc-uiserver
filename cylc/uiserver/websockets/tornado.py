@@ -4,6 +4,7 @@
 # The file was copied from this revision:
 # https://github.com/graphql-python/graphql-ws/blob/cf560b9a5d18d4a3908dc2cfe2199766cc988fef/graphql_ws/tornado.py
 
+from contextlib import suppress
 import getpass
 from inspect import isawaitable, isclass
 import socket
@@ -130,24 +131,36 @@ class TornadoSubscriptionServer(BaseAsyncSubscriptionServer):
 
         params['root_value'] = op_id
         execution_result = self.execute(params)
+        try:
+            if isawaitable(execution_result):
+                execution_result = await execution_result
+            if not hasattr(execution_result, '__aiter__'):
+                await self.send_execution_result(
+                    connection_context, op_id, execution_result)
+            else:
+                iterator = await execution_result.__aiter__()
+                connection_context.register_operation(op_id, iterator)
+                async for single_result in iterator:
+                    if not connection_context.has_operation(op_id):
+                        break
+                    await self.send_execution_result(
+                        connection_context, op_id, single_result)
+        except Exception as e:
+            await self.send_error(connection_context, op_id, e)
+        await self.send_message(connection_context, op_id, GQL_COMPLETE)
+        await connection_context.unsubscribe(op_id)
+        await self.on_operation_complete(connection_context, op_id)
 
-        if isawaitable(execution_result):
-            execution_result = await execution_result
+    async def on_operation_complete(self, connection_context, op_id):
+        # remove the subscription from the sub_statuses dict
+        with suppress(KeyError):
+            connection_context.request_context['sub_statuses'].pop(op_id)
 
-        if not hasattr(execution_result, '__aiter__'):
-            await self.send_execution_result(connection_context, op_id, execution_result)
-        else:
-            iterator = await execution_result.__aiter__()
-            connection_context.register_operation(op_id, iterator)
-            async for single_result in iterator:
-                if not connection_context.has_operation(op_id):
-                    break
-                await self.send_execution_result(connection_context, op_id, single_result)
-            await self.send_message(connection_context, op_id, GQL_COMPLETE)
 
     async def send_execution_result(self, connection_context, op_id, execution_result):
         # Resolve any pending promises
-        await resolve(execution_result.data)
-        request_context = connection_context.request_context
-        await request_context['resolvers'].flow_delta_processed(request_context, op_id)
+        if execution_result.data and 'logs' not in execution_result.data:
+            await resolve(execution_result.data)
+            request_context = connection_context.request_context
+            await request_context['resolvers'].flow_delta_processed(request_context, op_id)
         await super().send_execution_result(connection_context, op_id, execution_result)
