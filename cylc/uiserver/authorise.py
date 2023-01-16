@@ -552,6 +552,6 @@ def raise_auth_config_exception(config_type: str):
     raise Exception(
         f'Error in {config_type} config: '
         f'`c.CylcUIServer.{config_type}_authorization`. '
-        f'"[]" is not supported. Use "{Authorization.NOT_ALL}" to remove all'
+        f'"[]" is not supported. Use {Authorization.NOT_ALL!r} to remove all'
         ' permissions.'
     )
