@@ -13,7 +13,7 @@ ones in. -->
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.2.0 (<span actions:bind='release-date'>Released 2023-01-16</span>)__
 
-<!-- [Updated cylc-ui to x.y.z](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md) -->
+[Updated cylc-ui to 1.4.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
 
 ### Enhancements
 
