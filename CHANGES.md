@@ -17,6 +17,9 @@ ones in. -->
 
 ### Enhancements
 
+[#370](https://github.com/cylc/cylc-uiserver/pull/370) - Gui command adapted:
+`cylc gui workflow_id` is now supported and will open gui at that workflow.
+
 [#376](https://github.com/cylc/cylc-uiserver/pull/376) -
 UIServer logs are now archived. The five most recent logs are retained (located
 in `~/.cylc/uiserver/log/`). A new log is created with each UIServer instance.

@@ -55,8 +55,10 @@ Cylc specific configurations are documented here.
 
 from concurrent.futures import ProcessPoolExecutor
 import getpass
+import os
 from pathlib import Path, PurePath
 import sys
+from textwrap import dedent
 from typing import List
 
 from pkg_resources import parse_version
@@ -104,6 +106,8 @@ from cylc.uiserver.schema import schema
 from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
 
+INFO_FILES_DIR = Path(USER_CONF_ROOT / "info_files")
+
 
 class PathType(TraitType):
     """A pathlib traitlet type which allows string and undefined values."""
@@ -126,14 +130,17 @@ class CylcUIServer(ExtensionApp):
 
     name = 'cylc'
     app_name = 'cylc-gui'
-    default_url = "/cylc"
     load_other_extensions = True
     description = '''
-    Cylc - A user interface for monitoring and controlling Cylc workflows.
+    Cylc gui - A user interface for monitoring and controlling Cylc workflows.
     '''  # type: ignore[assignment]
-    examples = '''
-        cylc gui    # start the cylc GUI
-    '''  # type: ignore[assignment]
+    examples = dedent('''
+    cylc gui                  # Start the Cylc GUI (At the dashboard page)
+    cylc gui [workflow]       # Start the Cylc GUI (at the workflow page)
+    cylc gui --new [workflow] # Start the Cylc GUI (at the workflow page), with
+                                a new instance.
+
+    ''')  # type: ignore[assignment]
     config_file_paths = get_conf_dir_hierarchy(
         [
             SITE_CONF_ROOT,  # site configuration
@@ -509,12 +516,18 @@ class CylcUIServer(ExtensionApp):
         """Change the jinja templating environment."""
 
     @classmethod
-    def launch_instance(cls, argv=None, **kwargs):
+    def launch_instance(cls, argv=None, workflow_id=None, **kwargs):
+        if workflow_id:
+            cls.default_url = f"/cylc/#/workflows/{workflow_id}"
+        else:
+            cls.default_url = "/cylc"
         if argv is None:
             # jupyter server isn't expecting to be launched by a Cylc command
             # this patches some internal logic
             argv = sys.argv[2:]
+        os.environ["JUPYTER_RUNTIME_DIR"] = str(INFO_FILES_DIR)
         super().launch_instance(argv=argv, **kwargs)
+        del os.environ["JUPYTER_RUNTIME_DIR"]
 
     async def stop_extension(self):
         # stop the async scan task
