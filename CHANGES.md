@@ -11,14 +11,21 @@ creating a new release entry be sure to copy & paste the span tag with the
 updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
 -------------------------------------------------------------------------------
+## __cylc-uiserver-1.3.0 (<span actions:bind='release-date'>Pending</span>)__
+
+<!-- [Updated cylc-ui to x.y.z](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md) -->
+
+### Enhancements
+
+[#370](https://github.com/cylc/cylc-uiserver/pull/370) -
+`cylc gui workflow_id` is now supported and will open the GUI at that workflow.
+
+-------------------------------------------------------------------------------
 ## __cylc-uiserver-1.2.0 (<span actions:bind='release-date'>Released 2023-01-16</span>)__
 
 [Updated cylc-ui to 1.4.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
 
 ### Enhancements
-
-[#370](https://github.com/cylc/cylc-uiserver/pull/370) - Gui command adapted:
-`cylc gui workflow_id` is now supported and will open gui at that workflow.
 
 [#376](https://github.com/cylc/cylc-uiserver/pull/376) -
 UIServer logs are now archived. The five most recent logs are retained (located
