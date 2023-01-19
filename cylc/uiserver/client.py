@@ -66,8 +66,14 @@ class WorkflowRuntimeClient(WorkflowRuntimeClientBase):
         if not args:
             args = {}
 
-        with open(API_INFO_FILE, "r") as api_file:
-            api_info = json.loads(api_file.read())
+        try:
+            with open(API_INFO_FILE, "r") as api_file:
+                api_info = json.loads(api_file.read())
+        except FileNotFoundError:
+            raise ClientError(
+                'API info not found, is the UI-Server running?\n'
+                f'({API_INFO_FILE})'
+            )
 
         # send message
         msg: Dict[str, Any] = {'command': command, 'args': args}
@@ -96,6 +102,11 @@ class WorkflowRuntimeClient(WorkflowRuntimeClientBase):
                 request_timeout=float(self.timeout)
             )
             res = await AsyncHTTPClient().fetch(request)
+        except ConnectionRefusedError:
+            raise ClientError(
+                'Connection refused, is the UI-Server running?\n'
+                f'({api_info["url"]}cylc/graphql)'
+            )
         except HTTPClientError as exc:
             raise ClientError(
                 'Client error with Hub/UI-Server request.',
@@ -147,7 +158,7 @@ class WorkflowRuntimeClient(WorkflowRuntimeClientBase):
                 'comms_method':
                     os.getenv(
                         "CLIENT_COMMS_METH",
-                        default=CommsMeth.HTTP.value
+                        default=CommsMeth.HTTPS.value
                     )
             }
         }
