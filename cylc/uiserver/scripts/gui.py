@@ -65,7 +65,7 @@ def main(*argv):
             )
             update_html_file(gui_file, workflow_id)
             if '--no-browser' not in sys.argv:
-                webbrowser.open(gui_file, autoraise=True)
+                webbrowser.open(f'file://{gui_file}', autoraise=True)
             return
     return CylcUIServer.launch_instance(
         jp_server_opts or None, workflow_id=workflow_id
