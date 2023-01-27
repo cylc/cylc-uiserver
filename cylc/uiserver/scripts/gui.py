@@ -145,7 +145,7 @@ def update_html_file(gui_file, workflow_id):
     if not url_string:
         return
     url = url_string.group(1)
-    split_url = url.split('/workflows/')
+    split_url = url.split('/workspace/')
     if not workflow_id:
         # new url should point to dashboard
         if len(split_url) == 1:
@@ -165,7 +165,7 @@ def update_html_file(gui_file, workflow_id):
                 replacement_url_string = url.replace(old_workflow, workflow_id)
         else:
             # current url points to dashboard, update to point to workflow
-            replacement_url_string = f"{url}/workflows/{workflow_id}"
+            replacement_url_string = f"{url}/workspace/{workflow_id}"
     update_url_string(gui_file, url, replacement_url_string)
 
 

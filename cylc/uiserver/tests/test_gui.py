@@ -32,17 +32,17 @@ from cylc.uiserver.scripts.gui import update_html_file
         pytest.param(
             'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#" /> ',
             'some/workflow',
-            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workflows/some/workflow" /> ',
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workspace/some/workflow" /> ',
             id='existing_no_workflow_new_workflow'
         ),
         pytest.param(
-            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workflows/some/workflow" /> ',
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workspace/some/workflow" /> ',
             'another/flow',
-            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workflows/another/flow" /> ',
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workspace/another/flow" /> ',
             id='existing_workflow_new_workflow'
         ),
         pytest.param(
-            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workflows/some/workflow" /> ',
+            'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workspace/some/workflow" /> ',
             None,
             'content="1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#" /> ',
             id='existing_workflow_no_new_workflow'
