@@ -518,7 +518,7 @@ class CylcUIServer(ExtensionApp):
     @classmethod
     def launch_instance(cls, argv=None, workflow_id=None, **kwargs):
         if workflow_id:
-            cls.default_url = f"/cylc/#/workflows/{workflow_id}"
+            cls.default_url = f"/cylc/#/workspace/{workflow_id}"
         else:
             cls.default_url = "/cylc"
         if argv is None:
