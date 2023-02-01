@@ -402,6 +402,30 @@ class Services:
             with suppress(asyncio.CancelledError):
                 await enqueue_task
 
+    @classmethod
+    async def cat_log_files(cls, workflow: Tokens, task=None):
+        """Calls cat log to get list of available log files."""
+        print(f"in cat log 408")
+        cmd = ['cylc', 'cat-log', '-m', 'l']
+        cmd_workflow = cmd + ['workflow']
+        full_workflow = Tokens(f"{workflow.workflow_id}//{task}")
+        cmd.append(full_workflow.id)
+        # out_workflow, _ = await proc_workflow.communicate()
+        proc_job = await asyncio.subprocess.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        print("in cat log {cmd}")
+        # wait for proc to finish
+        await proc_job.wait()
+        # MOTD returned in stderr, no use in returning
+        out_job, _ = await proc_job.communicate()
+        if out_job:
+            yield list(out_job)
+        else:
+            yield ["No Logs Available"]
+
 
 class Resolvers(BaseResolvers):
     """UI Server context GraphQL query and mutation resolvers."""
@@ -434,6 +458,7 @@ class Resolvers(BaseResolvers):
         _meta: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """Mutate workflow."""
+        print("in mutator")
         req_meta = {
             'auth_user': info.context.get(  # type: ignore[union-attr]
                 'current_user', 'unknown user'
@@ -469,6 +494,7 @@ class Resolvers(BaseResolvers):
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any]
     ) -> List[Union[bool, str]]:
+        print("in here 496")
         if command == 'clean':
             return await Services.clean(
                 workflows,
@@ -502,5 +528,19 @@ class Resolvers(BaseResolvers):
             info,
             task,
             file
+        ):
+            yield ret
+
+    async def query_service(
+        self,
+        info: 'ResolveInfo',
+        _command: str,
+        workflow: Tokens,
+        task=None,
+    ):
+        print(f"in query servuice 537")
+        async for ret in Services.cat_log_files(
+            workflow,
+            task
         ):
             yield ret

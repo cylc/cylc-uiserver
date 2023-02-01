@@ -308,6 +308,47 @@ class UISSubscriptions(Subscriptions):
         resolver=resolve_logs
     )
 
+async def resolve_logfiles(
+    root: Optional[Any],
+    info: 'ResolveInfo',
+    *,
+    command='cat_log_files',
+    workflowID: str,
+    task=None
+):
+    print(f"in resove log files 322")
+    parsed_workflow = Tokens(workflowID).workflow_id
+    resolvers: 'Resolvers' = (
+        info.context.get('resolvers')  # type: ignore[union-attr]
+    )
+    async for item in resolvers.query_service(
+        command,
+        parsed_workflow,
+        task
+    ):
+        print(f"blah blah here I am {item}")
+        yield {'files': item}
+
+
+class UISQueries(Queries):
+    class LogFiles(graphene.ObjectType):
+        print("in LogFiles")
+        files = graphene.List(graphene.String)
+
+    log_files = graphene.Field(
+        LogFiles,
+        description='List available job logs',
+        workflowID=graphene.Argument(
+            ID
+        ),
+        task=graphene.Argument(
+            graphene.String,
+            description='cylc/task/job ID',
+            required=False
+        ),
+        resolver=resolve_logfiles
+    )
+
 
 class UISMutations(Mutations):
     play = _mut_field(Play)
@@ -315,7 +356,7 @@ class UISMutations(Mutations):
 
 
 schema = graphene.Schema(
-    query=Queries,
+    query=UISQueries,
     subscription=UISSubscriptions,
     mutation=UISMutations
 )
