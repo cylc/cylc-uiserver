@@ -340,11 +340,17 @@ class Services:
         full_workflow = workflow
         if file and task:
             full_workflow = Tokens(f"{workflow.workflow_id}//{task}")
-        cmd = ['cylc', 'cat-log']
+        cmd = ['cylc', 'cat-log', '-o']
+        cmd_workflow = full_workflow.id
+        if full_workflow['job']:
+            job = full_workflow['job']
+            # append the submit num
+            cmd += ['-s', job]
+            cmd_workflow = full_workflow.id.strip(job)
         if file:
             cmd += ['-f', file]
         cmd += ['-m', 't']
-        cmd.append(full_workflow.id)
+        cmd.append(cmd_workflow)
         log.info(f'$ {" ".join(cmd)}')
 
         # For info, below subprocess is safe (uses shell=false by default)
@@ -401,6 +407,34 @@ class Services:
             enqueue_task.cancel()
             with suppress(asyncio.CancelledError):
                 await enqueue_task
+
+    @classmethod
+    async def cat_log_files(cls, workflow: str, task=None):
+        """Calls cat log to get list of available log files.
+
+        Note kept separate from the cat_log method above as this is a one off
+        query rather than a process held open for subscription.
+        This uses the Cylc cat-log interface, list dir mode, forcing remote
+        file checking.
+        """
+        cmd = ['cylc', 'cat-log', '-m', 'l', '-o']
+        full_workflow = (f"{workflow}//")
+        if task:
+            full_workflow = (f"{workflow}//{task}")
+        cmd.append(full_workflow)
+        proc_job = await asyncio.subprocess.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        # wait for proc to finish
+        await proc_job.wait()
+        # MOTD returned in stderr, no use in returning
+        out_job, _ = await proc_job.communicate()
+        if out_job:
+            return out_job.decode().splitlines()
+        else:
+            return ["No Logs Available"]
 
 
 class Resolvers(BaseResolvers):
@@ -504,3 +538,13 @@ class Resolvers(BaseResolvers):
             file
         ):
             yield ret
+
+    async def query_service(
+        self,
+        workflow: Tokens,
+        task=None
+    ):
+        return await Services.cat_log_files(
+            workflow=workflow,
+            task=task
+        )

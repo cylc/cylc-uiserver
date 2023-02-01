@@ -314,13 +314,54 @@ class UISSubscriptions(Subscriptions):
     )
 
 
+class UISQueries(Queries):
+    class LogFiles(graphene.ObjectType):
+        # Example GraphiQL query:
+        # {
+        #    logFiles(workflowID: "<workflow_id>", task: "<task_id>") {
+        #      files
+        #    }
+        # }
+        files = graphene.List(graphene.String)
+
+    async def resolve_log_files(
+        root: Optional[Any],
+        info: 'ResolveInfo',
+        workflow: str,
+        task=None
+    ):
+        parsed_workflow = Tokens(workflow).workflow_id
+        resolvers: 'Resolvers' = (
+            info.context.get('resolvers')  # type: ignore[union-attr]
+        )
+        files = await resolvers.query_service(
+            parsed_workflow,
+            task=task
+        )
+        return {'files': files}
+
+    log_files = graphene.Field(
+        LogFiles,
+        description='List available job logs',
+        workflow=graphene.Argument(
+            ID
+        ),
+        task=graphene.Argument(
+            graphene.String,
+            description='cylc/task/job ID',
+            required=False
+        ),
+        resolver=resolve_log_files
+    )
+
+
 class UISMutations(Mutations):
     play = _mut_field(Play)
     clean = _mut_field(Clean)
 
 
 schema = graphene.Schema(
-    query=Queries,
+    query=UISQueries,
     subscription=UISSubscriptions,
     mutation=UISMutations
 )
