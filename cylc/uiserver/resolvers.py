@@ -412,7 +412,6 @@ class Services:
         cmd = ['cylc', 'cat-log', '-m', 'l']
         full_workflow = (f"{workflow}//{task}")
         cmd.append(full_workflow)
-        # out_workflow, _ = await proc_workflow.communicate()
         proc_job = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,

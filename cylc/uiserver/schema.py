@@ -311,6 +311,12 @@ class UISSubscriptions(Subscriptions):
 
 class UISQueries(Queries):
     class LogFiles(graphene.ObjectType):
+        # Example GraphiQL query:
+        # {
+        #    logFiles(workflowID: "<workflow_id>", task: "<task_id>") {
+        #      files
+        #    }
+        # }
         files = graphene.List(graphene.String)
 
     async def resolve_logfiles(
@@ -345,7 +351,6 @@ class UISQueries(Queries):
 
 
 class UISMutations(Mutations):
-
     play = _mut_field(Play)
     clean = _mut_field(Clean)
 
