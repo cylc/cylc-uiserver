@@ -98,7 +98,7 @@ class Play(graphene.Mutation):
     class Meta:
         description = sstrip('''
             Start, resume or restart a workflow run.
-+            Valid for: ['stopped', 'paused'] workflows.
+            Valid for: ['stopped', 'paused'] workflows.
         ''')
         resolver = partial(mutator, command='play')
 
