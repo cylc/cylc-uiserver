@@ -17,6 +17,9 @@ ones in. -->
 
 ### Enhancements
 
+[#367](https://github.com/cylc/cylc-uiserver/pull/367) -
+the log file now captures messages from cylc-flow.
+
 [#370](https://github.com/cylc/cylc-uiserver/pull/370) -
 `cylc gui workflow_id` is now supported and will open the GUI at that workflow.
 
