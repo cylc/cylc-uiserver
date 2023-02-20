@@ -30,6 +30,7 @@ from pathlib import Path
 import random
 import re
 import sys
+from urllib import request
 import webbrowser
 
 
@@ -50,6 +51,8 @@ CLI_OPT_NEW = "--new"
 
 def main(*argv):
     init_log()
+    import mdb
+    mdb.debug(ui_server=True)
     jp_server_opts, new_gui, workflow_id = parse_args_opts()
     if '--help' not in sys.argv:
         # get existing jpserver-<pid>-open.html files
@@ -57,19 +60,53 @@ def main(*argv):
         # these files are cleaned by jpserver on shutdown
         existing_guis = glob(os.path.join(INFO_FILES_DIR, "*open.html"))
         if existing_guis and not new_gui:
-            gui_file = random.choice(existing_guis)
-            print(
-                "Opening with existing gui." +
-                f" Use {CLI_OPT_NEW} option for a new gui.",
-                file=sys.stderr
-            )
-            update_html_file(gui_file, workflow_id)
-            if '--no-browser' not in sys.argv:
-                webbrowser.open(f'file://{gui_file}', autoraise=True)
-            return
+            gui_file = select_info_file(existing_guis)
+            if gui_file:
+                print(
+                    "Opening with existing gui." +
+                    f" Use {CLI_OPT_NEW} option for a new gui.",
+                    file=sys.stderr
+                )
+                update_html_file(gui_file, workflow_id)
+                if '--no-browser' not in sys.argv:
+                    webbrowser.open(f'file://{gui_file}', autoraise=True)
+                return
     return CylcUIServer.launch_instance(
         jp_server_opts or None, workflow_id=workflow_id
     )
+
+
+def select_info_file(existing_guis: list):
+    """This will select an active ui-server info file"""
+    existing_guis.sort(key=os.path.getmtime, reverse=True)
+    for gui_file in existing_guis:
+        if is_active_gui(gui_file):
+            return gui_file
+        check_remove_file(gui_file)
+
+
+def is_active_gui(gui_file):
+    """Returns true if return code is 200 from server"""
+    if request.urlopen(f"file://{gui_file}").getcode() == 200:
+        return True
+    return False
+
+
+def clean_info_file(gui_file):
+    try:
+        os.unlink(gui_file)
+    except Exception:
+        pass
+
+
+def check_remove_file(gui_file) -> None:
+    """Ask user if they want to remove the file."""
+    print(f"The following file cannot be used to open the Cylc GUI: {gui_file}.\n"
+          "The ui-server may be running on another host, or it may be down.\n")
+    ret = input('Do you want to remove this file? (y/n): ')
+    if ret.lower() == 'y':
+        clean_info_file(gui_file)
+    return
 
 
 def print_error(error: str, msg: str):
