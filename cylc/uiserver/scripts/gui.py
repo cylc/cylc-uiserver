@@ -29,8 +29,9 @@ import os
 from pathlib import Path
 import random
 import re
+from requests.exceptions import RequestException
+import requests
 import sys
-from urllib import request
 import webbrowser
 
 
@@ -51,8 +52,6 @@ CLI_OPT_NEW = "--new"
 
 def main(*argv):
     init_log()
-    import mdb
-    mdb.debug(ui_server=True)
     jp_server_opts, new_gui, workflow_id = parse_args_opts()
     if '--help' not in sys.argv:
         # get existing jpserver-<pid>-open.html files
@@ -60,41 +59,56 @@ def main(*argv):
         # these files are cleaned by jpserver on shutdown
         existing_guis = glob(os.path.join(INFO_FILES_DIR, "*open.html"))
         if existing_guis and not new_gui:
-            gui_file = select_info_file(existing_guis)
-            if gui_file:
+            url = select_info_file(existing_guis)
+            if url:
                 print(
                     "Opening with existing gui." +
                     f" Use {CLI_OPT_NEW} option for a new gui.",
                     file=sys.stderr
                 )
-                update_html_file(gui_file, workflow_id)
+                url = update_url(url, workflow_id)
                 if '--no-browser' not in sys.argv:
-                    webbrowser.open(f'file://{gui_file}', autoraise=True)
+                    webbrowser.open(url, autoraise=True)
                 return
     return CylcUIServer.launch_instance(
         jp_server_opts or None, workflow_id=workflow_id
     )
 
 
-def select_info_file(existing_guis: list):
+def select_info_file(existing_guis: list) -> str:
     """This will select an active ui-server info file"""
     existing_guis.sort(key=os.path.getmtime, reverse=True)
     for gui_file in existing_guis:
-        if is_active_gui(gui_file):
-            return gui_file
+        url = fish_url_from_file(gui_file)
+        if url and is_active_gui(url):
+            return url
         check_remove_file(gui_file)
 
 
-def is_active_gui(gui_file):
+def fish_url_from_file(gui_file):
+    with open(gui_file, "r") as f:
+        file_content = f.read()
+    url_extract_regex = re.compile('url=(.*?)\"')
+    match = url_extract_regex.search(file_content)
+    return match.group(1) if match else None
+
+
+def is_active_gui(url):
     """Returns true if return code is 200 from server"""
-    if request.urlopen(f"file://{gui_file}").getcode() == 200:
-        return True
-    return False
+    try:
+        req = requests.get(url)
+        if req.status_code == 200:
+            return True
+    except RequestException:
+        return False
 
 
-def clean_info_file(gui_file):
+def clean_info_files(gui_file):
+    pid = re.compile('-(\d*)-open\.html').search(gui_file).group(1)
+    json_file = os.path.join(INFO_FILES_DIR, f"jpserver-{pid}.json")
     try:
         os.unlink(gui_file)
+        os.unlink(json_file)
     except Exception:
         pass
 
@@ -102,10 +116,10 @@ def clean_info_file(gui_file):
 def check_remove_file(gui_file) -> None:
     """Ask user if they want to remove the file."""
     print(f"The following file cannot be used to open the Cylc GUI: {gui_file}.\n"
-          "The ui-server may be running on another host, or it may be down.\n")
+          "The ui-server may be running on another host, or it may be down.")
     ret = input('Do you want to remove this file? (y/n): ')
     if ret.lower() == 'y':
-        clean_info_file(gui_file)
+        clean_info_files(gui_file)
     return
 
 
@@ -172,43 +186,29 @@ def get_arg_parser():
     return parser
 
 
-def update_html_file(gui_file, workflow_id):
-    """ Update the html file to open at the correct workflow in the gui.
+def update_url(url, workflow_id):
+    """ Update the url to open at the correct workflow in the gui.
     """
-    with open(gui_file, "r") as f:
-        file_content = f.read()
-    url_extract_regex = re.compile('url=(.*?)\"')
-    url_string = url_extract_regex.search(file_content)
-    if not url_string:
+    if not url:
         return
-    url = url_string.group(1)
     split_url = url.split('/workspace/')
     if not workflow_id:
         # new url should point to dashboard
         if len(split_url) == 1:
             # no update required
-            return
+            return url
         else:
             # previous url points to workflow page and needs updating
             # replace with base url (including token)
-            replacement_url_string = split_url[0]
+            return split_url[0]
     else:
         if len(split_url) > 1:
             old_workflow = split_url[1]
             if workflow_id == old_workflow:
                 # same workflow page requested, no update needed
-                return
+                return url
             else:
-                replacement_url_string = url.replace(old_workflow, workflow_id)
+                return url.replace(old_workflow, workflow_id)
         else:
             # current url points to dashboard, update to point to workflow
-            replacement_url_string = f"{url}/workspace/{workflow_id}"
-    update_url_string(gui_file, url, replacement_url_string)
-
-
-def update_url_string(gui_file: str, url: str, replacement_url_string: str):
-    """Updates the url string in the given gui file."""
-    file = Path(gui_file)
-    current_text = file.read_text()
-    updated_text = current_text.replace(url, replacement_url_string)
-    file.write_text(updated_text)
+            return f"{url}/workspace/{workflow_id}"
