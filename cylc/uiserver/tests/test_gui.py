@@ -13,16 +13,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import builtins
 from glob import glob
-import json
-import mock
 import os
 from pathlib import Path
 import pytest
 from random import randint
+import requests
+from shutil import rmtree
 from time import sleep
 
-from cylc.uiserver.scripts.gui import fish_url_from_file, select_info_file, update_url
+from cylc.uiserver.scripts.gui import (
+    fish_url_from_file,
+    select_info_file,
+    update_url
+)
 
 @pytest.mark.parametrize(
     'existing_content,workflow_id,expected_updated_content',
@@ -91,27 +96,70 @@ def test_fish_url_from_file(file_content, expected_url, tmp_path):
     tmp_gui_file.write_text(file_content)
     actual_url = fish_url_from_file(tmp_gui_file)
     assert actual_url == expected_url
+    rmtree(tmp_path, ignore_errors=True)
 
 
 def test_gui_selection_and_clean_process(tmp_path, monkeypatch):
+    """Testing functionally the gui selection and cleaning process"""
     # set up file structure
     info_files_dir = Path(tmp_path/'.cylc'/'uiserver'/'info_files')
     info_files_dir.mkdir(parents=True, exist_ok=True)
     for i in range(1, 5):
         pid = randint(1000, 100000)
         html_file = (info_files_dir / f"jpserver-{pid}-open.html")
-        json_file = (info_files_dir / f"jpserver-{pid}.json")
+        # the json file is unused but created empty to ensure the html is the
+        # file used for selection
+        _json_file = (info_files_dir / f"jpserver-{pid}.json")
         html_file.touch()
-        html_file.write_text(f"")
+        html_file.write_text(f"content=\"1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token{pid}#/workspace/some/workflow\" more content")
         # Sleep ensure different modification time for sort
         sleep(0.1)
     mock_existing_guis = glob(os.path.join(info_files_dir, "*open.html"))
-  #  with mock.patch.object(__builtins__, 'input', lambda: 'y'):
-    monkeypatch.setattr(
-            'cylc.uiserver.gui.check_remove_file.input',
-            'y')
-    monkeypatch.setattr(
-            'cylc.uiserver.gui.is_active_gui.re',
-            'y')
+    monkeypatch.setattr(requests, 'get', mock_get)
     url = select_info_file(mock_existing_guis)
-    
+    # Test that the most recent ui-server is selected:
+    assert url == f"http://localhost:8892/cylc/?token=1234567890some_big_long_token{pid}#/workspace/some/workflow"
+    rmtree(tmp_path, ignore_errors=True)
+
+
+def test_cleaning_of_info_files(tmp_path, monkeypatch):
+    """Functionally tests the cleaning logic of the info files"""
+    mock_info_files_dir = Path(tmp_path/'.cylc'/'uiserver'/'info_files')
+    mock_info_files_dir.mkdir(parents=True, exist_ok=True)
+    html_file = (mock_info_files_dir / f"jpserver-12345-open.html")
+    json_file = (mock_info_files_dir / f"jpserver-12345.json")
+    json_file.touch()
+    html_file.touch()
+    html_file.write_text(f"Some content but no url in here")
+    assert html_file.exists() is True
+    assert json_file.exists() is True
+    # assert is called
+    mock_existing_guis = glob(os.path.join(mock_info_files_dir, "*open.html"))
+    monkeypatch.setattr(builtins, 'input', lambda *args, **kwargs: 'n')
+    # test that a no user response keeps the files
+    url = select_info_file(mock_existing_guis)
+    assert url is None
+    assert html_file.exists() is True
+    assert json_file.exists() is True
+    # Change user response to a yes and test files are removed
+    monkeypatch.setattr(builtins, 'input', lambda *args, **kwargs: 'y')
+    monkeypatch.setattr(
+        'cylc.uiserver.scripts.gui.INFO_FILES_DIR',
+        mock_info_files_dir
+    )
+    url = select_info_file(mock_existing_guis)
+    assert url is None
+    # test clean takes place
+    assert html_file.exists() is False
+    assert json_file.exists() is False
+    rmtree(tmp_path, ignore_errors=True)
+
+
+class MockResponse:
+    """Used for the response of mocked request"""
+    def __init__(self):
+        self.status_code = 200
+
+
+def mock_get(*args, **kwargs):
+    return MockResponse()

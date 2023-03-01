@@ -55,8 +55,10 @@ def main(*argv):
     jp_server_opts, new_gui, workflow_id = parse_args_opts()
     if '--help' not in sys.argv:
         # get existing jpserver-<pid>-open.html files
-        # assume if this exists then the server is still running
-        # these files are cleaned by jpserver on shutdown
+        # check if the server is available for use
+        # prompt for user whether to clean files for un-usable uiservers
+        # these files are usually cleaned by jpserver on shutdown, although
+        # can be left behind on crash or a `kill -9` of the process
         existing_guis = glob(os.path.join(INFO_FILES_DIR, "*open.html"))
         if existing_guis and not new_gui:
             url = select_info_file(existing_guis)
