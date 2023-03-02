@@ -30,6 +30,7 @@ import re
 from requests.exceptions import RequestException
 import requests
 import sys
+from typing import Optional
 import webbrowser
 
 
@@ -75,7 +76,7 @@ def main(*argv):
     )
 
 
-def select_info_file(existing_guis: list) -> str:
+def select_info_file(existing_guis: list) -> Optional[str]:
     """This will select an active ui-server info file"""
     existing_guis.sort(key=os.path.getmtime, reverse=True)
     for gui_file in existing_guis:
@@ -83,6 +84,7 @@ def select_info_file(existing_guis: list) -> str:
         if url and is_active_gui(url):
             return url
         check_remove_file(gui_file)
+    return None
 
 
 def fish_url_from_file(gui_file):
