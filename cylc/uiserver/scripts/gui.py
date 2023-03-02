@@ -26,8 +26,6 @@ import asyncio
 from contextlib import suppress
 from glob import glob
 import os
-from pathlib import Path
-import random
 import re
 from requests.exceptions import RequestException
 import requests
@@ -106,7 +104,7 @@ def is_active_gui(url):
 
 
 def clean_info_files(gui_file):
-    pid = re.compile('-(\d*)-open\.html').search(gui_file).group(1)
+    pid = re.compile(r'-(\d*)-open\.html').search(gui_file).group(1)
     json_file = os.path.join(INFO_FILES_DIR, f"jpserver-{pid}.json")
     try:
         os.unlink(gui_file)
@@ -117,8 +115,9 @@ def clean_info_files(gui_file):
 
 def check_remove_file(gui_file) -> None:
     """Ask user if they want to remove the file."""
-    print(f"The following file cannot be used to open the Cylc GUI: {gui_file}.\n"
-          "The ui-server may be running on another host, or it may be down.")
+    print("The following file cannot be used to open the Cylc GUI:"
+          f" {gui_file}.\nThe ui-server may be running on another host,"
+          " or it may be down.")
     ret = input('Do you want to remove this file? (y/n): ')
     if ret.lower() == 'y':
         clean_info_files(gui_file)
