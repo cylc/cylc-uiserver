@@ -101,6 +101,7 @@ class Play(graphene.Mutation):
 
             Valid for: stopped workflows.
         ''')
+        # Note we have the "resume" mutation for paused workflows.
         resolver = partial(mutator, command='play')
 
     class Arguments:
