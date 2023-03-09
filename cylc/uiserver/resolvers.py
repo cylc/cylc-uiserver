@@ -332,7 +332,8 @@ class Services:
             await queue.put(line.decode())
 
     @classmethod
-    async def cat_log(cls, workflow: Tokens, log, info, task=None, file=None):
+    async def cat_log(cls, workflow: Tokens, log, info, task=None, file=None,
+                      rotation_num=None):
         """Calls `cat log`.
 
         Used for log subscriptions.
@@ -343,6 +344,9 @@ class Services:
         cmd = ['cylc', 'cat-log']
         if file:
             cmd += ['-f', file]
+        if rotation_num:
+            print(f"rotation num is {rotation_num}")
+            cmd += ['-r', str(rotation_num)]
         cmd += ['-m', 't']
         cmd.append(full_workflow.id)
         log.info(f'$ {" ".join(cmd)}')
@@ -410,8 +414,11 @@ class Services:
         query rather than a process held open for subscription.
         """
         cmd = ['cylc', 'cat-log', '-m', 'l']
-        full_workflow = (f"{workflow}//{task}")
+        full_workflow = (f"{workflow}//")
+        if task:
+            full_workflow = (f"{workflow}//{task}")
         cmd.append(full_workflow)
+        print(f"command used is ...{cmd}")
         proc_job = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -458,7 +465,6 @@ class Resolvers(BaseResolvers):
         _meta: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """Mutate workflow."""
-        print("in mutator")
         req_meta = {
             'auth_user': info.context.get(  # type: ignore[union-attr]
                 'current_user', 'unknown user'
@@ -494,7 +500,6 @@ class Resolvers(BaseResolvers):
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any]
     ) -> List[Union[bool, str]]:
-        print("in here 496")
         if command == 'clean':
             return await Services.clean(
                 workflows,
@@ -520,14 +525,16 @@ class Resolvers(BaseResolvers):
         _command: str,
         workflows: List[Tokens],
         task=None,
-        file=None
+        file=None,
+        rotation_num=None
     ):
         async for ret in Services.cat_log(
             workflows[0],
             self.log,
             info,
             task,
-            file
+            file,
+            rotation_num
         ):
             yield ret
 
