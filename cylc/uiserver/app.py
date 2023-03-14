@@ -135,10 +135,10 @@ class CylcUIServer(ExtensionApp):
     Cylc gui - A user interface for monitoring and controlling Cylc workflows.
     '''  # type: ignore[assignment]
     examples = dedent('''
-    cylc gui                  # Start the Cylc GUI (At the dashboard page)
+    cylc gui                  # Start the Cylc GUI (at the dashboard page)
     cylc gui [workflow]       # Start the Cylc GUI (at the workflow page)
-    cylc gui --new [workflow] # Start the Cylc GUI (at the workflow page), with
-                                a new instance.
+    cylc gui --new [workflow] # Start a new Cylc server instance if an old one
+                              # has become unresponsive.
 
     ''')  # type: ignore[assignment]
     config_file_paths = get_conf_dir_hierarchy(
