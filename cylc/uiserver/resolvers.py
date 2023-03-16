@@ -344,9 +344,9 @@ class Services:
         cmd = ['cylc', 'cat-log']
         if file:
             cmd += ['-f', file]
-        if rotation_num:
-            print(f"rotation num is {rotation_num}")
-            cmd += ['-r', str(rotation_num)]
+        # if rotation_num:
+        #     print(f"rotation num is {rotation_num}")
+        #     cmd += ['-r', str(rotation_num)]
         cmd += ['-m', 't']
         cmd.append(full_workflow.id)
         log.info(f'$ {" ".join(cmd)}')
@@ -526,7 +526,6 @@ class Resolvers(BaseResolvers):
         workflows: List[Tokens],
         task=None,
         file=None,
-        rotation_num=None
     ):
         async for ret in Services.cat_log(
             workflows[0],
@@ -534,7 +533,6 @@ class Resolvers(BaseResolvers):
             info,
             task,
             file,
-            rotation_num
         ):
             yield ret
 

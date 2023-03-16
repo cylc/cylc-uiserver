@@ -266,29 +266,11 @@ class UISSubscriptions(Subscriptions):
         workflow: str,
         task=None,
         file=None,
-        file_count=None,
         **kwargs: Any,
     ) -> AsyncGenerator[Any, None]:
         """Cat Log Resolver
         Expands workflow provided subscription query.
         """
-        print(f"file is {file}..... task is {task}")
-        rotation_num = None
-        print(f"file count is P{file_count}")
-        if file_count:
-            if file == 'log':
-                rotation_num = 0
-                # we want the workflow log, no file is needed
-                file = None
-            else:
-                log_file_pattern = re.compile(
-                    r"(^(\d*)-(start|restart)-(\d*))"
-                )
-                match = log_file_pattern.search(file)
-                if match:
-                    rotation_num = file_count - int(match.group(2))
-                    print(f"P{rotation_num}......rot num")
-                    file = None
         parsed_workflows = [Tokens(workflow)]
         if kwargs.get('args', False):
             kwargs.update(kwargs.get('args', {}))
@@ -302,7 +284,7 @@ class UISSubscriptions(Subscriptions):
             parsed_workflows,
             task,
             file,
-            rotation_num
+         #   rotation_num
         ):
             yield {'lines': item}
 
@@ -324,11 +306,6 @@ class UISSubscriptions(Subscriptions):
             graphene.String,
             required=False,
             description='File name of job log to fetch, e.g. job.out'
-        ),
-        file_count=graphene.Argument(
-            graphene.Int,
-            required=False,
-            description='Number of log files. Internal use optional info.'
         ),
         resolver=resolve_logs
     )
