@@ -283,8 +283,7 @@ class UISSubscriptions(Subscriptions):
             command,
             parsed_workflows,
             task,
-            file,
-         #   rotation_num
+            file
         ):
             yield {'lines': item}
 

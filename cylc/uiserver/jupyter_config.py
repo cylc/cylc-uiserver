@@ -54,7 +54,7 @@ c.JupyterHub.template_paths = [
         'templates'
     )
 ]
-c.JupyterHub.ip = 'localhost'
+
 # store JupyterHub runtime files in the user config directory
 USER_CONF_ROOT.mkdir(parents=True, exist_ok=True)
 c.JupyterHub.cookie_secret_file = f'{USER_CONF_ROOT / "cookie_secret"}'

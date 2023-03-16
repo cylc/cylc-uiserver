@@ -17,8 +17,6 @@
 This should be the command JupyterHub is configured to spawn e.g:
   c.Spawner.cmd = ['cylc', 'hubapp']
 """
-import os
-from cylc.uiserver.app import INFO_FILES_DIR
 
 from cylc.uiserver import init_log
 from cylc.uiserver.hubapp import CylcHubApp
@@ -27,6 +25,5 @@ INTERNAL = True
 
 
 def main(*argv):
-    os.environ["JUPYTER_RUNTIME_DIR"] = f'{str(INFO_FILES_DIR)}/hub'
     init_log()
     return CylcHubApp.launch_instance(argv or None)

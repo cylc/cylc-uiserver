@@ -332,8 +332,7 @@ class Services:
             await queue.put(line.decode())
 
     @classmethod
-    async def cat_log(cls, workflow: Tokens, log, info, task=None, file=None,
-                      rotation_num=None):
+    async def cat_log(cls, workflow: Tokens, log, info, task=None, file=None):
         """Calls `cat log`.
 
         Used for log subscriptions.
@@ -344,9 +343,6 @@ class Services:
         cmd = ['cylc', 'cat-log']
         if file:
             cmd += ['-f', file]
-        # if rotation_num:
-        #     print(f"rotation num is {rotation_num}")
-        #     cmd += ['-r', str(rotation_num)]
         cmd += ['-m', 't']
         cmd.append(full_workflow.id)
         log.info(f'$ {" ".join(cmd)}')
@@ -525,21 +521,21 @@ class Resolvers(BaseResolvers):
         _command: str,
         workflows: List[Tokens],
         task=None,
-        file=None,
+        file=None
     ):
         async for ret in Services.cat_log(
             workflows[0],
             self.log,
             info,
             task,
-            file,
+            file
         ):
             yield ret
 
     async def query_service(
         self,
         workflow: Tokens,
-        task=None,
+        task=None
     ):
         return await Services.cat_log_files(
             workflow=workflow,
