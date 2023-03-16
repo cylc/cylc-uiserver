@@ -23,6 +23,12 @@ the log file now captures messages from cylc-flow.
 [#370](https://github.com/cylc/cylc-uiserver/pull/370) -
 `cylc gui workflow_id` is now supported and will open the GUI at that workflow.
 
+### Fixes
+
+[#431](https://github.com/cylc/cylc-uiserver/pull/431)- Adds an additional
+cleaning check for the ui-server contact file. This may have caused problems
+running a ui-server following a crash.
+
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.2.0 (<span actions:bind='release-date'>Released 2023-01-16</span>)__
 
