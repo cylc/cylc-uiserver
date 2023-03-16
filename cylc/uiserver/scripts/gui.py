@@ -80,14 +80,14 @@ def select_info_file(existing_guis: list) -> Optional[str]:
     """This will select an active ui-server info file"""
     existing_guis.sort(key=os.path.getmtime, reverse=True)
     for gui_file in existing_guis:
-        url = fish_url_from_file(gui_file)
+        url = get_url_from_file(gui_file)
         if url and is_active_gui(url):
             return url
         check_remove_file(gui_file)
     return None
 
 
-def fish_url_from_file(gui_file):
+def get_url_from_file(gui_file):
     with open(gui_file, "r") as f:
         file_content = f.read()
     url_extract_regex = re.compile('url=(.*?)\"')
@@ -120,7 +120,8 @@ def check_remove_file(gui_file) -> None:
     print("The following file cannot be used to open the Cylc GUI:"
           f" {gui_file}.\nThe ui-server may be running on another host,"
           " or it may be down.")
-    ret = input('Do you want to remove this file? (y/n): ')
+    ret = input(
+        cparse('<yellow>Do you want to remove this file? (y/n):</yellow>'))
     if ret.lower() == 'y':
         clean_info_files(gui_file)
     return

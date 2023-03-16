@@ -24,7 +24,7 @@ from shutil import rmtree
 from time import sleep
 
 from cylc.uiserver.scripts.gui import (
-    fish_url_from_file,
+    get_url_from_file,
     select_info_file,
     update_url
 )
@@ -89,12 +89,12 @@ def test_update_html_file_updates_gui_file(
         ),
     ]
 )
-def test_fish_url_from_file(file_content, expected_url, tmp_path):
+def test_get_url_from_file(file_content, expected_url, tmp_path):
     Path(tmp_path).mkdir(exist_ok=True)
     tmp_gui_file = Path(tmp_path / "gui")
     tmp_gui_file.touch()
     tmp_gui_file.write_text(file_content)
-    actual_url = fish_url_from_file(tmp_gui_file)
+    actual_url = get_url_from_file(tmp_gui_file)
     assert actual_url == expected_url
     rmtree(tmp_path, ignore_errors=True)
 
