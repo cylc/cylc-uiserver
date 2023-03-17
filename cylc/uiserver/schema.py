@@ -24,7 +24,6 @@ from typing import TYPE_CHECKING, Any, List, Optional, AsyncGenerator
 
 import graphene
 from graphene.types.generic import GenericScalar
-import re
 
 from cylc.flow.id import Tokens
 from cylc.flow.network.schema import (

@@ -340,11 +340,17 @@ class Services:
         full_workflow = workflow
         if file and task:
             full_workflow = Tokens(f"{workflow.workflow_id}//{task}")
-        cmd = ['cylc', 'cat-log']
+        cmd = ['cylc', 'cat-log', '-o']
+        cmd_workflow = full_workflow.id
+        if full_workflow['job']:
+            job = full_workflow['job']
+            # append the submit num
+            cmd += ['-s', job]
+            cmd_workflow = full_workflow.id.strip(job)
         if file:
             cmd += ['-f', file]
         cmd += ['-m', 't']
-        cmd.append(full_workflow.id)
+        cmd.append(cmd_workflow)
         log.info(f'$ {" ".join(cmd)}')
 
         # For info, below subprocess is safe (uses shell=false by default)
@@ -408,13 +414,14 @@ class Services:
 
         Note kept separate from the cat_log method above as this is a one off
         query rather than a process held open for subscription.
+        This uses the Cylc cat-log interface, list dir mode, forcing remote
+        file checking.
         """
-        cmd = ['cylc', 'cat-log', '-m', 'l']
+        cmd = ['cylc', 'cat-log', '-m', 'l', '-o']
         full_workflow = (f"{workflow}//")
         if task:
             full_workflow = (f"{workflow}//{task}")
         cmd.append(full_workflow)
-        print(f"command used is ...{cmd}")
         proc_job = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
