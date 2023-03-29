@@ -139,6 +139,7 @@ class CylcUIServer(ExtensionApp):
     cylc gui [workflow]       # Start the Cylc GUI (at the workflow page)
     cylc gui --new [workflow] # Start a new Cylc server instance if an old one
                               # has become unresponsive.
+    cylc gui --no-browser     # Start the server but don't open the browser
 
     ''')  # type: ignore[assignment]
     config_file_paths = get_conf_dir_hierarchy(
