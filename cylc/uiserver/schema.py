@@ -98,7 +98,10 @@ class Play(graphene.Mutation):
     class Meta:
         description = sstrip('''
             Start, resume or restart a workflow run.
+
+            Valid for: stopped workflows.
         ''')
+        # Note we have the "resume" mutation for paused workflows.
         resolver = partial(mutator, command='play')
 
     class Arguments:
@@ -218,6 +221,8 @@ class Clean(graphene.Mutation):
     class Meta:
         description = sstrip('''
             Clean a workflow from the run directory.
+
+            Valid for: stopped workflows.
         ''')
         resolver = partial(mutator, command='clean')
 
