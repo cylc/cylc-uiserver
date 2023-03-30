@@ -129,3 +129,6 @@ dmypy.json
 jupyterhub-proxy.pid
 jupyterhub.sqlite
 jupyterhub_cookie_secret
+
+�# IDE files
+.idea/

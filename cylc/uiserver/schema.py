@@ -27,11 +27,11 @@ from graphene.types.generic import GenericScalar
 
 from cylc.flow.id import Tokens
 from cylc.flow.network.schema import (
-    ALL_JOB_ARGS,
     CyclePoint,
     GenericResponse,
     ID,
-    Job,
+    SortArgs,
+    Task,
     Mutations,
     Queries,
     process_resolver_info,
@@ -294,55 +294,164 @@ async def list_jobs(args):
         db_file = Path(get_workflow_srv_dir(workflow['workflow']), 'db')
         wdbm = WorkflowDatabaseManager(db_file.parent)
         with wdbm.get_pri_dao() as pri_dao:
-            # TODO: support all arguments including states
-            for row in pri_dao.connect().execute('''
-                SELECT
-                    name,
-                    cycle,
-                    submit_num,
-                    submit_status,
-                    time_run,
-                    time_run_exit,
-                    run_status,
-                    job_runner_name,
-                    job_id,
-                    platform_name,
-                    time_submit,
-                    time_submit_exit
-                FROM
-                    task_jobs
-            '''):
-                print('#', row)
-                jobs.append({
-                    'id': workflow.duplicate(
-                        cycle=row[1],
-                        task=row[0],
-                        job=row[2]
-                    ),
-                    'cycle_point': row[1],
-                    'name': row[0],
-                    'state': row[3],
-                    'job_ID': row[8],
-                    'platform': row[9],
-                    'submit_num': row[2],
-                    'started_time': row[4],
-                    'finished_time': row[5],
-                    'submitted_time': row[10],
-                    # TODO submitted exit time???
-                    'job_runner_name': row[7],
-                })
+            conn = pri_dao.connect()
+            jobs = make_query(conn, workflow)
     return jobs
+
+
+def make_query(conn, workflow):
+
+    tasks = []
+    # TODO: support all arguments including states
+    for row in conn.execute('''
+SELECT
+    name,
+    cycle,
+    submit_num,
+    submit_status,
+    time_run,
+    time_run_exit,
+    job_id,
+    platform_name,
+    time_submit,
+
+    -- Calculate Queue time stats
+    MIN(queue_time) AS min_queue_time,
+    AVG(queue_time) AS mean_queue_time,
+    MAX(queue_time) AS max_queue_time,
+    AVG(queue_time * queue_time) AS mean_squares_queue_time,
+    MAX(CASE WHEN queue_time_quartile = 1 THEN queue_time END) queue_quartile_1,
+    MAX(CASE WHEN queue_time_quartile = 2 THEN queue_time END) queue_quartile_2,
+    MAX(CASE WHEN queue_time_quartile = 3 THEN queue_time END) queue_quartile_3,
+
+    -- Calculate Run time stats
+    MIN(run_time) AS min_run_time,
+    AVG(run_time) AS mean_run_time,
+    MAX(run_time) AS max_run_time,
+    AVG(run_time * run_time) AS mean_squares_run_time,
+    MAX(CASE WHEN run_time_quartile = 1 THEN run_time END) run_quartile_1,
+    MAX(CASE WHEN run_time_quartile = 2 THEN run_time END) run_quartile_2,
+    MAX(CASE WHEN run_time_quartile = 3 THEN run_time END) run_quartile_3,
+
+    -- Calculate Total time stats
+    MIN(total_time) AS min_total_time,
+    AVG(total_time) AS mean_total_time,
+    MAX(total_time) AS max_total_time,
+    AVG(total_time * total_time) AS mean_squares_total_time,
+    MAX(CASE WHEN total_time_quartile = 1 THEN total_time END) total_quartile_1,
+    MAX(CASE WHEN total_time_quartile = 2 THEN total_time END) total_quartile_2,
+    MAX(CASE WHEN total_time_quartile = 3 THEN total_time END) total_quartile_3,
+
+    COUNT(*) AS n
+
+FROM
+    (SELECT
+        *,
+        NTILE (4) OVER (PARTITION BY name ORDER BY queue_time) queue_time_quartile,
+        NTILE (4) OVER (PARTITION BY name ORDER BY run_time) run_time_quartile,
+        NTILE (4) OVER (PARTITION BY name ORDER BY total_time) total_time_quartile
+    FROM
+        (SELECT
+            *,
+            STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit) AS total_time,
+            STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run) AS run_time,
+            STRFTIME('%s', time_run) - STRFTIME('%s', time_submit) AS queue_time
+        FROM
+            task_jobs))
+WHERE
+    run_status = 0
+GROUP BY
+    name;
+'''):
+        print('#', row)
+        tasks.append({
+            'id': workflow.duplicate(
+                cycle=row[1],
+                task=row[0],
+                job=row[2]
+            ),
+            'name': row[0],
+            'cycle_point': row[1],
+            'submit_num': row[2],
+            'state': row[3],
+            'started_time': row[4],
+            'finished_time': row[5],
+            'job_ID': row[6],
+            'platform': row[7],
+            'submitted_time': row[8],
+            # Queue time stats
+            'min_queue_time': row[9],
+            'mean_queue_time': row[10],
+            'max_queue_time': row[11],
+            'std_dev_queue_time': (row[12] - row[10]**2)**0.5,
+            'first_quartile_queue': row[13],
+            'second_quartile_queue': row[14],
+            'third_quartile_queue': row[15],
+            # Run time stats
+            'min_run_time': row[16],
+            'mean_run_time': row[17],
+            'max_run_time': row[18],
+            'std_dev_run_time': (row[19] - row[17]**2)**0.5,
+            'first_quartile_run': row[20],
+            'second_quartile_run': row[21],
+            'third_quartile_run': row[22],
+            # Total
+            'min_total_time': row[23],
+            'mean_total_time': row[24],
+            'max_total_time': row[25],
+            'std_dev_total_time': (row[26] - row[24] ** 2) ** 0.5,
+            'first_quartile_total': row[27],
+            'second_quartile_total': row[28],
+            'third_quartile_total': row[29],
+
+            'count': row[30]
+        })
+
+    return tasks
+
+
+class UISTask(Task):
+
+    platform = graphene.String()
+    min_total_time = graphene.Int()
+    mean_total_time = graphene.Int()
+    max_total_time = graphene.Int()
+    std_dev_total_time = graphene.Int()
+    first_quartile_queue = graphene.Int()
+    second_quartile_queue = graphene.Int()
+    third_quartile_queue = graphene.Int()
+    min_queue_time = graphene.Int()
+    mean_queue_time = graphene.Int()
+    max_queue_time = graphene.Int()
+    std_dev_queue_time = graphene.Int()
+    first_quartile_run = graphene.Int()
+    second_quartile_run = graphene.Int()
+    third_quartile_run = graphene.Int()
+    min_run_time = graphene.Int()
+    mean_run_time = graphene.Int()
+    max_run_time = graphene.Int()
+    std_dev_run_time = graphene.Int()
+    first_quartile_total = graphene.Int()
+    second_quartile_total = graphene.Int()
+    third_quartile_total = graphene.Int()
+    count = graphene.Int()
 
 
 class UISQueries(Queries):
 
-    jobs = graphene.List(
-        Job,
-        description=Job._meta.description,
+    tasks = graphene.List(
+        UISTask,
+        description=Task._meta.description,
         live=graphene.Boolean(default_value=True),
         strip_null=STRIP_NULL_DEFAULT,
         resolver=get_jobs,
-        **ALL_JOB_ARGS,
+        workflows=graphene.List(ID, default_value=[]),
+        exworkflows=graphene.List(ID, default_value=[]),
+        ids=graphene.List(ID, default_value=[]),
+        exids=graphene.List(ID, default_value=[]),
+        mindepth=graphene.Int(default_value=-1),
+        maxdepth=graphene.Int(default_value=-1),
+        sort=SortArgs(default_value=None),
     )
 
 
