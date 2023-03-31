@@ -102,7 +102,7 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
     @pytest.mark.usefixtures("mock_authentication")
     def test_websockets_queue(self):
         handler = self._create_handler()
-        message = 'a message'
+        message = '{"message":"a message"}'
         assert handler.queue.empty()
         self.io_loop.run_sync(partial(handler.on_message, message),
                               get_async_test_timeout())

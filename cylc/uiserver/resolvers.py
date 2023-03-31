@@ -16,6 +16,7 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 import asyncio
+from contextlib import suppress
 from getpass import getuser
 import os
 from copy import deepcopy
@@ -25,12 +26,14 @@ from typing import (
 )
 
 from graphql.language.base import print_ast
+import psutil
 
 from cylc.flow.data_store_mgr import WORKFLOW
 from cylc.flow.exceptions import (
     ServiceFileError,
     WorkflowFilesError,
 )
+from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.flow.scripts.clean import run
@@ -41,7 +44,6 @@ if TYPE_CHECKING:
     from optparse import Values
     from graphql import ResolveInfo
     from cylc.flow.data_store_mgr import DataStoreMgr
-    from cylc.flow.id import Tokens
     from cylc.flow.option_parsers import Options
     from cylc.uiserver.workflows_mgr import WorkflowsManager
 
@@ -55,6 +57,9 @@ OPT_CONVERTERS: Dict['Options', Dict[
         'rm': lambda value: ('rm_dirs', [value] if value else None),
     }
 }
+
+# the maximum number of log lines to yield before truncating the file
+MAX_LINES = 5000
 
 
 def snake_to_kebab(snake):
@@ -321,6 +326,82 @@ class Services:
         await workflows_mgr.scan()
         return response
 
+    @staticmethod
+    async def enqueue(stream, queue):
+        async for line in stream:
+            await queue.put(line.decode())
+
+    @classmethod
+    async def cat_log(cls, workflow: Tokens, log, info, task=None, file=None):
+        """Calls `cat log`.
+
+        Used for log subscriptions.
+        """
+        full_workflow = workflow
+        if file and task:
+            full_workflow = Tokens(f"{workflow.workflow_id}//{task}")
+        cmd = ['cylc', 'cat-log']
+        if file:
+            cmd += ['-f', file]
+        cmd += ['-m', 't']
+        cmd.append(full_workflow.id)
+        log.info(f'$ {" ".join(cmd)}')
+
+        # For info, below subprocess is safe (uses shell=false by default)
+        proc = await asyncio.subprocess.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        buffer: List[str] = []
+        queue: asyncio.Queue = asyncio.Queue()
+        # Farm out reading from stdout stream to a background task
+        # This is to get around problem where stream is not EOF until
+        # subprocess ends
+        enqueue_task = asyncio.create_task(cls.enqueue(proc.stdout, queue))
+        op_id = info.root_value
+        line_count = 0
+        try:
+            while info.context['sub_statuses'].get(op_id) != 'stop':
+                if queue.empty():
+                    if buffer:
+                        yield list(buffer)
+                        buffer.clear()
+                    if proc.returncode not in [None, 0]:
+                        (_, stderr) = await proc.communicate()
+                        # pass any error onto ui
+                        yield stderr.decode().splitlines()
+                        break
+                    # sleep set at 1, which matches the `tail` default interval
+                    await asyncio.sleep(1)
+                else:
+                    if line_count > MAX_LINES:
+                        yield buffer
+                        yield [
+                            '\n\n' + ('-' * 80) + '\n',
+                            (
+                                'This file has been truncated because'
+                                f' it is over {MAX_LINES} lines long.\n'
+                            ),
+                        ]
+                        break
+                    line = await queue.get()
+                    line_count += 1
+                    buffer.append(line)
+                    if len(buffer) >= 75:
+                        yield list(buffer)
+                        buffer.clear()
+                        await asyncio.sleep(0)
+        finally:
+            with suppress(psutil.Error):
+                cat_log_proc = psutil.Process(proc.pid)
+                # cat-log process will auto-terminate on tail termination
+                for tail_proc in cat_log_proc.children():
+                    tail_proc.terminate()
+            enqueue_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await enqueue_task
+
 
 class Resolvers(BaseResolvers):
     """UI Server context GraphQL query and mutation resolvers."""
@@ -397,10 +478,29 @@ class Resolvers(BaseResolvers):
                 executor=self.executor
             )
 
-        else:
+        elif command == 'play':
             return await Services.play(
                 workflows,
                 kwargs,
                 self.workflows_mgr,
                 log=self.log
             )
+
+        raise NotImplementedError()
+
+    async def subscription_service(
+        self,
+        info: 'ResolveInfo',
+        _command: str,
+        workflows: List[Tokens],
+        task=None,
+        file=None
+    ):
+        async for ret in Services.cat_log(
+            workflows[0],
+            self.log,
+            info,
+            task,
+            file
+        ):
+            yield ret

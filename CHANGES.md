@@ -11,20 +11,39 @@ creating a new release entry be sure to copy & paste the span tag with the
 updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
 -------------------------------------------------------------------------------
-## __cylc-uiserver-1.2.0 (<span actions:bind='release-date'>Upcoming</span>)__
+## __cylc-uiserver-1.2.2 (<span actions:bind='release-date'>Upcoming</span>)__
 
 <!-- [Updated cylc-ui to x.y.z](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md) -->
+
+### Fixes
+
+[#431](https://github.com/cylc/cylc-uiserver/pull/431)- Adds an additional
+cleaning check for the UI server contact file. This may have caused problems
+running a UI server following a crash.
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.2.1 (<span actions:bind='release-date'>Released 2023-02-20</span>)__
+
+[Updated cylc-ui to 1.5.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### Enhancements
+
+[#367](https://github.com/cylc/cylc-uiserver/pull/367) -
+the log file now captures messages from cylc-flow.
+
+[#370](https://github.com/cylc/cylc-uiserver/pull/370) -
+`cylc gui workflow_id` is now supported and will open the GUI at that workflow.
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.2.0 (<span actions:bind='release-date'>Released 2023-01-16</span>)__
+
+[Updated cylc-ui to 1.4.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
 
 ### Enhancements
 
 [#376](https://github.com/cylc/cylc-uiserver/pull/376) -
 UIServer logs are now archived. The five most recent logs are retained (located
 in `~/.cylc/uiserver/log/`). A new log is created with each UIServer instance.
-
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.1.1 (<span actions:bind='release-date'>Upcoming</span>)__
-
-Maintenance release.
 
 ### Fixes
 

@@ -20,7 +20,7 @@ extra functionality specific to the UIS.
 """
 
 from functools import partial
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, AsyncGenerator
 
 import graphene
 from graphene.types.generic import GenericScalar
@@ -39,13 +39,12 @@ from cylc.flow.network.schema import (
     Subscriptions,
     WorkflowID,
     _mut_field,
-    get_nodes_all,
-    sstrip,
+    sstrip
 )
+from cylc.uiserver.resolvers import Resolvers
 
 if TYPE_CHECKING:
     from graphql import ResolveInfo
-    from cylc.uiserver.resolvers import Resolvers
 
 
 async def mutator(
@@ -103,7 +102,10 @@ class Play(graphene.Mutation):
     class Meta:
         description = sstrip('''
             Start, resume or restart a workflow run.
+
+            Valid for: stopped workflows.
         ''')
+        # Note we have the "resume" mutation for paused workflows.
         resolver = partial(mutator, command='play')
 
     class Arguments:
@@ -223,6 +225,8 @@ class Clean(graphene.Mutation):
     class Meta:
         description = sstrip('''
             Clean a workflow from the run directory.
+
+            Valid for: stopped workflows.
         ''')
         resolver = partial(mutator, command='clean')
 
@@ -455,14 +459,73 @@ class UISQueries(Queries):
     )
 
 
-class UISMutations(Mutations):
+class UISSubscriptions(Subscriptions):
+    # Example graphiql workflow log subscription:
+    # subscription {
+    #   logs(workflow: "foo") {
+    #     lines
+    #   }
+    # }
 
+    async def resolve_logs(
+        root: Optional[Any],
+        info: 'ResolveInfo',
+        *,
+        command='cat_log',
+        workflow: str,
+        task=None,
+        file=None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[Any, None]:
+        """Cat Log Resolver
+        Expands workflow provided subscription query.
+        """
+        parsed_workflows = [Tokens(workflow)]
+        if kwargs.get('args', False):
+            kwargs.update(kwargs.get('args', {}))
+            kwargs.pop('args')
+        resolvers: 'Resolvers' = (
+            info.context.get('resolvers')  # type: ignore[union-attr]
+        )
+        async for item in resolvers.subscription_service(
+            info,
+            command,
+            parsed_workflows,
+            task,
+            file
+        ):
+            yield {'lines': item}
+
+    class Logs(graphene.ObjectType):
+        lines = graphene.List(graphene.String)
+
+    logs = graphene.Field(
+        Logs,
+        description='Workflow & job logs',
+        workflow=graphene.Argument(
+            ID
+        ),
+        task=graphene.Argument(
+            graphene.String,
+            required=False,
+            description='cylc/task/job ID'
+        ),
+        file=graphene.Argument(
+            graphene.String,
+            required=False,
+            description='File name of job log to fetch, e.g. job.out'
+        ),
+        resolver=resolve_logs
+    )
+
+
+class UISMutations(Mutations):
     play = _mut_field(Play)
     clean = _mut_field(Clean)
 
 
 schema = graphene.Schema(
     query=UISQueries,
-    subscription=Subscriptions,
+    subscription=UISSubscriptions,
     mutation=UISMutations
 )
