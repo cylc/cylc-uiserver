@@ -108,11 +108,10 @@ def is_active_gui(url):
 def clean_info_files(gui_file):
     pid = re.compile(r'-(\d*)-open\.html').search(gui_file).group(1)
     json_file = os.path.join(INFO_FILES_DIR, f"jpserver-{pid}.json")
-    try:
+    with suppress(OSError):
         os.unlink(gui_file)
+    with suppress(OSError):
         os.unlink(json_file)
-    except Exception:
-        pass
 
 
 def check_remove_file(gui_file) -> None:

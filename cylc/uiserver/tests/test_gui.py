@@ -96,7 +96,6 @@ def test_get_url_from_file(file_content, expected_url, tmp_path):
     tmp_gui_file.write_text(file_content)
     actual_url = get_url_from_file(tmp_gui_file)
     assert actual_url == expected_url
-    rmtree(tmp_path, ignore_errors=True)
 
 
 def test_gui_selection_and_clean_process(tmp_path, monkeypatch):
@@ -109,7 +108,8 @@ def test_gui_selection_and_clean_process(tmp_path, monkeypatch):
         html_file = (info_files_dir / f"jpserver-{pid}-open.html")
         # the json file is unused but created empty to ensure the html is the
         # file used for selection
-        _json_file = (info_files_dir / f"jpserver-{pid}.json")
+        json_file = (info_files_dir / f"jpserver-{pid}.json")
+        json_file.touch()
         html_file.touch()
         html_file.write_text(f"content=\"1;url=http://localhost:8892/cylc/?token=1234567890some_big_long_token{pid}#/workspace/some/workflow\" more content")
         # Sleep ensure different modification time for sort
@@ -119,7 +119,6 @@ def test_gui_selection_and_clean_process(tmp_path, monkeypatch):
     url = select_info_file(mock_existing_guis)
     # Test that the most recent ui-server is selected:
     assert url == f"http://localhost:8892/cylc/?token=1234567890some_big_long_token{pid}#/workspace/some/workflow"
-    rmtree(tmp_path, ignore_errors=True)
 
 
 def test_cleaning_of_info_files(tmp_path, monkeypatch):
@@ -152,7 +151,6 @@ def test_cleaning_of_info_files(tmp_path, monkeypatch):
     # test clean takes place
     assert html_file.exists() is False
     assert json_file.exists() is False
-    rmtree(tmp_path, ignore_errors=True)
 
 
 class MockResponse:
