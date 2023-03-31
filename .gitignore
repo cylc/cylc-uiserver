@@ -130,5 +130,5 @@ jupyterhub-proxy.pid
 jupyterhub.sqlite
 jupyterhub_cookie_secret
 
-�# IDE files
+# IDE files
 .idea/
