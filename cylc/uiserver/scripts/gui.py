@@ -95,12 +95,10 @@ def get_url_from_file(gui_file):
     return match.group(1) if match else None
 
 
-def is_active_gui(url):
+def is_active_gui(url: str) -> bool:
     """Returns true if return code is 200 from server"""
     try:
-        req = requests.get(url)
-        if req.status_code == 200:
-            return True
+        return requests.get(url).status_code == 200
     except RequestException:
         return False
 
