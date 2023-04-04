@@ -388,25 +388,34 @@ GROUP BY
             'mean_queue_time': row[10],
             'max_queue_time': row[11],
             'std_dev_queue_time': (row[12] - row[10]**2)**0.5,
-            'first_quartile_queue': row[13],
-            'second_quartile_queue': row[14],
-            'third_quartile_queue': row[15],
+            'queue_quartiles': [row[13],
+                                row[13] if row[14] is None else row[14],
+                                row[13] if row[15] is None else row[15]],
+            # 'first_quartile_queue': row[13],
+            # 'second_quartile_queue': row[13] if row[14] is None else row[14],
+            # 'third_quartile_queue': row[13] if row[15] is None else row[15],
             # Run time stats
             'min_run_time': row[16],
             'mean_run_time': row[17],
             'max_run_time': row[18],
             'std_dev_run_time': (row[19] - row[17]**2)**0.5,
-            'first_quartile_run': row[20],
-            'second_quartile_run': row[21],
-            'third_quartile_run': row[22],
+            'run_quartiles': [row[20],
+                              row[20] if row[21] is None else row[21],
+                              row[20] if row[22] is None else row[22]],
+            # 'first_quartile_run': row[20],
+            # 'second_quartile_run': row[20] if row[21] is None else row[21],
+            # 'third_quartile_run': row[20] if row[22] is None else row[22],
             # Total
             'min_total_time': row[23],
             'mean_total_time': row[24],
             'max_total_time': row[25],
             'std_dev_total_time': (row[26] - row[24] ** 2) ** 0.5,
-            'first_quartile_total': row[27],
-            'second_quartile_total': row[28],
-            'third_quartile_total': row[29],
+            'total_quartiles': [row[27],
+                                row[27] if row[28] is None else row[28],
+                                row[27] if row[28] is None else row[29]],
+            # 'first_quartile_total': row[27],
+            # 'second_quartile_total': row[27] if row[28] is None else row[28],
+            # 'third_quartile_total': row[27] if row[28] is None else row[29],
 
             'count': row[30]
         })
@@ -421,23 +430,26 @@ class UISTask(Task):
     mean_total_time = graphene.Int()
     max_total_time = graphene.Int()
     std_dev_total_time = graphene.Int()
-    first_quartile_queue = graphene.Int()
-    second_quartile_queue = graphene.Int()
-    third_quartile_queue = graphene.Int()
+    queue_quartiles = graphene.List(graphene.Int)
+    # first_quartile_queue = graphene.Int()
+    # second_quartile_queue = graphene.Int()
+    # third_quartile_queue = graphene.Int()
     min_queue_time = graphene.Int()
     mean_queue_time = graphene.Int()
     max_queue_time = graphene.Int()
     std_dev_queue_time = graphene.Int()
-    first_quartile_run = graphene.Int()
-    second_quartile_run = graphene.Int()
-    third_quartile_run = graphene.Int()
+    run_quartiles = graphene.List(graphene.Int)
+    # first_quartile_run = graphene.Int()
+    # second_quartile_run = graphene.Int()
+    # third_quartile_run = graphene.Int()
     min_run_time = graphene.Int()
     mean_run_time = graphene.Int()
     max_run_time = graphene.Int()
     std_dev_run_time = graphene.Int()
-    first_quartile_total = graphene.Int()
-    second_quartile_total = graphene.Int()
-    third_quartile_total = graphene.Int()
+    total_quartiles = graphene.List(graphene.Int)
+    # first_quartile_total = graphene.Int()
+    # second_quartile_total = graphene.Int()
+    # third_quartile_total = graphene.Int()
     count = graphene.Int()
 
 
