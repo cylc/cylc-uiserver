@@ -4,6 +4,7 @@ import logging
 import pytest
 from unittest import mock
 
+from cylc.flow import CYLC_LOG
 from cylc.flow.id import Tokens
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.uiserver.resolvers import (
@@ -52,7 +53,7 @@ async def test_cat_log(workflow_run_dir):
     returns all the logs. Note the log content should be over 20 lines to check
     the buffer logic.
     """
-    (flow_name, log_dir) = workflow_run_dir
+    (id_, log_dir) = workflow_run_dir
     log_file_content = """2022-11-08T11:10:05Z DEBUG - Starting
     2022-11-08T11:10:05Z DEBUG -
     2022-11-08T11:10:05Z DEBUG -
@@ -75,23 +76,39 @@ async def test_cat_log(workflow_run_dir):
     2022-11-08T11:14:09Z DEBUG -
     2022-11-08T11:14:11Z INFO - DONE
     """
-    log_file = log_dir / 'log'
+    log_file = log_dir / '01-start-01.log'
     log_file.write_text(log_file_content)
     expected = log_file.read_text()
     info = mock.MagicMock()
     info.root_value = 2
     # mock the context
     info.context = {'sub_statuses': {2: "start"}}
-    workflow = Tokens(flow_name)
-    log = logging.getLogger('cylc')
+    workflow = Tokens(id_)
+    log = logging.getLogger(CYLC_LOG)
     # note - timeout tests that the cat-log process is being stopped correctly
+
+    first_response = None
     async with timeout(10):
         ret = services.cat_log(workflow, log, info)
-        actual = str()
-        async for buffered_return in ret:
-            for line in buffered_return:
+        actual = ''
+        is_first = True
+        async for response in ret:
+            if is_first:
+                first_response = response
+                is_first = False
+            for line in response.get('lines', []):
                 actual += line
                 if "DONE" in line:
                     info.context['sub_statuses'][2] = 'stop'
             await asyncio.sleep(0)
+
+    # the first response should include the log file path and
+    # connection status
+    assert first_response['path'].endswith('01-start-01.log')
+    assert first_response['connected'] is True
+
+    # the last response should change the connected status
+    assert response['connected'] is False
+
+    # the other responses should contain the log file lines
     assert actual.rstrip() == expected.rstrip()
