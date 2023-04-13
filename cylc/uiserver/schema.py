@@ -290,18 +290,19 @@ async def get_jobs(root, info, **args):
 async def list_jobs(args):
     if not args['workflows']:
         raise Exception('At least one workflow must be provided.')
-    from cylc.flow.workflow_db_mgr import WorkflowDatabaseManager
-    # from cylc.flow.rundb import CylcWorkflowDAO
-    from pathlib import Path
-    from cylc.flow.workflow_files import get_workflow_srv_dir
-
+    from cylc.flow.rundb import CylcWorkflowDAO
+    from cylc.flow.pathutil import get_workflow_run_dir
+    from cylc.flow.workflow_files import WorkflowFiles
     jobs = []
     for workflow in args['workflows']:
-        db_file = Path(get_workflow_srv_dir(workflow['workflow']), 'db')
-        wdbm = WorkflowDatabaseManager(db_file.parent)
-        with wdbm.get_pri_dao() as pri_dao:
-            conn = pri_dao.connect()
-            jobs = make_query(conn, workflow)
+        db_file = get_workflow_run_dir(
+            workflow['workflow'],
+            WorkflowFiles.LogDir.DIRNAME,
+            WorkflowFiles.LogDir.DB
+        )
+        with CylcWorkflowDAO(db_file, is_public=True) as dao:
+            conn = dao.connect()
+            jobs.extend(make_query(conn, workflow))
     return jobs
 
 
