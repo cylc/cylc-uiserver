@@ -39,7 +39,8 @@ from cylc.flow.network.schema import (
     Subscriptions,
     WorkflowID,
     _mut_field,
-    sstrip
+    sstrip,
+    get_nodes_all
 )
 from cylc.uiserver.resolvers import Resolvers
 
@@ -290,6 +291,7 @@ async def list_jobs(args):
     if not args['workflows']:
         raise Exception('At least one workflow must be provided.')
     from cylc.flow.workflow_db_mgr import WorkflowDatabaseManager
+    # from cylc.flow.rundb import CylcWorkflowDAO
     from pathlib import Path
     from cylc.flow.workflow_files import get_workflow_srv_dir
 
@@ -305,8 +307,9 @@ async def list_jobs(args):
 
 def make_query(conn, workflow):
 
-    tasks = []
     # TODO: support all arguments including states
+    # https://github.com/cylc/cylc-uiserver/issues/440
+    tasks = []
     for row in conn.execute('''
 SELECT
     name,
@@ -324,9 +327,12 @@ SELECT
     AVG(queue_time) AS mean_queue_time,
     MAX(queue_time) AS max_queue_time,
     AVG(queue_time * queue_time) AS mean_squares_queue_time,
-    MAX(CASE WHEN queue_time_quartile = 1 THEN queue_time END) queue_quartile_1,
-    MAX(CASE WHEN queue_time_quartile = 2 THEN queue_time END) queue_quartile_2,
-    MAX(CASE WHEN queue_time_quartile = 3 THEN queue_time END) queue_quartile_3,
+    MAX(CASE WHEN queue_time_quartile = 1 THEN queue_time END)
+     queue_quartile_1,
+    MAX(CASE WHEN queue_time_quartile = 2 THEN queue_time END)
+    queue_quartile_2,
+    MAX(CASE WHEN queue_time_quartile = 3 THEN queue_time END)
+    queue_quartile_3,
 
     -- Calculate Run time stats
     MIN(run_time) AS min_run_time,
@@ -342,24 +348,33 @@ SELECT
     AVG(total_time) AS mean_total_time,
     MAX(total_time) AS max_total_time,
     AVG(total_time * total_time) AS mean_squares_total_time,
-    MAX(CASE WHEN total_time_quartile = 1 THEN total_time END) total_quartile_1,
-    MAX(CASE WHEN total_time_quartile = 2 THEN total_time END) total_quartile_2,
-    MAX(CASE WHEN total_time_quartile = 3 THEN total_time END) total_quartile_3,
+    MAX(CASE WHEN total_time_quartile = 1 THEN total_time END)
+    total_quartile_1,
+    MAX(CASE WHEN total_time_quartile = 2 THEN total_time END)
+    total_quartile_2,
+    MAX(CASE WHEN total_time_quartile = 3 THEN total_time END)
+    total_quartile_3,
 
     COUNT(*) AS n
 
 FROM
     (SELECT
         *,
-        NTILE (4) OVER (PARTITION BY name ORDER BY queue_time) queue_time_quartile,
-        NTILE (4) OVER (PARTITION BY name ORDER BY run_time) run_time_quartile,
-        NTILE (4) OVER (PARTITION BY name ORDER BY total_time) total_time_quartile
+        NTILE (4) OVER (PARTITION BY name ORDER BY queue_time)
+        queue_time_quartile,
+        NTILE (4) OVER (PARTITION BY name ORDER BY run_time)
+        run_time_quartile,
+        NTILE (4) OVER (PARTITION BY name ORDER BY total_time)
+        total_time_quartile
     FROM
         (SELECT
             *,
-            STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit) AS total_time,
-            STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run) AS run_time,
-            STRFTIME('%s', time_run) - STRFTIME('%s', time_submit) AS queue_time
+            STRFTIME('%s', time_run_exit) -
+            STRFTIME('%s', time_submit) AS total_time,
+            STRFTIME('%s', time_run_exit) -
+            STRFTIME('%s', time_run) AS run_time,
+            STRFTIME('%s', time_run) -
+            STRFTIME('%s', time_submit) AS queue_time
         FROM
             task_jobs))
 WHERE
@@ -391,9 +406,6 @@ GROUP BY
             'queue_quartiles': [row[13],
                                 row[13] if row[14] is None else row[14],
                                 row[13] if row[15] is None else row[15]],
-            # 'first_quartile_queue': row[13],
-            # 'second_quartile_queue': row[13] if row[14] is None else row[14],
-            # 'third_quartile_queue': row[13] if row[15] is None else row[15],
             # Run time stats
             'min_run_time': row[16],
             'mean_run_time': row[17],
@@ -402,9 +414,6 @@ GROUP BY
             'run_quartiles': [row[20],
                               row[20] if row[21] is None else row[21],
                               row[20] if row[22] is None else row[22]],
-            # 'first_quartile_run': row[20],
-            # 'second_quartile_run': row[20] if row[21] is None else row[21],
-            # 'third_quartile_run': row[20] if row[22] is None else row[22],
             # Total
             'min_total_time': row[23],
             'mean_total_time': row[24],
@@ -413,9 +422,6 @@ GROUP BY
             'total_quartiles': [row[27],
                                 row[27] if row[28] is None else row[28],
                                 row[27] if row[28] is None else row[29]],
-            # 'first_quartile_total': row[27],
-            # 'second_quartile_total': row[27] if row[28] is None else row[28],
-            # 'third_quartile_total': row[27] if row[28] is None else row[29],
 
             'count': row[30]
         })
@@ -430,26 +436,29 @@ class UISTask(Task):
     mean_total_time = graphene.Int()
     max_total_time = graphene.Int()
     std_dev_total_time = graphene.Int()
-    queue_quartiles = graphene.List(graphene.Int)
-    # first_quartile_queue = graphene.Int()
-    # second_quartile_queue = graphene.Int()
-    # third_quartile_queue = graphene.Int()
+    queue_quartiles = graphene.List(
+        graphene.Int,
+        description=sstrip('''
+            List containing the first, second,
+            third and forth quartile queue times.'''))
     min_queue_time = graphene.Int()
     mean_queue_time = graphene.Int()
     max_queue_time = graphene.Int()
     std_dev_queue_time = graphene.Int()
-    run_quartiles = graphene.List(graphene.Int)
-    # first_quartile_run = graphene.Int()
-    # second_quartile_run = graphene.Int()
-    # third_quartile_run = graphene.Int()
+    run_quartiles = graphene.List(
+        graphene.Int,
+        description=sstrip('''
+            List containing the first, second,
+            third and forth quartile run times.'''))
     min_run_time = graphene.Int()
     mean_run_time = graphene.Int()
     max_run_time = graphene.Int()
     std_dev_run_time = graphene.Int()
-    total_quartiles = graphene.List(graphene.Int)
-    # first_quartile_total = graphene.Int()
-    # second_quartile_total = graphene.Int()
-    # third_quartile_total = graphene.Int()
+    total_quartiles = graphene.List(
+        graphene.Int,
+        description=sstrip('''
+            List containing the first, second,
+            third and forth quartile total times.'''))
     count = graphene.Int()
 
 
