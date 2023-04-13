@@ -48,9 +48,9 @@ def test_make_query_1():
     assert return_value[0]['count'] == 1
     assert return_value[0]['cycle_point'] == '1'
     assert return_value[0]['finished_time'] == '2022-12-14T15:10:00Z'
-    assert return_value[0]['first_quartile_queue'] == 60
-    assert return_value[0]['first_quartile_run'] == 540
-    assert return_value[0]['first_quartile_total'] == 600
+    assert return_value[0]['queue_quartiles'][0] == 60
+    assert return_value[0]['run_quartiles'][0] == 540
+    assert return_value[0]['total_quartiles'][0] == 600
     assert return_value[0]['id'].id == '~user/workflow//1/Task_1/01'
     assert return_value[0]['job_ID'] == 'UsersJob'
     assert return_value[0]['max_queue_time'] == 60
@@ -64,9 +64,9 @@ def test_make_query_1():
     assert return_value[0]['min_total_time'] == 600
     assert return_value[0]['name'] == 'Task_1'
     assert return_value[0]['platform'] == 'MyPlatform'
-    assert return_value[0]['second_quartile_queue'] is None
-    assert return_value[0]['second_quartile_run'] is None
-    assert return_value[0]['second_quartile_total'] is None
+    assert return_value[0]['queue_quartiles'][1] == 60
+    assert return_value[0]['run_quartiles'][1] == 540
+    assert return_value[0]['total_quartiles'][1] == 600
     assert return_value[0]['started_time'] == '2022-12-14T15:01:00Z'
     assert return_value[0]['state'] == 0
     assert return_value[0]['std_dev_queue_time'] == pytest.approx(0.0, 0.01)
@@ -74,9 +74,9 @@ def test_make_query_1():
     assert return_value[0]['std_dev_total_time'] == pytest.approx(0.0, 0.01)
     assert return_value[0]['submit_num'] == 1
     assert return_value[0]['submitted_time'] == '2022-12-14T15:00:00Z'
-    assert return_value[0]['third_quartile_queue'] is None
-    assert return_value[0]['third_quartile_run'] is None
-    assert return_value[0]['third_quartile_total'] is None
+    assert return_value[0]['queue_quartiles'][2] == 60
+    assert return_value[0]['run_quartiles'][2] == 540
+    assert return_value[0]['total_quartiles'][2] == 600
 
 
 def test_make_query_2():
@@ -108,9 +108,9 @@ def test_make_query_2():
     assert return_value[0]['count'] == 2
     assert return_value[0]['cycle_point'] == '2'
     assert return_value[0]['finished_time'] == '2022-12-15T15:12:00Z'
-    assert return_value[0]['first_quartile_queue'] == 60
-    assert return_value[0]['first_quartile_run'] == 540
-    assert return_value[0]['first_quartile_total'] == 600
+    assert return_value[0]['queue_quartiles'][0] == 60
+    assert return_value[0]['run_quartiles'][0] == 540
+    assert return_value[0]['total_quartiles'][0] == 600
     assert return_value[0]['id'].id == '~user/workflow//2/Task_1/01'
     assert return_value[0]['job_ID'] == 'UsersJob'
     assert return_value[0]['max_queue_time'] == 76
@@ -124,9 +124,9 @@ def test_make_query_2():
     assert return_value[0]['min_total_time'] == 600
     assert return_value[0]['name'] == 'Task_1'
     assert return_value[0]['platform'] == 'MyPlatform'
-    assert return_value[0]['second_quartile_queue'] == 76
-    assert return_value[0]['second_quartile_run'] == 644
-    assert return_value[0]['second_quartile_total'] == 720
+    assert return_value[0]['queue_quartiles'][1] == 76
+    assert return_value[0]['run_quartiles'][1] == 644
+    assert return_value[0]['total_quartiles'][1] == 720
     assert return_value[0]['started_time'] == '2022-12-15T15:01:16Z'
     assert return_value[0]['state'] == 0
     assert return_value[0]['std_dev_queue_time'] == pytest.approx(8.00, 0.01)
@@ -134,9 +134,9 @@ def test_make_query_2():
     assert return_value[0]['std_dev_total_time'] == pytest.approx(60.0, 0.01)
     assert return_value[0]['submit_num'] == 1
     assert return_value[0]['submitted_time'] == '2022-12-15T15:00:00Z'
-    assert return_value[0]['third_quartile_queue'] is None
-    assert return_value[0]['third_quartile_run'] is None
-    assert return_value[0]['third_quartile_total'] is None
+    assert return_value[0]['queue_quartiles'][2] == 60
+    assert return_value[0]['run_quartiles'][2] == 540
+    assert return_value[0]['total_quartiles'][2] is None
 
 
 def test_make_query_3():
@@ -172,9 +172,9 @@ def test_make_query_3():
     assert return_value[0]['count'] == 3
     assert return_value[0]['cycle_point'] == '3'
     assert return_value[0]['finished_time'] == '2022-12-16T15:12:00Z'
-    assert return_value[0]['first_quartile_queue'] == 60
-    assert return_value[0]['first_quartile_run'] == 540
-    assert return_value[0]['first_quartile_total'] == 600
+    assert return_value[0]['queue_quartiles'][0] == 60
+    assert return_value[0]['run_quartiles'][0] == 540
+    assert return_value[0]['total_quartiles'][0] == 600
     assert return_value[0]['id'].id == '~user/workflow//3/Task_1/01'
     assert return_value[0]['job_ID'] == 'UsersJob'
     assert return_value[0]['max_queue_time'] == 76
@@ -188,9 +188,9 @@ def test_make_query_3():
     assert return_value[0]['min_total_time'] == 600
     assert return_value[0]['name'] == 'Task_1'
     assert return_value[0]['platform'] == 'MyPlatform'
-    assert return_value[0]['second_quartile_queue'] == 76
-    assert return_value[0]['second_quartile_run'] == 644
-    assert return_value[0]['second_quartile_total'] == 720
+    assert return_value[0]['queue_quartiles'][1] == 76
+    assert return_value[0]['run_quartiles'][1] == 644
+    assert return_value[0]['total_quartiles'][1] == 720
     assert return_value[0]['started_time'] == '2022-12-16T15:01:16Z'
     assert return_value[0]['state'] == 0
     assert return_value[0]['std_dev_queue_time'] == pytest.approx(7.54, 0.01)
@@ -198,6 +198,6 @@ def test_make_query_3():
     assert return_value[0]['std_dev_total_time'] == pytest.approx(56.56, 0.01)
     assert return_value[0]['submit_num'] == 1
     assert return_value[0]['submitted_time'] == '2022-12-16T15:00:00Z'
-    assert return_value[0]['third_quartile_queue'] == 76
-    assert return_value[0]['third_quartile_run'] == 644
-    assert return_value[0]['third_quartile_total'] == 720
+    assert return_value[0]['queue_quartiles'][2] == 76
+    assert return_value[0]['run_quartiles'][2] == 644
+    assert return_value[0]['total_quartiles'][2] == 720
