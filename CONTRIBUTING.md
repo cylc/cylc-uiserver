@@ -51,6 +51,7 @@ below.
  - Ronnie Dutta
  - David Matthews
  - Mel Hall
+ - Christopher Bennett
  <!-- end-shortlog -->
 
 (All contributors are identifiable with email addresses in the git version
