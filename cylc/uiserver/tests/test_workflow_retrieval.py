@@ -136,7 +136,7 @@ def test_make_query_2():
     assert return_value[0]['submitted_time'] == '2022-12-15T15:00:00Z'
     assert return_value[0]['queue_quartiles'][2] == 60
     assert return_value[0]['run_quartiles'][2] == 540
-    assert return_value[0]['total_quartiles'][2] is None
+    assert return_value[0]['total_quartiles'][2] == 600
 
 
 def test_make_query_3():

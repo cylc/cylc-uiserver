@@ -259,32 +259,32 @@ class Clean(graphene.Mutation):
     result = GenericScalar()
 
 
-async def get_jobs(root, info, **args):
-    if args['live']:
-        return await get_nodes_all(root, info, **args)
+async def get_jobs(root, info, **kwargs):
+    if kwargs['live']:
+        return await get_nodes_all(root, info, **kwargs)
 
-    _, field_ids = process_resolver_info(root, info, args)
+    _, field_ids = process_resolver_info(root, info, kwargs)
 
-    if hasattr(args, 'id'):
-        args['ids'] = [args.get('id')]
+    if hasattr(kwargs, 'id'):
+        kwargs['ids'] = [kwargs.get('id')]
     if field_ids:
         if isinstance(field_ids, str):
             field_ids = [field_ids]
         elif isinstance(field_ids, dict):
             field_ids = list(field_ids)
-        args['ids'] = field_ids
+        kwargs['ids'] = field_ids
     elif field_ids == []:
         return []
 
     for arg in ('ids', 'exids'):
         # live objects can be represented by a universal ID
-        args[arg] = [Tokens(n_id, relative=True) for n_id in args[arg]]
-    args['workflows'] = [
-        Tokens(w_id) for w_id in args['workflows']]
-    args['exworkflows'] = [
-        Tokens(w_id) for w_id in args['exworkflows']]
+        kwargs[arg] = [Tokens(n_id, relative=True) for n_id in kwargs[arg]]
+    kwargs['workflows'] = [
+        Tokens(w_id) for w_id in kwargs['workflows']]
+    kwargs['exworkflows'] = [
+        Tokens(w_id) for w_id in kwargs['exworkflows']]
 
-    return await list_jobs(args)
+    return await list_jobs(kwargs)
 
 
 async def list_jobs(args):
@@ -299,7 +299,7 @@ async def list_jobs(args):
             workflow['workflow'],
             WorkflowFiles.LogDir.DIRNAME,
             WorkflowFiles.LogDir.DB
-        )
+        ) 
         with CylcWorkflowDAO(db_file, is_public=True) as dao:
             conn = dao.connect()
             jobs.extend(make_query(conn, workflow))
@@ -422,7 +422,7 @@ GROUP BY
             'std_dev_total_time': (row[26] - row[24] ** 2) ** 0.5,
             'total_quartiles': [row[27],
                                 row[27] if row[28] is None else row[28],
-                                row[27] if row[28] is None else row[29]],
+                                row[27] if row[29] is None else row[29]],
 
             'count': row[30]
         })
