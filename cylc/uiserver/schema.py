@@ -299,7 +299,7 @@ async def list_jobs(args):
             workflow['workflow'],
             WorkflowFiles.LogDir.DIRNAME,
             WorkflowFiles.LogDir.DB
-        ) 
+        )
         with CylcWorkflowDAO(db_file, is_public=True) as dao:
             conn = dao.connect()
             jobs.extend(make_query(conn, workflow))
