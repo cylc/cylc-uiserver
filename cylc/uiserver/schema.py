@@ -383,7 +383,6 @@ WHERE
 GROUP BY
     name;
 '''):
-        print('#', row)
         tasks.append({
             'id': workflow.duplicate(
                 cycle=row[1],
