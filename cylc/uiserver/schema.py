@@ -298,7 +298,7 @@ async def list_jobs(args):
         db_file = get_workflow_run_dir(
             workflow['workflow'],
             WorkflowFiles.LogDir.DIRNAME,
-            WorkflowFiles.LogDir.DB
+            "db"
         )
         with CylcWorkflowDAO(db_file, is_public=True) as dao:
             conn = dao.connect()
