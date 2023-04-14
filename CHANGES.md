@@ -15,6 +15,11 @@ ones in. -->
 
 <!-- [Updated cylc-ui to x.y.z](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md) -->
 
+### Enhancements
+
+[#434](https://github.com/cylc/cylc-uiserver/pull/434)- Added the server side
+code for the analysis view in the UI
+
 ### Fixes
 
 [#431](https://github.com/cylc/cylc-uiserver/pull/431)- Adds an additional
