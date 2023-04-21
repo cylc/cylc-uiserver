@@ -20,7 +20,7 @@ extra functionality specific to the UIS.
 """
 
 from functools import partial
-from typing import TYPE_CHECKING, Any, List, Optional, AsyncGenerator
+from typing import TYPE_CHECKING, Any, List, Optional
 
 import graphene
 from graphene.types.generic import GenericScalar
@@ -29,7 +29,6 @@ from cylc.flow.id import Tokens
 from cylc.flow.network.schema import (
     CyclePoint,
     GenericResponse,
-    ID,
     Mutations,
     Queries,
     Subscriptions,
@@ -37,7 +36,11 @@ from cylc.flow.network.schema import (
     _mut_field,
     sstrip
 )
-from cylc.uiserver.resolvers import Resolvers
+from cylc.uiserver.resolvers import (
+    Resolvers,
+    list_log_files,
+    stream_log,
+)
 
 if TYPE_CHECKING:
     from graphql import ResolveInfo
@@ -262,55 +265,48 @@ class UISSubscriptions(Subscriptions):
     #   }
     # }
 
-    async def resolve_logs(
-        root: Optional[Any],
-        info: 'ResolveInfo',
-        *,
-        command='cat_log',
-        workflow: str,
-        task=None,
-        file=None,
-        **kwargs: Any,
-    ) -> AsyncGenerator[Any, None]:
-        """Cat Log Resolver
-        Expands workflow provided subscription query.
-        """
-        parsed_workflows = [Tokens(workflow)]
-        if kwargs.get('args', False):
-            kwargs.update(kwargs.get('args', {}))
-            kwargs.pop('args')
-        resolvers: 'Resolvers' = (
-            info.context.get('resolvers')  # type: ignore[union-attr]
-        )
-        async for item in resolvers.subscription_service(
-            info,
-            command,
-            parsed_workflows,
-            task,
-            file
-        ):
-            yield {'lines': item}
-
     class Logs(graphene.ObjectType):
         lines = graphene.List(graphene.String)
+        connected = graphene.Boolean()
+        path = graphene.String()
+        error = graphene.String()
 
     logs = graphene.Field(
         Logs,
         description='Workflow & job logs',
-        workflow=graphene.Argument(
-            ID
-        ),
-        task=graphene.Argument(
-            graphene.String,
-            required=False,
-            description='cylc/task/job ID'
+        id=graphene.Argument(
+            graphene.ID,
+            description='workflow//[cycle/task[/job]]',
+            required=True,
         ),
         file=graphene.Argument(
             graphene.String,
             required=False,
             description='File name of job log to fetch, e.g. job.out'
         ),
-        resolver=resolve_logs
+        resolver=stream_log
+    )
+
+
+class UISQueries(Queries):
+    class LogFiles(graphene.ObjectType):
+        # Example GraphiQL query:
+        # {
+        #    logFiles(workflowID: "<workflow_id>", task: "<task_id>") {
+        #      files
+        #    }
+        # }
+        files = graphene.List(graphene.String)
+
+    log_files = graphene.Field(
+        LogFiles,
+        description='List available job logs',
+        id=graphene.Argument(
+            graphene.ID,
+            description='workflow//[cycle/task]',
+            required=True,
+        ),
+        resolver=list_log_files
     )
 
 
@@ -320,7 +316,7 @@ class UISMutations(Mutations):
 
 
 schema = graphene.Schema(
-    query=Queries,
+    query=UISQueries,
     subscription=UISSubscriptions,
     mutation=UISMutations
 )
