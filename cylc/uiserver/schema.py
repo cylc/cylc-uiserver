@@ -468,6 +468,26 @@ class UISTask(Task):
 
 class UISQueries(Queries):
 
+    class LogFiles(graphene.ObjectType):
+        # Example GraphiQL query:
+        # {
+        #    logFiles(workflowID: "<workflow_id>", task: "<task_id>") {
+        #      files
+        #    }
+        # }
+        files = graphene.List(graphene.String)
+
+    log_files = graphene.Field(
+        LogFiles,
+        description='List available job logs',
+        id=graphene.Argument(
+            graphene.ID,
+            description='workflow//[cycle/task]',
+            required=True,
+        ),
+        resolver=list_log_files
+    )
+
     tasks = graphene.List(
         UISTask,
         description=Task._meta.description,
@@ -512,28 +532,6 @@ class UISSubscriptions(Subscriptions):
             description='File name of job log to fetch, e.g. job.out'
         ),
         resolver=stream_log
-    )
-
-
-class UISQueries(Queries):
-    class LogFiles(graphene.ObjectType):
-        # Example GraphiQL query:
-        # {
-        #    logFiles(workflowID: "<workflow_id>", task: "<task_id>") {
-        #      files
-        #    }
-        # }
-        files = graphene.List(graphene.String)
-
-    log_files = graphene.Field(
-        LogFiles,
-        description='List available job logs',
-        id=graphene.Argument(
-            graphene.ID,
-            description='workflow//[cycle/task]',
-            required=True,
-        ),
-        resolver=list_log_files
     )
 
 
