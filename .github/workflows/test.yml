@@ -49,7 +49,6 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: install cylc-flow
-        run: |
         uses: cylc/release-actions/install-cylc-components@v1
         with:
           cylc_flow: true
