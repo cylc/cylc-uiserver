@@ -21,6 +21,10 @@ ones in. -->
 [#463](https://github.com/cylc/cylc-uiserver/pull/463) - Fixed failure to
 connect to workflows when they were restarted.
 
+[#455](https://github.com/cylc/cylc-uiserver/pull/455)- Added a specific
+warning for cases where workflow needs upgrade, and an upgrade toggle in
+cylc play dialog.
+
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.2.2 (<span actions:bind='release-date'>Released 2023-04-28</span>)__
 
@@ -28,8 +32,8 @@ connect to workflows when they were restarted.
 
 ### Enhancements
 
-[#434](https://github.com/cylc/cylc-uiserver/pull/434) - Added the server side
-code for the analysis view in the UI
+[#434](https://github.com/cylc/cylc-uiserver/pull/434)- Added the server side
+code for the analysis view in the UI.
 
 ### Fixes
 

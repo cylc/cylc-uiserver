@@ -332,9 +332,18 @@ class Services:
 
                 if ret:
                     # command failed
-                    _, err = proc.communicate()
+                    out, err = proc.communicate()
+                    if 'previously run with' in out:
+                        # Can't upgrade:
+                        msg = out + '\nEdit the play command to use "upgrade".'
+                    else:
+                        msg = (
+                            f'Could not start {tokens["workflow"]}'
+                            f' - {cmd_repr}'
+                        )
+
                     raise Exception(
-                        f'Could not start {tokens["workflow"]} - {cmd_repr}'
+                        msg
                         # suppress traceback unless in debug mode
                         + (f' - {err}' if DEBUG else '')
                     )
