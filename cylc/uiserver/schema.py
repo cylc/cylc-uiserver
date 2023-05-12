@@ -185,8 +185,8 @@ class Play(graphene.Mutation):
         upgrade = graphene.Boolean(
             description=sstrip('''
                 Allow the workflow to be restarted with a newer
-                 version of Cylc.
-        ''')
+                version of Cylc.
+            ''')
         )
         abort_if_any_task_fails = graphene.Boolean(
             default_value=False,
