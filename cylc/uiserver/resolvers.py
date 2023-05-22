@@ -332,8 +332,8 @@ class Services:
 
                 if ret:
                     # command failed
-                    _, err = proc.communicate()
-                    msg = err.strip() or (
+                    out, err = proc.communicate()
+                    msg = err.strip() or out.strip() or (
                         f'Could not start {tokens["workflow"]}'
                         f' - {cmd_repr}'
                     )
