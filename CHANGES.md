@@ -32,7 +32,7 @@ cylc play dialog.
 
 ### Enhancements
 
-[#434](https://github.com/cylc/cylc-uiserver/pull/434)- Added the server side
+[#434](https://github.com/cylc/cylc-uiserver/pull/434) - Added the server side
 code for the analysis view in the UI.
 
 ### Fixes

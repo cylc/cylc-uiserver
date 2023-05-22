@@ -339,8 +339,6 @@ class Services:
                     )
                     raise Exception(
                         msg
-                        # include possible traceback in debug mode
-                        + (f' - {err}' if DEBUG else '')
                     )
 
             except Exception as exc:
