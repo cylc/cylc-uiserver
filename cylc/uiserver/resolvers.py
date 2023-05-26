@@ -379,10 +379,13 @@ class Services:
                     if buffer:
                         yield {'lines': list(buffer)}
                         buffer.clear()
-                    if proc.returncode not in [None, 0]:
+                    if proc.returncode is not None:
                         (_, stderr) = await proc.communicate()
                         # pass any error onto ui
-                        yield {'error': stderr.decode()}
+                        msg = stderr.decode() if stderr.strip() else (
+                            f"cylc cat-log exited {proc.returncode}"
+                        )
+                        yield {'error': msg}
                         break
                     # sleep set at 1, which matches the `tail` default interval
                     await asyncio.sleep(1)
