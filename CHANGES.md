@@ -10,10 +10,22 @@ creating a new release entry be sure to copy & paste the span tag with the
 `actions:bind` attribute, which is used by a regex to find the text to be
 updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.2.2 (<span actions:bind='release-date'>Upcoming</span>)__
 
-<!-- [Updated cylc-ui to x.y.z](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md) -->
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.2.3 (<span actions:bind='release-date'>UPCOMING</span>)__
+
+[#456](https://github.com/cylc/cylc-uiserver/pull/456)- (packaging) pinned
+upper version of jupyter_server to prevent `pip` from installing version 2.
+
+-------------------------------------------------------------------------------
+## __cylc-uiserver-1.2.2 (<span actions:bind='release-date'>Released 2023-04-28</span>)__
+
+[Updated cylc-ui to 1.6.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### Enhancements
+
+[#434](https://github.com/cylc/cylc-uiserver/pull/434)- Added the server side
+code for the analysis view in the UI
 
 ### Enhancements
 
