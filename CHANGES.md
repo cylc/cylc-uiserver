@@ -27,11 +27,6 @@ upper version of jupyter_server to prevent `pip` from installing version 2.
 [#434](https://github.com/cylc/cylc-uiserver/pull/434)- Added the server side
 code for the analysis view in the UI
 
-### Enhancements
-
-[#434](https://github.com/cylc/cylc-uiserver/pull/434)- Added the server side
-code for the analysis view in the UI
-
 ### Fixes
 
 [#431](https://github.com/cylc/cylc-uiserver/pull/431)- Adds an additional
