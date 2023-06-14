@@ -160,6 +160,16 @@ def _build_cmd(cmd: List, args: Dict) -> List:
     return cmd
 
 
+def process_cat_log_stderr(text: bytes) -> str:
+    """Tidy up cylc cat-log stderr."""
+    return (
+        text.decode()
+        .replace('tail: no files remaining', '')
+        .replace('tail: ', '')
+        .strip()
+    )
+
+
 def _schema_opts_to_api_opts(
     schema_opts: Dict, schema: 'Options'
 ) -> 'Values':
@@ -382,7 +392,7 @@ class Services:
                     if proc.returncode is not None:
                         (_, stderr) = await proc.communicate()
                         # pass any error onto ui
-                        msg = stderr.decode() if stderr.strip() else (
+                        msg = process_cat_log_stderr(stderr) or (
                             f"cylc cat-log exited {proc.returncode}"
                         )
                         yield {'error': msg}
