@@ -160,6 +160,16 @@ def _build_cmd(cmd: List, args: Dict) -> List:
     return cmd
 
 
+def process_cat_log_stderr(text: bytes) -> str:
+    """Tidy up cylc cat-log stderr."""
+    return (
+        text.decode()
+        .replace('tail: no files remaining', '')
+        .replace('tail: ', '')
+        .strip()
+    )
+
+
 def _schema_opts_to_api_opts(
     schema_opts: Dict, schema: 'Options'
 ) -> 'Values':
@@ -379,10 +389,13 @@ class Services:
                     if buffer:
                         yield {'lines': list(buffer)}
                         buffer.clear()
-                    if proc.returncode not in [None, 0]:
+                    if proc.returncode is not None:
                         (_, stderr) = await proc.communicate()
                         # pass any error onto ui
-                        yield {'error': stderr.decode()}
+                        msg = process_cat_log_stderr(stderr) or (
+                            f"cylc cat-log exited {proc.returncode}"
+                        )
+                        yield {'error': msg}
                         break
                     # sleep set at 1, which matches the `tail` default interval
                     await asyncio.sleep(1)

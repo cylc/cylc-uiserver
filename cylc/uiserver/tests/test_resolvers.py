@@ -9,9 +9,9 @@ from cylc.flow.id import Tokens
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.uiserver.resolvers import (
     _schema_opts_to_api_opts,
-    Services
+    Services,
+    process_cat_log_stderr,
 )
-from pathlib import Path
 
 services = Services()
 
@@ -112,3 +112,16 @@ async def test_cat_log(workflow_run_dir):
 
     # the other responses should contain the log file lines
     assert actual.rstrip() == expected.rstrip()
+
+
+@pytest.mark.parametrize(
+    'text, expected',
+    [
+        (b"", ""),
+        (b"dog \n", "dog"),
+        (b"tail: dog: No such file\ntail: no files remaining",
+         "dog: No such file"),
+    ]
+)
+def test_process_cat_log_stderr(text: bytes, expected: str):
+    assert process_cat_log_stderr(text) == expected
