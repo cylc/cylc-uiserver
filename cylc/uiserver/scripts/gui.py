@@ -64,7 +64,7 @@ def main(*argv):
             if url:
                 print(
                     "Opening with existing gui." +
-                    f" Use {CLI_OPT_NEW} option for a new gui.",
+                    f" Use {CLI_OPT_NEW} option to start a new gui server.",
                     file=sys.stderr
                 )
                 url = update_url(url, workflow_id)
