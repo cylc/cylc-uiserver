@@ -335,7 +335,7 @@ class WorkflowsManager:  # noqa: SIM119
                 # workflow has been deleted
                 run(self._unregister(wid))
 
-            elif before.startswith('/') and after == 'inactive':
+            elif before.startswith('/'):
                 # workflow is no longer the same run as before e.g:
                 # * db has been removed whilst workflow stopped
                 # * run dir has been deleted and re-created
