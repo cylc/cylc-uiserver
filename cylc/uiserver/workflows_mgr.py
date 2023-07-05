@@ -305,35 +305,38 @@ class WorkflowsManager:  # noqa: SIM119
 
         # handle state changes
         async for wid, before, after, flow in self._workflow_state_changes():
-            if before == 'active' and after == 'inactive':
-                # workflow has stopped
-                run(self._disconnect(wid))
+            if before == 'active':
+                if after == 'inactive':
+                    # workflow has stopped
+                    run(self._disconnect(wid))
 
-            elif before == 'active' and after is None:
-                # workflow has stopped and been deleted
-                run(
-                    self._disconnect(wid),
-                    self._unregister(wid),
-                )
+                elif after is None:
+                    # workflow has stopped and been deleted
+                    run(
+                        self._disconnect(wid),
+                        self._unregister(wid),
+                    )
 
-            elif before is None and after == 'active':
-                # workflow has been created and started
-                run(
-                    self._register(wid, flow, is_active=True),
-                    self._connect(wid, flow),
-                )
+            elif before is None:
+                if after == 'active':
+                    # workflow has been created and started
+                    run(
+                        self._register(wid, flow, is_active=True),
+                        self._connect(wid, flow),
+                    )
 
-            elif before is None and after == 'inactive':
-                # workflow has been created
-                run(self._register(wid, flow, is_active=False))
+                elif after == 'inactive':
+                    # workflow has been created
+                    run(self._register(wid, flow, is_active=False))
 
-            elif before == 'inactive' and after == 'active':
-                # workflow has been started
-                run(self._connect(wid, flow))
+            elif before == 'inactive':
+                if after == 'active':
+                    # workflow has been started
+                    run(self._connect(wid, flow))
 
-            elif before == 'inactive' and after is None:
-                # workflow has been deleted
-                run(self._unregister(wid))
+                elif after is None:
+                    # workflow has been deleted
+                    run(self._unregister(wid))
 
             elif before.startswith('/'):
                 # workflow is no longer the same run as before e.g:
