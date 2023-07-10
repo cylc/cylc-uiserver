@@ -12,10 +12,14 @@ updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
 
 -------------------------------------------------------------------------------
-## __cylc-uiserver-1.2.3 (<span actions:bind='release-date'>UPCOMING</span>)__
+## __cylc-uiserver-1.3.0 (<span actions:bind='release-date'>Upcoming</span>)__
 
-[#456](https://github.com/cylc/cylc-uiserver/pull/456)- (packaging) pinned
-upper version of jupyter_server to prevent `pip` from installing version 2.
+[Updated cylc-ui to 2.0.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### Fixes
+
+[#463](https://github.com/cylc/cylc-uiserver/pull/463) - Fixed failure to
+connect to workflows when they were restarted.
 
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.2.2 (<span actions:bind='release-date'>Released 2023-04-28</span>)__
@@ -24,12 +28,12 @@ upper version of jupyter_server to prevent `pip` from installing version 2.
 
 ### Enhancements
 
-[#434](https://github.com/cylc/cylc-uiserver/pull/434)- Added the server side
+[#434](https://github.com/cylc/cylc-uiserver/pull/434) - Added the server side
 code for the analysis view in the UI
 
 ### Fixes
 
-[#431](https://github.com/cylc/cylc-uiserver/pull/431)- Adds an additional
+[#431](https://github.com/cylc/cylc-uiserver/pull/431) - Adds an additional
 cleaning check for the UI server contact file. This may have caused problems
 running a UI server following a crash.
 
