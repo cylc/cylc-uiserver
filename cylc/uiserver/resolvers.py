@@ -17,6 +17,7 @@
 
 import asyncio
 from contextlib import suppress
+import errno
 from getpass import getuser
 import os
 from copy import deepcopy
@@ -70,6 +71,8 @@ OPT_CONVERTERS: Dict['Options', Dict[
 
 # the maximum number of log lines to yield before truncating the file
 MAX_LINES = 5000
+
+ENOENT_MSG = os.strerror(errno.ENOENT)
 
 
 def snake_to_kebab(snake):
@@ -161,12 +164,15 @@ def _build_cmd(cmd: List, args: Dict) -> List:
 
 
 def process_cat_log_stderr(text: bytes) -> str:
-    """Tidy up cylc cat-log stderr."""
+    """Tidy up cylc cat-log stderr.
+
+    If ENOENT message is present in stderr, just return that, because
+    stderr may be full of other crud.
+    """
+    msg = text.decode()
     return (
-        text.decode()
-        .replace('tail: no files remaining', '')
-        .replace('tail: ', '')
-        .strip()
+        ENOENT_MSG if ENOENT_MSG in msg
+        else msg.strip()
     )
 
 
