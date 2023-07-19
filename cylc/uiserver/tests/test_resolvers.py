@@ -8,6 +8,7 @@ from cylc.flow import CYLC_LOG
 from cylc.flow.id import Tokens
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.uiserver.resolvers import (
+    ENOENT_MSG,
     _schema_opts_to_api_opts,
     Services,
     process_cat_log_stderr,
@@ -119,8 +120,8 @@ async def test_cat_log(workflow_run_dir):
     [
         (b"", ""),
         (b"dog \n", "dog"),
-        (b"tail: dog: No such file\ntail: no files remaining",
-         "dog: No such file"),
+        (f"tail: dog: {ENOENT_MSG}\ntail: no files remaining".encode(),
+         ENOENT_MSG),
     ]
 )
 def test_process_cat_log_stderr(text: bytes, expected: str):
