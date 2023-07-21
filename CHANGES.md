@@ -12,7 +12,7 @@ updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
 
 -------------------------------------------------------------------------------
-## __cylc-uiserver-1.3.0 (<span actions:bind='release-date'>Upcoming</span>)__
+## __cylc-uiserver-1.3.0 (<span actions:bind='release-date'>Released 2023-07-21</span>)__
 
 [Updated cylc-ui to 2.0.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
 
