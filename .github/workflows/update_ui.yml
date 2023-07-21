@@ -9,13 +9,17 @@ on:
       install:
         description: UI versions to install (space delimited)
         required: false
+      base-branch:
+        description: Branch to open PR against
+        required: false
+        default: 'master'
 
 jobs:
   ui:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      BRANCH: update-ui-${{github.run_number}}
+      HEAD_BRANCH: update-ui-${{ github.run_number }}
 
     steps:
       - name: checkout cylc-uiserver
@@ -26,11 +30,11 @@ jobs:
 
       - name: Create Branch
         run: |
-          git checkout -b "${BRANCH}"
+          git checkout -b "${HEAD_BRANCH}"
 
       - name: uninstall
         run: |
-          for version in ${{ github.event.inputs.uninstall }}; do
+          for version in ${{ inputs.uninstall }}; do
             git rm -rf "cylc/uiserver/ui/${version}"
             git commit -m "ui: uninstall ${version}"
           done
@@ -39,7 +43,7 @@ jobs:
         env:
           RELEASES: https://github.com/cylc/cylc-ui/releases/download
         run: |
-          for version in ${{ github.event.inputs.install }}; do
+          for version in ${{ inputs.install }}; do
             wget \
               "$RELEASES/${version}/cylc-ui-${version}-dist.zip" \
               -O "${version}.zip"
@@ -51,15 +55,18 @@ jobs:
 
       - name: push
         run: |
-          git push origin "$BRANCH"
+          git push origin "$HEAD_BRANCH"
 
       - name: Create pull request
-        uses: cylc/release-actions/create-pr@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          head: ${{ env.BRANCH }}
-          title: 'Update UI'
-          body: |
-            uninstall: ${{ github.event.inputs.uninstall }}
-            install: ${{ github.event.inputs.install }}
+          BASE_BRANCH: ${{ inputs.base-branch }}
+          TITLE: 'Update UI'
+          BODY: |
+            uninstall: ${{ inputs.uninstall }}
+            install: ${{ inputs.install }}
+          ASSIGNEE: ${{ github.triggering_actor }}
+        run: |
+          gh pr create -R "$GITHUB_REPOSITORY" \
+            -H "$HEAD_BRANCH" -B "$BASE_BRANCH" -t "$TITLE" -b "$BODY" \
+            -a "$ASSIGNEE" -r "$ASSIGNEE"
