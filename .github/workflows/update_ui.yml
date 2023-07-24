@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: checkout cylc-uiserver
         uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.base-branch }}
 
       - name: Configure git
         uses: cylc/release-actions/configure-git@v1
