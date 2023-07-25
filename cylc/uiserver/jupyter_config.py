@@ -21,8 +21,7 @@ import pkg_resources
 
 from cylc.uiserver import (
     __file__ as uis_pkg,
-    getenv,
-)
+    getenv)
 from cylc.uiserver.app import USER_CONF_ROOT
 
 
@@ -42,7 +41,6 @@ c.Spawner.environment = getenv(
     # may be used by Cylc UI developers to use a development UI build
     'CYLC_DEV',
 )
-
 # this auto-spawns uiservers without user interaction
 c.JupyterHub.implicit_spawn_seconds = 0.01
 
@@ -72,7 +70,7 @@ c.CylcUIServer.logging_config = {
         'file': {
             'class': 'logging.handlers.RotatingFileHandler',
             'level': 'INFO',
-            'filename': str(USER_CONF_ROOT / 'uiserver.log'),
+            'filename': str(USER_CONF_ROOT / 'log' / 'log'),
             'mode': 'a',
             'backupCount': 5,
             'maxBytes': 10485760,
@@ -81,6 +79,10 @@ c.CylcUIServer.logging_config = {
     },
     'loggers': {
         'CylcUIServer': {
+            'level': 'INFO',
+            'handlers': ['console', 'file'],
+        },
+        'cylc': {
             'level': 'INFO',
             'handlers': ['console', 'file'],
         },

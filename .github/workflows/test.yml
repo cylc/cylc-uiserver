@@ -24,19 +24,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Brew Install
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          # install system deps
+          brew update
+          brew install bash coreutils
+
+          # add GNU coreutils to the user PATH
+          # (see instructions in brew install output)
+          echo \
+            "$(brew --prefix)/opt/coreutils/libexec/gnubin" \
+            >> "${GITHUB_PATH}"
+
+          # add coreutils to the bashrc too (for jobs)
+          cat >> "${HOME}/.bashrc" <<__HERE__
+          PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
+          export PATH
+          __HERE__
+
       - name: Setup Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python }}
 
-      # NOTE: Install cylc-uiserver in editable mode for correct coverage results
-      - name: Install cylc-uiserver & dependencies
-        run: |
-          pip install git+https://github.com/cylc/cylc-flow@master
-          pip install -e .[all]
+      - name: install cylc-flow
+        uses: cylc/release-actions/install-cylc-components@v1
+        with:
+          cylc_flow: true
+          cylc_flow_opts: ''
 
-      - name: (Debug - pip list)
-        run: pip list --format=freeze
+      - name: install cylc-uiserver
+        run: pip install -e .[all]
 
       - name: Style test
         run: flake8

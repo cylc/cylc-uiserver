@@ -22,12 +22,12 @@ jobs:
     steps:
 
     - name: Checkout repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         ref: ${{ env.MERGE_SHA }}
 
     - name: Setup Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         # return to 3.x once cylc-flow is compatible with 3.10+ (pyuv)
         python-version: '3.9'
@@ -39,14 +39,14 @@ jobs:
       uses: cylc/release-actions/build-python-package@v1
 
     - name: Publish distribution to PyPI
-      uses: pypa/gh-action-pypi-publish@v1.4.2
+      uses: pypa/gh-action-pypi-publish@v1.8.8
       with:
         user: __token__ # uses the API token feature of PyPI - least permissions possible
         password: ${{ secrets.PYPI_TOKEN }}
 
     - name: Publish GitHub release
       id: create-release
-      uses: actions/create-release@v1
+      uses: cylc/release-actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -55,7 +55,7 @@ jobs:
         release_name: cylc-uiserver-${{ env.VERSION }}
         prerelease: ${{ env.PRERELEASE }}
         body: |
-          See [${{ env.CHANGELOG_FILE }}](https://github.com/${{ github.repository }}/blob/master/${{ env.CHANGELOG_FILE }}) for detail.
+          See [${{ env.CHANGELOG_FILE }}](https://github.com/${{ github.repository }}/blob/master/${{ env.CHANGELOG_FILE }}) for details.
         # TODO: Get topmost changelog section somehow and use that as the body?
 
     - name: Comment on the release PR with the results & next steps
@@ -65,3 +65,10 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         release-url: ${{ steps.create-release.outputs.html_url }}
+
+    - name: Bump dev version
+      uses: cylc/release-actions/stage-2/bump-dev-version@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        init-file: 'cylc/uiserver/__init__.py'

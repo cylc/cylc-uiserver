@@ -16,21 +16,35 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 import asyncio
+from contextlib import suppress
+import errno
 from getpass import getuser
 import os
 from copy import deepcopy
+import signal
 from subprocess import Popen, PIPE, DEVNULL
 from typing import (
-    TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Tuple, Union
+    Any,
+    AsyncGenerator,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    TYPE_CHECKING,
+    Tuple,
+    Union,
 )
 
 from graphql.language.base import print_ast
+import psutil
 
 from cylc.flow.data_store_mgr import WORKFLOW
 from cylc.flow.exceptions import (
     ServiceFileError,
     WorkflowFilesError,
 )
+from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.flow.scripts.clean import run
@@ -41,7 +55,6 @@ if TYPE_CHECKING:
     from optparse import Values
     from graphql import ResolveInfo
     from cylc.flow.data_store_mgr import DataStoreMgr
-    from cylc.flow.id import Tokens
     from cylc.flow.option_parsers import Options
     from cylc.uiserver.workflows_mgr import WorkflowsManager
 
@@ -55,6 +68,11 @@ OPT_CONVERTERS: Dict['Options', Dict[
         'rm': lambda value: ('rm_dirs', [value] if value else None),
     }
 }
+
+# the maximum number of log lines to yield before truncating the file
+MAX_LINES = 5000
+
+ENOENT_MSG = os.strerror(errno.ENOENT)
 
 
 def snake_to_kebab(snake):
@@ -143,6 +161,19 @@ def _build_cmd(cmd: List, args: Dict) -> List:
                 # don't provide values for binary flags
                 cmd.append(item)
     return cmd
+
+
+def process_cat_log_stderr(text: bytes) -> str:
+    """Tidy up cylc cat-log stderr.
+
+    If ENOENT message is present in stderr, just return that, because
+    stderr may be full of other crud.
+    """
+    msg = text.decode()
+    return (
+        ENOENT_MSG if ENOENT_MSG in msg
+        else msg.strip()
+    )
 
 
 def _schema_opts_to_api_opts(
@@ -321,6 +352,121 @@ class Services:
         await workflows_mgr.scan()
         return response
 
+    @staticmethod
+    async def enqueue(stream, queue):
+        async for line in stream:
+            await queue.put(line.decode())
+
+    @classmethod
+    async def cat_log(cls, id_: Tokens, log, info, file=None):
+        """Calls `cat log`.
+
+        Used for log subscriptions.
+        """
+        cmd: List[str] = [
+            'cylc',
+            'cat-log',
+            '--mode=tail',
+            '--force-remote',
+            '--prepend-path',
+            id_.id,
+        ]
+        if file:
+            cmd += ['-f', file]
+        log.info(f'$ {" ".join(cmd)}')
+
+        # For info, below subprocess is safe (uses shell=false by default)
+        proc = await asyncio.subprocess.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        buffer: List[str] = []
+        queue: asyncio.Queue = asyncio.Queue()
+        # Farm out reading from stdout stream to a background task
+        # This is to get around problem where stream is not EOF until
+        # subprocess ends
+        enqueue_task = asyncio.create_task(cls.enqueue(proc.stdout, queue))
+        op_id = info.root_value
+        line_count = 0
+        try:
+            while info.context['sub_statuses'].get(op_id) != 'stop':
+                if queue.empty():
+                    if buffer:
+                        yield {'lines': list(buffer)}
+                        buffer.clear()
+                    if proc.returncode is not None:
+                        (_, stderr) = await proc.communicate()
+                        # pass any error onto ui
+                        msg = process_cat_log_stderr(stderr) or (
+                            f"cylc cat-log exited {proc.returncode}"
+                        )
+                        yield {'error': msg}
+                        break
+                    # sleep set at 1, which matches the `tail` default interval
+                    await asyncio.sleep(1)
+                else:
+                    if line_count > MAX_LINES:
+                        yield {'lines': buffer}
+                        yield {
+                            'error': (
+                                'This file has been truncated because'
+                                f' it is over {MAX_LINES} lines long.'
+                            )
+                        }
+                        break
+                    elif line_count == 0:
+                        line_count += 1
+                        yield {
+                            'connected': True,
+                            'path': (await queue.get())[2:].strip(),
+                        }
+                        continue
+                    line = await queue.get()
+                    line_count += 1
+                    buffer.append(line)
+                    if len(buffer) >= 75:
+                        yield {'lines': list(buffer)}
+                        buffer.clear()
+                        await asyncio.sleep(0)
+        finally:
+            kill_process_tree(proc.pid)
+            enqueue_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await enqueue_task
+            yield {'connected': False}
+
+    @classmethod
+    async def cat_log_files(cls, id_: Tokens):
+        """Calls cat log to get list of available log files.
+
+        Note kept separate from the cat_log method above as this is a one off
+        query rather than a process held open for subscription.
+        This uses the Cylc cat-log interface, list dir mode, forcing remote
+        file checking.
+        """
+        cmd: List[str] = ['cylc', 'cat-log', '-m', 'l', '-o', id_.id]
+        proc_job = await asyncio.subprocess.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        # wait for proc to finish
+        await proc_job.wait()
+
+        # MOTD returned in stderr, no use in returning
+        out_job, _ = await proc_job.communicate()
+        if out_job:
+            return sorted(
+                # return the log files in reverse sort order
+                # this means that the most recent log file rotations
+                # will be at the top of the list
+                out_job.decode().splitlines(),
+                reverse=True,
+            )
+        else:
+            return []
+
 
 class Resolvers(BaseResolvers):
     """UI Server context GraphQL query and mutation resolvers."""
@@ -397,10 +543,99 @@ class Resolvers(BaseResolvers):
                 executor=self.executor
             )
 
-        else:
+        elif command == 'play':
             return await Services.play(
                 workflows,
                 kwargs,
                 self.workflows_mgr,
                 log=self.log
             )
+
+        raise NotImplementedError()
+
+    async def subscription_service(
+        self,
+        info: 'ResolveInfo',
+        _command: str,
+        ids: List[Tokens],
+        file=None
+    ):
+        async for ret in Services.cat_log(
+            ids[0],
+            self.log,
+            info,
+            file
+        ):
+            yield ret
+
+    async def query_service(
+        self,
+        id_: Tokens,
+    ):
+        return await Services.cat_log_files(id_)
+
+
+def kill_process_tree(
+    pid,
+    sig=signal.SIGTERM,
+    include_parent=True,
+):
+    """Kill an entire process tree.
+
+    Args:
+        pid: The parent process ID to kill.
+        sig: The signal to send to the processes in this tree.
+        include_parent: Also kill the parent process (pid).
+
+    """
+    try:
+        parent = psutil.Process(pid)
+    except psutil.NoSuchProcess:
+        return
+    children = parent.children(recursive=True)
+    if include_parent:
+        children.append(parent)
+    for p in children:
+        with suppress(psutil.NoSuchProcess):
+            p.send_signal(sig)
+
+
+async def list_log_files(
+    root: Optional[Any],
+    info: 'ResolveInfo',
+    id: str,  # noqa: required to match schema arg name
+):
+    tokens = Tokens(id)
+    resolvers: 'Resolvers' = (
+        info.context.get('resolvers')  # type: ignore[union-attr]
+    )
+    files = await resolvers.query_service(tokens)
+    return {'files': files}
+
+
+async def stream_log(
+    root: Optional[Any],
+    info: 'ResolveInfo',
+    *,
+    command='cat_log',
+    id: str,  # noqa: required to match schema arg name
+    file=None,
+    **kwargs: Any,
+) -> AsyncGenerator[Any, None]:
+    """Cat Log Resolver
+    Expands workflow provided subscription query.
+    """
+    tokens = Tokens(id)
+    if kwargs.get('args', False):
+        kwargs.update(kwargs.get('args', {}))
+        kwargs.pop('args')
+    resolvers: 'Resolvers' = (
+        info.context.get('resolvers')  # type: ignore[union-attr]
+    )
+    async for item in resolvers.subscription_service(
+        info,
+        command,
+        [tokens],
+        file
+    ):
+        yield item

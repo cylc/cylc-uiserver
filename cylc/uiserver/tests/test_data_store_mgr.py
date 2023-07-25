@@ -210,7 +210,11 @@ async def test_disconnect_workflow(
         CFF.PORT: 40000,
         CFF.API: api_version
     }
-    data_store_mgr._update_contact(w_id=w_id, contact_data=contact_data)
+    data_store_mgr._update_contact(
+        w_id=w_id,
+        contact_data=contact_data,
+        status='Something'
+    )
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
 
     data_store_mgr.disconnect_workflow(w_id=w_id)

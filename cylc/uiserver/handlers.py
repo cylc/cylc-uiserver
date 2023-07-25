@@ -19,7 +19,7 @@ import json
 import getpass
 import os
 import socket
-from typing import TYPE_CHECKING, Callable, Union
+from typing import TYPE_CHECKING, Callable, Union, Dict
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
@@ -34,8 +34,9 @@ from cylc.flow.scripts.cylc import (
 )
 
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
+from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
-
+from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 if TYPE_CHECKING:
     from graphql.execution import ExecutionResult
 
@@ -364,10 +365,11 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     """Endpoint for performing GraphQL subscriptions."""
     # No authorization decorators here, auth handled in AuthorizationMiddleware
-    def initialize(self, sub_server, resolvers):
-        self.queue = Queue(100)
-        self.subscription_server = sub_server
-        self.resolvers = resolvers
+    def initialize(self, sub_server, resolvers, sub_statuses=None):
+        self.queue: Queue = Queue(100)
+        self.subscription_server: TornadoSubscriptionServer = sub_server
+        self.resolvers: Resolvers = resolvers
+        self.sub_statuses: Dict = sub_statuses
 
     def select_subprotocol(self, subprotocols):
         return GRAPHQL_WS
@@ -386,6 +388,15 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         )
 
     async def on_message(self, message):
+        try:
+            message_dict = json.loads(message)
+            op_id = message_dict.get("id", None)
+            if (message_dict['type'] == 'start'):
+                self.sub_statuses[op_id] = 'start'
+            if (message_dict['type'] == 'stop'):
+                self.sub_statuses[op_id] = 'stop'
+        except (KeyError, ValueError):
+            pass
         await self.queue.put(message)
 
     async def recv(self):
@@ -404,4 +415,5 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
                 self.get_current_user()
             ).get('name'),
             'ops_queue': {},
+            'sub_statuses': self.sub_statuses
         }
