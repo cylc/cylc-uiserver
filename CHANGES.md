@@ -12,6 +12,17 @@ updated. Only the first match gets replaced, so it's fine to leave the old
 ones in. -->
 
 -------------------------------------------------------------------------------
+
+## __cylc-uiserver-1.4.0 (<span actions:bind='release-date'>Upcoming</span>)__
+
+### Fixes
+
+[#455](https://github.com/cylc/cylc-uiserver/pull/455)- Added a specific
+warning for cases where workflow needs upgrade, and an upgrade toggle in
+cylc play dialog.
+
+-------------------------------------------------------------------------------
+
 ## __cylc-uiserver-1.3.0 (<span actions:bind='release-date'>Released 2023-07-21</span>)__
 
 [Updated cylc-ui to 2.0.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
@@ -20,10 +31,6 @@ ones in. -->
 
 [#463](https://github.com/cylc/cylc-uiserver/pull/463) - Fixed failure to
 connect to workflows when they were restarted.
-
-[#455](https://github.com/cylc/cylc-uiserver/pull/455)- Added a specific
-warning for cases where workflow needs upgrade, and an upgrade toggle in
-cylc play dialog.
 
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.2.2 (<span actions:bind='release-date'>Released 2023-04-28</span>)__
