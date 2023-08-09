@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Callable, Union, Dict
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
-from graphql_ws.constants import GRAPHQL_WS
+from graphql_ws.constants import GRAPHQL_WS, TRANSPORT_WS_PROTOCOL
 from jupyter_server.base.handlers import JupyterHandler
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
@@ -36,9 +36,10 @@ from cylc.flow.scripts.cylc import (
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
 from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
-from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
+
 if TYPE_CHECKING:
     from graphql.execution import ExecutionResult
+    from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 
 
 ME = getpass.getuser()
@@ -367,11 +368,15 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     # No authorization decorators here, auth handled in AuthorizationMiddleware
     def initialize(self, sub_server, resolvers, sub_statuses=None):
         self.queue: Queue = Queue(100)
-        self.subscription_server: TornadoSubscriptionServer = sub_server
+        self.subscription_server: 'TornadoSubscriptionServer' = sub_server
         self.resolvers: Resolvers = resolvers
         self.sub_statuses: Dict = sub_statuses
 
     def select_subprotocol(self, subprotocols):
+        if TRANSPORT_WS_PROTOCOL in subprotocols:
+            # use graphql-transport-ws out of preference
+            return TRANSPORT_WS_PROTOCOL
+        # fallback to graphql-ws if required
         return GRAPHQL_WS
 
     @websockets_authenticated
@@ -415,5 +420,6 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
                 self.get_current_user()
             ).get('name'),
             'ops_queue': {},
-            'sub_statuses': self.sub_statuses
+            'sub_statuses': self.sub_statuses,
+            'subprotocols': [self.selected_subprotocol],
         }
