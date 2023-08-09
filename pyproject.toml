@@ -6,6 +6,32 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
+
+[tool.towncrier]
+directory = "changes.d"
+name = "Cylc UI Server"
+package = "cylc.uiserver"
+filename = "CHANGES.md"
+template = "changes.d/changelog-template.jinja"
+underlines = ["", "", ""]
+title_format = "## cylc-uiserver-{version} (Released {project_date})"
+issue_format = "[#{issue}](https://github.com/cylc/cylc-uiserver/pull/{issue})"
+
+# These changelog sections will be shown in the defined order:
+[[tool.towncrier.type]]
+directory = "break" # NB this is just the filename not directory e.g. 123.break.md
+name = "⚠ Breaking Changes"
+showcontent = true
+[[tool.towncrier.type]]
+directory = "feat"
+name = "🚀 Enhancements"
+showcontent = true
+[[tool.towncrier.type]]
+directory = "fix"
+name = "🔧 Fixes"
+showcontent = true
+
+
 [tool.pytest.ini_options]
 addopts = """
     --doctest-modules
