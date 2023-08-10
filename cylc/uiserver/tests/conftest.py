@@ -14,7 +14,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Test code and fixtures."""
 
-import asyncio
 from getpass import getuser
 import inspect
 import logging
@@ -47,6 +46,7 @@ class AsyncClientFixture(WorkflowRuntimeClient):
     pattern = zmq.REQ
     host = ''
     port = 0
+    workflow = 'myflow'
 
     def __init__(self):
         self.returns = None
@@ -57,6 +57,8 @@ class AsyncClientFixture(WorkflowRuntimeClient):
     async def async_request(
         self, command, args=None, timeout=None, req_meta=None
     ):
+        if isinstance(self.returns, Exception):
+            raise self.returns
         if (
             inspect.isclass(self.returns)
             and issubclass(self.returns, Exception)
