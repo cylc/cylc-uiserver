@@ -30,6 +30,10 @@ showcontent = true
 directory = "fix"
 name = "🔧 Fixes"
 showcontent = true
+[[tool.towncrier.type]]
+directory = "ui-version"
+name = "UI version"
+showcontent = true
 
 
 [tool.pytest.ini_options]

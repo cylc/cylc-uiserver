@@ -55,6 +55,14 @@ jobs:
             git commit -m "ui: install ${version}"
           done
 
+      - name: Add to changelog
+        if: inputs.install
+        run: |
+          python3 -m pip install -q towncrier
+          towncrier create +.ui-version.md --content "Updated cylc-ui to ${{ inputs.install }}"
+          git add changes.d
+          commit --amend --no-edit
+
       - name: push
         run: |
           git push origin "$HEAD_BRANCH"

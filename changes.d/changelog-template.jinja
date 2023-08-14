@@ -1,5 +1,9 @@
 {% if sections[""] %}
-{% for category, val in definitions.items() if category in sections[""] %}
+{% if "ui-version" in sections[""] %}
+[{{ sections[""]["ui-version"].keys()|first }}](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+{% endif %}
+{% for category, val in definitions.items() if category in sections[""] and category != "ui-version" %}
 ### {{ definitions[category]['name'] }}
 
 {% for text, pulls in sections[""][category].items() %}
