@@ -381,9 +381,9 @@ FROM
             STRFTIME('%s', time_run) -
             STRFTIME('%s', time_submit) AS queue_time
         FROM
-            task_jobs))
-WHERE
-    run_status = 0
+            task_jobs
+        WHERE
+            run_status = 0))
 GROUP BY
     name;
 '''):
