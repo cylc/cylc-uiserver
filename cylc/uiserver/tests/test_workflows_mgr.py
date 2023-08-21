@@ -16,6 +16,7 @@
 from itertools import product
 import logging
 from random import random
+from typing import Type
 
 import pytest
 
@@ -40,49 +41,27 @@ LOG = logging.getLogger('cylc')
 
 # --- workflow_request
 
-async def test_workflow_request_client_timeout(
-        async_client: AsyncClientFixture):
-    async_client.will_return(ClientTimeout)
-    ctx, msg = await workflow_request(client=async_client, command='')
-    assert not ctx
-    assert 'timeout' in msg.lower()  # type: ignore[attr-defined]
-
-
-async def test_workflow_request_client_error(
-        async_client: AsyncClientFixture, caplog):
-    caplog.set_level(logging.CRITICAL, logger='cylc')
-    async_client.will_return(ClientError)
-    ctx, msg = await workflow_request(client=async_client, command='')
-    assert not ctx
-    assert not msg
-
-
 @pytest.mark.parametrize(
-    "returns,command,req_context,expected_ctx,expected_msg",
-    [
-        pytest.param(
-            42, 'cmd', None, 'cmd', 42
-        ),
-        pytest.param(
-            42, '', None, '', 42
-        ),
-        pytest.param(
-            42, 'cmd', 'some-context', 'some-context', 42
-        )
-    ])
-async def test_workflow_request(
-        async_client: AsyncClientFixture,
-        returns,
-        command,
-        req_context,
-        expected_ctx,
-        expected_msg
+    'exc', [ClientError, ClientTimeout]
+)
+async def test_workflow_request_client_error(
+    exc: Type[Exception],
+    async_client: AsyncClientFixture,
+    caplog: pytest.LogCaptureFixture
 ):
-    async_client.will_return(returns)
-    ctx, msg = await workflow_request(
-        client=async_client, command=command, req_context=req_context)
-    assert expected_ctx == ctx
-    assert expected_msg == msg
+    caplog.set_level(logging.ERROR, logger='cylc')
+    logger = logging.getLogger('cylc')
+    async_client.will_return(exc)
+    with pytest.raises(exc):
+        await workflow_request(client=async_client, command='', log=logger)
+    assert exc.__name__ in caplog.text
+
+
+async def test_workflow_request(async_client: AsyncClientFixture):
+    """Test normal response of workflow_request matches async_request"""
+    async_client.will_return(42)
+    res = await workflow_request(client=async_client, command='')
+    assert res == 42
 
 
 # --- WorkflowsManager
@@ -226,7 +205,7 @@ async def test_workflow_state_change_uuid(
 
 
 async def test_multi_request(
-    workflows_manager,
+    workflows_manager: WorkflowsManager,
     async_client: AsyncClientFixture
 ):
     workflow_id = 'multi-request-workflow'
@@ -251,17 +230,18 @@ async def test_multi_request(
     response = await workflows_manager.multi_request(
         '', [workflow_id], None, multi_args)
     assert len(response) == 1
-    assert value == response[0]
+    assert response[0] == res
 
 
 async def test_multi_request_gather_errors(
     workflows_manager,
     async_client: AsyncClientFixture,
-    caplog
+    caplog: pytest.LogCaptureFixture
 ):
     workflow_id = 'gather-error-workflow'
     error_type = ValueError
     async_client.will_return(error_type)
+    async_client.workflow = workflow_id
 
     workflows_manager.workflows[workflow_id] = {
         'req_client': async_client
@@ -270,9 +250,11 @@ async def test_multi_request_gather_errors(
     caplog.clear()
     await workflows_manager.multi_request('', [workflow_id], None, None)
     assert caplog.record_tuples == [
-        ('cylc', 40, 'Failed to send requests to multiple workflows')
+        ('cylc', 40, f'Error communicating with {workflow_id}'),
+        ('cylc', 40, 'x'),
     ]
-    assert caplog.records[0].exc_info[0] == error_type
+    exc_info = caplog.records[1].exc_info
+    assert exc_info and exc_info[0] == error_type
 
 
 async def test_crashed_workflow(one_workflow_aiter, caplog, uis_caplog):

@@ -20,8 +20,9 @@ import logging
 import pytest
 import zmq
 
+from cylc.flow.exceptions import ClientTimeout, WorkflowStopped
 from cylc.flow.id import Tokens
-from cylc.flow.network import (MSG_TIMEOUT, ZMQSocketBase)
+from cylc.flow.network import ZMQSocketBase
 from cylc.flow.workflow_files import ContactFileFields as CFF
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
@@ -69,7 +70,7 @@ async def test_entire_workflow_update_ignores_timeout_message(
     receives a ``MSG_TIMEOUT`` message.
     """
     w_id = 'workflow_id'
-    async_client.will_return(MSG_TIMEOUT)
+    async_client.will_return(ClientTimeout)
 
     # Set the client used by our test workflow.
     data_store_mgr.workflows_mgr.workflows[w_id] = {
@@ -81,7 +82,7 @@ async def test_entire_workflow_update_ignores_timeout_message(
     # calling ``workflow_request``.
     await data_store_mgr._entire_workflow_update()
 
-    # When a ``MSG_TIMEOUT`` happens, the ``DataStoreMgr`` object ignores
+    # When a ClientTimeout happens, the ``DataStoreMgr`` object ignores
     # that message. So it means that its ``.data`` dictionary MUST NOT
     # have an entry for the Workflow ID.
     assert w_id not in data_store_mgr.data
@@ -90,7 +91,7 @@ async def test_entire_workflow_update_ignores_timeout_message(
 async def test_entire_workflow_update_gather_error(
     async_client: AsyncClientFixture,
     data_store_mgr: DataStoreMgr,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ):
     """
     Test that if ``asyncio.gather`` in ``entire_workflow_update``
@@ -102,8 +103,7 @@ async def test_entire_workflow_update_gather_error(
     #
     # This test wants to confirm this is not raised, but instead the
     # error is returned, so that we can inspect, log, etc.
-    error_type = ValueError
-    async_client.will_return(error_type)
+    async_client.will_return(ValueError)
 
     # Set the client used by our test workflow.
     data_store_mgr.workflows_mgr.workflows['workflow_id'] = {
@@ -113,16 +113,33 @@ async def test_entire_workflow_update_gather_error(
     # Call the entire_workflow_update function.
     # This should use the client defined above (``async_client``) when
     # calling ``workflow_request``.
-    caplog.clear()
     await data_store_mgr._entire_workflow_update()
     assert caplog.record_tuples == [
-        (
-            'cylc',
-            40,
-            'Failed to update entire local data-store of a workflow'
-        )
+        ('cylc', 40, 'Error communicating with myflow'),
+        ('cylc', 40, 'x'),
+        ('cylc', 40,
+         'Failed to update entire local data-store of a workflow: x'),
     ]
-    assert caplog.records[0].exc_info[0] == error_type
+    exc_info = caplog.records[1].exc_info
+    assert exc_info and exc_info[0] == ValueError
+
+
+async def test_entire_workflow_update__stopped_workflow(
+    async_client: AsyncClientFixture,
+    data_store_mgr: DataStoreMgr,
+    caplog: pytest.LogCaptureFixture,
+):
+    """Test that DataStoreMgr._entire_workflow_update() handles a stopped
+    workflow reasonably."""
+    exc = WorkflowStopped('myflow')
+    async_client.will_return(exc)
+    data_store_mgr.workflows_mgr.workflows['workflow_id'] = {
+        'req_client': async_client
+    }
+    await data_store_mgr._entire_workflow_update()
+    assert caplog.record_tuples == [
+        ('cylc', 40, f'WorkflowStopped: {exc}'),
+    ]
 
 
 async def test_register_workflow(
