@@ -22,7 +22,7 @@ from tornado.httpclient import HTTPClientError
 
 
 @pytest.mark.integration
-@pytest.mark.usefixtures("mock_authentication")
+@pytest.mark.usefixtures("mock_authentication_yossarian")
 async def test_cylc_handler(patch_conf_files, jp_fetch):
     """The Cylc endpoints have been added and work."""
     resp = await jp_fetch(
@@ -32,7 +32,7 @@ async def test_cylc_handler(patch_conf_files, jp_fetch):
 
 
 @pytest.mark.integration
-@pytest.mark.usefixtures("mock_authentication")
+@pytest.mark.usefixtures("mock_authentication_yossarian")
 @pytest.mark.parametrize(
     'endpoint,code,message,body',
     [
@@ -71,45 +71,6 @@ async def test_authorised_and_authenticated(
 
 
 @pytest.mark.integration
-@pytest.mark.usefixtures("mock_authentication_none")
-@pytest.mark.parametrize(
-    'endpoint,code,message,body',
-    [
-        pytest.param(
-            ('cylc', 'graphql'),
-            403,
-            'login redirect replaced by 403 for test purposes',
-            None,
-            id='cylc/graphql',
-        ),
-        pytest.param(
-            ('cylc', 'subscriptions'),
-            403,
-            'Forbidden',
-            None,
-            id='cylc/subscriptions',
-        ),
-        pytest.param(
-            ('cylc', 'userprofile'),
-            403,
-            'login redirect replaced by 403 for test purposes',
-            None,
-            id='cylc/userprofile',
-        )
-    ]
-)
-async def test_unauthenticated(
-    patch_conf_files,
-    jp_fetch,
-    endpoint,
-    code,
-    message,
-    body
-):
-    await _test(jp_fetch, endpoint, code, message, body)
-
-
-@pytest.mark.integration
 @pytest.mark.usefixtures("mock_authentication_yossarian")
 @pytest.mark.parametrize(
     'endpoint,code,message,body',
@@ -124,19 +85,13 @@ async def test_unauthenticated(
         ),
         pytest.param(
             # should pass through authentication but fail as there is no query
+            # (authorisation is performed in the grahpql layer)
             ('cylc', 'subscriptions'),
             400,
             'Bad Request',
             None,
             id='cylc/subscriptions',
         ),
-        pytest.param(
-            ('cylc', 'userprofile'),
-            403,
-            'authorization insufficient',
-            None,
-            id='cylc/userprofile',
-        )
     ]
 )
 async def test_unauthorised(

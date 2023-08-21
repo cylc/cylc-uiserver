@@ -15,7 +15,6 @@
 
 # Configuration file for jupyterhub.
 
-import os
 from pathlib import Path
 import pkg_resources
 
@@ -23,6 +22,7 @@ from cylc.uiserver import (
     __file__ as uis_pkg,
     getenv)
 from cylc.uiserver.app import USER_CONF_ROOT
+from cylc.uiserver.authorise import CylcAuthorizer
 
 
 # the command the hub should spawn (i.e. the cylc uiserver itself)
@@ -94,3 +94,10 @@ c.CylcUIServer.logging_config = {
         }
     },
 }
+
+
+# Define the authorization-policy for Jupyter Server.
+# This prevents users being granted full access to extensions such as Jupyter
+# Lab as a result of being granted the ``access:servers`` permission in Jupyter
+# Hub.
+c.ServerApp.authorizer_class = CylcAuthorizer

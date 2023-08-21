@@ -152,6 +152,7 @@ class CylcUIServer(ExtensionApp):
     config_file_paths.insert(0, str(Path(uis_pkg).parent))  # packaged config
     config_file_paths.reverse()
     # TODO: Add a link to the access group table mappings in cylc documentation
+    # https://github.com/cylc/cylc-uiserver/issues/466
     AUTH_DESCRIPTION = '''
             Authorization can be granted at operation (mutation) level, i.e.
             specifically grant user access to execute Cylc commands, e.g.
@@ -172,7 +173,7 @@ class CylcUIServer(ExtensionApp):
                applied to all workflows.
 
             For more information, including the access group mappings, see
-            :ref:`Authorization`.
+            :ref:`cylc.uiserver.multi-user`.
     '''
 
     site_authorization = Dict(
