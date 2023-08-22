@@ -21,6 +21,17 @@ ones in. -->
 for errors recorded in logs.
 
 -------------------------------------------------------------------------------
+
+## __cylc-uiserver-1.3.1 (<span actions:bind='release-date'>Upcoming</span>)__
+
+### Fixes
+
+[#455](https://github.com/cylc/cylc-uiserver/pull/455)- Added a specific
+warning for cases where workflow needs upgrade, and an upgrade toggle in
+cylc play dialog.
+
+-------------------------------------------------------------------------------
+
 ## __cylc-uiserver-1.3.0 (<span actions:bind='release-date'>Released 2023-07-21</span>)__
 
 [Updated cylc-ui to 2.0.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
@@ -38,7 +49,7 @@ connect to workflows when they were restarted.
 ### Enhancements
 
 [#434](https://github.com/cylc/cylc-uiserver/pull/434) - Added the server side
-code for the analysis view in the UI
+code for the analysis view in the UI.
 
 ### Fixes
 
