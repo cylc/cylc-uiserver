@@ -183,6 +183,7 @@ class Play(graphene.Mutation):
             ''')
         )
         upgrade = graphene.Boolean(
+            default_value=False,
             description=sstrip('''
                 Allow the workflow to be restarted with a newer
                 version of Cylc.
