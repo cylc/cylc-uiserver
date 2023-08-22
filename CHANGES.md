@@ -13,7 +13,7 @@ ones in. -->
 
 -------------------------------------------------------------------------------
 
-## __cylc-uiserver-1.4.0 (<span actions:bind='release-date'>Upcoming</span>)__
+## __cylc-uiserver-1.3.1 (<span actions:bind='release-date'>Upcoming</span>)__
 
 ### Fixes
 
