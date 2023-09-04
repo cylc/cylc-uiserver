@@ -30,6 +30,9 @@ Upgraded to Jupyter Server 2.7+ and Jupyter Hub 4.0+. Note cylc-uiserver
 1.3 remains supported and compatible with cylc-flow 8.2 for those not ready
 to make the jump just yet.
 
+[#490](https://github.com/cylc/cylc-uiserver/pull/490) - Make ``cylc play --upgrade``
+available from the GUI.
+
 -------------------------------------------------------------------------------
 ## __cylc-uiserver-1.3.0 (<span actions:bind='release-date'>Released 2023-07-21</span>)__
 

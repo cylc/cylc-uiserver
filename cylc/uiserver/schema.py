@@ -222,6 +222,12 @@ class Play(graphene.Mutation):
                 on the `cylc play` command line if they need to be overridden.
             ''')
         )
+        upgrade = graphene.Boolean(
+            default_value=False,
+            description=sstrip('''
+                Upgrade the workflow database.
+            ''')
+        )
 
     result = GenericScalar()
 
