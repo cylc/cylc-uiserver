@@ -1,0 +1,1 @@
+import{ch as r}from"./index-8c9d4a8a.js";const e={props:{workflowName:{type:String,required:!0}},computed:{...r("user",["user"]),workflowId(){return`~${this.user.owner}/${this.workflowName}`},variables(){return{workflowId:this.workflowId}}}};export{e as g};
