@@ -29,6 +29,12 @@ E.G. if the issue is on the `8.0.x` milestone, branch off of `8.0.x` to
 develop your bugfix, then raise the pull request against the `8.0.x` branch.
 We will later merge the `8.0.x` branch into `master`.
 
+We use [towncrier](https://towncrier.readthedocs.io/en/stable/index.html) for
+generating the changelog. Changelog entries are added by running
+```
+towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
+```
+
 Feel free to ask questions on the issue or developers chat if unsure about
 anything.
 

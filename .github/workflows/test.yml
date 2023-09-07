@@ -63,6 +63,10 @@ jobs:
       - name: Type checking
         run: mypy
 
+      - name: Check changelog
+        if: startsWith(matrix.os, 'ubuntu')
+        run: towncrier build --draft
+
       - name: Test
         run: pytest
 
