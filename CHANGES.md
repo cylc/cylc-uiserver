@@ -12,6 +12,19 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.3.1 (Released 2023-09-08)
+
+[Updated cylc-ui to 2.1.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🔧 Fixes
+
+[#379](https://github.com/cylc/cylc-uiserver/pull/379) - Fixed lack of info for errors recorded in logs.
+
+[#455](https://github.com/cylc/cylc-uiserver/pull/455) - Added an upgrade toggle in cylc play dialog, and a specific warning for cases where workflow needs upgrade.
+
+[#483](https://github.com/cylc/cylc-uiserver/pull/483) - Fixed bug in analysis view server-side query.
+
+
 ## cylc-uiserver-1.3.0 (Released 2023-07-21)
 
 [Updated cylc-ui to 2.0.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
