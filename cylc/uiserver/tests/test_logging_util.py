@@ -79,7 +79,7 @@ def test_log_conf_path(tmp_path, monkeypatch):
     """Check initial setup, no previous logs present"""
     monkeypatch.setenv('CYLC_UISERVER_LOG_PATH', 'elephant')
     LOG = RotatingUISFileHandler()
-    assert LOG.file_path == 'elephant/log'
+    assert str(LOG.file_path) == 'elephant/log'
 
 
 def test_init_log_with_established_setup(tmp_path):

@@ -18,6 +18,7 @@ from pathlib import Path
 from cylc.uiserver import config_util
 
 import pytest
+import importlib
 
 from cylc.flow.cfgspec.globalcfg import GlobalConfig
 from cylc.uiserver import __file__ as UIS_PKG
@@ -84,10 +85,24 @@ def test_cylc_site_conf_path(clear_env, capload, monkeypatch):
     ]
 
 
-def test_cylc_user_conf_path(clear_env, capload, monkeypatch):
+def test_cylc_user_conf_path(clear_env, monkeypatch):
     """The user config should change to $CYLC_CONF_PATH if set."""
     monkeypatch.setenv('CYLC_CONF_PATH', 'elephant')
+
+    # Reload modules with updated environment
+    import cylc.uiserver
+    importlib.reload(cylc.uiserver.config_util)
+    importlib.reload(cylc.uiserver.jupyterhub_config)
+    from cylc.uiserver.config_util import  USER_CONF_ROOT
+
     monkeypatch.setattr(config_util, '__version__', '0')
+
+    # Can't use the fixture due to the reload
+    capload = []
+    monkeypatch.setattr('cylc.uiserver.jupyterhub_config._load', capload.append)
+
+    assert USER_CONF_ROOT == Path('elephant/uiserver')
+
     load()
     assert capload == [
         SYS_CONF,
