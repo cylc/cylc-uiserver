@@ -18,10 +18,10 @@ jobs:
     strategy:
       matrix:
         os: ['ubuntu-latest']
-        python: ['3.7', '3.8', '3.9']
+        python: ['3.8', '3.9']
         include:
           - os: 'macos-latest'
-            python: '3.7'
+            python: '3.8'
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -33,6 +33,8 @@ jobs:
 
       - name: Build
         uses: cylc/release-actions/build-python-package@v1
+        with: 
+          check-dependencies: false
 
       - name: Inspect
         run: |

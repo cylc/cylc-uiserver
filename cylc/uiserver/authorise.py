@@ -15,16 +15,83 @@
 
 from contextlib import suppress
 from functools import lru_cache
-import graphene
+from getpass import getuser
 import grp
 from typing import List, Dict, Optional, Union, Any, Sequence, Set, Tuple
 from inspect import iscoroutinefunction
 import os
 import re
+
+import graphene
+from jupyter_server.auth import Authorizer
 from tornado import web
 from traitlets.config.loader import LazyConfigValue
 
 from cylc.uiserver.schema import UISMutations
+
+
+class CylcAuthorizer(Authorizer):
+    """Defines a safe default authorization policy for Jupyter Server.
+
+    `Jupyter Server`_ provides an authorisation layer which gives full
+    permissions to any user who has been granted permission to the Jupyter Hub
+    ``access:servers`` scope
+    (see :ref:`JupyterHub scopes reference <jupyterhub-scopes>`). This allows
+    the execution of arbitrary code under another user account.
+
+    To prevent this you must define an authorisation policy using
+    :py:attr:`c.ServerApp.authorizer_class
+    <jupyter_server.serverapp.ServerApp.authorizer_class>`.
+
+    This class defines a policy which blocks all API calls to another user's
+    server, apart from calls to Cylc interfaces explicitly defined in the
+    :ref:`Cylc authorisation configuration <cylc.uiserver.user_authorization>`.
+
+    This class is configured as the default authoriser for all Jupyter Server
+    instances spawned via the ``cylc hubapp`` command. This is the default if
+    you started `Jupyter Hub`_ using the ``cylc hub`` command. To see where
+    this default is set, see this file for the appropriate release of
+    cylc-uiserver:
+    https://github.com/cylc/cylc-uiserver/blob/master/cylc/uiserver/jupyter_config.py
+
+    If you are launching Jupyter Hub via another command (e.g. ``jupyterhub``)
+    or are overriding :py:attr:`jupyterhub.app.JupyterHub.spawner_class`, then
+    you will need to configure a safe authorisation policy e.g:
+
+    .. code-block:: python
+
+       from cylc.uiserver.authorise import CylcAuthorizer
+       c.ServerApp.authorizer_class = CylcAuthorizer
+
+    .. note::
+
+       It is possible to provide read-only access to Jupyter Server extensions
+       such as Jupyter Lab, however, this isn't advisable as Jupyter Lab does
+       not apply file-system permissions to what another user is allowed to
+       see.
+
+       If you wish to grant users access to other user's Jupyter Lab servers,
+       override this configuration with due care over what you choose to
+       expose.
+
+    """
+
+    def is_authorized(self, handler, user, action, resource) -> bool:
+        """Allow a user to access their own server.
+
+        Note that Cylc uses its own authorization system (which is locked-down
+        by default) and is not affected by this policy.
+        """
+        # the username of the user running this server
+        # (used for authorzation purposes)
+        me = getuser()
+
+        if user.username == me:
+            # give the user full permissions to their own server
+            return True
+
+        # block access to everyone else
+        return False
 
 
 def constant(func):

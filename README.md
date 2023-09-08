@@ -29,6 +29,7 @@ This repository provides the following components of the Cylc system.
   This is the Cylc web app that provides control and monitoring functionalities
   for Cylc workflows.
 
+  > **Note**
   > The UI is developed in a separate repository https://github.com/cylc/cylc-ui
 
 * **The UI Server**
@@ -97,6 +98,7 @@ $ cylc gui
 $ jupyter cylc
 ```
 
+> **Note**
 > By default, authentication is provided by the URL token. Alternatively, a
 > password can be configured (see Jupyter Server docs).
 >
@@ -115,8 +117,7 @@ other users.
 $ cylc hub
 ```
 
-> Users then authenticate with the hub which launches and manages their UI
-> Server.
+Users then authenticate with the hub which launches and manages their UI Server.
 
 
 ## Configuring
@@ -150,13 +151,11 @@ Alternatively a single config file can be provided on the command line.
 cylc hub --config
 ```
 
-> **Warning:**
->
+> **Warning**
 > If specifying a config file on the command line, the system config containing
 > the hardcoded Cylc default will **not** be loaded.
 
-> **Note:**
->
+> **Note**
 > The hub can also be run using the ``jupyterhub`` command, however, you
 > must source the configuration files manually on the command line.
 
@@ -211,8 +210,7 @@ Contributions welcome:
    pip install -e .[all]
    ```
 
-   > **Note:**
-   >
+   > **Note**
    > If you want to run with a development copy of Cylc Flow you must install
    > it first else `pip` will download the latest version from PyPi.
 
@@ -223,7 +221,8 @@ Contributions welcome:
 
    ```python
    # ~/.cylc/uiserver/jupyter_config.py
-   c.CylcUIServer.ui_build_dir = '~/cylc-ui/dist'  # path to build
+   import os
+   c.CylcUIServer.ui_build_dir = os.path.expanduser('~/cylc-ui/dist')
    ```
 
 Note about testing: unlike cylc-flow, cylc-uiserver uses the

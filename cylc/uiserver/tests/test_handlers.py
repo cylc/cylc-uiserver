@@ -56,15 +56,15 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
             handler.get
             _current_user = lambda: {'name': getuser()}
         else:
-            handler.get_current_user = lambda: None
+            handler.current_user = None
         return handler
 
-    @pytest.mark.usefixtures("mock_authentication")
+    @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_websockets_subprotocol(self):
         handler = self._create_handler()
         assert handler.select_subprotocol(subprotocols=[]) == GRAPHQL_WS
 
-    @pytest.mark.usefixtures("mock_authentication")
+    @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_websockets_check_origin_accepts_same_origin(self):
         """A request that includes the Host header must use the same
         value as the server host, or an error is raised.
@@ -79,7 +79,7 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         handler.request.headers['Host'] = host_header
         assert handler.check_origin(f'http://{host_header}')
 
-    @pytest.mark.usefixtures("mock_authentication")
+    @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_websockets_check_origin_rejects_different_origin(self):
         """A request from a different Host MUST be blocked to prevent
         CORS attacks.
@@ -93,13 +93,13 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         handler.request.headers['Origin'] = 'ui.notcylc'
         assert not handler.check_origin('http://ui.notcylc')
 
-    @pytest.mark.usefixtures("mock_authentication")
+    @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_websockets_context(self):
         handler = self._create_handler()
         assert handler.request == handler.context['request']
         assert 'resolvers' in handler.context
 
-    @pytest.mark.usefixtures("mock_authentication")
+    @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_websockets_queue(self):
         handler = self._create_handler()
         message = '{"message":"a message"}'
@@ -111,7 +111,7 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
                                                 get_async_test_timeout())
         assert handler.queue.empty()
 
-    @pytest.mark.usefixtures("mock_authentication")
+    @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_assert_callback_handler_gets_called(self):
         handler = self._create_handler()
         handler.subscription_server = MagicMock()

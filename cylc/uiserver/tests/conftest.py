@@ -28,6 +28,8 @@ from tornado.web import HTTPError
 from traitlets.config import Config
 import zmq
 
+from jupyter_server.auth.identity import User
+
 from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
 from cylc.flow.id import Tokens
 from cylc.flow.data_messages_pb2 import (  # type: ignore
@@ -202,60 +204,16 @@ def authorisation_false(monkeypatch):
 
 
 @pytest.fixture
-def mock_authentication(monkeypatch: pytest.MonkeyPatch):
-
-    def _mock_authentication(user=None, server=None, none=False):
-        ret = {
-            'name': user or getuser(),
-            'server': server or gethostname()
-        }
-        if none:
-            ret = None
-            monkeypatch.setattr(
-                'cylc.uiserver.handlers.parse_current_user',
-                lambda x: {
-                    'kind': 'user',
-                    'name': None,
-                    'server': 'some_server'
-                }
-            )
-
-            def mock_redirect(*args):
-                # normally tornado would attempt to redirect us to the login
-                # page - for testing purposes we will skip this and raise
-                # a 403 with an explanatory reason
-                raise HTTPError(
-                    403,
-                    reason='login redirect replaced by 403 for test purposes'
-                )
-
-            monkeypatch.setattr(
-                'cylc.uiserver.handlers.CylcAppHandler.redirect',
-                mock_redirect
-            )
-
-        monkeypatch.setattr(
-            'cylc.uiserver.handlers.CylcAppHandler.get_current_user',
-            lambda x: ret
-        )
-        monkeypatch.setattr(
-            'cylc.uiserver.handlers.CylcAppHandler.get_login_url',
-            lambda x: "http://cylc"
-        )
-
-    _mock_authentication()
-
-    return _mock_authentication
-
-
-@pytest.fixture
-def mock_authentication_yossarian(mock_authentication):
-    mock_authentication(user='yossarian')
-
-
-@pytest.fixture
-def mock_authentication_none(mock_authentication):
-    mock_authentication(none=True)
+def mock_authentication_yossarian(monkeypatch):
+    user = User('yossarian')
+    monkeypatch.setattr(
+        'cylc.uiserver.handlers.CylcAppHandler.current_user',
+        user,
+    )
+    monkeypatch.setattr(
+        'cylc.uiserver.handlers.is_token_authenticated',
+        lambda x: True,
+    )
 
 
 @pytest.fixture

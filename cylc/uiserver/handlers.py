@@ -18,13 +18,17 @@ from functools import wraps
 import json
 import getpass
 import os
-import socket
-from typing import TYPE_CHECKING, Callable, Union, Dict
+from typing import TYPE_CHECKING, Callable, Dict
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
 from graphql_ws.constants import GRAPHQL_WS
 from jupyter_server.base.handlers import JupyterHandler
+from jupyter_server.auth.identity import (
+    User as JPSUser,
+    IdentityProvider as JPSIdentityProvider,
+    PasswordIdentityProvider,
+)
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
@@ -61,60 +65,42 @@ def authorised(fun: Callable) -> Callable:
         **kwargs,
     ):
         nonlocal fun
-        user: Union[
-            None,   # unauthenticated
-            dict,   # hub auth
-            str,    # token auth or anonymous
+        user: JPSUser = handler.current_user
 
-        ] = handler.get_current_user()
-        if user is None or user == 'anonymous':
-            # user is not authenticated - calls should not get this far
-            # but the extra safety doesn't hurt
-            # NOTE: Auth tests will hit this line unless mocked authentication
-            # is provided.
-            raise web.HTTPError(403, reason='Forbidden')
-        if not (
-            isinstance(user, str)  # token authenticated
-            or (
-                isinstance(user, dict)
-                and _authorise(handler, user['name'])
-            )
-        ):
+        if not user or not user.username:
+            # the user is only truthy if they have authenticated successfully
             raise web.HTTPError(403, reason='authorization insufficient')
+
+        if not handler.identity_provider.auth_enabled:
+            # if authentication is turned off we don't want to work with this
+            raise web.HTTPError(403, reason='authorization insufficient')
+
+        if is_token_authenticated(handler):
+            # token or password authenticated, the bearer of the token or
+            # password has full control
+            pass
+
+        elif not _authorise(handler, user.username):
+            # other authentication (e.g. JupyterHub auth), check the user has
+            # read permissions for Cylc
+            raise web.HTTPError(403, reason='authorization insufficient')
+
         return fun(handler, *args, **kwargs)
     return _inner
 
 
-def is_token_authenticated(
-    handler: JupyterHandler,
-    user: Union[bytes, dict, str],
-) -> bool:
-    """Returns True if the UIS is running "standalone".
+def is_token_authenticated(handler: 'CylcAppHandler') -> bool:
+    """Returns True if this request is bearer token authenticated.
 
-    At present we cannot use handler.is_token_authenticated because it
-    returns False when the token is cached in a cookie.
+    E.G. The default single-user token-based authenticated.
 
-    https://github.com/jupyter-server/jupyter_server/pull/562
+    In these cases the bearer of the token is awarded full privileges.
     """
-    if isinstance(user, bytes):  # noqa: SIM114
-        # Cookie authentication:
-        # * The URL token is added to a secure cookie, it can then be
-        #   removed from the URL for subsequent requests, the cookie is
-        #   used in its place.
-        # * If the token was used token_authenticated is True.
-        # * If the cookie was used it is False (despite the cookie auth
-        #   being derived from token auth).
-        # * Due to a bug in jupyter_server the user is returned as bytes
-        #   when cookie auth is used so at present we can use this to
-        #   tell.
-        #   https://github.com/jupyter-server/jupyter_server/pull/562
-        # TODO: this hack is obviously not suitable for production!
-        return True
-    elif handler.token_authenticated:
-        # standalone UIS, the bearer of the token is the owner
-        # (no multi-user functionality so no further auth required)
-        return True
-    return False
+    identity_provider: JPSIdentityProvider = (
+        handler.serverapp.identity_provider
+    )
+    return identity_provider.__class__ == PasswordIdentityProvider
+    # NOTE: not using isinstance to narrow this down to just the one class
 
 
 def _authorise(
@@ -136,28 +122,24 @@ def _authorise(
         return False
 
 
-def parse_current_user(current_user):
-    """Standardises and returns the current user."""
-    if isinstance(current_user, dict):
-        # the server is running with authentication services provided
-        # by a hub
-        current_user = dict(current_user)  # make a copy for safety
-        return current_user
+def get_username(handler: 'CylcAppHandler'):
+    """Return the username for the authenticated user.
+
+    If the handler is token authenticated, then we return the username of the
+    account that this server instance is running under.
+    """
+    if is_token_authenticated(handler):
+        # the bearer of the token has full privileges
+        return ME
     else:
-        # the server is running using a token
-        # authentication is provided by jupyter server
-        return {
-            'kind': 'user',
-            'name': ME,
-            'server': socket.gethostname()
-        }
+        return handler.current_user.username
 
 
 class CylcAppHandler(JupyterHandler):
     """Base handler for Cylc endpoints.
 
     This handler adds the Cylc authorisation layer which is triggered by
-    calling CylcAppHandler.get_current_user which is called by
+    accessing CylcAppHandler.current_user which is called by
     web.authenticated.
 
     When running as a Hub application the make_singleuser_app method patches
@@ -171,11 +153,7 @@ class CylcAppHandler(JupyterHandler):
 
     def initialize(self, auth):
         self.auth = auth
-
-    # Without this, there is no xsrf token from the GET which causes a 403 and
-    # a missing _xsrf argument error on the first POST.
-    def prepare(self):
-        _ = self.xsrf_token
+        super().initialize()
 
     @property
     def hub_users(self):
@@ -266,11 +244,11 @@ class UserProfileHandler(CylcAppHandler):
         self.set_header("Content-Type", 'application/json')
 
     @web.authenticated
-    @authorised
+    # @authorised  TODO: I can't think why we would want to authorise this
     def get(self):
-        user_info = self.get_current_user()
-
-        user_info = parse_current_user(user_info)
+        user_info = {
+            'name': get_username(self)
+        }
 
         # add an entry for the workflow owner
         # NOTE: when running behind a hub this may be different from the
@@ -283,6 +261,7 @@ class UserProfileHandler(CylcAppHandler):
                 self.auth.get_permitted_operations(user_info['name']))
         ]
         # Pass the gui mode to the ui
+        # (used for functionality not security)
         if not os.environ.get("JUPYTERHUB_SINGLEUSER_APP"):
             user_info['mode'] = 'single user'
         else:
@@ -337,14 +316,8 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
             'graphql_params': self.graphql_params,
             'request': self.request,
             'resolvers': self.resolvers,
-            'current_user': parse_current_user(
-                self.get_current_user()
-            ).get('name'),
+            'current_user': get_username(self),
         }
-
-    @web.authenticated
-    def prepare(self):
-        super().prepare()
 
     @web.authenticated  # type: ignore[arg-type]
     async def execute(self, *args, **kwargs) -> 'ExecutionResult':
@@ -411,9 +384,7 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         return {
             'request': self.request,
             'resolvers': self.resolvers,
-            'current_user': parse_current_user(
-                self.get_current_user()
-            ).get('name'),
+            'current_user': get_username(self),
             'ops_queue': {},
             'sub_statuses': self.sub_statuses
         }
