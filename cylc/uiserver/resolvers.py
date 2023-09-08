@@ -332,11 +332,13 @@ class Services:
 
                 if ret:
                     # command failed
-                    _, err = proc.communicate()
+                    out, err = proc.communicate()
+                    msg = err.strip() or out.strip() or (
+                        f'Could not start {tokens["workflow"]}'
+                        f' - {cmd_repr}'
+                    )
                     raise Exception(
-                        f'Could not start {tokens["workflow"]} - {cmd_repr}'
-                        # suppress traceback unless in debug mode
-                        + (f' - {err}' if DEBUG else '')
+                        msg
                     )
 
             except Exception as exc:

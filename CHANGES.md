@@ -5,33 +5,27 @@ all changes see the [closed
 milestones](https://github.com/cylc/cylc-uiserver/milestones?state=closed) for
 each release.
 
-<!-- The topmost release date is automatically updated by GitHub Actions. When
-creating a new release entry be sure to copy & paste the span tag with the
-`actions:bind` attribute, which is used by a regex to find the text to be
-updated. Only the first match gets replaced, so it's fine to leave the old
-ones in. -->
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.3.1 (<span actions:bind='release-date'>Upcoming</span>)__
+<!--
+NOTE: Do not add entries here, use towncrier fragments instead:
+$ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
+-->
 
-<!-- [Updated cylc-ui to x.y.z](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md) -->
+<!-- towncrier release notes start -->
 
-### Fixes
+## cylc-uiserver-1.3.1 (Released 2023-09-08)
 
-[#379](https://github.com/cylc/cylc-uiserver/pull/379) - Fixed lack of info
-for errors recorded in logs.
+[Updated cylc-ui to 2.1.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.4.0 (<span actions:bind='release-date'>Awaiting Release</span>)__
+### 🔧 Fixes
 
-### Enhancements
+[#379](https://github.com/cylc/cylc-uiserver/pull/379) - Fixed lack of info for errors recorded in logs.
 
-[#450](https://github.com/cylc/cylc-uiserver/pull/450) -
-Upgraded to Jupyter Server 2.7+ and Jupyter Hub 4.0+. Note cylc-uiserver
-1.3 remains supported and compatible with cylc-flow 8.2 for those not ready
-to make the jump just yet.
+[#455](https://github.com/cylc/cylc-uiserver/pull/455) - Added an upgrade toggle in cylc play dialog, and a specific warning for cases where workflow needs upgrade.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.3.0 (<span actions:bind='release-date'>Released 2023-07-21</span>)__
+[#483](https://github.com/cylc/cylc-uiserver/pull/483) - Fixed bug in analysis view server-side query.
+
+
+## cylc-uiserver-1.3.0 (Released 2023-07-21)
 
 [Updated cylc-ui to 2.0.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
 
@@ -40,15 +34,14 @@ to make the jump just yet.
 [#463](https://github.com/cylc/cylc-uiserver/pull/463) - Fixed failure to
 connect to workflows when they were restarted.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.2.2 (<span actions:bind='release-date'>Released 2023-04-28</span>)__
+## cylc-uiserver-1.2.2 (Released 2023-04-28)
 
 [Updated cylc-ui to 1.6.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
 
 ### Enhancements
 
 [#434](https://github.com/cylc/cylc-uiserver/pull/434) - Added the server side
-code for the analysis view in the UI
+code for the analysis view in the UI.
 
 ### Fixes
 
@@ -56,8 +49,7 @@ code for the analysis view in the UI
 cleaning check for the UI server contact file. This may have caused problems
 running a UI server following a crash.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.2.1 (<span actions:bind='release-date'>Released 2023-02-20</span>)__
+## cylc-uiserver-1.2.1 (Released 2023-02-20)
 
 [Updated cylc-ui to 1.5.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
 
@@ -69,8 +61,7 @@ the log file now captures messages from cylc-flow.
 [#370](https://github.com/cylc/cylc-uiserver/pull/370) -
 `cylc gui workflow_id` is now supported and will open the GUI at that workflow.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.2.0 (<span actions:bind='release-date'>Released 2023-01-16</span>)__
+## cylc-uiserver-1.2.0 (Released 2023-01-16)
 
 [Updated cylc-ui to 1.4.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
 
@@ -85,8 +76,7 @@ in `~/.cylc/uiserver/log/`). A new log is created with each UIServer instance.
 [#386](https://github.com/cylc/cylc-uiserver/pull/386) - Work around bug in
 JupyterHub 3.0.0 that prevents `cylc hub` from starting.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.1.0 (<span actions:bind='release-date'>Released 2022-07-28</span>)__
+## cylc-uiserver-1.1.0 (Released 2022-07-28)
 
 [Updated cylc-ui to 1.3.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-130-released-2022-07-27)
 
@@ -100,20 +90,17 @@ Traitlets `logging_config` "trait" for more information.
 [#323](https://github.com/cylc/cylc-uiserver/pull/323) -
 `cylc clean` made available for runs and files within runs.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.0.3 (<span actions:bind='release-date'>Released 2022-05-31</span>)__
+## cylc-uiserver-1.0.3 (Released 2022-05-31)
 
 [Updated cylc-ui to 1.2.1](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-121-released-2022-05-30)
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.0.2 (<span actions:bind='release-date'>Released 2022-05-20</span>)__
+## cylc-uiserver-1.0.2 (Released 2022-05-20)
 
 [Updated cylc-ui to 1.2.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-120-released-2022-05-19)
 
 Internal changes, see https://github.com/cylc/cylc-uiserver/milestone/11?closed=1
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.0.1 (<span actions:bind='release-date'>Released 2022-03-23</span>)__
+## cylc-uiserver-1.0.1 (Released 2022-03-23)
 
 [Updated cylc-ui to 1.1.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-110-released-2022-03-23)
 
@@ -122,8 +109,7 @@ Internal changes, see https://github.com/cylc/cylc-uiserver/milestone/11?closed=
 [#324](https://github.com/cylc/cylc-uiserver/pull/324) -
 Fix issues where workflow status could be incorrect.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-1.0.0 (<span actions:bind='release-date'>Released 2022-02-17</span>)__
+## cylc-uiserver-1.0.0 (Released 2022-02-17)
 
 [Updated cylc-ui to 1.0.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md#cylc-ui-100-released-2022-02-17)
 
@@ -141,8 +127,7 @@ Updated for the new Global Universal ID.
 [#304](https://github.com/cylc/cylc-uiserver/pull/304) -
 Suppressed client connection traceback.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-0.6.0 (<span actions:bind='release-date'>Released 2021-11-11</span>)__
+## cylc-uiserver-0.6.0 (Released 2021-11-11)
 
 Multi-user functionality implemented.
 
@@ -168,16 +153,14 @@ Update old, broken hold options for playing workflows.
 Allowed broken entries in the group id database to be
 ignored and logged without causing total failure.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-0.5.0 (<span actions:bind='release-date'>Released 2021-07-28</span>)__
+## cylc-uiserver-0.5.0 (Released 2021-07-28)
 
 ### Enhancements
 
 [#214](https://github.com/cylc/cylc-uiserver/pull/214) -
 Store the JupyterHub runtime files in ~/.cylc/hub.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-0.4.0 (<span actions:bind='release-date'>Released 2021-04-21</span>)__
+## cylc-uiserver-0.4.0 (Released 2021-04-21)
 
 ### Enhancements
 
@@ -187,8 +170,7 @@ Add authorisation for multi-user setups.
 [#197](https://github.com/cylc/cylc-uiserver/pull/197) -
 Make the workflow scan interval configurable.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-0.3.0 (2021-03-29)__
+## cylc-uiserver-0.3.0 (2021-03-29)
 
 Release 0.3.0 of Cylc UI Server.
 
@@ -232,8 +214,7 @@ None.
 
 None.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-0.2 (2020-07-14)__
+## cylc-uiserver-0.2 (2020-07-14)
 
 Release 0.2 of Cylc UI Server.
 
@@ -261,7 +242,6 @@ None.
 
 None.
 
--------------------------------------------------------------------------------
-## __cylc-uiserver-0.1 (2019-09-18)__
+## cylc-uiserver-0.1 (2019-09-18)
 
 Initial release of Cylc UI Server.

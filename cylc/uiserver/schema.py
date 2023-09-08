@@ -182,6 +182,13 @@ class Play(graphene.Mutation):
                 `[scheduler][main loop]plugins`. Can be used multiple times.
             ''')
         )
+        upgrade = graphene.Boolean(
+            default_value=False,
+            description=sstrip('''
+                Allow the workflow to be restarted with a newer
+                version of Cylc.
+            ''')
+        )
         abort_if_any_task_fails = graphene.Boolean(
             default_value=False,
             description=sstrip('''
@@ -381,9 +388,9 @@ FROM
             STRFTIME('%s', time_run) -
             STRFTIME('%s', time_submit) AS queue_time
         FROM
-            task_jobs))
-WHERE
-    run_status = 0
+            task_jobs
+        WHERE
+            run_status = 0))
 GROUP BY
     name;
 '''):
