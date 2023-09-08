@@ -15,6 +15,10 @@ ones in. -->
 
 <!-- [Updated cylc-ui to x.y.z](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md) -->
 
+### Enhancements
+[#496](https://github.com/cylc/cylc-uiserver/pull/496) - Allow configuring the
+user config path and log path with environment variables
+
 ### Fixes
 
 [#379](https://github.com/cylc/cylc-uiserver/pull/379) - Fixed lack of info

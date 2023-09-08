@@ -52,6 +52,7 @@ below.
  - David Matthews
  - Mel Hall
  - Christopher Bennett
+ - Scott Wales
  <!-- end-shortlog -->
 
 (All contributors are identifiable with email addresses in the git version

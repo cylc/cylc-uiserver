@@ -30,7 +30,7 @@ class RotatingUISFileHandler(logging.handlers.RotatingFileHandler):
     LOG_NAME_EXTENSION = "-uiserver.log"
 
     def __init__(self):
-        self.file_path = Path(USER_CONF_ROOT / "log").expanduser()
+        self.file_path = Path(os.getenv('CYLC_UISERVER_LOG_PATH') or USER_CONF_ROOT, "log").expanduser()
 
     def on_start(self):
         """Set up logging"""
