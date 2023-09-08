@@ -84,6 +84,20 @@ def test_cylc_site_conf_path(clear_env, capload, monkeypatch):
     ]
 
 
+def test_cylc_user_conf_path(clear_env, capload, monkeypatch):
+    """The user config should change to $CYLC_CONF_PATH if set."""
+    monkeypatch.setenv('CYLC_CONF_PATH', 'elephant')
+    monkeypatch.setattr(config_util, '__version__', '0')
+    load()
+    assert capload == [
+        SYS_CONF,
+        (SITE_CONF / 'jupyter_config.py'),
+        (SITE_CONF / '0/jupyter_config.py'),
+        Path('elephant/uiserver/jupyter_config.py'),
+        Path('elephant/uiserver/0/jupyter_config.py'),
+    ]
+
+
 def test_get_conf_dir_hierarchy(monkeypatch: pytest.MonkeyPatch):
     """Tests hierarchy of versioning for config"""
     config_paths = ['config_path/one', 'config_path/two']

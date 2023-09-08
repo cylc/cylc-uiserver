@@ -38,7 +38,7 @@ SITE_CONF_ROOT: Path = Path(
     or GlobalConfig.DEFAULT_SITE_CONF_PATH,
     UISERVER_DIR
 )
-USER_CONF_ROOT = Path.home() / '.cylc' / UISERVER_DIR
+USER_CONF_ROOT = Path(os.getenv('CYLC_CONF_PATH') or Path.home() / '.cylc', UISERVER_DIR)
 
 
 def get_conf_dir_hierarchy(
