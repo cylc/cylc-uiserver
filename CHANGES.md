@@ -12,6 +12,13 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.4.0 (Released 2023-09-12)
+
+### 🚀 Enhancements
+
+[#450](https://github.com/cylc/cylc-uiserver/pull/450) - Upgraded to Jupyter Server 2.7+ and Jupyter Hub 4.0+. Note cylc-uiserver 1.3 remains supported and compatible with cylc-flow 8.2 for those not ready to make the jump just yet.
+
+
 ## cylc-uiserver-1.3.1 (Released 2023-09-08)
 
 [Updated cylc-ui to 2.1.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
