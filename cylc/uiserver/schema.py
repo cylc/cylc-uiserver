@@ -270,6 +270,17 @@ class Clean(graphene.Mutation):
     result = GenericScalar()
 
 
+class Scan(graphene.Mutation):
+    class Meta:
+        description = sstrip('''
+            Scan the filesystem for file changes.
+
+            Valid for: stopped workflows.
+        ''')
+        resolver = partial(mutator, command='scan')
+    result = GenericScalar()
+
+
 async def get_jobs(root, info, **kwargs):
     if kwargs['live']:
         return await get_nodes_all(root, info, **kwargs)
@@ -545,6 +556,7 @@ class UISSubscriptions(Subscriptions):
 class UISMutations(Mutations):
     play = _mut_field(Play)
     clean = _mut_field(Clean)
+    scan = _mut_field(Scan)
 
 
 schema = graphene.Schema(
