@@ -20,7 +20,6 @@ from pathlib import Path
 import pytest
 from random import randint
 import requests
-from shutil import rmtree
 from time import sleep
 
 from cylc.uiserver.scripts.gui import (
@@ -29,48 +28,72 @@ from cylc.uiserver.scripts.gui import (
     update_url
 )
 
+from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
+GLOBAL_CONFIG = glbl_cfg().get(['hub', 'url'])
+
+
 @pytest.mark.parametrize(
-    'existing_content,workflow_id,expected_updated_content',
+    'existing_content,workflow_id,expected_updated_content,hub_url',
     [
         pytest.param(
             'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#',
             None,
             'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#',
+            '',
             id='existing_no_workflow_new_no_workflow'
         ),
         pytest.param(
             'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#',
             'some/workflow',
             'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workspace/some/workflow',
+            '',
             id='existing_no_workflow_new_workflow'
+        ),
+        pytest.param(
+            'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#',
+            'some/hub/workflow',
+            'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/user/mdawson/cylc/#/workspace/some/hub/workflow',
+            'localhost:8000',
+            id='existing_no_workflow_new_workflow_hub'
         ),
         pytest.param(
             'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workspace/some/workflow',
             'another/flow',
             'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workspace/another/flow',
+            '',
             id='existing_workflow_new_workflow'
         ),
         pytest.param(
             'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/workspace/some/workflow',
             None,
             'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#',
+            '',
             id='existing_workflow_no_new_workflow'
         ),
         pytest.param(
             '',
             'another/flow',
             None,
+            '',
             id='no_url_no_change'
         ),
     ]
 )
+
 def test_update_html_file_updates_gui_file(
     existing_content,
     workflow_id,
-        expected_updated_content):
+    expected_updated_content,
+    hub_url,
+    mock_glbl_cfg):
     """Tests url is updated correctly"""
-
+    mock_glbl_cfg('cylc.uiserver.scripts.gui.glbl_cfg', 
+        f'''[hub]
+        url = {hub_url}
+        ''')
     updated_file_content = update_url(existing_content, workflow_id)
+    print('updated_file_content')
+    print(updated_file_content)
     assert updated_file_content == expected_updated_content
 
 

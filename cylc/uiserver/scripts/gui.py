@@ -32,6 +32,7 @@ import requests
 import sys
 from typing import Optional
 import webbrowser
+from getpass import getuser
 
 
 from cylc.flow.id_cli import parse_id_async
@@ -39,6 +40,8 @@ from cylc.flow.exceptions import (
     InputError,
     WorkflowFilesError
 )
+
+from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
 
 from cylc.uiserver import init_log
 from cylc.uiserver.app import (
@@ -51,8 +54,15 @@ CLI_OPT_NEW = "--new"
 
 def main(*argv):
     init_log()
+    GLOBAL_CONFIG = glbl_cfg().get(['hub', 'url'])
     jp_server_opts, new_gui, workflow_id = parse_args_opts()
     if '--help' not in sys.argv:
+        if GLOBAL_CONFIG:
+            print(f"Running on {GLOBAL_CONFIG} as specified in global config.")
+            webbrowser.open(
+                update_url(GLOBAL_CONFIG, workflow_id), autoraise=True
+            )
+            return
         # get existing jpserver-<pid>-open.html files
         # check if the server is available for use
         # prompt for user whether to clean files for un-usable uiservers
@@ -190,6 +200,7 @@ def get_arg_parser():
 def update_url(url, workflow_id):
     """ Update the url to open at the correct workflow in the gui.
     """
+    GLOBAL_CONFIG = glbl_cfg().get(['hub', 'url'])
     if not url:
         return
     split_url = url.split('/workspace/')
@@ -212,4 +223,8 @@ def update_url(url, workflow_id):
                 return url.replace(old_workflow, workflow_id)
         else:
             # current url points to dashboard, update to point to workflow
-            return f"{url}/workspace/{workflow_id}"
+            if GLOBAL_CONFIG:
+                return (f"{url}/user/{getuser()}/{CylcUIServer.name}"
+                        f"/#/workspace/{workflow_id}")
+            else:
+                return f"{url}/workspace/{workflow_id}"
