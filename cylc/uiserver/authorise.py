@@ -523,7 +523,7 @@ class AuthorizationMiddleware:
                        f":requested to {op_name}.")
         if message:
             log_message = log_message + " " + message
-        raise web.HTTPError(http_code, reason=message)
+        raise web.HTTPError(http_code, reason=log_message)
 
     def get_op_name(self, field_name: str, operation: str) -> Optional[str]:
         """
