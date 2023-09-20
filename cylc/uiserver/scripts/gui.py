@@ -30,6 +30,7 @@ import re
 from requests.exceptions import RequestException
 import requests
 import sys
+from textwrap import dedent
 from typing import Optional
 import webbrowser
 from getpass import getuser
@@ -56,6 +57,23 @@ def main(*argv):
     init_log()
     GLOBAL_CONFIG = glbl_cfg().get(['hub', 'url'])
     jp_server_opts, new_gui, workflow_id = parse_args_opts()
+    if '--help' in sys.argv and GLOBAL_CONFIG:
+        print(
+            dedent('''
+                cylc gui [WORKFLOW]
+
+                Open the Cylc GUI in a new web browser tab.
+
+                If WORKFLOW is specified, the GUI will open on this workflow.
+
+                This command has been configured to use a centrally configured
+                Jupyter Hub instance rather than start a standalone server.
+                To see the configuration options for the server run
+                "cylc gui --help-all", these options can be configured in the
+                Jupyter configuration files using "c.Spawner.cmd", see the Cylc
+                and Jupyter Hub documentation for more details.
+            '''))
+        return
     if '--help' not in sys.argv:
         if GLOBAL_CONFIG:
             print(f"Running on {GLOBAL_CONFIG} as specified in global config.")
