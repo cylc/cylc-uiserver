@@ -12,12 +12,6 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
-## cylc-uiserver-1.4.1
-### 🚀 Enhancements
-
-[#507](https://github.com/cylc/cylc-uiserver/pull/507) - Added functionality for routing to a multiuser deploymnet when running cylc gui command.
-
-
 ## cylc-uiserver-1.4.0 (Released 2023-09-12)
 
 ### 🚀 Enhancements

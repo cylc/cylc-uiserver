@@ -55,9 +55,9 @@ CLI_OPT_NEW = "--new"
 
 def main(*argv):
     init_log()
-    GLOBAL_CONFIG = glbl_cfg().get(['hub', 'url'])
+    hub_url = glbl_cfg().get(['hub', 'url'])
     jp_server_opts, new_gui, workflow_id = parse_args_opts()
-    if '--help' in sys.argv and GLOBAL_CONFIG:
+    if '--help' in sys.argv and hub_url:
         print(
             dedent('''
                 cylc gui [WORKFLOW]
@@ -75,10 +75,10 @@ def main(*argv):
             '''))
         return
     if '--help' not in sys.argv:
-        if GLOBAL_CONFIG:
-            print(f"Running on {GLOBAL_CONFIG} as specified in global config.")
+        if hub_url:
+            print(f"Running on {hub_url } as specified in global config.")
             webbrowser.open(
-                update_url(GLOBAL_CONFIG, workflow_id), autoraise=True
+                update_url(hub_url, workflow_id), autoraise=True
             )
             return
         # get existing jpserver-<pid>-open.html files

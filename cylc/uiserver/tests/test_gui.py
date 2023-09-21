@@ -28,10 +28,6 @@ from cylc.uiserver.scripts.gui import (
     update_url
 )
 
-from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
-GLOBAL_CONFIG = glbl_cfg().get(['hub', 'url'])
-
-
 @pytest.mark.parametrize(
     'existing_content,workflow_id,expected_updated_content,hub_url',
     [
@@ -92,8 +88,6 @@ def test_update_html_file_updates_gui_file(
         url = {hub_url}
         ''')
     updated_file_content = update_url(existing_content, workflow_id)
-    print('updated_file_content')
-    print(updated_file_content)
     assert updated_file_content == expected_updated_content
 
 
