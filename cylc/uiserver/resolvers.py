@@ -374,9 +374,9 @@ class Services:
             id_: Tokens,
             log,
             info,
-            force_remote=True,
-            file=None,
-            ):
+            force_remote: bool = True,
+            file: Optional[str] = None,
+    ):
         """Calls `cat log`.
 
         Used for log subscriptions.
@@ -456,7 +456,7 @@ class Services:
             yield {'connected': False}
 
     @classmethod
-    async def cat_log_files(cls, id_: Tokens, force_remote):
+    async def cat_log_files(cls, id_: Tokens, force_remote: bool):
         """Calls cat log to get list of available log files.
 
         Note kept separate from the cat_log method above as this is a one off
@@ -505,6 +505,7 @@ class Resolvers(BaseResolvers):
         self.log = log
         self.workflows_mgr = workflows_mgr
         self.executor = executor
+        self.force_remote_logs = force_remote_logs
 
         # Set extra attributes
         for key, value in kwargs.items():
@@ -591,7 +592,7 @@ class Resolvers(BaseResolvers):
             ids[0],
             self.log,
             info,
-            file,
+            file=file,
             force_remote=self.force_remote_logs,
         ):
             yield ret
@@ -601,9 +602,9 @@ class Resolvers(BaseResolvers):
         id_: Tokens,
     ):
         return await Services.cat_log_files(
-                id_,
-                force_remote=self.force_remote_logs
-                )
+            id_,
+            force_remote=self.force_remote_logs
+        )
 
 
 def kill_process_tree(
