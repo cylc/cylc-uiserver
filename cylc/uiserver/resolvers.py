@@ -369,7 +369,14 @@ class Services:
             await queue.put(line.decode())
 
     @classmethod
-    async def cat_log(cls, id_: Tokens, log, info, force_remote=True, file=None):
+    async def cat_log(
+            cls,
+            id_: Tokens,
+            log,
+            info,
+            force_remote=True,
+            file=None,
+            ):
         """Calls `cat log`.
 
         Used for log subscriptions.
@@ -593,7 +600,10 @@ class Resolvers(BaseResolvers):
         self,
         id_: Tokens,
     ):
-        return await Services.cat_log_files(id_, force_remote=self.force_remote_logs)
+        return await Services.cat_log_files(
+                id_,
+                force_remote=self.force_remote_logs
+                )
 
 
 def kill_process_tree(
