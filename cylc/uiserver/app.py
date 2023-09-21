@@ -65,6 +65,7 @@ from pkg_resources import parse_version
 from tornado import ioloop
 from tornado.web import RedirectHandler
 from traitlets import (
+    Bool,
     Dict,
     Float,
     Int,
@@ -324,6 +325,13 @@ class CylcUIServer(ExtensionApp):
         ''',
         default_value=1
     )
+    force_remote_logs = Bool(
+        config=True,
+        help='''
+            Always use --force-remote with `cat-log`
+        ''',
+        default_value=True
+    )
 
     @validate('ui_build_dir')
     def _check_ui_build_dir_exists(self, proposed):
@@ -392,6 +400,7 @@ class CylcUIServer(ExtensionApp):
             log=self.log,
             executor=self.executor,
             workflows_mgr=self.workflows_mgr,
+            force_remote_logs=True,
         )
 
     def initialize_settings(self):

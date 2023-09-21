@@ -369,7 +369,7 @@ class Services:
             await queue.put(line.decode())
 
     @classmethod
-    async def cat_log(cls, id_: Tokens, log, info, file=None):
+    async def cat_log(cls, id_: Tokens, log, info, force_remote=True, file=None):
         """Calls `cat log`.
 
         Used for log subscriptions.
@@ -378,10 +378,11 @@ class Services:
             'cylc',
             'cat-log',
             '--mode=tail',
-            '--force-remote',
             '--prepend-path',
             id_.id,
         ]
+        if force_remote:
+            cmd += ['--force-remote']
         if file:
             cmd += ['-f', file]
         log.info(f'$ {" ".join(cmd)}')
@@ -448,7 +449,7 @@ class Services:
             yield {'connected': False}
 
     @classmethod
-    async def cat_log_files(cls, id_: Tokens):
+    async def cat_log_files(cls, id_: Tokens, force_remote):
         """Calls cat log to get list of available log files.
 
         Note kept separate from the cat_log method above as this is a one off
@@ -456,7 +457,9 @@ class Services:
         This uses the Cylc cat-log interface, list dir mode, forcing remote
         file checking.
         """
-        cmd: List[str] = ['cylc', 'cat-log', '-m', 'l', '-o', id_.id]
+        cmd: List[str] = ['cylc', 'cat-log', '-m', 'l', id_.id]
+        if force_remote:
+            cmd += ['--force-remote']
         proc_job = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -488,6 +491,7 @@ class Resolvers(BaseResolvers):
         log: 'Logger',
         workflows_mgr: 'WorkflowsManager',
         executor,
+        force_remote_logs: bool,
         **kwargs
     ):
         super().__init__(data)
@@ -580,7 +584,8 @@ class Resolvers(BaseResolvers):
             ids[0],
             self.log,
             info,
-            file
+            file,
+            force_remote=self.force_remote_logs,
         ):
             yield ret
 
@@ -588,7 +593,7 @@ class Resolvers(BaseResolvers):
         self,
         id_: Tokens,
     ):
-        return await Services.cat_log_files(id_)
+        return await Services.cat_log_files(id_, force_remote=self.force_remote_logs)
 
 
 def kill_process_tree(
