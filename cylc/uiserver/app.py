@@ -400,7 +400,7 @@ class CylcUIServer(ExtensionApp):
             log=self.log,
             executor=self.executor,
             workflows_mgr=self.workflows_mgr,
-            force_remote_logs=True,
+            force_remote_logs=self.config.CylcUIServer.force_remote_logs,
         )
 
     def initialize_settings(self):
