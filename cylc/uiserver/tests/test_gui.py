@@ -17,6 +17,7 @@ import builtins
 from glob import glob
 import os
 from pathlib import Path
+from getpass import getuser
 import pytest
 from random import randint
 import requests
@@ -48,7 +49,7 @@ from cylc.uiserver.scripts.gui import (
         pytest.param(
             'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#',
             'some/hub/workflow',
-            'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/user/mdawson/cylc/#/workspace/some/hub/workflow',
+            f'http://localhost:8892/cylc/?token=1234567890some_big_long_token1234567890#/user/{getuser()}/cylc/#/workspace/some/hub/workflow',
             'localhost:8000',
             id='existing_no_workflow_new_workflow_hub'
         ),
