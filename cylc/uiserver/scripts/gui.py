@@ -74,7 +74,7 @@ def main(*argv):
                 and Jupyter Hub documentation for more details.
             '''))
         return
-    if '--help' not in sys.argv:
+    if not {'--help', '--help-all'} & set(sys.argv):
         if hub_url:
             print(f"Running on {hub_url } as specified in global config.")
             webbrowser.open(
@@ -218,7 +218,7 @@ def get_arg_parser():
 def update_url(url, workflow_id):
     """ Update the url to open at the correct workflow in the gui.
     """
-    GLOBAL_CONFIG = glbl_cfg().get(['hub', 'url'])
+    hub_url = glbl_cfg().get(['hub', 'url'])
     if not url:
         return
     split_url = url.split('/workspace/')
@@ -241,7 +241,7 @@ def update_url(url, workflow_id):
                 return url.replace(old_workflow, workflow_id)
         else:
             # current url points to dashboard, update to point to workflow
-            if GLOBAL_CONFIG:
+            if hub_url:
                 return (f"{url}/user/{getuser()}/{CylcUIServer.name}"
                         f"/#/workspace/{workflow_id}")
             else:
