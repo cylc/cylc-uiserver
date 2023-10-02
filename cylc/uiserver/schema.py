@@ -372,7 +372,7 @@ async def list_jobs(args):
         )
         with CylcWorkflowDAO(db_file, is_public=True) as dao:
             conn = dao.connect()
-            jobs.extend(make_jobs_query(conn, workflow, args.get('task_name')))
+            jobs.extend(make_jobs_query(conn, workflow, args.get('tasks')))
     return jobs
 
 
@@ -499,16 +499,19 @@ GROUP BY
     return tasks
 
 
-def make_jobs_query(conn, workflow, task):
+def make_jobs_query(conn, workflow, tasks):
 
     # TODO: support all arguments including states
     # https://github.com/cylc/cylc-uiserver/issues/440
     jobs = []
-    # Make this more secure
-    if task:
-        snippet = f" AND name = '{task}'"
+
+    # Create sql snippet used to limit which tasks are returned by query
+    if tasks:
+        where_clauses = "' OR name = '".join(tasks)
+        where_clauses = f" AND (name = '{where_clauses}')"
     else:
-        snippet = ''
+        where_clauses = ''
+
     for row in conn.execute(f'''
 SELECT
     name,
@@ -526,7 +529,8 @@ SELECT
 FROM
     task_jobs
 WHERE
-    run_status = 0{snippet};
+    run_status = 0
+    {where_clauses};
 '''):
         jobs.append({
             'id': workflow.duplicate(
@@ -642,7 +646,7 @@ class UISQueries(Queries):
         mindepth=graphene.Int(default_value=-1),
         maxdepth=graphene.Int(default_value=-1),
         sort=SortArgs(default_value=None),
-        task_name=graphene.String()
+        tasks=graphene.List(ID, default_value=[])
     )
 
 
