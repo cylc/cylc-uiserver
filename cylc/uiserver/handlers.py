@@ -122,7 +122,7 @@ def _authorise(
         return False
 
 
-def get_username(handler: 'CylcAppHandler'):
+def get_usernames(handler: 'CylcAppHandler'):
     """Return the username for the authenticated user.
 
     If the handler is token authenticated, then we return the username of the
@@ -130,9 +130,13 @@ def get_username(handler: 'CylcAppHandler'):
     """
     if is_token_authenticated(handler):
         # the bearer of the token has full privileges
-        return ME
+        if ('.' in ME):
+            initials = ME.split('.')[0].upper()+ME.split('.')[1][0].upper()
+        else:
+            initials = ME[0].upper()
+        return {'name': ME, 'initials': initials, 'username': ME}
     else:
-        return handler.current_user.username
+        return {'name': handler.current_user.username, 'initials': handler.current_user.initials, 'username': handler.current_user.username}
 
 
 class CylcAppHandler(JupyterHandler):
@@ -248,7 +252,11 @@ class UserProfileHandler(CylcAppHandler):
     def get(self):
         user_info = dict(self.current_user.__dict__)
 
-        user_info['name'] = get_username(self)
+        user_details = get_usernames(self)
+
+        user_info['name'] = user_details['name']
+        user_info['initials'] = user_details['initials']
+        user_info['username'] = user_details['username']
 
         # add an entry for the workflow owner
         # NOTE: when running behind a hub this may be different from the
@@ -316,7 +324,7 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
             'graphql_params': self.graphql_params,
             'request': self.request,
             'resolvers': self.resolvers,
-            'current_user': get_username(self),
+            'current_user': get_usernames(self)['username'],
         }
 
     @web.authenticated  # type: ignore[arg-type]
@@ -384,7 +392,7 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         return {
             'request': self.request,
             'resolvers': self.resolvers,
-            'current_user': get_username(self),
+            'current_user': get_usernames(self)['username'],
             'ops_queue': {},
             'sub_statuses': self.sub_statuses
         }
