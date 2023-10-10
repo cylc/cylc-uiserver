@@ -131,12 +131,16 @@ def get_usernames(handler: 'CylcAppHandler'):
     if is_token_authenticated(handler):
         # the bearer of the token has full privileges
         if ('.' in ME):
-            initials = ME.split('.')[0].upper()+ME.split('.')[1][0].upper()
+            initials = ME.split('.')[0].upper() + ME.split('.')[1][0].upper()
         else:
             initials = ME[0].upper()
         return {'name': ME, 'initials': initials, 'username': ME}
     else:
-        return {'name': handler.current_user.username, 'initials': handler.current_user.initials, 'username': handler.current_user.username}
+        return {
+            'name': handler.current_user.username,
+            'initials': handler.current_user.initials,
+            'username': handler.current_user.username
+        }
 
 
 class CylcAppHandler(JupyterHandler):
