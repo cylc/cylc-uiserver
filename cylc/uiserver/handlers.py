@@ -256,13 +256,10 @@ class UserProfileHandler(CylcAppHandler):
     @web.authenticated
     # @authorised  TODO: I can't think why we would want to authorise this
     def get(self):
-        user_info = dict(self.current_user.__dict__)
-
-        user_details = get_usernames(self)
-
-        user_info['name'] = user_details['name']
-        user_info['initials'] = user_details['initials']
-        user_info['username'] = user_details['username']
+        user_info = {
+            **self.current_user.__dict__,
+            **get_usernames(self)
+        }
 
         # add an entry for the workflow owner
         # NOTE: when running behind a hub this may be different from the
