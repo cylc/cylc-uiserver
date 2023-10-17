@@ -98,7 +98,7 @@ def is_token_authenticated(handler: 'CylcAppHandler') -> bool:
     In these cases the bearer of the token is awarded full privileges.
     """
     identity_provider: JPSIdentityProvider = (
-        handler.serverapp.identity_provider
+        handler.serverapp.identity_provider # type: ignore
     )
     return identity_provider.__class__ == PasswordIdentityProvider
     # NOTE: not using isinstance to narrow this down to just the one class
