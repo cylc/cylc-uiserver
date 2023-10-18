@@ -38,10 +38,11 @@ from cylc.flow.scripts.cylc import (
 )
 
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
-from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
-from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
+
 if TYPE_CHECKING:
+    from cylc.uiserver.resolvers import Resolvers
+    from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
     from graphql.execution import ExecutionResult
 
 
@@ -97,7 +98,7 @@ def is_token_authenticated(handler: 'CylcAppHandler') -> bool:
     In these cases the bearer of the token is awarded full privileges.
     """
     identity_provider: JPSIdentityProvider = (
-        handler.serverapp.identity_provider
+        handler.serverapp.identity_provider  # type: ignore[union-attr]
     )
     return identity_provider.__class__ == PasswordIdentityProvider
     # NOTE: not using isinstance to narrow this down to just the one class
