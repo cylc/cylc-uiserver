@@ -38,10 +38,10 @@ from cylc.flow.scripts.cylc import (
 )
 
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
-from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
-from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 if TYPE_CHECKING:
+    from cylc.uiserver.resolvers import Resolvers
+    from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
     from graphql.execution import ExecutionResult
 
 
@@ -122,7 +122,18 @@ def _authorise(
         return False
 
 
-def get_usernames(handler: 'CylcAppHandler'):
+def get_initials(username: str):
+    if ('.' in username):
+        first_inital = username.split('.')[0][0].upper()
+        last_initial = username.split('.')[1][0].upper()
+        return first_inital + last_initial
+    elif (username != ''):
+        return username[0].upper()
+    else:
+        return None
+
+
+def get_user_info(handler: 'CylcAppHandler'):
     """Return the username for the authenticated user.
 
     If the handler is token authenticated, then we return the username of the
@@ -130,17 +141,15 @@ def get_usernames(handler: 'CylcAppHandler'):
     """
     if is_token_authenticated(handler):
         # the bearer of the token has full privileges
-        if ('.' in ME):
-            first_inital = ME.split('.')[0][0].upper()
-            last_initial = ME.split('.')[1][0].upper()
-            initials = first_inital + last_initial
-        else:
-            initials = ME[0].upper()
-        return {'name': ME, 'initials': initials, 'username': ME}
+        return {'name': ME, 'initials': get_initials(ME), 'username': ME}
     else:
+        if (handler.current_user.initials):
+            initials = handler.current_user.initials
+        else:
+            initials = get_initials(handler.current_user.username)
         return {
-            'name': handler.current_user.username,
-            'initials': '',
+            'name': handler.current_user.name,
+            'initials': initials,
             'username': handler.current_user.username
         }
 
@@ -258,7 +267,7 @@ class UserProfileHandler(CylcAppHandler):
     def get(self):
         user_info = {
             **self.current_user.__dict__,
-            **get_usernames(self)
+            **get_user_info(self)
         }
 
         # add an entry for the workflow owner
@@ -327,7 +336,7 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
             'graphql_params': self.graphql_params,
             'request': self.request,
             'resolvers': self.resolvers,
-            'current_user': get_usernames(self)['username'],
+            'current_user': get_user_info(self)['username'],
         }
 
     @web.authenticated  # type: ignore[arg-type]
@@ -395,7 +404,7 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         return {
             'request': self.request,
             'resolvers': self.resolvers,
-            'current_user': get_usernames(self)['username'],
+            'current_user': get_user_info(self)['username'],
             'ops_queue': {},
             'sub_statuses': self.sub_statuses
         }
