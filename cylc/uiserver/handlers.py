@@ -39,6 +39,7 @@ from cylc.flow.scripts.cylc import (
 
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
+
 if TYPE_CHECKING:
     from cylc.uiserver.resolvers import Resolvers
     from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
