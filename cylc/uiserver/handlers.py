@@ -125,9 +125,8 @@ def _authorise(
 
 def get_initials(username: str):
     if ('.' in username):
-        first_inital = username.split('.')[0][0].upper()
-        last_initial = username.split('.')[1][0].upper()
-        return first_inital + last_initial
+        first, last = username.split('.', maxsplit=1)
+        return f"{first[0]}{last[0]}".upper()
     elif (username != ''):
         return username[0].upper()
     else:
@@ -144,10 +143,9 @@ def get_user_info(handler: 'CylcAppHandler'):
         # the bearer of the token has full privileges
         return {'name': ME, 'initials': get_initials(ME), 'username': ME}
     else:
-        if (handler.current_user.initials):
-            initials = handler.current_user.initials
-        else:
-            initials = get_initials(handler.current_user.username)
+        initials = handler.current_user.initials or get_initials(
+            handler.current_user.username
+        )
         return {
             'name': handler.current_user.name,
             'initials': initials,
