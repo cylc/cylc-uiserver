@@ -123,7 +123,17 @@ def _authorise(
         return False
 
 
-def get_username(handler: 'CylcAppHandler'):
+def get_initials(username: str):
+    if ('.' in username):
+        first, last = username.split('.', maxsplit=1)
+        return f"{first[0]}{last[0]}".upper()
+    elif (username != ''):
+        return username[0].upper()
+    else:
+        return None
+
+
+def get_user_info(handler: 'CylcAppHandler'):
     """Return the username for the authenticated user.
 
     If the handler is token authenticated, then we return the username of the
@@ -131,9 +141,16 @@ def get_username(handler: 'CylcAppHandler'):
     """
     if is_token_authenticated(handler):
         # the bearer of the token has full privileges
-        return ME
+        return {'name': ME, 'initials': get_initials(ME), 'username': ME}
     else:
-        return handler.current_user.username
+        initials = handler.current_user.initials or get_initials(
+            handler.current_user.username
+        )
+        return {
+            'name': handler.current_user.name,
+            'initials': initials,
+            'username': handler.current_user.username
+        }
 
 
 class CylcAppHandler(JupyterHandler):
@@ -248,7 +265,8 @@ class UserProfileHandler(CylcAppHandler):
     # @authorised  TODO: I can't think why we would want to authorise this
     def get(self):
         user_info = {
-            'name': get_username(self)
+            **self.current_user.__dict__,
+            **get_user_info(self)
         }
 
         # add an entry for the workflow owner
@@ -317,7 +335,7 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
             'graphql_params': self.graphql_params,
             'request': self.request,
             'resolvers': self.resolvers,
-            'current_user': get_username(self),
+            'current_user': get_user_info(self)['username'],
         }
 
     @web.authenticated  # type: ignore[arg-type]
@@ -385,7 +403,7 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         return {
             'request': self.request,
             'resolvers': self.resolvers,
-            'current_user': get_username(self),
+            'current_user': get_user_info(self)['username'],
             'ops_queue': {},
             'sub_statuses': self.sub_statuses
         }
