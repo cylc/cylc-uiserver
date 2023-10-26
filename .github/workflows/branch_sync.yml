@@ -1,0 +1,20 @@
+name: Sync PR
+
+on:
+  push:
+    branches:
+      - '*.*.x'
+  schedule:
+    - cron: '49 03 * * 1-5' # 03:49 UTC Mon-Fri
+  workflow_dispatch:
+    inputs:
+      head_branch:
+        description: Branch to merge into master
+        required: true
+
+jobs:
+  sync:
+    uses: cylc/release-actions/.github/workflows/branch-sync.yml@v1
+    with:
+      head_branch: ${{ inputs.head_branch }}
+    secrets: inherit
