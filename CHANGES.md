@@ -12,6 +12,10 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.4.1 (Released 2023-11-02)
+
+[Updated cylc-ui to 2.2.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
 ## cylc-uiserver-1.4.0 (Released 2023-09-12)
 
 ### 🚀 Enhancements
