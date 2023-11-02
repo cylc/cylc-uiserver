@@ -280,6 +280,15 @@ class Services:
         return cls._return("Workflow(s) cleaned")
 
     @classmethod
+    async def scan(
+        cls,
+        args: dict,
+        workflows_mgr: 'WorkflowsManager',
+    ):
+        await workflows_mgr.scan()
+        return cls._return("Scan requested")
+
+    @classmethod
     async def play(cls, workflows, args, workflows_mgr, log):
         """Calls `cylc play`."""
         response = []
@@ -534,9 +543,10 @@ class Resolvers(BaseResolvers):
         info: 'ResolveInfo',
         command: str,
         workflows: Iterable['Tokens'],
-        kwargs: Dict[str, Any]
+        kwargs: Dict[str, Any],
     ) -> List[Union[bool, str]]:
-        if command == 'clean':
+
+        if command == 'clean':  # noqa: SIM116
             return await Services.clean(
                 workflows,
                 kwargs,
@@ -544,13 +554,17 @@ class Resolvers(BaseResolvers):
                 log=self.log,
                 executor=self.executor
             )
-
         elif command == 'play':
             return await Services.play(
                 workflows,
                 kwargs,
                 self.workflows_mgr,
                 log=self.log
+            )
+        elif command == 'scan':
+            return await Services.scan(
+                kwargs,
+                self.workflows_mgr
             )
 
         raise NotImplementedError()
