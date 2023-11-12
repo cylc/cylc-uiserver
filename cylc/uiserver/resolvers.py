@@ -306,7 +306,7 @@ class Services:
                 args.pop('cylc_version')
 
             # build the command
-            cmd = ['cylc', 'play', '--color=never']
+            cmd = ['cylc', 'play', '--color=never', '--comms-method=zmq']
             cmd = _build_cmd(cmd, args)
 
         except Exception as exc:
