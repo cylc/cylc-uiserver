@@ -1,5 +1,6 @@
 import asyncio
 from async_timeout import timeout
+import io
 import logging
 import pytest
 from unittest import mock
@@ -113,6 +114,75 @@ async def test_cat_log(workflow_run_dir):
 
     # the other responses should contain the log file lines
     assert actual.rstrip() == expected.rstrip()
+
+
+async def test_cat_log_remote(workflow_run_dir):
+    (id_, log_dir) = workflow_run_dir
+    workflow = Tokens(id_)
+    log = logging.getLogger(CYLC_LOG)
+
+    info = mock.MagicMock()
+    info.root_value = 2
+    # mock the context
+    info.context = {'sub_statuses': {2: "start"}}
+
+    # Mock out the `cylc cat-log` subprocess and the process killer to avoid
+    # side effects
+    with (mock.patch("asyncio.subprocess.create_subprocess_exec") as subp,
+        mock.patch("cylc.uiserver.resolvers.kill_process_tree") as kpt):
+        subp.return_value.returncode = 0
+        subp.return_value.communicate = mock.AsyncMock()
+        subp.return_value.communicate.return_value = (b"", b"")
+
+        async with timeout(10):
+            ret = services.cat_log(workflow, log, info, force_remote=False)
+            async for response in ret:
+                await asyncio.sleep(0)
+
+        subp.assert_called_once()
+        assert subp.call_args[0] == ('cylc','cat-log','--mode=tail','--prepend-path', workflow.id)
+        subp.reset_mock()
+
+        async with timeout(10):
+            ret = services.cat_log(workflow, log, info, force_remote=True)
+            async for response in ret:
+                await asyncio.sleep(0)
+
+        subp.assert_called_once()
+        assert subp.call_args[0] == ('cylc','cat-log','--mode=tail','--prepend-path', workflow.id, '--force-remote')
+
+
+async def test_cat_log_files_remote(workflow_run_dir):
+    (id_, log_dir) = workflow_run_dir
+    workflow = Tokens(id_)
+    log = logging.getLogger(CYLC_LOG)
+
+    info = mock.MagicMock()
+    info.root_value = 2
+    # mock the context
+    info.context = {'sub_statuses': {2: "start"}}
+
+    # Mock out the `cylc cat-log` subprocess and the process killer to avoid
+    # side effects
+    with (mock.patch("asyncio.subprocess.create_subprocess_exec") as subp,
+        mock.patch("cylc.uiserver.resolvers.kill_process_tree") as kpt):
+        subp.return_value.returncode = 0
+        subp.return_value.communicate = mock.AsyncMock()
+        subp.return_value.communicate.return_value = (b"", b"")
+
+        async with timeout(10):
+            ret = await services.cat_log_files(workflow, force_remote=False)
+
+        subp.assert_called_once()
+        assert subp.call_args[0] == ('cylc','cat-log','-m','l', workflow.id)
+        subp.reset_mock()
+
+        async with timeout(10):
+            ret = await services.cat_log_files(workflow, force_remote=True)
+
+        subp.assert_called_once()
+        assert subp.call_args[0] == ('cylc','cat-log','-m','l', workflow.id, '--force-remote')
+        subp.reset_mock()
 
 
 @pytest.mark.parametrize(
