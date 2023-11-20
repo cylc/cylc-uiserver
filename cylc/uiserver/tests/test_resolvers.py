@@ -1,8 +1,11 @@
 import asyncio
+from typing import Any, Dict, List, Optional
 from async_timeout import timeout
 import logging
+import os
 import pytest
-from unittest import mock
+from unittest.mock import MagicMock, Mock
+from subprocess import Popen, TimeoutExpired
 
 from cylc.flow import CYLC_LOG
 from cylc.flow.id import Tokens
@@ -13,6 +16,7 @@ from cylc.uiserver.resolvers import (
     Services,
     process_cat_log_stderr,
 )
+from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 services = Services()
 
@@ -45,6 +49,124 @@ def test_Services_anciliary_methods(func, message, expect):
     """Small functions return [bool, message].
     """
     assert func(message) == expect
+
+
+@pytest.mark.parametrize(
+    'workflows, args, env, popen_ret_code, expected_ret, expected_env',
+    [
+        pytest.param(
+            [Tokens('wflow1'), Tokens('~murray/wflow2')],
+            {},
+            {},
+            0,
+            [True, "Workflow(s) started"],
+            {},
+            id="multiple"
+        ),
+        pytest.param(
+            [Tokens('~feynman/wflow1')],
+            {},
+            {},
+            None,
+            [False, "Cannot start workflows for other users."],
+            {},
+            id="other user's wflow"
+        ),
+        pytest.param(
+            [Tokens('wflow1')],
+            {},
+            {},
+            1,
+            [False, "strange"],
+            {},
+            id="command failed"
+        ),
+        pytest.param(
+            [Tokens('wflow1')],
+            {'cylc_version': 'top'},
+            {'CYLC_VERSION': 'bottom', 'CYLC_ENV_NAME': 'quark'},
+            0,
+            [True, "Workflow(s) started"],
+            {'CYLC_VERSION': 'top'},
+            id="cylc version overrides env"
+        ),
+    ]
+)
+async def test_play(
+    monkeypatch: pytest.MonkeyPatch,
+    workflows: List[Tokens],
+    args: Dict[str, Any],
+    env: Dict[str, str],
+    popen_ret_code: Optional[int],
+    expected_ret: list,
+    expected_env: Dict[str, str],
+):
+    """It runs cylc play correctly.
+
+    Params:
+        workflows: list of workflow tokens
+        args: any args/options for cylc play
+        env: any environment variables
+        popen_ret_code: return code from cylc play
+        expected_ret: expected return value
+        expected_env: any expected environment variables
+    """
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setattr('cylc.uiserver.resolvers.getuser', lambda: 'murray')
+    mock_popen = Mock(
+        spec=Popen,
+        return_value=Mock(
+            spec=Popen,
+            wait=Mock(return_value=popen_ret_code),
+            communicate=Mock(return_value=('charm', 'strange')),
+        )
+    )
+    monkeypatch.setattr('cylc.uiserver.resolvers.Popen', mock_popen)
+
+    ret = await Services.play(
+        workflows,
+        {'some': 'opt', **args},
+        workflows_mgr=Mock(spec=WorkflowsManager),
+        log=Mock(),
+    )
+
+    assert ret == expected_ret
+
+    expected_env = {**os.environ, **expected_env}
+    expected_env.pop('CYLC_ENV_NAME', None)
+
+    for i, call_args in enumerate(mock_popen.call_args_list):
+        cmd_str = ' '.join(call_args.args[0])
+        assert cmd_str.startswith('cylc play')
+        assert '--some opt' in cmd_str
+        assert workflows[i]['workflow'] in cmd_str
+
+        assert call_args.kwargs['env'] == expected_env
+
+
+async def test_play_timeout(monkeypatch: pytest.MonkeyPatch):
+    """It returns an error if cylc play times out."""
+    def timeout(*args, **kwargs):
+        raise TimeoutExpired('cylc play', 42)
+
+    mock_popen = Mock(
+        spec=Popen,
+        return_value=Mock(
+            spec=Popen,
+            wait=timeout,
+        )
+    )
+    monkeypatch.setattr('cylc.uiserver.resolvers.Popen', mock_popen)
+
+    ret = await Services.play(
+        [Tokens('wflow1')],
+        {},
+        workflows_mgr=Mock(spec=WorkflowsManager),
+        log=Mock(),
+    )
+
+    assert ret == [False, "Command 'cylc play' timed out after 42 seconds"]
 
 
 async def test_cat_log(workflow_run_dir):
@@ -80,7 +202,7 @@ async def test_cat_log(workflow_run_dir):
     log_file = log_dir / '01-start-01.log'
     log_file.write_text(log_file_content)
     expected = log_file.read_text()
-    info = mock.MagicMock()
+    info = MagicMock()
     info.root_value = 2
     # mock the context
     info.context = {'sub_statuses': {2: "start"}}
