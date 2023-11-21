@@ -278,6 +278,8 @@ class Services:
     ) -> List[Union[bool, str]]:
         """Calls `cylc play`."""
         cylc_version = args.pop('cylc_version', None)
+        results: Dict[str, str] = {}
+        failed = False
         for tokens in workflows:
             try:
                 cmd = _build_cmd(['cylc', 'play', '--color=never'], args)
@@ -288,7 +290,8 @@ class Services:
                     )
                 # Note: authorisation has already taken place.
                 # add the workflow to the command
-                cmd = [*cmd, tokens['workflow']]
+                wflow: str = tokens['workflow']
+                cmd = [*cmd, wflow]
 
                 # get a representation of the command being run
                 cmd_repr = ' '.join(cmd)
@@ -310,20 +313,26 @@ class Services:
                     stderr=PIPE,
                     text=True
                 )
-                ret = proc.wait(timeout=20)
+                ret_code = proc.wait(timeout=20)
 
-                if ret:
+                if ret_code:
                     # command failed
                     out, err = proc.communicate()
-                    msg = err.strip() or out.strip() or (
-                        f'Could not start {tokens["workflow"]}'
-                        f' - {cmd_repr}'
+                    results[wflow] = err.strip() or out.strip() or (
+                        f'Command failed ({ret_code}): {cmd_repr}'
                     )
-                    raise Exception(msg)
+                    failed = True
+                else:
+                    results[wflow] = 'started'
 
             except Exception as exc:
                 # oh noes, something went wrong, send back confirmation
                 return cls._error(exc)
+
+        if failed:
+            return cls._error(
+                "\n".join(f"{wflow}: {msg}" for wflow, msg in results.items())
+            )
 
         # trigger a re-scan
         await workflows_mgr.scan()
