@@ -134,24 +134,31 @@ async def test_play(
     'workflows, popen_ret_codes, popen_communicate, expected',
     [
         pytest.param(
+            [Tokens('wflow1')],
+            [1],
+            ("", "bad things!!"),
+            "bad things!!",
+            id="one"
+        ),
+        pytest.param(
             [Tokens('wflow1'), Tokens('wflow2')],
             [1, 0],
             ("", "bad things!!"),
-            "wflow1: bad things!!\nwflow2: started",
+            "\n\nwflow1: bad things!!\n\nwflow2: started",
             id="multiple"
         ),
         pytest.param(
             [Tokens('wflow1')],
             [1],
             ("something", ""),
-            "wflow1: something",
+            "something",
             id="uses stdout if stderr empty"
         ),
         pytest.param(
             [Tokens('wflow1')],
             [4],
             ("", ""),
-            "wflow1: Command failed (4): cylc play",
+            "Command failed (4): cylc play",
             id="fallback msg if stdout/stderr empty"
         ),
     ]

@@ -330,8 +330,13 @@ class Services:
                 return cls._error(exc)
 
         if failed:
+            if len(results) == 1:
+                return cls._error(results.popitem()[1])
+            # else log each workflow result on separate lines
             return cls._error(
-                "\n".join(f"{wflow}: {msg}" for wflow, msg in results.items())
+                "\n\n" + "\n\n".join(
+                    f"{wflow}: {msg}" for wflow, msg in results.items()
+                )
             )
 
         # trigger a re-scan
