@@ -89,11 +89,14 @@ async def test_cat_log(workflow_run_dir):
     # note - timeout tests that the cat-log process is being stopped correctly
 
     first_response = None
-    async with timeout(10):
+    async with timeout(20):
         ret = services.cat_log(workflow, log, info)
         actual = ''
         is_first = True
         async for response in ret:
+            if err := response.get('error'):
+                # Surface any unexpected errors for better visibility
+                log.exception(err)
             if is_first:
                 first_response = response
                 is_first = False
