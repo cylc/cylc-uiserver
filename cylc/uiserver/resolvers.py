@@ -95,26 +95,6 @@ def snake_to_kebab(snake):
     raise TypeError(type(snake))
 
 
-def check_cylc_version(version):
-    """Check the provided Cylc version is available on the CLI.
-
-    Sets CYLC_VERSION=version and tests the result of cylc --version
-    to make sure the requested version is installed and selectable via
-    the CYLC_VERSION environment variable.
-    """
-    proc = Popen(
-        ['cylc', '--version'],
-        env={**os.environ, 'CYLC_VERSION': version},
-        stdin=DEVNULL,
-        stdout=PIPE,
-        stderr=PIPE,
-        text=True
-    )
-    ret = proc.wait(timeout=5)
-    out, err = proc.communicate()
-    return ret or out.strip() == version
-
-
 def _build_cmd(cmd: List, args: Dict) -> List:
     """Add args to command.
 
@@ -289,39 +269,29 @@ class Services:
         return cls._return("Scan requested")
 
     @classmethod
-    async def play(cls, workflows, args, workflows_mgr, log):
+    async def play(
+        cls,
+        workflows: Iterable[Tokens],
+        args: Dict[str, Any],
+        workflows_mgr: 'WorkflowsManager',
+        log: 'Logger',
+    ) -> List[Union[bool, str]]:
         """Calls `cylc play`."""
-        response = []
-        # get ready to run the command
-        try:
-            # check that the request cylc version is available
-            cylc_version = None
-            if 'cylc_version' in args:
-                cylc_version = args['cylc_version']
-                if not check_cylc_version(cylc_version):
-                    return cls._error(
-                        f'cylc version not available: {cylc_version}'
-                    )
-                args = dict(args)
-                args.pop('cylc_version')
-
-            # build the command
-            cmd = ['cylc', 'play', '--color=never']
-            cmd = _build_cmd(cmd, args)
-
-        except Exception as exc:
-            # oh noes, something went wrong, send back confirmation
-            return cls._error(exc)
-        # start each requested flow
+        cylc_version = args.pop('cylc_version', None)
+        results: Dict[str, str] = {}
+        failed = False
         for tokens in workflows:
             try:
+                cmd = _build_cmd(['cylc', 'play', '--color=never'], args)
+
                 if tokens['user'] and tokens['user'] != getuser():
                     return cls._error(
                         'Cannot start workflows for other users.'
                     )
                 # Note: authorisation has already taken place.
                 # add the workflow to the command
-                cmd = [*cmd, tokens['workflow']]
+                wflow: str = tokens['workflow']
+                cmd = [*cmd, wflow]
 
                 # get a representation of the command being run
                 cmd_repr = ' '.join(cmd)
@@ -329,39 +299,50 @@ class Services:
                     cmd_repr = f'CYLC_VERSION={cylc_version} {cmd_repr}'
                 log.info(f'$ {cmd_repr}')
 
-                # run cylc run
+                env = os.environ.copy()
+                env.pop('CYLC_ENV_NAME', None)
+                if cylc_version:
+                    env['CYLC_VERSION'] = cylc_version
+
+                # run cylc play
                 proc = Popen(
                     cmd,
+                    env=env,
                     stdin=DEVNULL,
                     stdout=PIPE,
                     stderr=PIPE,
                     text=True
                 )
-                ret = proc.wait(timeout=20)
+                ret_code = proc.wait(timeout=20)
 
-                if ret:
+                if ret_code:
                     # command failed
                     out, err = proc.communicate()
-                    msg = err.strip() or out.strip() or (
-                        f'Could not start {tokens["workflow"]}'
-                        f' - {cmd_repr}'
+                    results[wflow] = err.strip() or out.strip() or (
+                        f'Command failed ({ret_code}): {cmd_repr}'
                     )
-                    raise Exception(
-                        msg
-                    )
+                    failed = True
+                else:
+                    results[wflow] = 'started'
 
             except Exception as exc:
                 # oh noes, something went wrong, send back confirmation
                 return cls._error(exc)
 
-            else:
-                # send a success message
-                return cls._return(
-                    'Workflow started'
+        if failed:
+            if len(results) == 1:
+                return cls._error(results.popitem()[1])
+            # else log each workflow result on separate lines
+            return cls._error(
+                "\n\n" + "\n\n".join(
+                    f"{wflow}: {msg}" for wflow, msg in results.items()
                 )
+            )
+
         # trigger a re-scan
         await workflows_mgr.scan()
-        return response
+        # send a success message
+        return cls._return('Workflow(s) started')
 
     @staticmethod
     async def enqueue(stream, queue):
