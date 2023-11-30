@@ -12,6 +12,16 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.4.2 (Released 2023-11-29)
+
+[Updated cylc-ui to 2.3.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🔧 Fixes
+
+[#525](https://github.com/cylc/cylc-uiserver/pull/525) - Fix bugs when playing workflows using the form:
+  - Specified Cylc version wasn't working
+  - Could not play multiple workflows
+
 ## cylc-uiserver-1.4.1 (Released 2023-11-03)
 
 [Updated cylc-ui to 2.2.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
