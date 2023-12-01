@@ -78,6 +78,14 @@ def test_Services_anciliary_methods(func, message, expect):
             {'CYLC_VERSION': 'top'},
             id="cylc version overrides env"
         ),
+        pytest.param(
+            [Tokens('wflow1')],
+            {},
+            {'CYLC_VERSION': 'charm', 'CYLC_ENV_NAME': 'quark'},
+            [True, "Workflow(s) started"],
+            {'CYLC_VERSION': 'charm', 'CYLC_ENV_NAME': 'quark'},
+            id="cylc env not overriden if no version specified"
+        ),
     ]
 )
 async def test_play(
@@ -97,6 +105,9 @@ async def test_play(
         expected_ret: expected return value
         expected_env: any expected environment variables
     """
+    monkeypatch.delenv('CYLC_ENV_NAME', raising=False)
+    expected_env = {**os.environ, **expected_env}
+
     for k, v in env.items():
         monkeypatch.setenv(k, v)
     monkeypatch.setattr('cylc.uiserver.resolvers.getuser', lambda: 'murray')
@@ -117,9 +128,6 @@ async def test_play(
     )
 
     assert ret == expected_ret
-
-    expected_env = {**os.environ, **expected_env}
-    expected_env.pop('CYLC_ENV_NAME', None)
 
     for i, call_args in enumerate(mock_popen.call_args_list):
         cmd_str = ' '.join(call_args.args[0])
