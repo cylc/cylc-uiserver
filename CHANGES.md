@@ -12,6 +12,12 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.4.3 (Released 2023-12-05)
+
+### 🔧 Fixes
+
+[#533](https://github.com/cylc/cylc-uiserver/pull/533) - Fixed bug introduced in 1.4.2 where playing a workflow would fail if using a Cylc environment whose name does not match `cylc-8.X.Y` exactly.
+
 ## cylc-uiserver-1.4.2 (Released 2023-11-29)
 
 [Updated cylc-ui to 2.3.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
