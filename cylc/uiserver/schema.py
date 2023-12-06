@@ -327,13 +327,13 @@ async def list_elements(args):
             conn = dao.connect()
             if 'tasks' in args:
                 elements.extend(
-                    make_jobs_query(conn, workflow, args.get('tasks')))
+                    run_jobs_query(conn, workflow, args.get('tasks')))
             else:
-                elements.extend(make_task_query(conn, workflow))
+                elements.extend(run_task_query(conn, workflow))
     return elements
 
 
-def make_task_query(conn, workflow):
+def run_task_query(conn, workflow):
 
     # TODO: support all arguments including states
     # https://github.com/cylc/cylc-uiserver/issues/440
@@ -459,7 +459,7 @@ GROUP BY
     return tasks
 
 
-def make_jobs_query(conn, workflow, tasks):
+def run_jobs_query(conn, workflow, tasks):
 
     # TODO: support all arguments including states
     # https://github.com/cylc/cylc-uiserver/issues/440

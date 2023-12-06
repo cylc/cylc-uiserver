@@ -17,7 +17,7 @@ import pytest
 import sqlite3
 
 from cylc.flow.id import Tokens
-from cylc.uiserver.schema import make_task_query, make_jobs_query
+from cylc.uiserver.schema import run_task_query, run_jobs_query
 
 '''This file tests the ability for the cylc UI to retrieve workflow information
 and perform simple statistical calculations for the analysis tab'''
@@ -43,7 +43,7 @@ def test_make_task_query_1():
     conn.commit()
     workflow = Tokens('~user/workflow')
 
-    return_value = make_task_query(conn, workflow)
+    return_value = run_task_query(conn, workflow)
 
     assert return_value[0]['count'] == 1
     assert return_value[0]['cycle_point'] == '1'
@@ -103,7 +103,7 @@ def test_make_task_query_2():
     conn.commit()
     workflow = Tokens('~user/workflow')
 
-    return_value = make_task_query(conn, workflow)
+    return_value = run_task_query(conn, workflow)
 
     assert return_value[0]['count'] == 2
     assert return_value[0]['cycle_point'] == '2'
@@ -167,7 +167,7 @@ def test_make_task_query_3():
     conn.commit()
     workflow = Tokens('~user/workflow')
 
-    return_value = make_task_query(conn, workflow)
+    return_value = run_task_query(conn, workflow)
 
     assert len(return_value) == 1
     assert return_value[0]['count'] == 3
@@ -233,7 +233,7 @@ def test_make_jobs_query_1():
     workflow = Tokens('~user/workflow')
     tasks = []
 
-    return_value = make_jobs_query(conn, workflow, tasks)
+    return_value = run_jobs_query(conn, workflow, tasks)
 
     assert len(return_value) == 3
 
