@@ -300,8 +300,8 @@ class Services:
                 log.info(f'$ {cmd_repr}')
 
                 env = os.environ.copy()
-                env.pop('CYLC_ENV_NAME', None)
                 if cylc_version:
+                    env.pop('CYLC_ENV_NAME', None)
                     env['CYLC_VERSION'] = cylc_version
 
                 # run cylc play
