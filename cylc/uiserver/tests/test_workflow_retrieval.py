@@ -14,10 +14,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
+import asyncio
 import sqlite3
 
 from cylc.flow.id import Tokens
-from cylc.uiserver.schema import run_task_query, run_jobs_query
+from cylc.uiserver.schema import run_task_query, run_jobs_query, list_elements
+
+pytest_plugins = ('pytest_asyncio',)
 
 '''This file tests the ability for the cylc UI to retrieve workflow information
 and perform simple statistical calculations for the analysis tab'''
@@ -258,3 +261,13 @@ def test_make_jobs_query_1():
     assert return_value[1]['state'] == 0
     assert return_value[1]['submit_num'] == 1
     assert return_value[1]['submitted_time'] == '2022-12-15T15:00:00Z'
+
+
+async def test_list_elements():
+
+    with pytest.raises(Exception) as e_info:
+        await list_elements({'stuff': [1, 2, 3], 'workflows': []})
+
+    exception_raised = e_info.value
+    assert exception_raised.args[0] == \
+           'At least one workflow must be provided.'
