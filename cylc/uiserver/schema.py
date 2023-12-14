@@ -299,7 +299,7 @@ async def get_elements(root, info, **kwargs):
         elif isinstance(field_ids, dict):
             field_ids = list(field_ids)
         kwargs['ids'] = field_ids
-    elif not field_ids:
+    elif field_ids == []:
         return []
 
     for arg in ('ids', 'exids'):
