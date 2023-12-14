@@ -14,13 +14,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
-import asyncio
 import sqlite3
 
 from cylc.flow.id import Tokens
 from cylc.uiserver.schema import run_task_query, run_jobs_query, list_elements
 
-pytest_plugins = ('pytest_asyncio',)
 
 '''This file tests the ability for the cylc UI to retrieve workflow information
 and perform simple statistical calculations for the analysis tab'''
