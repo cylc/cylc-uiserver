@@ -15,9 +15,11 @@
 
 import pytest
 import sqlite3
+from typing import List
 
 from cylc.flow.id import Tokens
-from cylc.uiserver.schema import run_task_query, run_jobs_query, list_elements
+from cylc.uiserver.schema import run_task_query, run_jobs_query, \
+    list_elements, get_elements
 
 
 '''This file tests the ability for the cylc UI to retrieve workflow information
@@ -261,7 +263,7 @@ def test_make_jobs_query_1():
     assert return_value[1]['submitted_time'] == '2022-12-15T15:00:00Z'
 
 
-async def test_list_elements():
+async def test_list_elements(monkeypatch):
 
     with pytest.raises(Exception) as e_info:
         await list_elements({'stuff': [1, 2, 3], 'workflows': []})
@@ -269,3 +271,40 @@ async def test_list_elements():
     exception_raised = e_info.value
     assert exception_raised.args[0] == \
            'At least one workflow must be provided.'
+
+
+async def test_get_elements(monkeypatch):
+
+    # get_elements takes 2 args, root and info and kwargs.
+    # Root always seems to be none
+    root = None
+    # info is a graphql object that only gets used to pass on other
+    # functions that I'm not testing
+    info = None
+
+    async def mock_return_list_elements(kwargs):
+        return kwargs
+
+    def mock_process_resolver_info(*args):
+        return 'unused_var', None
+
+    monkeypatch.setattr('cylc.uiserver.schema.list_elements',
+                        mock_return_list_elements)
+    monkeypatch.setattr('cylc.uiserver.schema.process_resolver_info',
+                        mock_process_resolver_info)
+
+    return_value = await get_elements(
+        root,
+        info,
+        live=False,
+        ids=[],
+        exids=[],
+        workflows=['~mock_workflow_dir'],
+        exworkflows=[])
+
+    assert return_value['exids'] == []
+    assert return_value['exworkflows'] == []
+    assert return_value['ids'] == []
+    assert return_value['live'] is False
+    assert isinstance(return_value['workflows'], List)
+    assert isinstance(return_value['workflows'][0], Tokens)
