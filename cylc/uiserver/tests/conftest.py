@@ -29,6 +29,7 @@ from traitlets.config import Config
 import zmq
 
 from jupyter_server.auth.identity import User
+from _pytest.monkeypatch import MonkeyPatch
 
 from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
 from cylc.flow.id import Tokens
@@ -411,3 +412,10 @@ def mock_glbl_cfg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     yield _mock_glbl_cfg
     rmtree(tmp_path)
+
+
+@pytest.fixture(scope='module')
+def mod_monkeypatch():
+    monkeypatch = MonkeyPatch()
+    yield monkeypatch
+    monkeypatch.undo()

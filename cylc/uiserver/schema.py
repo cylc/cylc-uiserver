@@ -25,27 +25,36 @@ from typing import TYPE_CHECKING, Any, List, Optional
 import graphene
 from graphene.types.generic import GenericScalar
 
+from cylc.flow.data_store_mgr import (
+    DELTA_ADDED,
+)
 from cylc.flow.id import Tokens
 from cylc.flow.network.schema import (
     CyclePoint,
     GenericResponse,
     ID,
-    SortArgs,
-    Task,
     Mutations,
     Queries,
-    process_resolver_info,
     STRIP_NULL_DEFAULT,
+    SortArgs,
     Subscriptions,
+    Task,
+    Workflow,
     WorkflowID,
     _mut_field,
+    get_nodes_all,
+    get_workflows,
+    process_resolver_info,
     sstrip,
-    get_nodes_all
 )
 from cylc.uiserver.resolvers import (
     Resolvers,
     list_log_files,
     stream_log,
+)
+from cylc.uiserver.services.source_workflows import (
+    list_source_workflows,
+    get_workflow_source,
 )
 
 if TYPE_CHECKING:
@@ -484,17 +493,37 @@ class UISTask(Task):
     count = graphene.Int()
 
 
+class SourceWorkflow(graphene.ObjectType):
+    """A Cylc workflow source directory.
+
+    This may or may not be located within the configured cylc source
+    directories. For workflows located outside of the configured
+    directories, the "name" field will allways be null.
+    """
+    name = graphene.String(
+        description='The name of the source workflow'
+    )
+    path = graphene.String(
+        description='The location of the source workflow.'
+    )
+
+
+class UISWorkflow(Workflow):
+    source = graphene.Field(
+        SourceWorkflow,
+        resolver=get_workflow_source,
+    )
+
+
+class LogFiles(graphene.ObjectType):
+    files = graphene.List(graphene.String)
+
+
 class UISQueries(Queries):
-
-    class LogFiles(graphene.ObjectType):
-        # Example GraphiQL query:
-        # {
-        #    logFiles(workflowID: "<workflow_id>", task: "<task_id>") {
-        #      files
-        #    }
-        # }
-        files = graphene.List(graphene.String)
-
+    source_workflows = graphene.List(
+        SourceWorkflow,
+        resolver=list_source_workflows,
+    )
     log_files = graphene.Field(
         LogFiles,
         description='List available job logs',
@@ -505,7 +534,6 @@ class UISQueries(Queries):
         ),
         resolver=list_log_files
     )
-
     tasks = graphene.List(
         UISTask,
         description=Task._meta.description,
@@ -519,6 +547,20 @@ class UISQueries(Queries):
         mindepth=graphene.Int(default_value=-1),
         maxdepth=graphene.Int(default_value=-1),
         sort=SortArgs(default_value=None),
+    )
+
+    workflows = graphene.List(
+        UISWorkflow,
+        description=Workflow._meta.description,
+        ids=graphene.List(ID, default_value=[]),
+        exids=graphene.List(ID, default_value=[]),
+        # TODO: Change these defaults post #3500 in coordination with WUI
+        strip_null=graphene.Boolean(default_value=False),
+        delta_store=graphene.Boolean(default_value=False),
+        delta_type=graphene.String(default_value=DELTA_ADDED),
+        initial_burst=graphene.Boolean(default_value=True),
+        ignore_interval=graphene.Float(default_value=2.5),
+        resolver=get_workflows
     )
 
 
