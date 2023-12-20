@@ -4,13 +4,23 @@ on:
   pull_request:
   workflow_dispatch:
   push:
-    branches: [master]
+    branches:
+      - master
+      - '*.*.x'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: 2
 
 jobs:
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
+      fail-fast: false
       matrix:
         os: ['ubuntu-latest']
         python: ['3.8', '3.9']
@@ -44,7 +54,7 @@ jobs:
           __HERE__
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
 
@@ -58,9 +68,11 @@ jobs:
         run: pip install -e .[all]
 
       - name: Style test
+        if: startsWith(matrix.os, 'ubuntu')
         run: flake8
 
       - name: Type checking
+        if: startsWith(matrix.os, 'ubuntu')
         run: mypy
 
       - name: Check changelog
@@ -75,8 +87,30 @@ jobs:
           coverage xml --ignore-errors
           coverage report
 
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage_${{ matrix.os }}_py-${{ matrix.python }}
+          path: coverage.xml
+          retention-days: 4
+
+  codecov:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+
       - name: Codecov upload
         uses: codecov/codecov-action@v3
         with:
-          name: '${{ matrix.os }} py-${{ matrix.python }}'
-          fail_ci_if_error: false
+          name: ${{ github.workflow }}
+          fail_ci_if_error: true
+          verbose: true
+          # Token not required for public repos, but avoids upload failure due
+          # to rate-limiting (but not for PRs opened from forks)
+          token: ${{ secrets.CODECOV_TOKEN }}
