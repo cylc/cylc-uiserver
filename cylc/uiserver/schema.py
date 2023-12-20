@@ -291,8 +291,6 @@ async def get_elements(root, info, **kwargs):
 
     _, field_ids = process_resolver_info(root, info, kwargs)
 
-    if hasattr(kwargs, 'id'):
-        kwargs['ids'] = [kwargs.get('id')]
     if field_ids:
         if isinstance(field_ids, str):
             field_ids = [field_ids]

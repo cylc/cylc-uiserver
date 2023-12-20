@@ -273,7 +273,78 @@ async def test_list_elements(monkeypatch):
            'At least one workflow must be provided.'
 
 
-async def test_get_elements(monkeypatch):
+@pytest.mark.parametrize(
+    'field_ids, kwargs, expected',
+    [
+        pytest.param(
+            [],
+            {
+                'ids': ['//1/t/01'],
+                'workflows': ['~u/w'],
+            },
+            [],
+            id="field_ids = empty list"
+        ),
+        pytest.param(
+            None,
+            {
+                'ids': ['//1/t/01'],
+                'exids': ['//1/t/01'],
+                'workflows': ['~u/w'],
+                'exworkflows': ['~u2/w']
+            },
+            {
+                'live': False,
+                'ids': [Tokens('//1/t/01')],
+                'exids': [Tokens('//1/t/01')],
+                'workflows': [Tokens('~u/w')],
+                'exworkflows': [Tokens('~u2/w')]
+            },
+            id="field_ids = None"
+        ),
+        pytest.param(
+            '//2/t/01',
+            {
+                'ids': ['//1/t/01'],
+                'exids': [],
+                'workflows': ['~u/w'],
+                'exworkflows': []
+            },
+            {
+                'live': False,
+                'ids': [Tokens('//2/t/01')],
+                'exids': [],
+                'workflows': [Tokens('~u/w')],
+                'exworkflows': []
+            },
+            id="field_ids = str"
+        ),
+        pytest.param(
+            {
+                '//2/t/01': 'something',
+                '//2/t/02': 'something else',
+            },
+            {
+                'ids': ['//1/t/01'],
+                'exids': [],
+                'workflows': ['~u/w'],
+                'exworkflows': []
+            },
+            {
+                'live': False,
+                'ids': [Tokens('//2/t/01'), Tokens('//2/t/02')],
+                'exids': [],
+                'workflows': [Tokens('~u/w')],
+                'exworkflows': []
+            },
+            id="field_ids = dict"
+        )
+    ]
+)
+async def test_get_elements(
+    monkeypatch: pytest.MonkeyPatch,
+    field_ids, kwargs, expected
+):
 
     # get_elements takes 2 args, root and info and kwargs.
     # Root always seems to be none
@@ -286,25 +357,16 @@ async def test_get_elements(monkeypatch):
         return kwargs
 
     def mock_process_resolver_info(*args):
-        return 'unused_var', None
+        return None, field_ids
 
     monkeypatch.setattr('cylc.uiserver.schema.list_elements',
                         mock_return_list_elements)
     monkeypatch.setattr('cylc.uiserver.schema.process_resolver_info',
                         mock_process_resolver_info)
 
-    return_value = await get_elements(
+    assert await get_elements(
         root,
         info,
         live=False,
-        ids=[],
-        exids=[],
-        workflows=['~mock_workflow_dir'],
-        exworkflows=[])
-
-    assert return_value['exids'] == []
-    assert return_value['exworkflows'] == []
-    assert return_value['ids'] == []
-    assert return_value['live'] is False
-    assert isinstance(return_value['workflows'], List)
-    assert isinstance(return_value['workflows'][0], Tokens)
+        **kwargs
+    ) == expected
