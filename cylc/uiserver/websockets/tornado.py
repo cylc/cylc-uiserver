@@ -15,7 +15,6 @@ from tornado.websocket import WebSocketClosedError
 from graphql.execution.middleware import MiddlewareManager
 from graphql_ws.base import ConnectionClosedException
 from graphql_ws.base_async import (
-    resolve,
     BaseAsyncConnectionContext,
     BaseAsyncSubscriptionServer
 )
@@ -29,6 +28,9 @@ from graphql_ws.constants import (
 from typing import Union, Awaitable, Any, List, Tuple, Dict, Optional
 
 from cylc.uiserver.authorise import AuthorizationMiddleware
+from cylc.uiserver.websockets.resolve import resolve
+
+
 setup_observable_extension()
 
 NO_MSG_DELAY = 1.0
