@@ -13,7 +13,7 @@ from asyncio import create_task, gather, wait, shield, sleep
 from asyncio.queues import QueueEmpty
 from tornado.websocket import WebSocketClosedError
 from graphql.execution.middleware import MiddlewareManager
-from graphql_ws.base import ConnectionClosedException
+from graphql_ws.base import ConnectionClosedException, BaseSubscriptionServer
 from graphql_ws.base_async import (
     BaseAsyncConnectionContext,
     BaseAsyncSubscriptionServer
@@ -165,4 +165,14 @@ class TornadoSubscriptionServer(BaseAsyncSubscriptionServer):
             await resolve(execution_result.data)
             request_context = connection_context.request_context
             await request_context['resolvers'].flow_delta_processed(request_context, op_id)
-        await super().send_execution_result(connection_context, op_id, execution_result)
+        else:
+            await resolve(execution_result.data)
+
+        # NOTE: skip TornadoSubscriptionServer.send_execution_result because it
+        # calls "resolve" then invokes BaseSubscriptionServer.send_execution_result
+        await BaseSubscriptionServer.send_execution_result(
+            self,
+            connection_context,
+            op_id,
+            execution_result,
+        )
