@@ -33,7 +33,7 @@ jobs:
 
       - name: Build
         uses: cylc/release-actions/build-python-package@v1
-        with: 
+        with:
           check-dependencies: false
 
       - name: Inspect
