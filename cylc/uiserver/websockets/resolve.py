@@ -27,7 +27,8 @@ found in the graphql-ws library with the above license.
 This is temporary code until the change makes its way upstream.
 """
 
-# NOTE: transient dependency from graphql-ws not
+# NOTE: transient dependency from graphql-ws purposefully not
+# reflected in cylc-uiserver dependencies 
 from promise import Promise
 
 from graphql_ws.base_async import is_awaitable
@@ -39,7 +40,7 @@ async def resolve(
     _key=None,
 ):
     """
-    Recursively wait on any awaitable children of a data element and resolve
+    Wait on any awaitable children of a data element and resolve
     any Promises.
     """
     stack = [(data, _container, _key)]
