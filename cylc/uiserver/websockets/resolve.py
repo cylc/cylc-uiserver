@@ -28,7 +28,7 @@ This is temporary code until the change makes its way upstream.
 """
 
 # NOTE: transient dependency from graphql-ws purposefully not
-# reflected in cylc-uiserver dependencies 
+# reflected in cylc-uiserver dependencies
 from promise import Promise
 
 from graphql_ws.base_async import is_awaitable
