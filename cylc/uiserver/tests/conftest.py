@@ -211,7 +211,7 @@ def mock_authentication_yossarian(monkeypatch):
         user,
     )
     monkeypatch.setattr(
-        'cylc.uiserver.handlers.is_token_authenticated',
+        'cylc.uiserver.handlers.is_bearer_token_authenticated',
         lambda x: True,
     )
 
