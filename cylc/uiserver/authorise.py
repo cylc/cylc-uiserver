@@ -76,6 +76,10 @@ class CylcAuthorizer(Authorizer):
 
     """
 
+    # This is here just to fix sphinx autodoc warning from traitlets' __init__
+    def __init__(*args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def is_authorized(self, handler, user, action, resource) -> bool:
         """Allow a user to access their own server.
 
