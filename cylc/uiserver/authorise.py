@@ -77,6 +77,7 @@ class CylcAuthorizer(Authorizer):
     """
 
     # This is here just to fix sphinx autodoc warning from traitlets' __init__
+    # see https://github.com/cylc/cylc-uiserver/pull/560
     def __init__(*args, **kwargs):
         super().__init__(*args, **kwargs)
 
