@@ -26,12 +26,16 @@ import graphene
 from graphene.types.generic import GenericScalar
 
 from cylc.flow.id import Tokens
+from cylc.flow.rundb import CylcWorkflowDAO
+from cylc.flow.pathutil import get_workflow_run_dir
+from cylc.flow.workflow_files import WorkflowFiles
 from cylc.flow.network.schema import (
     CyclePoint,
     GenericResponse,
     ID,
     SortArgs,
     Task,
+    Job,
     Mutations,
     Queries,
     process_resolver_info,
@@ -281,14 +285,12 @@ class Scan(graphene.Mutation):
     result = GenericScalar()
 
 
-async def get_jobs(root, info, **kwargs):
+async def get_elements(root, info, **kwargs):
     if kwargs['live']:
         return await get_nodes_all(root, info, **kwargs)
 
     _, field_ids = process_resolver_info(root, info, kwargs)
 
-    if hasattr(kwargs, 'id'):
-        kwargs['ids'] = [kwargs.get('id')]
     if field_ids:
         if isinstance(field_ids, str):
             field_ids = [field_ids]
@@ -306,16 +308,13 @@ async def get_jobs(root, info, **kwargs):
     kwargs['exworkflows'] = [
         Tokens(w_id) for w_id in kwargs['exworkflows']]
 
-    return await list_jobs(kwargs)
+    return await list_elements(kwargs)
 
 
-async def list_jobs(args):
+async def list_elements(args):
     if not args['workflows']:
         raise Exception('At least one workflow must be provided.')
-    from cylc.flow.rundb import CylcWorkflowDAO
-    from cylc.flow.pathutil import get_workflow_run_dir
-    from cylc.flow.workflow_files import WorkflowFiles
-    jobs = []
+    elements = []
     for workflow in args['workflows']:
         db_file = get_workflow_run_dir(
             workflow['workflow'],
@@ -324,11 +323,15 @@ async def list_jobs(args):
         )
         with CylcWorkflowDAO(db_file, is_public=True) as dao:
             conn = dao.connect()
-            jobs.extend(make_query(conn, workflow))
-    return jobs
+            if 'tasks' in args:
+                elements.extend(
+                    run_jobs_query(conn, workflow, args.get('tasks')))
+            else:
+                elements.extend(run_task_query(conn, workflow))
+    return elements
 
 
-def make_query(conn, workflow):
+def run_task_query(conn, workflow):
 
     # TODO: support all arguments including states
     # https://github.com/cylc/cylc-uiserver/issues/440
@@ -425,6 +428,7 @@ GROUP BY
             'mean_queue_time': row[10],
             'max_queue_time': row[11],
             'std_dev_queue_time': (row[12] - row[10]**2)**0.5,
+            # Prevents null entries when there are too few tasks for quartiles
             'queue_quartiles': [row[13],
                                 row[13] if row[14] is None else row[14],
                                 row[13] if row[15] is None else row[15]],
@@ -433,6 +437,7 @@ GROUP BY
             'mean_run_time': row[17],
             'max_run_time': row[18],
             'std_dev_run_time': (row[19] - row[17]**2)**0.5,
+            # Prevents null entries when there are too few tasks for quartiles
             'run_quartiles': [row[20],
                               row[20] if row[21] is None else row[21],
                               row[20] if row[22] is None else row[22]],
@@ -441,6 +446,7 @@ GROUP BY
             'mean_total_time': row[24],
             'max_total_time': row[25],
             'std_dev_total_time': (row[26] - row[24] ** 2) ** 0.5,
+            # Prevents null entries when there are too few tasks for quartiles
             'total_quartiles': [row[27],
                                 row[27] if row[28] is None else row[28],
                                 row[27] if row[29] is None else row[29]],
@@ -449,6 +455,60 @@ GROUP BY
         })
 
     return tasks
+
+
+def run_jobs_query(conn, workflow, tasks):
+
+    # TODO: support all arguments including states
+    # https://github.com/cylc/cylc-uiserver/issues/440
+    jobs = []
+
+    # Create sql snippet used to limit which tasks are returned by query
+    if tasks:
+        where_clauses = "' OR name = '".join(tasks)
+        where_clauses = f" AND (name = '{where_clauses}')"
+    else:
+        where_clauses = ''
+    for row in conn.execute(f'''
+SELECT
+    name,
+    cycle,
+    submit_num,
+    submit_status,
+    time_run,
+    time_run_exit,
+    job_id,
+    platform_name,
+    time_submit,
+    STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit) AS total_time,
+    STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run) AS run_time,
+    STRFTIME('%s', time_run) - STRFTIME('%s', time_submit) AS queue_time
+FROM
+    task_jobs
+WHERE
+    run_status = 0
+    {where_clauses};
+'''):
+        jobs.append({
+            'id': workflow.duplicate(
+                cycle=row[1],
+                task=row[0],
+                job=row[2]
+            ),
+            'name': row[0],
+            'cycle_point': row[1],
+            'submit_num': row[2],
+            'state': row[3],
+            'started_time': row[4],
+            'finished_time': row[5],
+            'job_ID': row[6],
+            'platform': row[7],
+            'submitted_time': row[8],
+            'total_time': row[9],
+            'run_time': row[10],
+            'queue_time': row[11]
+        })
+    return jobs
 
 
 class UISTask(Task):
@@ -484,6 +544,13 @@ class UISTask(Task):
     count = graphene.Int()
 
 
+class UISJob(Job):
+
+    total_time = graphene.Int()
+    queue_time = graphene.Int()
+    run_time = graphene.Int()
+
+
 class UISQueries(Queries):
 
     class LogFiles(graphene.ObjectType):
@@ -511,7 +578,7 @@ class UISQueries(Queries):
         description=Task._meta.description,
         live=graphene.Boolean(default_value=True),
         strip_null=STRIP_NULL_DEFAULT,
-        resolver=get_jobs,
+        resolver=get_elements,
         workflows=graphene.List(ID, default_value=[]),
         exworkflows=graphene.List(ID, default_value=[]),
         ids=graphene.List(ID, default_value=[]),
@@ -519,6 +586,23 @@ class UISQueries(Queries):
         mindepth=graphene.Int(default_value=-1),
         maxdepth=graphene.Int(default_value=-1),
         sort=SortArgs(default_value=None),
+
+    )
+
+    jobs = graphene.List(
+        UISJob,
+        description=Job._meta.description,
+        live=graphene.Boolean(default_value=True),
+        strip_null=STRIP_NULL_DEFAULT,
+        resolver=get_elements,
+        workflows=graphene.List(ID, default_value=[]),
+        exworkflows=graphene.List(ID, default_value=[]),
+        ids=graphene.List(ID, default_value=[]),
+        exids=graphene.List(ID, default_value=[]),
+        mindepth=graphene.Int(default_value=-1),
+        maxdepth=graphene.Int(default_value=-1),
+        sort=SortArgs(default_value=None),
+        tasks=graphene.List(ID, default_value=[])
     )
 
 
