@@ -34,7 +34,6 @@ from cylc.flow.network.schema import (
     NODE_MAP,
     CyclePoint,
     GenericResponse,
-    ID,
     SortArgs,
     Task,
     Job,
@@ -581,10 +580,10 @@ class UISQueries(Queries):
         live=graphene.Boolean(default_value=True),
         strip_null=STRIP_NULL_DEFAULT,
         resolver=get_elements,
-        workflows=graphene.List(ID, default_value=[]),
-        exworkflows=graphene.List(ID, default_value=[]),
-        ids=graphene.List(ID, default_value=[]),
-        exids=graphene.List(ID, default_value=[]),
+        workflows=graphene.List(graphene.ID, default_value=[]),
+        exworkflows=graphene.List(graphene.ID, default_value=[]),
+        ids=graphene.List(graphene.ID, default_value=[]),
+        exids=graphene.List(graphene.ID, default_value=[]),
         mindepth=graphene.Int(default_value=-1),
         maxdepth=graphene.Int(default_value=-1),
         sort=SortArgs(default_value=None),
@@ -597,14 +596,14 @@ class UISQueries(Queries):
         live=graphene.Boolean(default_value=True),
         strip_null=STRIP_NULL_DEFAULT,
         resolver=get_elements,
-        workflows=graphene.List(ID, default_value=[]),
-        exworkflows=graphene.List(ID, default_value=[]),
-        ids=graphene.List(ID, default_value=[]),
-        exids=graphene.List(ID, default_value=[]),
+        workflows=graphene.List(graphene.ID, default_value=[]),
+        exworkflows=graphene.List(graphene.ID, default_value=[]),
+        ids=graphene.List(graphene.ID, default_value=[]),
+        exids=graphene.List(graphene.ID, default_value=[]),
         mindepth=graphene.Int(default_value=-1),
         maxdepth=graphene.Int(default_value=-1),
         sort=SortArgs(default_value=None),
-        tasks=graphene.List(ID, default_value=[])
+        tasks=graphene.List(graphene.ID, default_value=[])
     )
 
 
