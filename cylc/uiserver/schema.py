@@ -26,10 +26,12 @@ import graphene
 from graphene.types.generic import GenericScalar
 
 from cylc.flow.id import Tokens
+from cylc.flow.data_store_mgr import JOBS, TASKS
 from cylc.flow.rundb import CylcWorkflowDAO
 from cylc.flow.pathutil import get_workflow_run_dir
 from cylc.flow.workflow_files import WorkflowFiles
 from cylc.flow.network.schema import (
+    NODE_MAP,
     CyclePoint,
     GenericResponse,
     ID,
@@ -642,6 +644,12 @@ class UISMutations(Mutations):
     clean = _mut_field(Clean)
     scan = _mut_field(Scan)
 
+
+# Add UIS types to the cylc-flow backend:
+NODE_MAP.update(
+    UISTask=TASKS,
+    UISJob=JOBS,
+)
 
 schema = graphene.Schema(
     query=UISQueries,
