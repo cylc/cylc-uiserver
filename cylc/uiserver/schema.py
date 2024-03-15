@@ -26,13 +26,14 @@ import graphene
 from graphene.types.generic import GenericScalar
 
 from cylc.flow.id import Tokens
+from cylc.flow.data_store_mgr import JOBS, TASKS
 from cylc.flow.rundb import CylcWorkflowDAO
 from cylc.flow.pathutil import get_workflow_run_dir
 from cylc.flow.workflow_files import WorkflowFiles
 from cylc.flow.network.schema import (
+    NODE_MAP,
     CyclePoint,
     GenericResponse,
-    ID,
     SortArgs,
     Task,
     Job,
@@ -579,10 +580,10 @@ class UISQueries(Queries):
         live=graphene.Boolean(default_value=True),
         strip_null=STRIP_NULL_DEFAULT,
         resolver=get_elements,
-        workflows=graphene.List(ID, default_value=[]),
-        exworkflows=graphene.List(ID, default_value=[]),
-        ids=graphene.List(ID, default_value=[]),
-        exids=graphene.List(ID, default_value=[]),
+        workflows=graphene.List(graphene.ID, default_value=[]),
+        exworkflows=graphene.List(graphene.ID, default_value=[]),
+        ids=graphene.List(graphene.ID, default_value=[]),
+        exids=graphene.List(graphene.ID, default_value=[]),
         mindepth=graphene.Int(default_value=-1),
         maxdepth=graphene.Int(default_value=-1),
         sort=SortArgs(default_value=None),
@@ -595,14 +596,14 @@ class UISQueries(Queries):
         live=graphene.Boolean(default_value=True),
         strip_null=STRIP_NULL_DEFAULT,
         resolver=get_elements,
-        workflows=graphene.List(ID, default_value=[]),
-        exworkflows=graphene.List(ID, default_value=[]),
-        ids=graphene.List(ID, default_value=[]),
-        exids=graphene.List(ID, default_value=[]),
+        workflows=graphene.List(graphene.ID, default_value=[]),
+        exworkflows=graphene.List(graphene.ID, default_value=[]),
+        ids=graphene.List(graphene.ID, default_value=[]),
+        exids=graphene.List(graphene.ID, default_value=[]),
         mindepth=graphene.Int(default_value=-1),
         maxdepth=graphene.Int(default_value=-1),
         sort=SortArgs(default_value=None),
-        tasks=graphene.List(ID, default_value=[])
+        tasks=graphene.List(graphene.ID, default_value=[])
     )
 
 
@@ -642,6 +643,12 @@ class UISMutations(Mutations):
     clean = _mut_field(Clean)
     scan = _mut_field(Scan)
 
+
+# Add UIS types to the cylc-flow backend:
+NODE_MAP.update(
+    UISTask=TASKS,
+    UISJob=JOBS,
+)
 
 schema = graphene.Schema(
     query=UISQueries,
