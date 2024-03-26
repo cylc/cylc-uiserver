@@ -73,21 +73,37 @@ def log_call(fcn):
 
 
 class DataStoreMgr:
-    """Manage the local data-store acquisition/updates for all workflows."""
+    """Manage the local data-store acquisition/updates for all workflows.
+
+    Args:
+        workflows_mgr:
+            Service that scans for workflows.
+        log:
+            Application logger.
+        max_threads:
+            Max number of threads to use for subscriptions.
+
+            Note, this determines the maximum number of active workflows that
+            can be updated.
+
+            This should be overridden for real use in the UIS app. The
+            default is here for test purposes.
+
+    """
 
     INIT_DATA_WAIT_TIME = 5.  # seconds
     INIT_DATA_RETRY_DELAY = 0.5  # seconds
     RECONCILE_TIMEOUT = 5.  # seconds
     PENDING_DELTA_CHECK_INTERVAL = 0.5
 
-    def __init__(self, workflows_mgr, log):
+    def __init__(self, workflows_mgr, log, max_threads=10):
         self.workflows_mgr = workflows_mgr
         self.log = log
         self.data = {}
         self.w_subs: Dict[str, WorkflowSubscriber] = {}
         self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown'}
         self.loop = None
-        self.executor = ThreadPoolExecutor()
+        self.executor = ThreadPoolExecutor(max_threads)
         self.delta_queues = {}
 
     @log_call
