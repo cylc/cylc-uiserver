@@ -30,8 +30,10 @@ import re
 from requests.exceptions import RequestException
 import requests
 import sys
+from textwrap import dedent
 from typing import Optional
 import webbrowser
+from getpass import getuser
 
 
 from cylc.flow.id_cli import parse_id_async
@@ -39,6 +41,8 @@ from cylc.flow.exceptions import (
     InputError,
     WorkflowFilesError
 )
+
+from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
 
 from cylc.uiserver import init_log
 from cylc.uiserver.app import (
@@ -51,8 +55,32 @@ CLI_OPT_NEW = "--new"
 
 def main(*argv):
     init_log()
+    hub_url = glbl_cfg().get(['hub', 'url'])
     jp_server_opts, new_gui, workflow_id = parse_args_opts()
-    if '--help' not in sys.argv:
+    if '--help' in sys.argv and hub_url:
+        print(
+            dedent('''
+                cylc gui [WORKFLOW]
+
+                Open the Cylc GUI in a new web browser tab.
+
+                If WORKFLOW is specified, the GUI will open on this workflow.
+
+                This command has been configured to use a centrally configured
+                Jupyter Hub instance rather than start a standalone server.
+                To see the configuration options for the server run
+                "cylc gui --help-all", these options can be configured in the
+                Jupyter configuration files using "c.Spawner.cmd", see the Cylc
+                and Jupyter Hub documentation for more details.
+            '''))
+        return
+    if not {'--help', '--help-all'} & set(sys.argv):
+        if hub_url:
+            print(f"Running on {hub_url } as specified in global config.")
+            webbrowser.open(
+                update_url(hub_url, workflow_id), autoraise=True
+            )
+            return
         # get existing jpserver-<pid>-open.html files
         # check if the server is available for use
         # prompt for user whether to clean files for un-usable uiservers
@@ -190,6 +218,7 @@ def get_arg_parser():
 def update_url(url, workflow_id):
     """ Update the url to open at the correct workflow in the gui.
     """
+    hub_url = glbl_cfg().get(['hub', 'url'])
     if not url:
         return
     split_url = url.split('/workspace/')
@@ -212,4 +241,8 @@ def update_url(url, workflow_id):
                 return url.replace(old_workflow, workflow_id)
         else:
             # current url points to dashboard, update to point to workflow
-            return f"{url}/workspace/{workflow_id}"
+            if hub_url:
+                return (f"{url}/user/{getuser()}/{CylcUIServer.name}"
+                        f"/#/workspace/{workflow_id}")
+            else:
+                return f"{url}/workspace/{workflow_id}"

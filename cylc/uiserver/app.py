@@ -65,6 +65,7 @@ from pkg_resources import parse_version
 from tornado import ioloop
 from tornado.web import RedirectHandler
 from traitlets import (
+    Bool,
     Dict,
     Float,
     Int,
@@ -75,12 +76,14 @@ from traitlets import (
     default,
     validate,
 )
+from types import SimpleNamespace
 
 from jupyter_server.extension.application import ExtensionApp
 
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
 )
+from cylc.flow.profiler import Profiler
 from cylc.uiserver import (
     __file__ as uis_pkg,
 )
@@ -334,6 +337,16 @@ class CylcUIServer(ExtensionApp):
         ''',
         default_value=100,
     )
+    profile = Bool(
+        config=True,
+        help='''
+            Turn on Python profiling.
+
+            The profile results will be saved to ~/.cylc/uiserver/profile.prof
+            in cprofile format.
+        ''',
+        default_value=False,
+    )
 
     @validate('ui_build_dir')
     def _check_ui_build_dir_exists(self, proposed):
@@ -417,6 +430,8 @@ class CylcUIServer(ExtensionApp):
         self.settings.update({'<trait>':...})
         """
         super().initialize_settings()
+
+        # startup messages
         self.log.info("Starting Cylc UI Server")
         self.log.info(f'Serving UI from: {self.ui_path}')
         self.log.debug(
@@ -425,6 +440,16 @@ class CylcUIServer(ExtensionApp):
                 for key, value in self.config['CylcUIServer'].items()
             )
         )
+
+        # start profiling
+        self.profiler = Profiler(
+            # the profiler is designed to attach to a Cylc scheduler
+            schd=SimpleNamespace(workflow_log_dir=USER_CONF_ROOT),
+            # profiling is turned on via the "profile" traitlet
+            enabled=self.profile,
+        )
+        self.profiler.start()
+
         # start the async scan task running (do this on server start not init)
         ioloop.IOLoop.current().add_callback(
             self.workflows_mgr.run
@@ -554,3 +579,4 @@ class CylcUIServer(ExtensionApp):
         self.data_store_mgr.executor.shutdown(wait=False)
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()
+        self.profiler.stop()
