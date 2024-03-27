@@ -324,6 +324,16 @@ class CylcUIServer(ExtensionApp):
         ''',
         default_value=1
     )
+    max_threads = Int(
+        config=True,
+        help='''
+            Set the maximum number of threads the Cylc UI Server can use.
+
+            This determines the maximum number of active workflows that the
+            server can track.
+        ''',
+        default_value=100,
+    )
 
     @validate('ui_build_dir')
     def _check_ui_build_dir_exists(self, proposed):
@@ -384,7 +394,11 @@ class CylcUIServer(ExtensionApp):
         super().__init__(*args, **kwargs)
         self.executor = ProcessPoolExecutor(max_workers=self.max_workers)
         self.workflows_mgr = WorkflowsManager(self, log=self.log)
-        self.data_store_mgr = DataStoreMgr(self.workflows_mgr, self.log)
+        self.data_store_mgr = DataStoreMgr(
+            self.workflows_mgr,
+            self.log,
+            self.max_threads,
+        )
         # sub_status dictionary storing status of subscriptions
         self.sub_statuses = {}
         self.resolvers = Resolvers(
