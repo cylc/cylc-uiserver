@@ -327,16 +327,6 @@ class CylcUIServer(ExtensionApp):
         ''',
         default_value=1
     )
-    max_threads = Int(
-        config=True,
-        help='''
-            Set the maximum number of threads the Cylc UI Server can use.
-
-            This determines the maximum number of active workflows that the
-            server can track.
-        ''',
-        default_value=100,
-    )
     profile = Bool(
         config=True,
         help='''
@@ -410,7 +400,6 @@ class CylcUIServer(ExtensionApp):
         self.data_store_mgr = DataStoreMgr(
             self.workflows_mgr,
             self.log,
-            self.max_threads,
         )
         # sub_status dictionary storing status of subscriptions
         self.sub_statuses = {}
@@ -450,10 +439,16 @@ class CylcUIServer(ExtensionApp):
         )
         self.profiler.start()
 
+        # start up the data store manager update task
+        ioloop.IOLoop.current().add_callback(
+            self.data_store_mgr.startup
+        )
+
         # start the async scan task running (do this on server start not init)
         ioloop.IOLoop.current().add_callback(
             self.workflows_mgr.run
         )
+
         # configure the scan interval
         ioloop.PeriodicCallback(
             self.workflows_mgr.scan,
@@ -571,12 +566,9 @@ class CylcUIServer(ExtensionApp):
         del os.environ["JUPYTER_RUNTIME_DIR"]
 
     async def stop_extension(self):
+        self.profiler.stop()
         # stop the async scan task
         await self.workflows_mgr.stop()
-        for sub in self.data_store_mgr.w_subs.values():
-            sub.stop()
-        # Shutdown the thread pool executor
-        self.data_store_mgr.executor.shutdown(wait=False)
+        self.data_store_mgr.shutdown()
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()
-        self.profiler.stop()
