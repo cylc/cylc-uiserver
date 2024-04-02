@@ -1,0 +1,1 @@
+import{aM as o,bs as p}from"./index-C2AHI-HK.js";const d={type:Object,required:!1,default:()=>({})},r="update:initialOptions";function O(t,{props:i,emit:a},n){const e=o(i.initialOptions[t]??n);return p(e,(s,u)=>a(r,{...i.initialOptions,[t]:s}),{immediate:!0,deep:!0}),e}export{O as a,d as i,r as u};
