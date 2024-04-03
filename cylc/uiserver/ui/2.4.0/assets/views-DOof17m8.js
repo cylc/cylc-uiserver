@@ -1,0 +1,7 @@
+function __vite__mapDeps(indexes) {
+  if (!__vite__mapDeps.viteFileDeps) {
+    __vite__mapDeps.viteFileDeps = ["./Tree-C7Y7750n.js","./index-C2AHI-HK.js","./index-nVd75nhG.css","./graphql-BScASb0Q.js","./initialOptions-DCNtfDfN.js","./TaskFilter-Blo6nLre.js","./Table-CpiKrP14.js","./VDataTable-BEEIiNy3.js","./VDataTable-i748D_Hl.css","./Graph-CtQJfnu7.js","./ViewToolbar-CVjJgDJD.js","./ViewToolbar-BOvewNgr.css","./Graph-Dp0bHIWU.css","./Log-CkkBOR13.js","./VAlert-DabNp_ty.js","./VAlert-2gHfPYRK.css","./Log-MmWiUpRz.css","./Analysis-BKeGvL7F.js","./Analysis-CpBFsrga.css"]
+  }
+  return indexes.map((i) => __vite__mapDeps.viteFileDeps[i])
+}
+import{eP as a,bY as n,eQ as r,eR as m,eS as s,eT as _,L as e,cN as o}from"./index-C2AHI-HK.js";const l=e(()=>o(()=>import("./Tree-C7Y7750n.js"),__vite__mapDeps([0,1,2,3,4,5]),import.meta.url)),c=e(()=>o(()=>import("./Table-CpiKrP14.js"),__vite__mapDeps([6,1,2,3,4,5,7,8]),import.meta.url)),p=e(()=>o(()=>import("./Graph-CtQJfnu7.js"),__vite__mapDeps([9,1,2,3,10,11,12]),import.meta.url)),u=e(()=>o(()=>import("./Log-CkkBOR13.js"),__vite__mapDeps([13,1,2,10,11,3,4,14,15,16]),import.meta.url)),d=e(()=>o(()=>import("./Analysis-BKeGvL7F.js"),__vite__mapDeps([17,1,2,3,7,8,18]),import.meta.url)),i="Tree",V=new Map([[i,{component:l,icon:a}],["Table",{component:c,icon:n}],["Graph",{component:p,icon:r}],["Log",{component:u,icon:m}],["Analysis",{component:d,icon:s}]]),E=()=>{const t=_("defaultView",i);return V.has(t.value)||(t.value=i),t};export{V as a,E as u};
