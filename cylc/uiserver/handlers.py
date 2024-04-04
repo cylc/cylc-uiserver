@@ -24,11 +24,6 @@ from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
 from graphql_ws.constants import GRAPHQL_WS
 from jupyter_server.base.handlers import JupyterHandler
-from jupyter_server.auth.identity import (
-    User as JPSUser,
-    IdentityProvider as JPSIdentityProvider,
-    PasswordIdentityProvider,
-)
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
 
@@ -38,12 +33,14 @@ from cylc.flow.scripts.cylc import (
 )
 
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
+from cylc.uiserver.utils import is_bearer_token_authenticated
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
 
 if TYPE_CHECKING:
     from cylc.uiserver.resolvers import Resolvers
     from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
     from graphql.execution import ExecutionResult
+    from jupyter_server.auth.identity import User as JPSUser
 
 
 ME = getpass.getuser()
@@ -66,7 +63,7 @@ def authorised(fun: Callable) -> Callable:
         **kwargs,
     ):
         nonlocal fun
-        user: JPSUser = handler.current_user
+        user: 'JPSUser' = handler.current_user
 
         if not user or not user.username:
             # the user is only truthy if they have authenticated successfully
@@ -76,7 +73,7 @@ def authorised(fun: Callable) -> Callable:
             # if authentication is turned off we don't want to work with this
             raise web.HTTPError(403, reason='authorization insufficient')
 
-        if is_token_authenticated(handler):
+        if is_bearer_token_authenticated(handler):
             # token or password authenticated, the bearer of the token or
             # password has full control
             pass
@@ -88,20 +85,6 @@ def authorised(fun: Callable) -> Callable:
 
         return fun(handler, *args, **kwargs)
     return _inner
-
-
-def is_token_authenticated(handler: 'CylcAppHandler') -> bool:
-    """Returns True if this request is bearer token authenticated.
-
-    E.G. The default single-user token-based authenticated.
-
-    In these cases the bearer of the token is awarded full privileges.
-    """
-    identity_provider: JPSIdentityProvider = (
-        handler.serverapp.identity_provider  # type: ignore[union-attr]
-    )
-    return identity_provider.__class__ == PasswordIdentityProvider
-    # NOTE: not using isinstance to narrow this down to just the one class
 
 
 def _authorise(
@@ -139,7 +122,7 @@ def get_user_info(handler: 'CylcAppHandler'):
     If the handler is token authenticated, then we return the username of the
     account that this server instance is running under.
     """
-    if is_token_authenticated(handler):
+    if is_bearer_token_authenticated(handler):
         # the bearer of the token has full privileges
         return {'name': ME, 'initials': get_initials(ME), 'username': ME}
     else:

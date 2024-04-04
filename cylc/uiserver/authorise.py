@@ -28,6 +28,7 @@ from tornado import web
 from traitlets.config.loader import LazyConfigValue
 
 from cylc.uiserver.schema import UISMutations
+from cylc.uiserver.utils import is_bearer_token_authenticated
 
 
 class CylcAuthorizer(Authorizer):
@@ -82,6 +83,11 @@ class CylcAuthorizer(Authorizer):
         Note that Cylc uses its own authorization system (which is locked-down
         by default) and is not affected by this policy.
         """
+        if is_bearer_token_authenticated(handler):
+            # this session is authenticated by a token or password NOT by
+            # Jupyter Hub -> the bearer of the token has full permissions
+            return True
+
         # the username of the user running this server
         # (used for authorzation purposes)
         me = getuser()
