@@ -43,6 +43,9 @@ from cylc.flow.workflow_files import ContactFileFields as CFF
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.workflows_mgr import WorkflowsManager
 
+from cylc.flow.cfgspec.globalcfg import SPEC
+from cylc.flow.parsec.config import ParsecConfig
+from cylc.flow.parsec.validate import cylc_config_validate
 
 class AsyncClientFixture(WorkflowRuntimeClient):
     pattern = zmq.REQ
@@ -360,3 +363,51 @@ def workflow_run_dir(request):
     yield flow_name, log_dir
     if not request.session.testsfailed:
         rmtree(run_dir)
+
+@pytest.fixture
+def mock_glbl_cfg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """A Pytest fixture for fiddling global config values.
+
+    * Hacks the specified `glbl_cfg` object.
+    * Can be called multiple times within a test function.
+
+    Args:
+        pypath (str):
+            The python-like path to the global configuation object you want
+            to fiddle.
+            E.G. if you want to hack the `glbl_cfg` in
+            `cylc.flow.scheduler` you would provide
+            `cylc.flow.scheduler.glbl_cfg`
+        global_config (str):
+            The globlal configuration as a multi-line string.
+
+    Example:
+        Change the value of `UTC mode` in the global config as seen from
+        `the scheduler` module.
+
+        def test_something(mock_glbl_cfg):
+            mock_glbl_cfg(
+                'cylc.flow.scheduler.glbl_cfg',
+                '''
+                    [scheduler]
+                        UTC mode = True
+                '''
+            )
+
+    """
+    # TODO: modify Parsec so we can use StringIO rather than a temp file.
+    def _mock_glbl_cfg(pypath: str, global_config: str) -> None:
+        nonlocal tmp_path, monkeypatch
+        global_config_path = tmp_path / 'global.cylc'
+        global_config_path.write_text(global_config)
+        glbl_cfg = ParsecConfig(SPEC, validator=cylc_config_validate)
+        glbl_cfg.loadcfg(global_config_path)
+
+        def _inner(cached=False):
+            nonlocal glbl_cfg
+            return glbl_cfg
+
+        monkeypatch.setattr(pypath, _inner)
+
+    yield _mock_glbl_cfg
+    rmtree(tmp_path)
