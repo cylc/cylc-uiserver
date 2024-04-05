@@ -12,6 +12,16 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.4.4 (Released 2024-04-05)
+
+[Updated cylc-ui to 2.4.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🔧 Fixes
+
+[#558](https://github.com/cylc/cylc-uiserver/pull/558) - Permit Jupyter Lab to be run in the same Jupyter Server instance as the Cylc UI Server in standalone mode (i.e. via `cylc gui`), note it was already possible to do this in multi-user mode (i.e. via `cylc hub`).
+
+[#570](https://github.com/cylc/cylc-uiserver/pull/570) - Fix an issue that could impose a low limit on the number of active workflows the server is able to track.
+
 ## cylc-uiserver-1.4.3 (Released 2023-12-05)
 
 ### 🔧 Fixes
