@@ -14,6 +14,35 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from typing import TYPE_CHECKING
+
+from jupyter_server.auth.identity import PasswordIdentityProvider
+
+if TYPE_CHECKING:
+    from cylc.uiserver.handlers import CylcAppHandler
+    from jupyter_server.auth.identity import (
+        IdentityProvider as JPSIdentityProvider,
+    )
+
+
+def is_bearer_token_authenticated(handler: 'CylcAppHandler') -> bool:
+    """Returns True if this request is bearer token authenticated.
+
+    Bearer tokens, e.g. tokens (?token=1234) and passwords, are short pieces of
+    text that are used for authentication. These can be used in single-user
+    mode (i.e. "cylc gui"). In these cases the bearer of the token is awarded
+    full privileges.
+
+    In multi-user mode, we have more advanced authentication based on an
+    external service which allows us to implement fine-grained authorisation.
+    """
+    identity_provider: 'JPSIdentityProvider' = (
+        handler.serverapp.identity_provider  # type: ignore[union-attr]
+    )
+    return identity_provider.__class__ == PasswordIdentityProvider
+    # NOTE: not using isinstance to narrow this down to just the one class
+
+
 def _repr(value):
     if isinstance(value, dict):
         return '<dict>'
