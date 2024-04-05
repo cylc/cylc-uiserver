@@ -3,7 +3,7 @@ name: Sync PR
 on:
   push:
     branches:
-      - '*.*.x'
+      - '[0-9]+.[0-9]+.x'
   schedule:
     - cron: '49 03 * * 1-5' # 03:49 UTC Mon-Fri
   workflow_dispatch:
