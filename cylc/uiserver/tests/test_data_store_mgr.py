@@ -37,7 +37,7 @@ async def test_entire_workflow_update(
 ):
     """Test that ``entire_workflow_update`` is executed successfully."""
     w_id = 'workflow_id'
-    entire_workflow = make_entire_workflow(f'{w_id}')
+    entire_workflow = make_entire_workflow(w_id)
     async_client.will_return(entire_workflow.SerializeToString())
 
     # Set the client used by our test workflow.
@@ -48,7 +48,7 @@ async def test_entire_workflow_update(
     # Call the entire_workflow_update function.
     # This should use the client defined above (``async_client``) when
     # calling ``workflow_request``.
-    await data_store_mgr._entire_workflow_update()
+    await data_store_mgr._entire_workflow_update(w_id)
 
     # The ``DataStoreMgr`` sets the workflow data retrieved in its
     # own ``.data`` dictionary, which will contain Protobuf message
@@ -61,84 +61,68 @@ async def test_entire_workflow_update(
     assert entire_workflow.workflow.id == w_id_data['workflow'].id
 
 
-async def test_entire_workflow_update_ignores_timeout_message(
-    async_client: AsyncClientFixture,
-    data_store_mgr: DataStoreMgr
+async def test_connect_workflow_error(
+    monkeypatch,
+    data_store_mgr,
+    caplog,
 ):
-    """
-    Test that ``entire_workflow_update`` ignores if the client
-    receives a ``MSG_TIMEOUT`` message.
-    """
-    w_id = 'workflow_id'
-    async_client.will_return(ClientTimeout)
+    """It should catch and log errors.
 
-    # Set the client used by our test workflow.
-    data_store_mgr.workflows_mgr.workflows[w_id] = {
-        'req_client': async_client
+    The _start_subscription and _entire_workflow_update methods will attempt
+    connect to and communicate with workflows, this could result in errors e.g.
+    WorkflowStopped or ClientTimeout.
+
+    The "connect_workflow" method should catch and log these errors.
+    """
+    # mock a workflow for the data store to pretend to connect to
+    w_id = 'myflow'
+    contact_data = {
+        'name': w_id,
+        CFF.HOST: 'meh',
+        CFF.PUBLISH_PORT: '123',
     }
 
-    # Call the entire_workflow_update function.
-    # This should use the client defined above (``async_client``) when
-    # calling ``workflow_request``.
-    await data_store_mgr._entire_workflow_update()
+    # an arbitrary exception to raise
+    exc = Exception(f'such and such error: {w_id}')
 
-    # When a ClientTimeout happens, the ``DataStoreMgr`` object ignores
-    # that message. So it means that its ``.data`` dictionary MUST NOT
-    # have an entry for the Workflow ID.
-    assert w_id not in data_store_mgr.data
+    # mock the data store methods so this error is raised
+    async def _raise_client_error(*args):
+        raise exc
 
+    monkeypatch.setattr(
+        data_store_mgr,
+        '_start_subscription',
+        _raise_client_error
+    )
+    monkeypatch.setattr(
+        data_store_mgr,
+        '_entire_workflow_update',
+        _raise_client_error
+    )
 
-async def test_entire_workflow_update_gather_error(
-    async_client: AsyncClientFixture,
-    data_store_mgr: DataStoreMgr,
-    caplog: pytest.LogCaptureFixture,
-):
-    """
-    Test that if ``asyncio.gather`` in ``entire_workflow_update``
-    has a coroutine raising an error, it will handle the error correctly.
-    """
-    # The ``AsyncClient`` will raise an error. This will happen when
-    # ``workflow_request`` is called via ``asyncio.gather``, which
-    # would be raised if ``return_exceptions`` is not given.
-    #
-    # This test wants to confirm this is not raised, but instead the
-    # error is returned, so that we can inspect, log, etc.
-    async_client.will_return(ValueError)
+    caplog.set_level(0)
+    caplog.clear()
 
-    # Set the client used by our test workflow.
-    data_store_mgr.workflows_mgr.workflows['workflow_id'] = {
-        'req_client': async_client
-    }
+    # attempt to connect
+    await data_store_mgr.connect_workflow(w_id, contact_data)
 
-    # Call the entire_workflow_update function.
-    # This should use the client defined above (``async_client``) when
-    # calling ``workflow_request``.
-    await data_store_mgr._entire_workflow_update()
+    # ensure the error is logged
     assert caplog.record_tuples == [
-        ('cylc', 40, 'Error communicating with myflow'),
-        ('cylc', 40, 'x'),
-        ('cylc', 40,
-         'Failed to update entire local data-store of a workflow: x'),
-    ]
-    exc_info = caplog.records[1].exc_info
-    assert exc_info and exc_info[0] == ValueError
-
-
-async def test_entire_workflow_update__stopped_workflow(
-    async_client: AsyncClientFixture,
-    data_store_mgr: DataStoreMgr,
-    caplog: pytest.LogCaptureFixture,
-):
-    """Test that DataStoreMgr._entire_workflow_update() handles a stopped
-    workflow reasonably."""
-    exc = WorkflowStopped('myflow')
-    async_client.will_return(exc)
-    data_store_mgr.workflows_mgr.workflows['workflow_id'] = {
-        'req_client': async_client
-    }
-    await data_store_mgr._entire_workflow_update()
-    assert caplog.record_tuples == [
-        ('cylc', 40, f'WorkflowStopped: {exc}'),
+        (
+            'cylc',
+            20,
+            f"[data-store] connect_workflow('{w_id}', <dict>)",
+        ),
+        (
+            'cylc',
+            40,
+            f'Failed to connect to myflow: such and such error: {w_id}',
+        ),
+        (
+            'cylc',
+            20,
+            f"[data-store] disconnect_workflow('{w_id}')",
+        ),
     ]
 
 
@@ -219,65 +203,3 @@ async def test_disconnect_workflow(
 
     data_store_mgr.disconnect_workflow(w_id=w_id)
     assert data_store_mgr.data[w_id]['workflow'].api_version == 0
-
-
-async def test_workflow_connect_fail(
-    data_store_mgr: DataStoreMgr,
-    port_range,
-    monkeypatch,
-    caplog,
-):
-    """Simulate a failure during workflow connection.
-
-    The data store should "rollback" any incidental changes made during the
-    failed connection attempt by disconnecting from the workflow afterwards.
-
-    Not an ideal test as we don't actually get a communication failure,
-    the data store manager just skips contacting the workflow because
-    we aren't providing a client for it to connect to, however, probably the
-    best we can achieve without actually running a workflow.
-    """
-    # patch the zmq logic so that the connection doesn't fail at the first
-    # hurdle
-    monkeypatch.setattr(
-        'cylc.flow.network.ZMQSocketBase._socket_bind', lambda *a, **k: None,
-    )
-
-    # start a ZMQ REPLY socket in order to claim an unused port
-    w_id = Tokens(user='user', workflow='workflow_id').id
-    try:
-        context = zmq.Context()
-        server = ZMQSocketBase(
-            zmq.REP,
-            context=context,
-            workflow=w_id,
-            bind=True,
-        )
-        server._socket_bind(*port_range)
-
-        # register the workflow with the data store
-        await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
-        contact_data = {
-            'name': 'workflow_id',
-            'owner': 'cylc',
-            CFF.HOST: 'localhost',
-            CFF.PORT: server.port,
-            CFF.PUBLISH_PORT: server.port,
-            CFF.API: 1
-        }
-
-        # try to connect to the workflow
-        caplog.set_level(logging.DEBUG, data_store_mgr.log.name)
-        await data_store_mgr.connect_workflow(w_id, contact_data)
-
-        # the connection should fail because our ZMQ socket is not a
-        # WorkflowRuntimeServer with the correct endpoints and auth
-        assert [record.message for record in caplog.records] == [
-            "[data-store] connect_workflow('~user/workflow_id', <dict>)",
-            'failed to connect to ~user/workflow_id',
-            "[data-store] disconnect_workflow('~user/workflow_id')",
-        ]
-    finally:
-        # tidy up
-        server.stop()
-        context.destroy()
