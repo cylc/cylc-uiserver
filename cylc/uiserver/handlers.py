@@ -187,7 +187,7 @@ class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
     @web.authenticated
     def get(self, path):
         # authenticate the static handler
-        # this provides us with login redirection and token cashing
+        # this provides us with login redirection and token caching
         return web.StaticFileHandler.get(self, path)
 
 
