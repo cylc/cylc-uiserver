@@ -184,6 +184,10 @@ class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
     def initialize(self, *args, **kwargs):
         return web.StaticFileHandler.initialize(self, *args, **kwargs)
 
+    def check_xsrf_cookie(self):
+        # don't need XSRF protections on static assets
+        return
+
     @web.authenticated
     def get(self, path):
         # authenticate the static handler
