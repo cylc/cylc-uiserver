@@ -193,7 +193,8 @@ class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
         # authenticate the static handler
         # this provides us with login redirection and token caching
         # accessing xsrf_token ensures xsrf cookie is set if it needs to be,
-        # e.g. setting it during request for /index.html to be available for next request to /userprofile
+        # e.g. setting it during request for /index.html
+        # to be available for next request to /userprofile
         self.xsrf_token  # noqa
         return web.StaticFileHandler.get(self, path)
 
