@@ -59,6 +59,7 @@ below.
  - Mel Hall
  - Christopher Bennett
  - Mark Dawson
+ - Min RK
  <!-- end-shortlog -->
 
 (All contributors are identifiable with email addresses in the git version
