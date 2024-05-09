@@ -1,0 +1,1 @@
+Avoid requiring jupyter_config.py in to be in uiserver subdirectory when using CYLC_SITE_CONF_PATH

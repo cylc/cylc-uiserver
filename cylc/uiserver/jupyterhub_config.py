@@ -25,8 +25,8 @@ import os
 from pathlib import Path
 
 from cylc.uiserver.config_util import (
+    CONF_FILE_NAME,
     DEFAULT_CONF_PATH,
-    UISERVER_DIR,
     USER_CONF_ROOT,
     SITE_CONF_ROOT,
     get_conf_dir_hierarchy
@@ -46,10 +46,8 @@ def _load(path):
 def load() -> None:
     """Load the relevant UIS/Hub configuration files."""
     if os.getenv('CYLC_SITE_CONF_PATH'):
-        site_conf_path: Path = Path(
-            os.environ['CYLC_SITE_CONF_PATH'],
-            UISERVER_DIR
-        )
+        site_conf_path: Path = check_cylc_site_conf_path(
+            Path(os.environ['CYLC_SITE_CONF_PATH']))
     else:
         site_conf_path = SITE_CONF_ROOT
     base_config_paths = [site_conf_path, USER_CONF_ROOT]
@@ -59,6 +57,24 @@ def load() -> None:
     config_paths.insert(0, str(DEFAULT_CONF_PATH))
     for path in config_paths:
         _load(Path(path))
+
+
+def check_cylc_site_conf_path(path_: Path) -> Path:
+    """Check path set by CYLC_SITE_CONF_PATH
+
+    1. Path exists and has a file.
+    2. File is readable.
+    """
+    conf_file_path = (path_ / CONF_FILE_NAME)
+    if not conf_file_path.is_file():
+        LOG.warning(
+            f'Config path {path_} set by'
+            ' "CYLC_SITE_CONF_PATH" does not exist or.'
+            ' does not have a jupyter_config.py file.')
+    elif not os.access(conf_file_path, os.R_OK):
+        LOG.error(f'Unable to read config file at {path_}')
+        return SITE_CONF_ROOT
+    return path_
 
 
 hub_version = os.environ.get('CYLC_HUB_VERSION')
