@@ -57,27 +57,87 @@ see the
 
 ### For Single-User Setups
 
-Via conda (preferred):
-```bash
-conda install cylc-uiserver
-```
+Install:
 
-Via pip:
+| Conda/Mamba (preferred) | Pip |
+| --- | --- |
+| `conda install cylc-uiserver-base` | `pip install cylc-uiserver` |
+
+Then start your server:
 ```bash
-pip install cylc-uiserver
+cylc gui
 ```
 
 ### For Multi-User Setups
 
-Via conda (preferred):
+Install:
+
+| Conda/Mamba (preferred) | Pip + Npm |
+| --- | --- |
+| `conda install cylc-uiserver` | `pip install cylc-uiserver[hub]` |
+|   | `npm install configurable-http-proxy` |
+
+
+Then start your hub:
 ```bash
-conda install cylc-uiserver-hub
+cylc hub
 ```
 
-Via pip (consult jupyterhub documentation):
+### List Of Packages
+
+There are a few different packages to suit different needs.
+
+| Tool | Package | Description | Cylc UI Server | Jupyter Hub | Configurable HTTP Proxy |
+| --- | --- | --- | --- | --- | --- |
+| pip | cylc-uiserver | Single user | :heavy_check_mark: | :x: | :x: |
+| conda | cylc-uiserver-base | Single user | :heavy_check_mark:  | :x: | :x: |
+| conda | cylc-uiserver-hub-base | Multi user (without proxy) | :heavy_check_mark: | :heavy_check_mark: | :x: |
+| pip | cylc-uiserver[hub] | Multi user (without proxy) | :heavy_check_mark: | :heavy_check_mark: | :x: |
+| conda | cylc-uiserver | Multi user | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+
+The Configurable HTTP Proxy package (Node JS) provides the reverse proxy
+that Jupyter Hub requires to collate user's servers behind a single URL. It can
+be installed via `conda install configurable-http-proxy` but is not available
+via pip (because it requires Node JS)
+
+Other proxies including the
+[Traefik Proxy](https://github.com/jupyterhub/traefik-proxy) (Python) can also
+fulfil this purpose, see
+[list of Jupyter Hub proxies](https://jupyterhub.readthedocs.io/en/stable/howto/proxy.html#index-of-proxies).
+
+### Installing Jupyter Hub Separately
+
+The easiest way to get going with Cylc and Jupyter Hub is to install and deploy
+them together and launch Jupyter Hub via the `cylc hub` command.
+
 ```bash
-pip install cylc-uiserver[hub]
+conda install cylc-uiserver
+cylc hub
 ```
+
+However, you can also deploy Jupyter Hub separately from the servers it
+deploys (e.g. Jupyter Lab or Cylc UI Server) and launch it via the `jupyterhub`
+command.
+
+If you are deploying Jupyter Hub separately from Cylc UI Server, these
+configurations may be relevant:
+
+* The Jupyter Hub
+  [`spawner.cmd`](https://jupyterhub.readthedocs.io/en/stable/reference/config-reference.html)
+  determines the command that Jupyter Hub runs in order to start a user's
+  server. You may wish to use a wrapper script to activate the required environment.
+* The Jupyter Server
+  [``ServerApp.jpserver_extensions``](https://jupyter-server.readthedocs.io/en/latest/other/full-config.html)
+  configuration determines what Jupyter Server Extensions (e.g. Jupyter Lab or
+  Cylc UI Server) are activated when Jupyter Server starts.
+  The default behaviour is to activate any installed extensions, however, if
+  overridden, you may need to explicitly list cylc-uiserver here.
+* The Cylc
+  [jupyter_config.py](https://github.com/cylc/cylc-uiserver/blob/master/cylc/uiserver/jupyter_config.py)
+  file contains the default Cylc configuration. This applies to hubs started by
+  `cylc hub` command but not by the `jupyterhub` command. You may want to
+  include some of the configurations from this file in your Jupyter Hub
+  configuration.
 
 
 ## Running
