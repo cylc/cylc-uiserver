@@ -460,6 +460,12 @@ class CylcUIServer(ExtensionApp):
             self.scan_interval * 1000
         ).start()
 
+        # configure the sync level expiry check
+        ioloop.PeriodicCallback(
+            self.data_store_mgr.check_query_sync_level_expiries,
+            self.data_store_mgr.SYNC_LEVEL_TIMER_INTERVAL * 1000
+        ).start()
+
     def initialize_handlers(self):
         self.authobj = self.set_auth()
         self.set_sub_server()

@@ -45,7 +45,7 @@ from cylc.flow.exceptions import (
     WorkflowFilesError,
 )
 from cylc.flow.id import Tokens
-from cylc.flow.network.resolvers import BaseResolvers
+from cylc.flow.network.resolvers import BaseResolvers, workflow_filter
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.flow.scripts.clean import run
 
@@ -497,11 +497,12 @@ class Resolvers(BaseResolvers):
             )
         }
         w_ids = [
-            flow[WORKFLOW].id
-            for flow in await self.get_workflows_data(w_args)]
+            workflow[WORKFLOW].id
+            for workflow in self.data_store_mgr.data.values()
+            if workflow_filter(workflow, w_args)
+        ]
         if not w_ids:
-            return [{
-                'response': (False, 'No matching workflows')}]
+            return [{'response': (False, 'No matching workflows')}]
         # Pass the request to the workflow GraphQL endpoints
         _, variables, _, _ = info.context.get(  # type: ignore[union-attr]
             'graphql_params'
