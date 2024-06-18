@@ -12,6 +12,20 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.5.0 (Released 2024-06-18)
+
+[Updated cylc-ui to 2.5.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🚀 Enhancements
+
+[#507](https://github.com/cylc/cylc-uiserver/pull/507) - Added functionality for routing to a multiuser deployment when running cylc gui command.
+
+[#548](https://github.com/cylc/cylc-uiserver/pull/548) - Improve the performance of the GraphQL server.
+
+### 🔧 Fixes
+
+[#592](https://github.com/cylc/cylc-uiserver/pull/592) - Compatibility with JupyterHub 4.1 XSRF changes for static requests
+
 ## cylc-uiserver-1.4.4 (Released 2024-04-05)
 
 [Updated cylc-ui to 2.4.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
