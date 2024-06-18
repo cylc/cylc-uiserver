@@ -36,7 +36,7 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
 import time
-from typing import Dict, Optional, Set
+from typing import TYPE_CHECKING, Dict, Optional, Set, cast
 
 from cylc.flow.exceptions import WorkflowStopped
 from cylc.flow.id import Tokens
@@ -55,6 +55,9 @@ from cylc.flow.workflow_status import WorkflowStatus
 
 from .utils import fmt_call
 from .workflows_mgr import workflow_request
+
+if TYPE_CHECKING:
+    from cylc.flow.data_messages_pb2 import PbWorkflow
 
 
 def log_call(fcn):
@@ -408,7 +411,7 @@ class DataStoreMgr:
             new_data = deepcopy(DATA_TEMPLATE)
             for field, value in pb_data.ListFields():
                 if field.name == WORKFLOW:
-                    new_data[field.name].CopyFrom(value)
+                    cast('PbWorkflow', new_data[field.name]).CopyFrom(value)
                     new_data['delta_times'] = {
                         key: value.last_updated
                         for key in DATA_TEMPLATE
