@@ -22,7 +22,7 @@ import zmq
 
 from cylc.flow.exceptions import ClientTimeout, WorkflowStopped
 from cylc.flow.id import Tokens
-from cylc.flow.network import ZMQSocketBase
+from cylc.flow.network.base import ZMQSocketBase
 from cylc.flow.workflow_files import ContactFileFields as CFF
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
