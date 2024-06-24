@@ -53,6 +53,9 @@ jobs:
           export PATH
           __HERE__
 
+      - name: Patch DNS
+        uses: cylc/release-actions/patch-dns@v1
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
