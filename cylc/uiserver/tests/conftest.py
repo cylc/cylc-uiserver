@@ -14,17 +14,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Test code and fixtures."""
 
-from getpass import getuser
 import inspect
 import logging
 from pathlib import Path
 from shutil import rmtree
-from socket import gethostname
 from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 import pytest
-from tornado.web import HTTPError
 from traitlets.config import Config
 import zmq
 
@@ -46,6 +43,7 @@ from cylc.uiserver.workflows_mgr import WorkflowsManager
 from cylc.flow.cfgspec.globalcfg import SPEC
 from cylc.flow.parsec.config import ParsecConfig
 from cylc.flow.parsec.validate import cylc_config_validate
+
 
 class AsyncClientFixture(WorkflowRuntimeClient):
     pattern = zmq.REQ
@@ -223,7 +221,7 @@ def mock_authentication_yossarian(monkeypatch):
 def jp_server_config(jp_template_dir):
     """Config to turn the CylcUIServer extension on.
 
-    Auto-loading, add as an argument in the test function to activate.
+    Overrides jupyter server fixture of the same name.
     """
     config = {
         "ServerApp": {
@@ -235,12 +233,9 @@ def jp_server_config(jp_template_dir):
     return config
 
 
-@pytest.fixture
-def patch_conf_files(monkeypatch):
-    """Auto-patches the CylcUIServer to prevent it loading config files.
-
-    Auto-loading, add as an argument in the test function to activate.
-    """
+@pytest.fixture(autouse=True)
+def patch_conf_files(monkeypatch: pytest.MonkeyPatch):
+    """Auto-patches the CylcUIServer to prevent it loading config files."""
     monkeypatch.setattr(
         'cylc.uiserver.app.CylcUIServer.config_file_paths', []
     )
@@ -363,6 +358,7 @@ def workflow_run_dir(request):
     yield flow_name, log_dir
     if not request.session.testsfailed:
         rmtree(run_dir)
+
 
 @pytest.fixture
 def mock_glbl_cfg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
