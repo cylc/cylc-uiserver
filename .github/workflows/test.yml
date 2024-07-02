@@ -25,8 +25,8 @@ jobs:
         os: ['ubuntu-latest']
         python: ['3.8', '3.9']
         include:
-          - os: 'macos-11'
-            python: '3.8'
+          - os: 'macos-latest'
+            python: '3.9'
     env:
       PYTEST_ADDOPTS: --cov --color=yes
 
@@ -52,6 +52,9 @@ jobs:
           PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
           export PATH
           __HERE__
+
+      - name: Patch DNS
+        uses: cylc/release-actions/patch-dns@v1
 
       - name: Setup Python
         uses: actions/setup-python@v5
