@@ -23,7 +23,7 @@ from tornado.httpclient import HTTPClientError
 
 @pytest.mark.integration
 @pytest.mark.usefixtures("mock_authentication_yossarian")
-async def test_cylc_handler(patch_conf_files, jp_fetch):
+async def test_cylc_handler(jp_fetch):
     """The Cylc endpoints have been added and work."""
     resp = await jp_fetch(
         'cylc', 'userprofile', method='GET'
@@ -60,7 +60,6 @@ async def test_cylc_handler(patch_conf_files, jp_fetch):
     ]
 )
 async def test_authorised_and_authenticated(
-    patch_conf_files,
     jp_fetch,
     endpoint,
     code,
@@ -95,7 +94,6 @@ async def test_authorised_and_authenticated(
     ]
 )
 async def test_unauthorised(
-    patch_conf_files,
     jp_fetch,
     endpoint,
     code,
