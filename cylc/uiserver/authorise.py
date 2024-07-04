@@ -20,7 +20,7 @@ import grp
 from inspect import iscoroutinefunction
 import os
 import re
-from typing import List, Optional, Union, Any, Sequence, Set, Tuple
+from typing import List, Optional, Union, Set, Tuple
 
 import graphene
 from jupyter_server.auth import Authorizer
@@ -242,7 +242,7 @@ class Authorization:
         return auth_conf
 
     def get_owner_site_limits_for_access_user(
-        self, access_user_name: str, access_user_groups: Sequence[Any]
+        self, access_user_name: str, access_user_groups: List[str]
     ) -> Set:
         """Returns limits owner can give to given access_user
 
@@ -279,7 +279,7 @@ class Authorization:
         return limits
 
     def get_access_user_permissions_from_owner_conf(
-        self, access_user_name: str, access_user_groups: Sequence[Any]
+        self, access_user_name: str, access_user_groups: List[str]
     ) -> set:
         """
         Returns set of operations specific to access user from owner user conf.
@@ -448,7 +448,7 @@ class Authorization:
         return owner_dict
 
     def return_site_auth_defaults_for_access_user(
-        self, access_user_name: str, access_user_groups: Sequence[Any]
+        self, access_user_name: str, access_user_groups: List[str]
     ) -> Set:
         """Return site authorization defaults for given access user.
 
@@ -480,7 +480,7 @@ class Authorization:
         defaults.discard("")
         return defaults
 
-    def _get_groups(self, user: str) -> List:
+    def _get_groups(self, user: str) -> List[str]:
         """Allows get groups to use self.logger if something goes wrong.
 
         Added to provide a single interface for get_groups to this class, to
