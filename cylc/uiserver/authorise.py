@@ -239,7 +239,7 @@ class Authorization:
 
     def get_owner_site_limits_for_access_user(
         self, access_user_name: str, access_user_groups: List[str]
-    ) -> Set:
+    ) -> Set[str]:
         """Returns limits owner can give to given access_user
 
         Args:

@@ -395,3 +395,17 @@ def test_parse_group_ids(monkeypatch, input_):
         [f'group:{mock_grid_db[i]}' for i in input_ if i in mock_grid_db],
         [i for i in input_ if i not in mock_grid_db],
     )
+
+
+def test_empty_configs():
+    """Test the default permissions when no auth config is provided."""
+    # blank site & user configs
+    auth_obj = Authorization('me', {}, {}, log)
+    # the owner_dict should be empty
+    assert auth_obj.owner_dict == {}
+
+    # other users should not have any permissions
+    assert auth_obj._get_permitted_operations('someone-else') == set()
+
+    # the owner should always have full permissions
+    assert auth_obj._get_permitted_operations('me') == set(ALL_OPS)
