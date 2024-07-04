@@ -25,7 +25,6 @@ from typing import List, Optional, Union, Set, Tuple
 import graphene
 from jupyter_server.auth import Authorizer
 from tornado import web
-from traitlets.config.loader import LazyConfigValue
 
 from cylc.uiserver.schema import UISMutations
 from cylc.uiserver.utils import is_bearer_token_authenticated
@@ -116,6 +115,13 @@ class Authorization:
     Authorization has access groups: `READ`, `CONTROL`, `ALL` - along with
     their negations, `!READ`, `!CONTROL` and `!ALL` which indicate removal of
     the permission groups.
+
+    Args:
+        owner: The server owner's user name.
+        owner_auth_conf: The server owner's authorization configuration.
+        site_auth_conf: The site's authorization configuration.
+        log: The application logger.
+
     """
 
     # config literals
@@ -150,11 +156,17 @@ class Authorization:
     ASYNC_OPS = {"query", "mutation"}
     READ_AUTH_OPS = {"query", "subscription"}
 
-    def __init__(self, owner, owner_auth_conf, site_auth_conf, log) -> None:
-        self.owner = owner
+    def __init__(
+        self,
+        owner: str,
+        owner_auth_conf: dict,
+        site_auth_conf: dict,
+        log,
+    ):
+        self.owner: str = owner
         self.log = log
-        self.owner_auth_conf = self.set_auth_conf(owner_auth_conf)
-        self.site_auth_config = self.set_auth_conf(site_auth_conf)
+        self.owner_auth_conf: dict = owner_auth_conf
+        self.site_auth_config: dict = site_auth_conf
         self.owner_user_info = {
             "user": self.owner,
             "user_groups": self._get_groups(self.owner),
@@ -225,21 +237,6 @@ class Authorization:
         permission_set.discard("")
 
         return permission_set
-
-    @staticmethod
-    def set_auth_conf(auth_conf: Union[LazyConfigValue, dict]) -> dict:
-        """Resolve lazy config where empty
-
-        Args:
-            auth_conf: Authorization configuration from a jupyter_config.py
-
-        Returns:
-            Valid configuration dictionary
-
-        """
-        if isinstance(auth_conf, LazyConfigValue):
-            return auth_conf.to_dict()
-        return auth_conf
 
     def get_owner_site_limits_for_access_user(
         self, access_user_name: str, access_user_groups: List[str]

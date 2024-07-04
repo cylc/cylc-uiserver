@@ -542,15 +542,15 @@ class CylcUIServer(ExtensionApp):
             auth=self.authobj,
         )
 
-    def set_auth(self):
+    def set_auth(self) -> Authorization:
         """Create authorization object.
         One for the lifetime of the UIServer.
         """
         return Authorization(
             getpass.getuser(),
-            self.config.CylcUIServer.user_authorization,
-            self.config.CylcUIServer.site_authorization,
-            self.log
+            self.config.CylcUIServer.user_authorization.to_dict(),
+            self.config.CylcUIServer.site_authorization.to_dict(),
+            self.log,
         )
 
     def initialize_templates(self):
