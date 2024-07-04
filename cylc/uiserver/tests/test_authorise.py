@@ -23,7 +23,7 @@ from cylc.uiserver.authorise import (
     Authorization,
     AuthorizationMiddleware,
     get_list_of_mutations,
-    parse_group_ids
+    parse_group_ids,
 )
 
 log = ExtensionApp().log
@@ -86,9 +86,14 @@ FAKE_SITE_CONF = {
         },
     },
     "server_owner_1": {
-        "*": {"default": ["READ", "message"],
-              "limit": ["READ", "CONTROL"]},
-        "user1": {"default": ["READ", "play", "pause"], "limit": ["ALL"]},
+        "*": {
+            "default": ["READ", "message"],
+            "limit": ["READ", "CONTROL"],
+        },
+        "user1": {
+            "default": ["READ", "play", "pause"],
+            "limit": ["ALL"],
+        },
     },
     "server_owner_2": {
         "user2": {"limit": "ALL"},
@@ -180,7 +185,7 @@ FAKE_USER_CONF = {
             ["group:group2"],
             set(),
             id="owner only in group and *",
-        )
+        ),
     ],
 )
 @patch("cylc.uiserver.authorise.get_groups")
@@ -193,9 +198,7 @@ def test_get_permitted_operations(
     user_groups,
 ):
     mocked_get_groups.side_effect = [(owner_groups, []), (user_groups, [])]
-    auth_obj = Authorization(
-        owner_name, FAKE_USER_CONF, FAKE_SITE_CONF, log
-    )
+    auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF, log)
     actual_operations = auth_obj.get_permitted_operations(
         access_user=user_name
     )
@@ -203,14 +206,13 @@ def test_get_permitted_operations(
 
 
 @pytest.mark.parametrize(
-    "expected_operations, access_user_dict, owner_auth_conf,",
+    'expected_operations, access_user_name,'
+    ' access_user_groups, owner_auth_conf,',
     [
         pytest.param(
             {"!kill", "READ", "kill", "!stop", "pause", "play"},
-            {
-                "access_username": "access_user_1",
-                "access_user_groups": ["group:group1", "group:group2"],
-            },
+            "access_user_1",
+            ["group:group1", "group:group2"],
             {
                 "*": ["READ", "!kill"],
                 "access_user_1": ["READ", "pause", "kill", "play", "!stop"],
@@ -219,10 +221,8 @@ def test_get_permitted_operations(
         ),
         pytest.param(
             {"READ"},
-            {
-                "access_username": "access_user_2",
-                "access_user_groups": ["group:group1", "group:group2"],
-            },
+            "access_user_2",
+            ["group:group1", "group:group2"],
             {
                 "*": ["READ"],
                 "access_user_1": ["READ", "pause", "kill", "play", "!stop"],
@@ -231,10 +231,8 @@ def test_get_permitted_operations(
         ),
         pytest.param(
             {"pause", "kill", "!stop", "READ", "CONTROL"},
-            {
-                "access_username": "access_user_1",
-                "access_user_groups": ["group:group1", "group:group2"],
-            },
+            "access_user_1",
+            ["group:group1", "group:group2"],
             {
                 "*": ["READ"],
                 "access_user_1": ["READ", "pause", "kill", "!stop"],
@@ -246,7 +244,11 @@ def test_get_permitted_operations(
 )
 @patch("cylc.uiserver.authorise.get_groups")
 def test_get_access_user_permissions_from_owner_conf(
-    mocked_get_groups, expected_operations, access_user_dict, owner_auth_conf
+    mocked_get_groups,
+    expected_operations,
+    access_user_name,
+    access_user_groups,
+    owner_auth_conf,
 ):
     """Test the un-processed permissions of owner conf."""
     mocked_get_groups.return_value = (["group:blah"], [])
@@ -254,7 +256,7 @@ def test_get_access_user_permissions_from_owner_conf(
         "some_user", owner_auth_conf, {"fake": "config"}, log
     )
     permitted_operations = authobj.get_access_user_permissions_from_owner_conf(
-        access_user_dict
+        access_user_name, access_user_groups
     )
     assert permitted_operations == expected_operations
 
@@ -284,7 +286,7 @@ def test_expand_and_process_access_groups(permission_set, expected):
         "some_user",
         {"fake": "config"},
         {"fake": "config"},
-        log
+        log,
     )
     actual = authobj.expand_and_process_access_groups(permission_set)
     assert actual == expected
@@ -321,8 +323,7 @@ def test_expand_and_process_access_groups(permission_set, expected):
 )
 def test_get_op_name(mut_field_name, operation, expected_op_name):
     mock_authobj = Authorization(
-        "some_user", {"fake": "config"},
-        {"fake": "config"}, log
+        "some_user", {"fake": "config"}, {"fake": "config"}, log
     )
     auth_middleware = AuthorizationMiddleware
     auth_middleware.auth = mock_authobj
@@ -336,11 +337,7 @@ def test_get_op_name(mut_field_name, operation, expected_op_name):
     "owner_name,  user_name, get_permitted_operations_is_called, expected",
     [
         pytest.param(
-            "mel",
-            "mel",
-            False,
-            True,
-            id="Owner user always permitted"
+            "mel", "mel", False, True, id="Owner user always permitted"
         ),
         pytest.param(
             "mel",
@@ -383,17 +380,9 @@ def test_get_list_of_mutations(control, expected):
     assert set(actual) == set(expected)
 
 
-@pytest.mark.parametrize(
-    'input_',
-    (
-        [123],
-        [123, 456],
-        [100, 123]
-    )
-)
+@pytest.mark.parametrize('input_', ([123], [123, 456], [100, 123]))
 def test_parse_group_ids(monkeypatch, input_):
-    """Returns a list of group ids or groups where ID's haven't worked
-    """
+    """Returns a list of group ids or groups where ID's haven't worked"""
     mock_grid_db = {
         123: 'foo',
         456: 'bar',
@@ -403,11 +392,6 @@ def test_parse_group_ids(monkeypatch, input_):
     )
     result = parse_group_ids(input_)
     assert result == (
-        [
-            f'group:{mock_grid_db[i]}'
-            for i in input_ if i in mock_grid_db
-        ],
-        [
-            i for i in input_ if i not in mock_grid_db
-        ],
-        )
+        [f'group:{mock_grid_db[i]}' for i in input_ if i in mock_grid_db],
+        [i for i in input_ if i not in mock_grid_db],
+    )

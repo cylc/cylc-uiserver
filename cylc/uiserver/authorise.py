@@ -17,10 +17,10 @@ from contextlib import suppress
 from functools import lru_cache
 from getpass import getuser
 import grp
-from typing import List, Dict, Optional, Union, Any, Sequence, Set, Tuple
 from inspect import iscoroutinefunction
 import os
 import re
+from typing import List, Optional, Union, Any, Sequence, Set, Tuple
 
 import graphene
 from jupyter_server.auth import Authorizer
@@ -118,13 +118,16 @@ def constant(func):
 
 
 class Authorization:
-    """Authorization Information Class
-    One instance for the life of the UI Server. If authorization settings
-    change they will need to re-start the UI Server.
+    """Authorization configuration object.
+
+    One instance of this class lives for the life of the UI Server.
+
+    If authorization settings change the UI Server will need to be re-started
+    to pick them up.
+
     Authorization has access groups: `READ`, `CONTROL`, `ALL` - along with
     their negations, `!READ`, `!CONTROL` and `!ALL` which indicate removal of
     the permission groups.
-
     """
 
     # config literals
@@ -147,7 +150,6 @@ class Authorization:
     READ_OPERATION = "read"
 
     # Access group identifiers (used in config)
-
     READ = "READ"
     CONTROL = "CONTROL"
     ALL = "ALL"
@@ -156,22 +158,9 @@ class Authorization:
     NOT_ALL = "!ALL"
 
     # Access Groups
-
     READ_OPS = {READ_OPERATION}
     ASYNC_OPS = {"query", "mutation"}
     READ_AUTH_OPS = {"query", "subscription"}
-
-    @staticmethod
-    @constant
-    def ALL_OPS() -> List[str]:
-        """ALL OPS constant, returns list of all mutations."""
-        return get_list_of_mutations()
-
-    @staticmethod
-    @constant
-    def CONTROL_OPS() -> List[str]:
-        """CONTROL OPS constant, returns list of all control mutations."""
-        return get_list_of_mutations(control=True)
 
     def __init__(self, owner, owner_auth_conf, site_auth_conf, log) -> None:
         self.owner = owner
@@ -190,6 +179,18 @@ class Authorization:
         )
 
     @staticmethod
+    @constant
+    def ALL_OPS() -> List[str]:
+        """ALL OPS constant, returns list of all mutations."""
+        return get_list_of_mutations()
+
+    @staticmethod
+    @constant
+    def CONTROL_OPS() -> List[str]:
+        """CONTROL OPS constant, returns list of all control mutations."""
+        return get_list_of_mutations(control=True)
+
+    @staticmethod
     def expand_and_process_access_groups(permission_set: set) -> set:
         """Process a permission set.
 
@@ -200,36 +201,44 @@ class Authorization:
             permission_set: set of permissions
 
         Returns:
-            permission_set: processed permission set.
+            processed permission set.
+
         """
+        # Expand permission groups
+        # E.G. ALL -> ["read", "trigger", "broadcast", ...]
         for action_group, expansion in {
+            Authorization.READ: Authorization.READ_OPS,
             Authorization.CONTROL: Authorization.CONTROL_OPS.fget(),
             Authorization.ALL: Authorization.ALL_OPS.fget(),
-            Authorization.READ: Authorization.READ_OPS,
         }.items():
             if action_group in permission_set:
                 permission_set.remove(action_group)
                 permission_set.update(expansion)
-        # Expand negated permissions
+
+        # Expand negated permission groups
+        # E.G. !CONTROL -> ["!trigger", "!stop", "!pause", ...]
         for action_group, expansion in {
-                Authorization.NOT_CONTROL: [
-                    f"!{x}" for x in Authorization.CONTROL_OPS.fget()],
-                Authorization.NOT_ALL: [
-                    f"!{x}" for x in Authorization.ALL_OPS.fget()],
-                Authorization.NOT_READ: [
-                    f"!{x}" for x in Authorization.READ_OPS]}.items():
+            Authorization.NOT_READ: [f"!{x}" for x in Authorization.READ_OPS],
+            Authorization.NOT_CONTROL: [
+                f"!{x}" for x in Authorization.CONTROL_OPS.fget()
+            ],
+            Authorization.NOT_ALL: [
+                f"!{x}" for x in Authorization.ALL_OPS.fget()
+            ],
+        }.items():
             if action_group in permission_set:
                 permission_set.remove(action_group)
                 permission_set.update(expansion)
+
         # Remove negated permissions
         remove = set()
-
         for perm in permission_set:
             if perm.startswith("!"):
                 remove.add(perm.lstrip("!"))
                 remove.add(perm)
         permission_set.difference_update(remove)
         permission_set.discard("")
+
         return permission_set
 
     @staticmethod
@@ -241,29 +250,31 @@ class Authorization:
 
         Returns:
             Valid configuration dictionary
+
         """
         if isinstance(auth_conf, LazyConfigValue):
             return auth_conf.to_dict()
         return auth_conf
 
     def get_owner_site_limits_for_access_user(
-        self, access_user: Dict[str, Union[str, Sequence[Any]]]
+        self, access_user_name: str, access_user_groups: Sequence[Any]
     ) -> Set:
         """Returns limits owner can give to given access_user
 
         Args:
-            access_user: Dictionary containing info about access user and their
-            membership of system groups.
+            access_user_name: The username of the authenticated user.
+            access_user_groups: All groups the authenticated user belongs to.
 
         Returns:
             Set of limits that the uiserver owner is allowed to give away
             for given access user.
+
         """
         limits: Set[str] = set()
         if not self.owner_dict:
             return limits
-        items_to_check = ["*", access_user["access_username"]]
-        items_to_check.extend(access_user["access_user_groups"])
+        items_to_check = ["*", access_user_name]
+        items_to_check.extend(access_user_groups)
         for item in items_to_check:
             permission: Union[str, List] = ""
             default = ""
@@ -271,7 +282,8 @@ class Authorization:
                 default = self.owner_dict[item].get(Authorization.DEFAULT, "")
             with suppress(KeyError):
                 permission = self.owner_dict[item].get(
-                    Authorization.LIMIT, default)
+                    Authorization.LIMIT, default
+                )
             if permission == []:
                 raise_auth_config_exception("site")
             if isinstance(permission, str):
@@ -282,17 +294,18 @@ class Authorization:
         return limits
 
     def get_access_user_permissions_from_owner_conf(
-        self, access_user: Dict[str, Union[str, Sequence[Any]]]
+        self, access_user_name: str, access_user_groups: Sequence[Any]
     ) -> set:
         """
         Returns set of operations specific to access user from owner user conf.
 
         Args:
-            access_user: Dictionary containing info about access user and their
-            membership of system groups. Defaults to None.
+            access_user_name: The username of the authenticated user.
+            access_user_groups: All groups the authenticated user belongs to.
+
         """
-        items_to_check = ["*", access_user["access_username"]]
-        items_to_check.extend(access_user["access_user_groups"])
+        items_to_check = ["*", access_user_name]
+        items_to_check.extend(access_user_groups)
         allowed_operations = set()
         for item in items_to_check:
             permission = self.owner_auth_conf.get(item, "")
@@ -310,7 +323,8 @@ class Authorization:
     def _get_permitted_operations(self, access_user: str):
         """Return permitted operations for given access_user.
 
-        Cached for efficiency.
+        This method is cached for efficiency.
+
         Checks:
         - site config to ensure owner is permitted to give away permissions
         - user config for authorised operations related to access_user and
@@ -322,39 +336,49 @@ class Authorization:
 
         Returns:
             Set of operations permitted by given access user for this UI Server
+
         """
-        # For use in the ui, owner permissions (ALL operations) are set
+        # users have full access to their own server (ALL)
         if access_user == self.owner:
             return set(Authorization.ALL_OPS.fget())
-        # Otherwise process permissions for (non-uiserver owner) access_user
 
-        access_user_dict = {
-            "access_username": access_user,
-            "access_user_groups": self._get_groups(access_user),
-        }
+        # all groups the authenticated user belongs to
+        access_user_groups = self._get_groups(access_user)
+
+        # the maximum permissions the site permits the user to grant
         limits_owner_can_give = self.get_owner_site_limits_for_access_user(
-            access_user=access_user_dict)
+            access_user, access_user_groups
+        )
+
+        # the permissions the user wishes to grant
         user_conf_permitted_ops = (
             self.get_access_user_permissions_from_owner_conf(
-                access_user=access_user_dict)
+                access_user, access_user_groups
+            )
         )
-        # If not explicit permissions for access user in owner conf then revert
-        # to site defaults
+
         if len(user_conf_permitted_ops) == 0:
+            # the user has not specified the permissions they wish to grant
+            # -> fallback to the site defaults
             user_conf_permitted_ops = (
                 self.return_site_auth_defaults_for_access_user(
-                    access_user=access_user_dict
+                    access_user, access_user_groups
                 )
             )
+
+        # expand permission groups and remove negated permissions
         user_conf_permitted_ops = self.expand_and_process_access_groups(
             user_conf_permitted_ops
         )
         limits_owner_can_give = self.expand_and_process_access_groups(
             limits_owner_can_give
         )
+
+        # subtract permissions that the site does not permit to be granted
         allowed_operations = limits_owner_can_give.intersection(
             user_conf_permitted_ops
         )
+
         self.log.info(
             f"User {access_user} authorized permissions: "
             f"{sorted(allowed_operations)}"
@@ -371,6 +395,7 @@ class Authorization:
         Returns:
             True if access_user permitted to action operation, otherwise,
             False.
+
         """
         if access_user == self.owner_user_info["user"]:
             return True
@@ -386,8 +411,8 @@ class Authorization:
 
     def build_owner_site_auth_conf(self):
         """Build UI Server owner permissions dictionary.
-        Creates a reduced site auth dictionary for the ui-server owner.
 
+        Creates a reduced site auth dictionary for the ui-server owner.
         """
         owner_dict = {}
         items_to_check = ["*", self.owner_user_info["user"]]
@@ -402,13 +427,17 @@ class Authorization:
                     if existing_user_conf:
                         # process limits and defaults and update dictionary
                         existing_default = existing_user_conf.get(
-                            Authorization.DEFAULT, '')
+                            Authorization.DEFAULT, ''
+                        )
                         existing_limit = existing_user_conf.get(
-                            Authorization.LIMIT, existing_default)
+                            Authorization.LIMIT, existing_default
+                        )
                         new_default = acc_user_perms.get(
-                            Authorization.DEFAULT, '')
+                            Authorization.DEFAULT, ''
+                        )
                         new_limit = acc_user_perms.get(
-                            Authorization.LIMIT, new_default)
+                            Authorization.LIMIT, new_default
+                        )
                         set_defs = set()
                         for conf in [existing_default, new_default]:
                             if isinstance(conf, list):
@@ -422,35 +451,35 @@ class Authorization:
                             else:
                                 set_lims.add(conf)
                         # update and continue
-                        owner_dict[
-                            acc_user_conf][Authorization.LIMIT] = list(
-                            set_lims)
-                        owner_dict[
-                            acc_user_conf][Authorization.DEFAULT] = list(
-                            set_defs)
+                        owner_dict[acc_user_conf][Authorization.LIMIT] = list(
+                            set_lims
+                        )
+                        owner_dict[acc_user_conf][Authorization.DEFAULT] = (
+                            list(set_defs)
+                        )
                         continue
                     owner_dict.update(access_user_dict)
         # Now we have a reduced site auth dictionary for the current owner
         return owner_dict
 
     def return_site_auth_defaults_for_access_user(
-        self, access_user: Dict[str, Union[str, Sequence[Any]]]
+        self, access_user_name: str, access_user_groups: Sequence[Any]
     ) -> Set:
         """Return site authorization defaults for given access user.
+
         Args:
-            access_user: access_user dictionary, in the form
-                        {'access_username': username
-                         'access_user_group: [group1, group2,...]'
-                        }
+            access_user_name: The username of the authenticated user.
+            access_user_groups: All groups the authenticated user belongs to.
+
         Returns:
-            Set of default operations permitted
+            The set of default operations permitted.
 
         """
         defaults: Set[str] = set()
         if not self.owner_dict:
             return defaults
-        items_to_check = ["*", access_user["access_username"]]
-        items_to_check.extend(access_user["access_user_groups"])
+        items_to_check = ["*", access_user_name]
+        items_to_check.extend(access_user_groups)
         for item in items_to_check:
             permission: Union[str, List] = ""
             with suppress(KeyError):
@@ -489,6 +518,7 @@ class AuthorizationMiddleware:
 
     Raises:
         web.HTTPError: Unauthorized requests.
+
     """
 
     auth = None
@@ -502,8 +532,10 @@ class AuthorizationMiddleware:
         # It shouldn't get here but worth checking for zero trust
         if not op_name:
             self.auth_failed(
-                current_user, op_name, http_code=400,
-                msg="Operation not in schema."
+                current_user,
+                op_name,
+                http_code=400,
+                msg="Operation not in schema.",
             )
         try:
             authorised = self.auth.is_permitted(current_user, op_name)
@@ -512,15 +544,22 @@ class AuthorizationMiddleware:
             authorised = False
         if not authorised:
             self.auth_failed(current_user, op_name, http_code=403)
-        if (info.operation.operation in Authorization.ASYNC_OPS
-                or iscoroutinefunction(next_)):
+        if (
+            info.operation.operation in Authorization.ASYNC_OPS
+            or iscoroutinefunction(next_)
+        ):
             return self.async_resolve(next_, root, info, **args)
         return next_(root, info, **args)
 
-    def auth_failed(self, current_user: str, op_name: str,
-                    http_code: int, message: Optional[str] = None):
-        """
-        Raise authorization error
+    def auth_failed(
+        self,
+        current_user: str,
+        op_name: str,
+        http_code: int,
+        message: Optional[str] = None,
+    ):
+        """Raise an authorization error.
+
         Args:
             current_user: username accessing operation
             op_name: operation name
@@ -529,31 +568,38 @@ class AuthorizationMiddleware:
 
         Raises:
             web.HTTPError
+
         """
-        log_message = (f"Authorization failed for {current_user}"
-                       f":requested to {op_name}.")
+        log_message = (
+            f"Authorization failed for {current_user}"
+            f":requested to {op_name}."
+        )
         if message:
             log_message = log_message + " " + message
         raise web.HTTPError(http_code, reason=message)
 
     def get_op_name(self, field_name: str, operation: str) -> Optional[str]:
-        """
-        Returns operation name required for authorization.
+        """Returns the operation name required for authorization.
+
         Converts queries and subscriptions to read operations.
+
         Args:
             field_name: Field name e.g. play
             operation: operation type
 
         Returns:
-            operation name
+            The operation name.
+
         """
         if operation in Authorization.READ_AUTH_OPS:
             return Authorization.READ_OPERATION
         else:
             # Check it is a mutation in our schema
-            if self.auth and re.sub(
-                r'(?<!^)(?=[A-Z])', '_', field_name
-            ).lower() in Authorization.ALL_OPS.fget():
+            if (
+                self.auth
+                and re.sub(r'(?<!^)(?=[A-Z])', '_', field_name).lower()
+                in Authorization.ALL_OPS.fget()
+            ):
                 return field_name
         return None
 
@@ -563,7 +609,7 @@ class AuthorizationMiddleware:
 
 
 def get_groups(username: str) -> Tuple[List[str], List[str]]:
-    """Return list of system groups for given user.
+    """Return a list of system groups for given user.
 
     Uses ``os.getgrouplist`` and ``os.NGROUPS_MAX`` to get system groups for a
     given user. ``grp.getgrgid`` then parses these to return a list of group
@@ -573,7 +619,8 @@ def get_groups(username: str) -> Tuple[List[str], List[str]]:
         username: username used to check system groups.
 
     Returns:
-        list: system groups for username given
+        System groups for username given
+
     """
     groupmax = os.NGROUPS_MAX  # type: ignore
     group_ids = os.getgrouplist(username, groupmax)
@@ -589,8 +636,8 @@ def parse_group_ids(group_ids: List) -> Tuple[List[str], List[str]]:
         group_ids: List of users groups, in number format
 
     Returns:
-        List: List of users groups, in id format with group identifier
-        prepended.
+        List of users groups, in id format with group identifier prepended.
+
     """
     group_list = []
     bad_group_list = []
@@ -609,7 +656,8 @@ def parse_group_ids(group_ids: List) -> Tuple[List[str], List[str]]:
 def get_list_of_mutations(control: bool = False) -> List[str]:
     """Gets list of mutations"""
     list_of_mutations = [
-        attr for attr in dir(UISMutations)
+        attr
+        for attr in dir(UISMutations)
         if isinstance(getattr(UISMutations, attr), graphene.Field)
     ]
     if control:
@@ -626,6 +674,7 @@ def raise_auth_config_exception(config_type: str):
 
     Args:
         config_type: Either site or user.
+
     """
     raise Exception(
         f'Error in {config_type} config: '
