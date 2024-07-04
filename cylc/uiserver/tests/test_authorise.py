@@ -449,3 +449,30 @@ def test_case_conversion(caplog):
     caplog.clear()
     assert not auth_obj.is_permitted('other', 'broadcast')
     assert caplog.messages[-1] == 'other: not authorized to broadcast'
+
+
+def test_empty_list_in_config():
+    """Test empty lists cause exceptions to be raised.
+
+    Empty lists have an unclear meaning due to the inheritance of default
+    permissions so are not permitted.
+
+    Note:
+        It would be nicer to validate this out at startup than forcing the
+        error at runtime.
+    """
+    auth_obj = Authorization('me', {'other': []}, {}, LOG)
+    with pytest.raises(Exception, match='Error in user config'):
+        auth_obj.is_permitted('other', 'read')
+
+    auth_obj = Authorization('me', {}, {'*': {'other': {'limit': []}}}, LOG)
+    with pytest.raises(Exception, match='Error in site config'):
+        auth_obj.is_permitted('other', 'read')
+
+    auth_obj = Authorization('me', {}, {'*': {'other': {'default': []}}}, LOG)
+    with pytest.raises(Exception, match='Error in site config'):
+        auth_obj.is_permitted('other', 'read')
+
+    auth_obj = Authorization('me', {}, {'*': {'me': {'default': []}}}, LOG)
+    with pytest.raises(Exception, match='Error in site config'):
+        auth_obj.return_site_auth_defaults_for_access_user('me', ['x'])
