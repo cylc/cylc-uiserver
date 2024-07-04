@@ -158,19 +158,18 @@ class Authorization:
 
     def __init__(
         self,
-        owner: str,
+        owner_user_name: str,
         owner_auth_conf: dict,
         site_auth_conf: dict,
         log,
     ):
-        self.owner: str = owner
+        self.owner_user_name: str = owner_user_name
+        self.owner_user_groups: List[str] = self._get_groups(
+            self.owner_user_name
+        )
         self.log = log
         self.owner_auth_conf: dict = owner_auth_conf
         self.site_auth_config: dict = site_auth_conf
-        self.owner_user_info = {
-            "user": self.owner,
-            "user_groups": self._get_groups(self.owner),
-        }
         self.owner_dict = self.build_owner_site_auth_conf()
 
         # lru_cache this method - see flake8-bugbear B019
@@ -321,7 +320,7 @@ class Authorization:
 
         """
         # users have full access to their own server (ALL)
-        if access_user == self.owner:
+        if access_user == self.owner_user_name:
             return set(self.ALL_OPS)
 
         # all groups the authenticated user belongs to
@@ -379,7 +378,7 @@ class Authorization:
             False.
 
         """
-        if access_user == self.owner_user_info["user"]:
+        if access_user == self.owner_user_name:
             return True
         # re.sub needed for snake/camel case
         if re.sub(
@@ -397,8 +396,8 @@ class Authorization:
         Creates a reduced site auth dictionary for the ui-server owner.
         """
         owner_dict = {}
-        items_to_check = ["*", self.owner_user_info["user"]]
-        items_to_check.extend(self.owner_user_info["user_groups"])
+        items_to_check = ["*", self.owner_user_name]
+        items_to_check.extend(self.owner_user_groups)
 
         # dict containing user info applying to the current ui_server owner
         for uis_owner_conf, access_user_dict in self.site_auth_config.items():
