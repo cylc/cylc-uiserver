@@ -13,9 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from jupyter_server.extension.application import ExtensionApp
+import logging
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+
+from jupyter_server.extension.application import ExtensionApp
 
 import pytest
 
@@ -26,7 +28,7 @@ from cylc.uiserver.authorise import (
     parse_group_ids,
 )
 
-log = ExtensionApp().log
+LOG = ExtensionApp().log
 
 CONTROL_OPS = [
     "clean",
@@ -198,7 +200,7 @@ def test_get_permitted_operations(
     user_groups,
 ):
     mocked_get_groups.side_effect = [(owner_groups, []), (user_groups, [])]
-    auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF, log)
+    auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF, LOG)
     actual_operations = auth_obj.get_permitted_operations(
         access_user=user_name
     )
@@ -253,7 +255,7 @@ def test_get_access_user_permissions_from_owner_conf(
     """Test the un-processed permissions of owner conf."""
     mocked_get_groups.return_value = (["group:blah"], [])
     authobj = Authorization(
-        "some_user", owner_auth_conf, {"fake": "config"}, log
+        "some_user", owner_auth_conf, {"fake": "config"}, LOG
     )
     permitted_operations = authobj.get_access_user_permissions_from_owner_conf(
         access_user_name, access_user_groups
@@ -286,7 +288,7 @@ def test_expand_and_process_access_groups(permission_set, expected):
         "some_user",
         {"fake": "config"},
         {"fake": "config"},
-        log,
+        LOG,
     )
     actual = authobj.expand_and_process_access_groups(permission_set)
     assert actual == expected
@@ -323,7 +325,7 @@ def test_expand_and_process_access_groups(permission_set, expected):
 )
 def test_get_op_name(mut_field_name, operation, expected_op_name):
     mock_authobj = Authorization(
-        "some_user", {"fake": "config"}, {"fake": "config"}, log
+        "some_user", {"fake": "config"}, {"fake": "config"}, LOG
     )
     auth_middleware = AuthorizationMiddleware
     auth_middleware.auth = mock_authobj
@@ -357,7 +359,7 @@ def test_is_permitted(
     expected,
 ):
     mocked_get_groups.side_effect = [([""], []), ([""], [])]
-    auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF, log)
+    auth_obj = Authorization(owner_name, FAKE_USER_CONF, FAKE_SITE_CONF, LOG)
     auth_obj.get_permitted_operations = Mock(return_value=["fake_operation"])
     actual = auth_obj.is_permitted(
         access_user=user_name, operation="fake_operation"
@@ -400,7 +402,7 @@ def test_parse_group_ids(monkeypatch, input_):
 def test_empty_configs():
     """Test the default permissions when no auth config is provided."""
     # blank site & user configs
-    auth_obj = Authorization('me', {}, {}, log)
+    auth_obj = Authorization('me', {}, {}, LOG)
     # the owner_dict should be empty
     assert auth_obj.owner_dict == {}
 
@@ -409,3 +411,41 @@ def test_empty_configs():
 
     # the owner should always have full permissions
     assert auth_obj._get_permitted_operations('me') == set(ALL_OPS)
+
+
+def test_case_conversion(caplog):
+    """Test camel to snake case conversion of permission names."""
+    my_log = logging.getLogger('test_case_conversion')
+    caplog.set_level(logging.INFO, logger=my_log.name)
+
+    auth_obj = Authorization(
+        'me',
+        {'other': ['CONTROL']},
+        {'*': {'*': {'limit': ['ALL']}}},
+        my_log,
+    )
+
+    # internal use case (perm provided in Python syntax)
+    assert auth_obj.is_permitted('other', 'release_hold_point')
+    assert auth_obj.is_permitted('other', 'set_graph_window_extent')
+
+    # external use case (perm provided in GraphQL syntax)
+    assert auth_obj.is_permitted('other', 'ReleaseHoldPoint')
+    assert auth_obj.is_permitted('other', 'SetGraphWindowExtent')
+
+    # invalid permission names
+    assert not auth_obj.is_permitted('other', 'no_such_permission')
+    assert not auth_obj.is_permitted('other', 'RELeaseHOLdPoint')
+    assert not auth_obj.is_permitted('other', 'SEtGRAPhWINDOwEXTENt')
+    assert not auth_obj.is_permitted('other', 'Release_Hold_Point')
+
+    # calls should be logged
+    # (successfull call)
+    caplog.clear()
+    assert auth_obj.is_permitted('other', 'release_hold_point')
+    assert caplog.messages[-1] == 'other: authorized to release_hold_point'
+
+    # (rejected call)
+    caplog.clear()
+    assert not auth_obj.is_permitted('other', 'broadcast')
+    assert caplog.messages[-1] == 'other: not authorized to broadcast'

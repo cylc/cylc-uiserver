@@ -19,7 +19,6 @@ from getpass import getuser
 import grp
 from inspect import iscoroutinefunction
 import os
-import re
 from typing import List, Optional, Union, Set, Tuple
 
 import graphene
@@ -28,6 +27,8 @@ from tornado import web
 
 from cylc.uiserver.schema import UISMutations
 from cylc.uiserver.utils import is_bearer_token_authenticated
+
+from graphene.utils.str_converters import to_snake_case
 
 
 class CylcAuthorizer(Authorizer):
@@ -380,14 +381,15 @@ class Authorization:
         """
         if access_user == self.owner_user_name:
             return True
-        # re.sub needed for snake/camel case
-        if re.sub(
-            r'(?<!^)(?=[A-Z])', '_', operation
-        ).lower() in self.get_permitted_operations(access_user):
+
+        # convert from GraphQL camel case to Python snake case
+        operation = to_snake_case(operation)
+
+        if operation in self.get_permitted_operations(access_user):
             self.log.info(f"{access_user}: authorized to {operation}")
             return True
-        self.log.info(f"{access_user}: not authorized to {operation}")
 
+        self.log.info(f"{access_user}: not authorized to {operation}")
         return False
 
     def build_owner_site_auth_conf(self):
@@ -574,14 +576,14 @@ class AuthorizationMiddleware:
         """
         if operation in Authorization.READ_AUTH_OPS:
             return Authorization.READ_OPERATION
-        else:
-            # Check it is a mutation in our schema
-            if (
-                self.auth
-                and re.sub(r'(?<!^)(?=[A-Z])', '_', field_name).lower()
-                in self.auth.ALL_OPS
-            ):
-                return field_name
+
+        # convert from GraphQL camel case to Python snake case
+        field_name = to_snake_case(field_name)
+
+        # Check it is a mutation in our schema
+        if self.auth and field_name in self.auth.ALL_OPS:
+            return field_name
+
         return None
 
     async def async_resolve(self, next_, root, info, **args):
