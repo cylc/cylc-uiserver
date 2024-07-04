@@ -105,18 +105,6 @@ class CylcAuthorizer(Authorizer):
         return False
 
 
-def constant(func):
-    """Decorator preventing reassignment"""
-
-    def fset(self, value):
-        raise TypeError
-
-    def fget():
-        return func()
-
-    return property(fget, fset)
-
-
 class Authorization:
     """Authorization configuration object.
 
@@ -178,20 +166,17 @@ class Authorization:
             self._get_permitted_operations
         )
 
-    @staticmethod
-    @constant
-    def ALL_OPS() -> List[str]:
+    @property
+    def ALL_OPS(self) -> List[str]:
         """ALL OPS constant, returns list of all mutations."""
         return get_list_of_mutations()
 
-    @staticmethod
-    @constant
-    def CONTROL_OPS() -> List[str]:
+    @property
+    def CONTROL_OPS(self) -> List[str]:
         """CONTROL OPS constant, returns list of all control mutations."""
         return get_list_of_mutations(control=True)
 
-    @staticmethod
-    def expand_and_process_access_groups(permission_set: set) -> set:
+    def expand_and_process_access_groups(self, permission_set: set) -> set:
         """Process a permission set.
 
         Takes a permission set, e.g. limits, defaults.
@@ -208,8 +193,8 @@ class Authorization:
         # E.G. ALL -> ["read", "trigger", "broadcast", ...]
         for action_group, expansion in {
             Authorization.READ: Authorization.READ_OPS,
-            Authorization.CONTROL: Authorization.CONTROL_OPS.fget(),
-            Authorization.ALL: Authorization.ALL_OPS.fget(),
+            Authorization.CONTROL: self.CONTROL_OPS,
+            Authorization.ALL: self.ALL_OPS,
         }.items():
             if action_group in permission_set:
                 permission_set.remove(action_group)
@@ -220,10 +205,10 @@ class Authorization:
         for action_group, expansion in {
             Authorization.NOT_READ: [f"!{x}" for x in Authorization.READ_OPS],
             Authorization.NOT_CONTROL: [
-                f"!{x}" for x in Authorization.CONTROL_OPS.fget()
+                f"!{x}" for x in self.CONTROL_OPS
             ],
             Authorization.NOT_ALL: [
-                f"!{x}" for x in Authorization.ALL_OPS.fget()
+                f"!{x}" for x in self.ALL_OPS
             ],
         }.items():
             if action_group in permission_set:
@@ -340,7 +325,7 @@ class Authorization:
         """
         # users have full access to their own server (ALL)
         if access_user == self.owner:
-            return set(Authorization.ALL_OPS.fget())
+            return set(self.ALL_OPS)
 
         # all groups the authenticated user belongs to
         access_user_groups = self._get_groups(access_user)
@@ -598,7 +583,7 @@ class AuthorizationMiddleware:
             if (
                 self.auth
                 and re.sub(r'(?<!^)(?=[A-Z])', '_', field_name).lower()
-                in Authorization.ALL_OPS.fget()
+                in self.auth.ALL_OPS
             ):
                 return field_name
         return None
