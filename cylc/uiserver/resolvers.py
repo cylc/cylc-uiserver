@@ -16,14 +16,19 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 import asyncio
-from contextlib import suppress
 import errno
-from getpass import getuser
 import os
-from copy import deepcopy
 import signal
-from subprocess import Popen, PIPE, DEVNULL
+from contextlib import suppress
+from copy import deepcopy
+from getpass import getuser
+from subprocess import (
+    DEVNULL,
+    PIPE,
+    Popen,
+)
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncGenerator,
     Callable,
@@ -31,31 +36,27 @@ from typing import (
     Iterable,
     List,
     Optional,
-    TYPE_CHECKING,
     Tuple,
     Union,
 )
 
-from graphql.language.base import print_ast
 import psutil
-
 from cylc.flow.data_store_mgr import WORKFLOW
-from cylc.flow.exceptions import (
-    ServiceFileError,
-    WorkflowFilesError,
-)
+from cylc.flow.exceptions import ServiceFileError, WorkflowFilesError
 from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
-from cylc.flow.scripts.clean import CleanOptions
-from cylc.flow.scripts.clean import run
+from cylc.flow.scripts.clean import CleanOptions, run
+from graphql.language.base import print_ast
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
     from logging import Logger
     from optparse import Values
-    from graphql import ResolveInfo
+
     from cylc.flow.data_store_mgr import DataStoreMgr
     from cylc.flow.option_parsers import Options
+    from graphql import ResolveInfo
+
     from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
@@ -429,7 +430,7 @@ class Services:
             yield {'connected': False}
 
     @classmethod
-    async def cat_log_files(cls, id_: Tokens):
+    async def cat_log_files(cls, id_: Tokens, log: 'Logger') -> List[str]:
         """Calls cat log to get list of available log files.
 
         Note kept separate from the cat_log method above as this is a one off
@@ -438,26 +439,27 @@ class Services:
         file checking.
         """
         cmd: List[str] = ['cylc', 'cat-log', '-m', 'l', '-o', id_.id]
+        log.debug(f"$ {' '.join(cmd)}")
         proc_job = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        # wait for proc to finish
-        await proc_job.wait()
-
-        # MOTD returned in stderr, no use in returning
-        out_job, _ = await proc_job.communicate()
-        if out_job:
+        ret_code = await proc_job.wait()
+        out, err = await proc_job.communicate()
+        if ret_code:
+            log.error(
+                f"Command failed ({ret_code}): {' '.join(cmd)}\n{err.decode()}"
+            )
+        if out:
             return sorted(
                 # return the log files in reverse sort order
                 # this means that the most recent log file rotations
                 # will be at the top of the list
-                out_job.decode().splitlines(),
+                out.decode().splitlines(),
                 reverse=True,
             )
-        else:
-            return []
+        return []
 
 
 class Resolvers(BaseResolvers):
@@ -569,7 +571,7 @@ class Resolvers(BaseResolvers):
         self,
         id_: Tokens,
     ):
-        return await Services.cat_log_files(id_)
+        return await Services.cat_log_files(id_, self.log)
 
 
 def kill_process_tree(
