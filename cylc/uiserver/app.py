@@ -76,6 +76,7 @@ from traitlets import (
     default,
     validate,
 )
+from traitlets.config.loader import LazyConfigValue
 from types import SimpleNamespace
 
 from jupyter_server.extension.application import ExtensionApp
@@ -546,10 +547,17 @@ class CylcUIServer(ExtensionApp):
         """Create authorization object.
         One for the lifetime of the UIServer.
         """
+        user_auth = self.config.CylcUIServer.user_authorization
+        site_auth = self.config.CylcUIServer.site_authorization
+        if isinstance(user_auth, LazyConfigValue):
+            user_auth: dict = user_auth.to_dict()
+        if isinstance(site_auth, LazyConfigValue):
+            site_auth: dict = site_auth.to_dict()
+
         return Authorization(
             getpass.getuser(),
-            self.config.CylcUIServer.user_authorization.to_dict(),
-            self.config.CylcUIServer.site_authorization.to_dict(),
+            user_auth,
+            site_auth,
             self.log,
         )
 
