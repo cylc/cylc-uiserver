@@ -547,8 +547,8 @@ class CylcUIServer(ExtensionApp):
         """Create authorization object.
         One for the lifetime of the UIServer.
         """
-        user_auth = self.config.CylcUIServer.user_authorization
-        site_auth = self.config.CylcUIServer.site_authorization
+        user_auth: Union[LazyConfigValue, dict] = self.config.CylcUIServer.user_authorization
+        site_auth: Union[LazyConfigValue, dict] = self.config.CylcUIServer.site_authorization
         if isinstance(user_auth, LazyConfigValue):
             user_auth: dict = user_auth.to_dict()
         if isinstance(site_auth, LazyConfigValue):
