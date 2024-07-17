@@ -55,6 +55,10 @@ c.JupyterHub.template_paths = [
     )
 ]
 
+# configure websocket pings (helps to detect client-closed connections)
+c.ServerApp.websocket_ping_interval = 10
+c.ServerApp.websocket_ping_timeout = 10
+
 # store JupyterHub runtime files in the user config directory
 USER_CONF_ROOT.mkdir(parents=True, exist_ok=True)
 c.JupyterHub.cookie_secret_file = f'{USER_CONF_ROOT / "cookie_secret"}'
