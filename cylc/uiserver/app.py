@@ -53,14 +53,16 @@ Cylc specific configurations are documented here.
    the environment variable ``CYLC_SITE_CONF_PATH``.
 """
 
-from concurrent.futures import ProcessPoolExecutor
 import getpass
 import os
-from pathlib import Path, PurePath
 import sys
+from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import List, Optional
+from types import SimpleNamespace
+from typing import List, Optional, Union
 
+from jupyter_server.extension.application import ExtensionApp
 from pkg_resources import parse_version
 from tornado import ioloop
 from tornado.web import RedirectHandler
@@ -76,9 +78,7 @@ from traitlets import (
     default,
     validate,
 )
-from types import SimpleNamespace
-
-from jupyter_server.extension.application import ExtensionApp
+from traitlets.config.loader import LazyConfigValue
 
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
@@ -108,6 +108,7 @@ from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
 from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
+
 
 INFO_FILES_DIR = Path(USER_CONF_ROOT / "info_files")
 
@@ -553,10 +554,21 @@ class CylcUIServer(ExtensionApp):
         """Create authorization object.
         One for the lifetime of the UIServer.
         """
+        user_auth: Union[LazyConfigValue, dict] = (
+            self.config.CylcUIServer.user_authorization
+        )
+        site_auth: Union[LazyConfigValue, dict] = (
+            self.config.CylcUIServer.site_authorization
+        )
+        if isinstance(user_auth, LazyConfigValue):
+            user_auth = user_auth.to_dict()
+        if isinstance(site_auth, LazyConfigValue):
+            site_auth = site_auth.to_dict()
+
         return Authorization(
             getpass.getuser(),
-            self.config.CylcUIServer.user_authorization.to_dict(),
-            self.config.CylcUIServer.site_authorization.to_dict(),
+            user_auth,
+            site_auth,
             self.log,
         )
 
