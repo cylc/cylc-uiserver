@@ -53,14 +53,16 @@ Cylc specific configurations are documented here.
    the environment variable ``CYLC_SITE_CONF_PATH``.
 """
 
-from concurrent.futures import ProcessPoolExecutor
 import getpass
 import os
-from pathlib import Path, PurePath
 import sys
+from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import List, Union
+from types import SimpleNamespace
+from typing import List, Optional, Union
 
+from jupyter_server.extension.application import ExtensionApp
 from pkg_resources import parse_version
 from tornado import ioloop
 from tornado.web import RedirectHandler
@@ -77,9 +79,6 @@ from traitlets import (
     validate,
 )
 from traitlets.config.loader import LazyConfigValue
-from types import SimpleNamespace
-
-from jupyter_server.extension.application import ExtensionApp
 
 from cylc.flow.network.graphql import (
     CylcGraphQLBackend, IgnoreFieldMiddleware
@@ -109,6 +108,7 @@ from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
 from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
+
 
 INFO_FILES_DIR = Path(USER_CONF_ROOT / "info_files")
 
@@ -146,15 +146,6 @@ class CylcUIServer(ExtensionApp):
     cylc gui --no-browser     # Start the server but don't open the browser
 
     ''')  # type: ignore[assignment]
-    config_file_paths = get_conf_dir_hierarchy(
-        [
-            SITE_CONF_ROOT,  # site configuration
-            USER_CONF_ROOT,  # user configuration
-        ], filename=False
-    )
-    # Next include currently needed for directory making
-    config_file_paths.insert(0, str(Path(uis_pkg).parent))  # packaged config
-    config_file_paths.reverse()
     # TODO: Add a link to the access group table mappings in cylc documentation
     # https://github.com/cylc/cylc-uiserver/issues/466
     AUTH_DESCRIPTION = '''
@@ -406,6 +397,7 @@ class CylcUIServer(ExtensionApp):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._config_file_paths: Optional[List[str]] = None
         self.executor = ProcessPoolExecutor(max_workers=self.max_workers)
         self.workflows_mgr = WorkflowsManager(self, log=self.log)
         self.data_store_mgr = DataStoreMgr(
@@ -421,6 +413,21 @@ class CylcUIServer(ExtensionApp):
             executor=self.executor,
             workflows_mgr=self.workflows_mgr,
         )
+
+    @property
+    def config_file_paths(self) -> List[str]:
+        if self._config_file_paths is None:
+            ret = get_conf_dir_hierarchy(
+                [
+                    SITE_CONF_ROOT,  # site configuration
+                    USER_CONF_ROOT,  # user configuration
+                ], filename=False
+            )
+            # Next include currently needed for directory making
+            ret.insert(0, str(Path(uis_pkg).parent))  # packaged config
+            ret.reverse()
+            self._config_file_paths = ret
+        return self._config_file_paths
 
     def initialize_settings(self):
         """Update extension settings.
