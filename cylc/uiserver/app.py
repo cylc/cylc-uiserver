@@ -59,7 +59,7 @@ import os
 from pathlib import Path, PurePath
 import sys
 from textwrap import dedent
-from typing import List
+from typing import List, Union
 
 from pkg_resources import parse_version
 from tornado import ioloop
@@ -547,12 +547,16 @@ class CylcUIServer(ExtensionApp):
         """Create authorization object.
         One for the lifetime of the UIServer.
         """
-        user_auth: Union[LazyConfigValue, dict] = self.config.CylcUIServer.user_authorization
-        site_auth: Union[LazyConfigValue, dict] = self.config.CylcUIServer.site_authorization
+        user_auth: Union[LazyConfigValue, dict] = (
+            self.config.CylcUIServer.user_authorization
+        )
+        site_auth: Union[LazyConfigValue, dict] = (
+            self.config.CylcUIServer.site_authorization
+        )
         if isinstance(user_auth, LazyConfigValue):
-            user_auth: dict = user_auth.to_dict()
+            user_auth = user_auth.to_dict()
         if isinstance(site_auth, LazyConfigValue):
-            site_auth: dict = site_auth.to_dict()
+            site_auth = site_auth.to_dict()
 
         return Authorization(
             getpass.getuser(),
