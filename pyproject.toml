@@ -16,6 +16,7 @@ template = "changes.d/changelog-template.jinja"
 underlines = ["", "", ""]
 title_format = "## cylc-uiserver-{version} (Released {project_date})"
 issue_format = "[#{issue}](https://github.com/cylc/cylc-uiserver/pull/{issue})"
+ignore = ["changelog-template.jinja"]
 
 # These changelog sections will be shown in the defined order:
 [[tool.towncrier.type]]
