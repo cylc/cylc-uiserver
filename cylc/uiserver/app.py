@@ -592,10 +592,17 @@ class CylcUIServer(ExtensionApp):
     async def stop_extension(self):
         # stop the async scan task
         await self.workflows_mgr.stop()
+
+        # stop active subscriptions
         for sub in self.data_store_mgr.w_subs.values():
             sub.stop()
-        # Shutdown the thread pool executor
+
+        # Shutdown the thread pool executor (used for subscription processing)
         self.data_store_mgr.executor.shutdown(wait=False)
+
+        # stop the process pool (used for background commands)
+        self.executor.shutdown()
+
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()
         self.profiler.stop()
