@@ -119,6 +119,12 @@ However, you can also deploy Jupyter Hub separately from the servers it
 deploys (e.g. Jupyter Lab or Cylc UI Server) and launch it via the `jupyterhub`
 command.
 
+Enable the Cylc UI Server in `jupyterhub` or `jupyter lab` by running
+```bash
+jupyter server extension enable --py cylc.uiserver
+```
+The Cylc UI will be available by replacing `/lab` in the URL with `/cylc`.
+
 If you are deploying Jupyter Hub separately from Cylc UI Server, these
 configurations may be relevant:
 
