@@ -30,7 +30,8 @@ from cylc.uiserver import (
 )
 
 # base configuration - always used
-DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / 'jupyter_config.py'
+CONF_FILE_NAME = 'jupyter_config.py'
+DEFAULT_CONF_PATH: Path = Path(uis_pkg).parent / CONF_FILE_NAME
 UISERVER_DIR = 'uiserver'
 # UIS configuration dirs
 SITE_CONF_ROOT: Path = Path(
