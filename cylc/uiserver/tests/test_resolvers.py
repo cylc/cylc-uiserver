@@ -224,7 +224,7 @@ async def test_play_timeout(monkeypatch: pytest.MonkeyPatch):
         log=Mock(),
     )
     assert ret == [
-        False, "Command 'cylc play wflow1' timed out after 20 seconds"
+        False, "Command 'cylc play wflow1' timed out after 120 seconds"
     ]
 
 

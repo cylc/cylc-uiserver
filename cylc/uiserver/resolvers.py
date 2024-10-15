@@ -314,7 +314,7 @@ class Services:
                     stderr=PIPE,
                     text=True
                 )
-                ret_code = proc.wait(timeout=20)
+                ret_code = proc.wait(timeout=120)
 
                 if ret_code:
                     # command failed
