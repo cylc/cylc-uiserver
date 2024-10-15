@@ -12,6 +12,16 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.5.1 (Released 2024-10-15)
+
+[Updated cylc-ui to 2.6.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🔧 Fixes
+
+[#607](https://github.com/cylc/cylc-uiserver/pull/607) - Log any errors when trying to list the workflow/job log files in the UI.
+
+[#619](https://github.com/cylc/cylc-uiserver/pull/619) - Ensure that subprocesses created by Cylc UI Server are cleaned up correctly when the server shuts down.
+
 ## cylc-uiserver-1.5.0 (Released 2024-06-18)
 
 [Updated cylc-ui to 2.5.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
