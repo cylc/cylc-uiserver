@@ -15,6 +15,7 @@
 
 from functools import partial
 from getpass import getuser
+import json
 from unittest import mock
 from unittest.mock import MagicMock
 import pytest
@@ -120,3 +121,19 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
         self.io_loop.run_sync(handler.open,
                               get_async_test_timeout())
         handler.subscription_server.handle.assert_called_once()
+
+
+@pytest.mark.integration
+async def test_userprofile(
+    jp_fetch, cylc_uis, jp_serverapp,
+):
+    """Test the userprofile endpoint."""
+    # patch the default_url back to how it is set in cylc.uiserver.app
+    cylc_uis.default_url = '/cylc'
+
+    response = await jp_fetch('cylc', 'userprofile')
+    user_profile = json.loads(response.body.decode())
+    assert user_profile['username'] == getuser()
+    assert user_profile['owner'] == getuser()
+    assert 'read' in user_profile['permissions']
+    assert 'cylc' in user_profile['extensions']
