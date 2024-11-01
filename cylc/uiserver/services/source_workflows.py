@@ -32,6 +32,7 @@ SOURCE_DIRS: List[Path] = [
     for source_dir in glbl_cfg().get(['install', 'source dirs'])
 ]
 
+CWD = Path('.').absolute()
 
 SourceWorkflow = Dict
 
@@ -47,6 +48,7 @@ def _source_workflow(source_path: Path) -> SourceWorkflow:
     return {
         'name': _get_source_workflow_name(source_path),
         'path': source_path,
+        'relative_path': _get_source_workflow_relative_path(source_path),
     }
 
 
@@ -56,7 +58,7 @@ def _blank_source_workflow() -> SourceWorkflow:
     This will be used for workflows which were not installed by "cylc install".
     """
 
-    return {'name': None, 'path': None}
+    return {'name': None, 'path': None, 'relative_path': None}
 
 
 def _get_source_workflow_name(source_path: Path) -> Optional[str]:
@@ -77,6 +79,18 @@ def _get_source_workflow_name(source_path: Path) -> Optional[str]:
         with suppress(ValueError):
             return str(source_path.relative_to(source_dir))
     return None
+
+
+def _get_source_workflow_relative_path(source_path: Path) -> Optional[Path]:
+    """Return the relative path to the workflow from CWD.
+
+    * Returns `None` if the path is not under CWD.
+    * Does *not* resolve symlinks.
+    """
+    try:
+        return source_path.relative_to(CWD)
+    except ValueError:
+        return None
 
 
 def _get_workflow_source(workflow_id):

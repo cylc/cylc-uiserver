@@ -575,6 +575,12 @@ class SourceWorkflow(graphene.ObjectType):
     path = graphene.String(
         description='The location of the source workflow.'
     )
+    relative_path = graphene.String(
+        description=(
+            "The location of the source workflow relative to the server's CWD"
+            ' or "null" if the source is not within CWD.'
+        )
+    )
 
 
 class UISWorkflow(Workflow):

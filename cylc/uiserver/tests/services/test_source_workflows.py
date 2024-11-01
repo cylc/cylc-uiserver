@@ -13,6 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from pathlib import Path
+
 from cylc.uiserver.services.source_workflows import (
     _get_source_workflow_name,
     _get_workflow_source,
@@ -47,6 +49,11 @@ def source_dirs(mod_monkeypatch, mod_tmp_path):
     mod_monkeypatch.setattr(
         'cylc.uiserver.services.source_workflows.SOURCE_DIRS',
         [source_dir_a, source_dir_b]
+    )
+
+    mod_monkeypatch.setattr(
+        'cylc.uiserver.services.source_workflows.CWD',
+        mod_tmp_path.absolute(),
     )
 
     return [source_dir_a, source_dir_b]
@@ -115,29 +122,46 @@ async def test_list_source_workflows(source_dirs):
         {
             'name': 'bar/b1',
             'path': a / 'bar/b1',
+            'relative_path': Path('a/bar/b1'),
         },
         {
             'name': 'baz',
             'path': b / 'baz',
+            'relative_path': Path('b/baz'),
         },
         {
             'name': 'foo',
             'path': a / 'foo',
+            'relative_path': Path('a/foo'),
         },
     ]
 
 
-def test_get_workflow_source(source_dirs, installed_workflows):
+def test_get_workflow_source(source_dirs, installed_workflows, monkeypatch, mod_tmp_path):
     a, b, *_ = source_dirs
     assert _get_workflow_source('one') == {
         'name': 'foo',
         'path': a / 'foo',
+        'relative_path': Path('a/foo'),
     }
     assert _get_workflow_source('two') == {
         'name': None,
         'path': a.parent / 'somewhere-else',
+        'relative_path': Path('somewhere-else'),
     }
     assert _get_workflow_source('three') == {
         'name': None,
         'path': None,
+        'relative_path': None,
+    }
+
+    # test a workflow source that is not relative to CWD
+    monkeypatch.setattr(
+        'cylc.uiserver.services.source_workflows.CWD',
+        mod_tmp_path.absolute() / 'x/y/z',
+    )
+    assert _get_workflow_source('one') == {
+        'name': 'foo',
+        'path': a / 'foo',
+        'relative_path': None,  # <== not relative
     }
