@@ -27,6 +27,7 @@ from subprocess import (
     PIPE,
     Popen,
 )
+from time import time
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -57,6 +58,7 @@ if TYPE_CHECKING:
     from cylc.flow.option_parsers import Options
     from graphql import ResolveInfo
 
+    from cylc.uiserver.app import CylcUIServer
     from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
@@ -205,6 +207,9 @@ def _clean(workflow_ids, opts):
 class Services:
     """Cylc services provided by the UI Server."""
 
+    # log file stream lag
+    CAT_LOG_SLEEP = 1
+
     @staticmethod
     def _error(message: Union[Exception, str]):
         """Format error case response."""
@@ -351,7 +356,7 @@ class Services:
             await queue.put(line.decode())
 
     @classmethod
-    async def cat_log(cls, id_: Tokens, log, info, file=None):
+    async def cat_log(cls, id_: Tokens, app: 'CylcUIServer', info, file=None):
         """Calls `cat log`.
 
         Used for log subscriptions.
@@ -366,7 +371,7 @@ class Services:
         ]
         if file:
             cmd += ['-f', file]
-        log.info(f'$ {" ".join(cmd)}')
+        app.log.info(f'$ {" ".join(cmd)}')
 
         # For info, below subprocess is safe (uses shell=false by default)
         proc = await asyncio.subprocess.create_subprocess_exec(
@@ -380,26 +385,51 @@ class Services:
         # This is to get around problem where stream is not EOF until
         # subprocess ends
         enqueue_task = asyncio.create_task(cls.enqueue(proc.stdout, queue))
+
+        # GraphQL operation ID
         op_id = info.root_value
+
+        # track the number of lines received so far
         line_count = 0
+
+        # the time we started the cylc cat-loo process
+        start_time = time()
+
+        # configured cat-log process timeout
+        timeout = float(app.log_timeout)
+
         try:
             while info.context['sub_statuses'].get(op_id) != 'stop':
+                if time() - start_time > timeout:
+                    # timeout exceeded -> kill the cat-log process
+                    break
+
                 if queue.empty():
+                    # there are *no* lines to read from the cat-log process
                     if buffer:
+                        # yield everything in the buffer
                         yield {'lines': list(buffer)}
                         buffer.clear()
+
                     if proc.returncode is not None:
+                        # process exited
+                        # -> pass any stderr text to the client
                         (_, stderr) = await proc.communicate()
-                        # pass any error onto ui
                         msg = process_cat_log_stderr(stderr) or (
                             f"cylc cat-log exited {proc.returncode}"
                         )
                         yield {'error': msg}
+
+                        # stop reading log lines
                         break
+
                     # sleep set at 1, which matches the `tail` default interval
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(cls.CAT_LOG_SLEEP)
+
                 else:
+                    # there *are* lines to read from the cat-log process
                     if line_count > MAX_LINES:
+                        # we have read beyond the line count
                         yield {'lines': buffer}
                         yield {
                             'error': (
@@ -408,25 +438,39 @@ class Services:
                             )
                         }
                         break
+
                     elif line_count == 0:
+                        # this is the first line
+                        # (this is a special line contains the file path)
                         line_count += 1
                         yield {
                             'connected': True,
                             'path': (await queue.get())[2:].strip(),
                         }
                         continue
+
+                    # read in the log lines and add them to the buffer
                     line = await queue.get()
                     line_count += 1
                     buffer.append(line)
                     if len(buffer) >= 75:
                         yield {'lines': list(buffer)}
                         buffer.clear()
+                        # there is more text to read so don't sleep (but
+                        # still "sleep(0)" to yield control to other
+                        # coroutines)
                         await asyncio.sleep(0)
+
         finally:
+            # kill the cat-log process
             kill_process_tree(proc.pid)
+
+            # terminate the queue
             enqueue_task.cancel()
             with suppress(asyncio.CancelledError):
                 await enqueue_task
+
+            # tell the client we have disconnected
             yield {'connected': False}
 
     @classmethod
@@ -467,6 +511,7 @@ class Resolvers(BaseResolvers):
 
     def __init__(
         self,
+        app: 'CylcUIServer',
         data: 'DataStoreMgr',
         log: 'Logger',
         workflows_mgr: 'WorkflowsManager',
@@ -474,6 +519,7 @@ class Resolvers(BaseResolvers):
         **kwargs
     ):
         super().__init__(data)
+        self.app = app
         self.log = log
         self.workflows_mgr = workflows_mgr
         self.executor = executor
@@ -561,7 +607,7 @@ class Resolvers(BaseResolvers):
     ):
         async for ret in Services.cat_log(
             ids[0],
-            self.log,
+            self.app,
             info,
             file
         ):
