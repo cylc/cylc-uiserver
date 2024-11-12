@@ -340,6 +340,26 @@ class CylcUIServer(ExtensionApp):
         default_value=False,
     )
 
+    log_timeout = Float(
+        # Note: This timeout it intended to clean up log streams that are no
+        # longer being actively monitored and prevent the associated "cat-log"
+        # processes from persisting in situations where they should not be
+        # (e.g. if the websocket connection unexpectedly closes)
+        config=True,
+        help='''
+            The maximum length of time Cylc will stream a log file for in
+            seconds.
+
+            The "Log" view in the Cylc GUI streams log files allowing you to
+            monitor the file while is grows.
+
+            After the configured timeout, the stream will close. The log
+            view in the GUI will display a "reconnect" button allowing you
+            to restart the stream if desired.
+        ''',
+        default_value=(60 * 60 * 4),  # 4 hours
+    )
+
     @validate('ui_build_dir')
     def _check_ui_build_dir_exists(self, proposed):
         if proposed['value'].exists():
@@ -408,6 +428,7 @@ class CylcUIServer(ExtensionApp):
         # sub_status dictionary storing status of subscriptions
         self.sub_statuses = {}
         self.resolvers = Resolvers(
+            self,
             self.data_store_mgr,
             log=self.log,
             executor=self.executor,

@@ -1,11 +1,27 @@
+# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import asyncio
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 from async_timeout import timeout
 import logging
 import os
 import pytest
 from unittest.mock import MagicMock, Mock
 from subprocess import Popen, TimeoutExpired
+from types import SimpleNamespace
 
 from cylc.flow import CYLC_LOG
 from cylc.flow.id import Tokens
@@ -228,7 +244,23 @@ async def test_play_timeout(monkeypatch: pytest.MonkeyPatch):
     ]
 
 
-async def test_cat_log(workflow_run_dir):
+@pytest.fixture
+def app():
+    return SimpleNamespace(
+        log=logging.getLogger(CYLC_LOG),
+        log_timeout=10,
+    )
+
+
+@pytest.fixture
+def fast_sleep(monkeypatch):
+    monkeypatch.setattr(
+        'cylc.uiserver.resolvers.Services.CAT_LOG_SLEEP',
+        0.1,
+    )
+
+
+async def test_cat_log(workflow_run_dir, app, fast_sleep):
     """This is a functional test for cat_log subscription resolver.
 
     It creates a log file and then runs the cat_log service. Checking it
@@ -265,18 +297,17 @@ async def test_cat_log(workflow_run_dir):
     # mock the context
     info.context = {'sub_statuses': {2: "start"}}
     workflow = Tokens(id_)
-    log = logging.getLogger(CYLC_LOG)
-    # note - timeout tests that the cat-log process is being stopped correctly
 
+    # note - timeout tests that the cat-log process is being stopped correctly
     first_response = None
     async with timeout(20):
-        ret = services.cat_log(workflow, log, info)
+        ret = services.cat_log(workflow, app, info)
         actual = ''
         is_first = True
         async for response in ret:
             if err := response.get('error'):
                 # Surface any unexpected errors for better visibility
-                log.exception(err)
+                app.log.exception(err)
             if is_first:
                 first_response = response
                 is_first = False
@@ -296,6 +327,36 @@ async def test_cat_log(workflow_run_dir):
 
     # the other responses should contain the log file lines
     assert actual.rstrip() == log_file_content.rstrip()
+
+
+async def test_cat_log_timeout(workflow_run_dir, app, fast_sleep):
+    """This is a functional test for cat_log subscription resolver.
+
+    It creates a log file and then runs the cat_log service. Checking it
+    returns all the logs. Note the log content should be over 20 lines to check
+    the buffer logic.
+    """
+    (id_, log_dir) = workflow_run_dir
+    log_file = log_dir / '01-start-01.log'
+    log_file.write_text('forty two')
+    info = MagicMock()
+    info.root_value = 2
+    # mock the context
+    info.context = {'sub_statuses': {2: "start"}}
+    workflow = Tokens(id_)
+
+    app.log_timeout = 0
+
+    ret = services.cat_log(workflow, app, info)
+    responses = []
+    async with timeout(5):
+        async for response in ret:
+            responses.append(response)
+            await asyncio.sleep(0)
+
+    assert len(responses) == 1
+    assert responses[0]['connected'] is False
+    assert 'error' not in responses[0]
 
 
 @pytest.mark.parametrize(
