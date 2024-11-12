@@ -392,7 +392,7 @@ class Services:
         # track the number of lines received so far
         line_count = 0
 
-        # the time we started the cylc cat-loo process
+        # the time we started the cylc cat-log process
         start_time = time()
 
         # configured cat-log process timeout
