@@ -45,7 +45,7 @@ if TYPE_CHECKING:
 
 
 ME = getpass.getuser()
-RE_SLASH = x = re.compile(r'\/+')
+RE_SLASH = re.compile(r'\/+')
 
 
 def authorised(fun: Callable) -> Callable:
