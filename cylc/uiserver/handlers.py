@@ -18,6 +18,7 @@ from functools import wraps
 import json
 import getpass
 import os
+import re
 from typing import TYPE_CHECKING, Callable, Dict
 
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
@@ -44,6 +45,7 @@ if TYPE_CHECKING:
 
 
 ME = getpass.getuser()
+RE_SLASH = re.compile(r'\/+')
 
 
 def authorised(fun: Callable) -> Callable:
@@ -258,7 +260,6 @@ class UserProfileHandler(CylcAppHandler):
         self.set_header("Content-Type", 'application/json')
 
     @web.authenticated
-    # @authorised  TODO: I can't think why we would want to authorise this
     def get(self):
         user_info = {
             **self.current_user.__dict__,
@@ -281,6 +282,19 @@ class UserProfileHandler(CylcAppHandler):
             user_info['mode'] = 'single user'
         else:
             user_info['mode'] = 'multi user'
+
+        user_info['extensions'] = {
+            app.name: RE_SLASH.sub(
+                '/', f'{self.serverapp.base_url}/{app.default_url}'
+            )
+            for extension_apps
+            in self.serverapp.extension_manager.extension_apps.values()
+            # filter out extensions that do not provide a default_url OR
+            # set it to the root endpoint.
+            for app in extension_apps
+            if getattr(app, 'default_url', '/') != '/'
+        }
+
         self.write(json.dumps(user_info))
 
 
