@@ -34,6 +34,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Patch DNS
+        uses: cylc/release-actions/patch-dns@v1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
       - name: Brew Install
         if: startsWith(matrix.os, 'macos')
         run: |
@@ -52,14 +60,6 @@ jobs:
           PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
           export PATH
           __HERE__
-
-      - name: Patch DNS
-        uses: cylc/release-actions/patch-dns@v1
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
 
       - name: install cylc-flow
         uses: cylc/release-actions/install-cylc-components@v1
