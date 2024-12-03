@@ -43,10 +43,11 @@ from cylc.flow.network.schema import (
     STRIP_NULL_DEFAULT,
     Subscriptions,
     WorkflowID,
+    WorkflowRunMode as RunMode,
     _mut_field,
-    sstrip,
     get_nodes_all
 )
+from cylc.flow.util import sstrip
 from cylc.uiserver.resolvers import (
     Resolvers,
     list_log_files,
@@ -79,29 +80,6 @@ async def mutator(
     )
     res = await resolvers.service(info, command, parsed_workflows, kwargs)
     return GenericResponse(result=res)
-
-
-class RunMode(graphene.Enum):
-    """The mode to run a workflow in."""
-
-    Live = 'live'
-    Dummy = 'dummy'
-    DummyLocal = 'dummy-local'
-    Simulation = 'simulation'
-
-    @property
-    def description(self):
-        if self == RunMode.Live:
-            return 'The normal default run mode'
-        if self == RunMode.Dummy:
-            return 'Replaces all *-script items with nothing'
-        if self == RunMode.DummyLocal:
-            return (
-                'Replaces all *-script items with nothing and sets'
-                ' platform = localhost for all tasks.'
-            )
-        if self == RunMode.Simulation:
-            return 'Simulates job submission, does not run anything at all.'
 
 
 class CylcVersion(graphene.String):
@@ -170,7 +148,7 @@ class Play(graphene.Mutation):
             ''')
         )
         mode = RunMode(
-            default_value=RunMode.Live.name  # type: ignore[attr-defined]
+            default_value=RunMode.Live.name
         )
         host = graphene.String(
             description=sstrip('''
