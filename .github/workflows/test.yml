@@ -25,7 +25,7 @@ jobs:
         os: ['ubuntu-latest']
         python: ['3.8', '3.9']
         include:
-          - os: 'macos-12'
+          - os: 'macos-latest'
             python: '3.9'
     env:
       PYTEST_ADDOPTS: --cov --color=yes
