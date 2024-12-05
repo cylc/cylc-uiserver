@@ -25,7 +25,7 @@ jobs:
         os: ['ubuntu-latest']
         python: ['3.8', '3.9']
         include:
-          - os: 'macos-12'
+          - os: 'macos-latest'
             python: '3.9'
     env:
       PYTEST_ADDOPTS: --cov --color=yes
@@ -33,6 +33,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Patch DNS
+        uses: cylc/release-actions/patch-dns@v1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
 
       - name: Brew Install
         if: startsWith(matrix.os, 'macos')
@@ -52,14 +60,6 @@ jobs:
           PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
           export PATH
           __HERE__
-
-      - name: Patch DNS
-        uses: cylc/release-actions/patch-dns@v1
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
 
       - name: install cylc-flow
         uses: cylc/release-actions/install-cylc-components@v1
