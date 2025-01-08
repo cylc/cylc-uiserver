@@ -12,6 +12,17 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.6.0 (Released 2025-01-08)
+
+[Updated cylc-ui to 2.7.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🔧 Fixes
+
+[#619](https://github.com/cylc/cylc-uiserver/pull/619) - Ensure that subprocesses created by Cylc UI Server are cleaned up correctly when the server shuts down.
+
+[#645](https://github.com/cylc/cylc-uiserver/pull/645) - Add a default timeout for the `cylc cat-log` command which is used to provide access to log files in the cylc-ui.
+  This timeout can be adjusted with the `log_timeout` option.
+
 ## cylc-uiserver-1.5.1 (Released 2024-10-15)
 
 [Updated cylc-ui to 2.6.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
