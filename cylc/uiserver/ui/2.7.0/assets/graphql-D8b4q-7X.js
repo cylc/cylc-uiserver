@@ -1,0 +1,1 @@
+import{a1 as r}from"./index-Hyq34tSM.js";const e={props:{workflowName:{type:String,required:!0}},computed:{...r("user",["user"]),workflowId(){return`~${this.user.owner}/${this.workflowName}`},variables(){return{workflowId:this.workflowId}}}};export{e as g};
