@@ -1,0 +1,1 @@
+import{Q as o,c5 as p}from"./index-Hyq34tSM.js";const c={type:Object,required:!1,default:()=>({})},r="update:initialOptions";function d(t,{props:i,emit:n},a){const e=o(i.initialOptions[t]??a);return p(e,(s,u)=>n(r,{...i.initialOptions,[t]:s}),{immediate:!0,deep:!0}),e}export{d as a,c as i,r as u};
