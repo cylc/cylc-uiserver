@@ -304,7 +304,8 @@ async def list_elements(args):
             conn = dao.connect()
             if 'tasks' in args:
                 elements.extend(
-                    run_jobs_query(conn, workflow, args.get('tasks')))
+                    run_jobs_query(conn, workflow, args.get('tasks'), args.get('run_status'))
+                )
             else:
                 elements.extend(run_task_query(conn, workflow))
     return elements
@@ -436,38 +437,66 @@ GROUP BY
     return tasks
 
 
-def run_jobs_query(conn, workflow, tasks):
+def run_jobs_query(conn, workflow, tasks, run_status=None):
 
     # TODO: support all arguments including states
     # https://github.com/cylc/cylc-uiserver/issues/440
     jobs = []
+    where = []
 
     # Create sql snippet used to limit which tasks are returned by query
     if tasks:
-        where_clauses = "' OR name = '".join(tasks)
-        where_clauses = f" AND (name = '{where_clauses}')"
-    else:
-        where_clauses = ''
-    for row in conn.execute(f'''
-SELECT
-    name,
-    cycle,
-    submit_num,
-    submit_status,
-    time_run,
-    time_run_exit,
-    job_id,
-    platform_name,
-    time_submit,
-    STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit) AS total_time,
-    STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run) AS run_time,
-    STRFTIME('%s', time_run) - STRFTIME('%s', time_submit) AS queue_time
-FROM
-    task_jobs
-WHERE
-    run_status = 0
-    {where_clauses};
-'''):
+        where.append(
+            r'(name = '
+            + r"' OR name = '".join(tasks)
+            + r')'
+        )
+    if run_status:
+        where.append(rf'run_status = "{run_status}"')
+
+    query = r'''
+        SELECT
+            name,
+            cycle,
+            submit_num,
+            submit_status,
+            time_run,
+            time_run_exit,
+            job_id,
+            platform_name,
+            time_submit,
+            STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit) AS total_time,
+            STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run) AS run_time,
+            STRFTIME('%s', time_run) - STRFTIME('%s', time_submit) AS queue_time,
+            run_status
+        FROM
+            task_jobs
+        '''
+    if where:
+        query += 'WHERE ' + '\n AND '.join(where)
+    from cylc.flow.task_state import (
+        TASK_STATUS_SUCCEEDED,
+        TASK_STATUS_FAILED,
+        TASK_STATUS_SUBMITTED,
+        TASK_STATUS_SUBMIT_FAILED,
+    )
+    for row in conn.execute(query):
+        submit_status, run_status = row[3], row[12]
+        if run_status is not None:
+            if run_status == 0:
+                status = TASK_STATUS_SUCCEEDED
+            else:
+                status = TASK_STATUS_FAILED
+        elif time_run is not None:
+            status = TASK_STATUS_RUNNING
+        elif submit_status is not None:
+            if submit_status == 0:
+                status = TASK_STATUS_SUBMITTED
+            else:
+                status = TASK_STATUS_SUBMIT_FAILED
+        else:
+            return
+
         jobs.append({
             'id': workflow.duplicate(
                 cycle=row[1],
@@ -477,7 +506,7 @@ WHERE
             'name': row[0],
             'cycle_point': row[1],
             'submit_num': row[2],
-            'state': row[3],
+            'state': status,
             'started_time': row[4],
             'finished_time': row[5],
             'job_ID': row[6],
@@ -581,7 +610,8 @@ class UISQueries(Queries):
         mindepth=graphene.Int(default_value=-1),
         maxdepth=graphene.Int(default_value=-1),
         sort=SortArgs(default_value=None),
-        tasks=graphene.List(graphene.ID, default_value=[])
+        tasks=graphene.List(graphene.ID, default_value=[]),
+        run_status=graphene.Int(default_value=None),
     )
 
 
