@@ -590,7 +590,7 @@ class CylcUIServer(ExtensionApp):
             getpass.getuser(),
             user_auth,
             site_auth,
-            self.log,
+            log=self.log,
         )
 
     def initialize_templates(self):
