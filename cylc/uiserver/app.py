@@ -142,7 +142,9 @@ class CylcUIServer(ExtensionApp):
     cylc gui                  # Start the Cylc GUI (at the dashboard page)
     cylc gui [workflow]       # Start the Cylc GUI (at the workflow page)
     cylc gui --new [workflow] # Start a new Cylc server instance if an old one
-                              # has become unresponsive.
+                              # has become unresponsive, or, if the GUI has
+                              # been configured to launch via a centralised
+                              # hub.
     cylc gui --no-browser     # Start the server but don't open the browser
 
     ''')  # type: ignore[assignment]
