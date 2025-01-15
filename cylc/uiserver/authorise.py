@@ -165,12 +165,12 @@ class Authorization:
         log,
     ):
         self.owner_user_name: str = owner_user_name
-        self.owner_user_groups: List[str] = self._get_groups(
-            self.owner_user_name
-        )
         self.log = log
         self.owner_auth_conf: dict = owner_auth_conf
         self.site_auth_config: dict = site_auth_conf
+        self.owner_user_groups: List[str] = self._get_groups(
+            self.owner_user_name
+        )
         self.owner_dict = self.build_owner_site_auth_conf()
 
         # lru_cache this method - see flake8-bugbear B019
