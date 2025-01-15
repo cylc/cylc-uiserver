@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import inspect
 import logging
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -476,3 +477,22 @@ def test_empty_list_in_config():
     auth_obj = Authorization('me', {}, {'*': {'me': {'default': []}}}, LOG)
     with pytest.raises(Exception, match='Error in site config'):
         auth_obj.return_site_auth_defaults_for_access_user('me', ['x'])
+
+
+def test_Authorization_logging(monkeypatch: pytest.MonkeyPatch):
+    """Test logging doesn't fall over spectacularly during __init__()."""
+    # Patch all methods to call self.log:
+    for name, method in inspect.getmembers(
+        Authorization, predicate=inspect.isfunction
+    ):
+        if (
+            not name.startswith('__') and
+            inspect.signature(method).parameters.get('self')
+        ):
+            monkeypatch.setattr(
+                Authorization,
+                name,
+                lambda self, *a, **k: self.log.info('foo'),
+            )
+    # Test:
+    Authorization('brian', {}, {}, log=Mock())
