@@ -75,7 +75,7 @@ def main(*argv):
             '''))
         return
     if not {'--help', '--help-all'} & set(sys.argv):
-        if hub_url:
+        if hub_url and not new_gui:
             print(f"Running on {hub_url } as specified in global config.")
             webbrowser.open(
                 update_url(hub_url, workflow_id), autoraise=True
