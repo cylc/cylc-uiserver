@@ -12,6 +12,16 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.6.1 (Released 2025-01-15)
+
+### 🚀 Enhancements
+
+[#661](https://github.com/cylc/cylc-uiserver/pull/661) - The GUI can now be launched in standalone mode even if `[hub]url` is configured, using the `--new` option.
+
+### 🔧 Fixes
+
+[#660](https://github.com/cylc/cylc-uiserver/pull/660) - Fixed crash when starting the UI Server if a user has invalid groups in their profile.
+
 ## cylc-uiserver-1.6.0 (Released 2025-01-08)
 
 [Updated cylc-ui to 2.7.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
