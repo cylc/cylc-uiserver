@@ -55,6 +55,7 @@ Cylc specific configurations are documented here.
 
 import getpass
 import os
+from pprint import pformat
 import sys
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path, PurePath
@@ -86,6 +87,7 @@ from cylc.flow.network.graphql import (
 from cylc.flow.profiler import Profiler
 from cylc.uiserver import (
     __file__ as uis_pkg,
+    __version__,
 )
 from cylc.uiserver.authorise import (
     Authorization,
@@ -463,13 +465,17 @@ class CylcUIServer(ExtensionApp):
         super().initialize_settings()
 
         # startup messages
-        self.log.info("Starting Cylc UI Server")
-        self.log.info(f'Serving UI from: {self.ui_path}')
+        self.log.info(f"Starting Cylc UI Server v{__version__}")
+        self.log.info(f"Serving UI from: {self.ui_path}")
+
+        try:
+            self.log.setLevel(self.log_level)
+        except Exception as exc:
+            self.log.warning(exc)
+
         self.log.debug(
-            'CylcUIServer config:\n' + '\n'.join(
-                f'  * {key} = {repr(value)}'
-                for key, value in self.config['CylcUIServer'].items()
-            )
+            "CylcUIServer config:\n"
+            f"{pformat(self.config.CylcUIServer, indent=2)}"
         )
 
         # start profiling
