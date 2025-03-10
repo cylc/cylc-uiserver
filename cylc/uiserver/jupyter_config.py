@@ -69,7 +69,6 @@ c.CylcUIServer.logging_config = {
     'handlers': {
         'file': {
             'class': 'logging.handlers.RotatingFileHandler',
-            'level': 'INFO',
             'filename': str(USER_CONF_ROOT / 'log' / 'log'),
             'mode': 'a',
             'backupCount': 5,
@@ -79,7 +78,6 @@ c.CylcUIServer.logging_config = {
     },
     'loggers': {
         'CylcUIServer': {
-            'level': 'INFO',
             'handlers': ['console', 'file'],
         },
         'cylc': {

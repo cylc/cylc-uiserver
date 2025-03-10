@@ -15,33 +15,45 @@
 
 from asyncio import Queue
 from functools import wraps
-import json
 import getpass
+import json
 import os
 import re
-from typing import TYPE_CHECKING, Callable, Dict
-
-from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
-from graphql import get_default_backend
-from graphql_ws.constants import GRAPHQL_WS
-from jupyter_server.base.handlers import JupyterHandler
-from tornado import web, websocket
-from tornado.ioloop import IOLoop
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+)
 
 from cylc.flow.scripts.cylc import (
     get_version as get_cylc_version,
     list_plugins as list_cylc_plugins,
 )
+from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
+from graphql import get_default_backend
+from graphql_ws.constants import GRAPHQL_WS
+from jupyter_server.base.handlers import JupyterHandler
+from tornado import (
+    web,
+    websocket,
+)
+from tornado.ioloop import IOLoop
 
-from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
+from cylc.uiserver import __version__
+from cylc.uiserver.authorise import (
+    Authorization,
+    AuthorizationMiddleware,
+)
 from cylc.uiserver.utils import is_bearer_token_authenticated
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
 
+
 if TYPE_CHECKING:
-    from cylc.uiserver.resolvers import Resolvers
-    from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
     from graphql.execution import ExecutionResult
     from jupyter_server.auth.identity import User as JPSUser
+
+    from cylc.uiserver.resolvers import Resolvers
+    from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 
 
 ME = getpass.getuser()
@@ -263,19 +275,19 @@ class UserProfileHandler(CylcAppHandler):
     def get(self):
         user_info = {
             **self.current_user.__dict__,
-            **get_user_info(self)
+            **get_user_info(self),
+            'uis_version': __version__,
+            # add an entry for the workflow owner
+            # NOTE: when running behind a hub this may be different from the
+            # authenticated user
+            'owner': ME,
         }
 
-        # add an entry for the workflow owner
-        # NOTE: when running behind a hub this may be different from the
-        # authenticated user
-        user_info['owner'] = ME
-
         # Make user permissions available to the ui
-        user_info['permissions'] = [
-            snake_to_camel(perm) for perm in (
-                self.auth.get_permitted_operations(user_info['name']))
-        ]
+        user_info['permissions'] = sorted(
+            snake_to_camel(perm)
+            for perm in self.auth.get_permitted_operations(user_info['name'])
+        )
         # Pass the gui mode to the ui
         # (used for functionality not security)
         if not os.environ.get("JUPYTERHUB_SINGLEUSER_APP"):
