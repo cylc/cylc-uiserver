@@ -95,6 +95,7 @@ from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.handlers import (
     CylcStaticHandler,
     CylcVersionHandler,
+    CylcLabBridgeHandler,
     SubscriptionHandler,
     UIServerGraphQLHandler,
     UserProfileHandler,
@@ -491,6 +492,11 @@ class CylcUIServer(ExtensionApp):
             self.scan_interval * 1000
         ).start()
 
+        # register Jupyter Event schemas
+        self.serverapp.event_logger.register_event_schema(
+            Path(__file__).parent / 'event_schemas/test.yml'
+        )
+
     def initialize_handlers(self):
         self.authobj = self.set_auth()
         self.set_sub_server()
@@ -499,6 +505,11 @@ class CylcUIServer(ExtensionApp):
             (
                 'cylc/version',
                 CylcVersionHandler,
+                {'auth': self.authobj}
+            ),
+            (
+                'cylc/lab-bridge/([^/]+)/(.*)',
+                CylcLabBridgeHandler,
                 {'auth': self.authobj}
             ),
             (
