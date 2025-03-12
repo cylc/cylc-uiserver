@@ -76,7 +76,7 @@ def main(*argv):
         return
     if not {'--help', '--help-all'} & set(sys.argv):
         if hub_url and not new_gui:
-            print(f"Running on {hub_url } as specified in global config.")
+            print(f"Running on {hub_url} as specified in global config.")
             webbrowser.open(
                 update_url(hub_url, workflow_id), autoraise=True
             )
@@ -91,7 +91,7 @@ def main(*argv):
             url = select_info_file(existing_guis)
             if url:
                 print(
-                    "Opening with existing gui." +
+                    "Opening with existing gui."
                     f" Use {CLI_OPT_NEW} option to start a new gui server.",
                     file=sys.stderr
                 )
