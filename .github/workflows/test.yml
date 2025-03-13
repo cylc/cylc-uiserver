@@ -15,6 +15,10 @@ concurrency:
 env:
   FORCE_COLOR: 2
 
+defaults:
+  run:
+    shell: bash -c "exec $CONDA_PREFIX/bin/bash -elo pipefail {0}"
+
 jobs:
   test:
     runs-on: ${{ matrix.os }}
@@ -23,10 +27,10 @@ jobs:
       fail-fast: false
       matrix:
         os: ['ubuntu-latest']
-        python: ['3.8', '3.9']
+        python-version: ['3.8', '3.9']
         include:
           - os: 'macos-latest'
-            python: '3.9'
+            python-version: '3.8'  # oldest supported
     env:
       PYTEST_ADDOPTS: --cov --color=yes
 
@@ -37,29 +41,17 @@ jobs:
       - name: Patch DNS
         uses: cylc/release-actions/patch-dns@v1
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Install System Dependencies
+        uses: mamba-org/setup-micromamba@v2
         with:
-          python-version: ${{ matrix.python }}
-
-      - name: Brew Install
-        if: startsWith(matrix.os, 'macos')
-        run: |
-          # install system deps
-          brew update
-          brew install bash coreutils
-
-          # add GNU coreutils to the user PATH
-          # (see instructions in brew install output)
-          echo \
-            "$(brew --prefix)/opt/coreutils/libexec/gnubin" \
-            >> "${GITHUB_PATH}"
-
-          # add coreutils to the bashrc too (for jobs)
-          cat >> "${HOME}/.bashrc" <<__HERE__
-          PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
-          export PATH
-          __HERE__
+          cache-environment: true
+          post-cleanup: 'all'
+          environment-name: cylc-uiserver
+          create-args: >-
+            python=${{ matrix.python-version }}
+            pip
+            bash
+            coreutils
 
       - name: install cylc-flow
         uses: cylc/release-actions/install-cylc-components@v1
@@ -92,7 +84,7 @@ jobs:
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage_${{ matrix.os }}_py-${{ matrix.python }}
+          name: coverage_${{ matrix.os }}_py-${{ matrix.python-version }}
           path: coverage.xml
           retention-days: 4
 
