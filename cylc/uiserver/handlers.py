@@ -19,28 +19,27 @@ import json
 import getpass
 import os
 import re
-from typing import TYPE_CHECKING, Callable, Dict
+from typing import TYPE_CHECKING, Callable, Dict, Awaitable, Optional
 
-from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
-from graphql import get_default_backend
-from graphql_ws.constants import GRAPHQL_WS
 from jupyter_server.base.handlers import JupyterHandler
 from tornado import web, websocket
 from tornado.ioloop import IOLoop
+from graphql.execution.middleware import MiddlewareManager
 
+from cylc.flow.network.graphql import instantiate_middleware
 from cylc.flow.scripts.cylc import (
     get_version as get_cylc_version,
     list_plugins as list_cylc_plugins,
 )
-
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
+from cylc.uiserver.graphql import authenticated as websockets_authenticated
+from cylc.uiserver.graphql.tornado import TornadoGraphQLHandler
+from cylc.uiserver.graphql.tornado_ws import GRAPHQL_WS
 from cylc.uiserver.utils import is_bearer_token_authenticated
-from cylc.uiserver.websockets import authenticated as websockets_authenticated
 
 if TYPE_CHECKING:
     from cylc.uiserver.resolvers import Resolvers
-    from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
-    from graphql.execution import ExecutionResult
+    from cylc.uiserver.graphql.tornado_ws import TornadoSubscriptionServer
     from jupyter_server.auth.identity import User as JPSUser
 
 
@@ -314,32 +313,37 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
     def set_default_headers(self) -> None:
         self.set_header('Server', '')
 
-    def initialize(self, schema=None, executor=None, middleware=None,
-                   root_value=None, graphiql=False, pretty=False,
-                   batch=False, backend=None, auth=None, **kwargs):
+    def initialize(
+        self, schema=None, middleware=None, root_value=None, pretty=False,
+        batch=False, execution_context_class=None, validation_rules=None,
+        auth=None, **kwargs
+    ):
         super(TornadoGraphQLHandler, self).initialize()
-        self.auth = auth
-        self.schema = schema
 
+        self.schema = schema or self.schema
+        self.auth = auth
         if middleware is not None:
-            self.middleware = list(self.instantiate_middleware(middleware))
+            if isinstance(middleware, MiddlewareManager):
+                self.middleware = middleware
+            else:
+                self.middleware = list(instantiate_middleware(middleware))
+        self.root_value = root_value
+        self.pretty = pretty or self.pretty
+        self.batch = batch or self.batch
+        self.execution_context_class = (
+            execution_context_class or self.execution_context_class
+        )
+
         # Make authorization info available to auth middleware
         for mw in self.middleware:
             if isinstance(mw, AuthorizationMiddleware):
                 mw.auth = self.auth
-        self.executor = executor
-        self.root_value = root_value
-        self.pretty = pretty
-        self.graphiql = graphiql
-        self.batch = batch
-        self.backend = backend or get_default_backend()
         # Set extra attributes
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
 
-    @property
-    def context(self):
+    def get_context(self):
         """The GraphQL context passed to resolvers (incl middleware)."""
         return {
             'graphql_params': self.graphql_params,
@@ -349,15 +353,10 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
         }
 
     @web.authenticated  # type: ignore[arg-type]
-    async def execute(self, *args, **kwargs) -> 'ExecutionResult':
-        # Use own backend, and TornadoGraphQLHandler already does validation.
-        return await self.schema.execute(
-            *args,
-            backend=self.backend,
-            variable_values=kwargs.get('variables'),
-            validate=False,
-            **kwargs,
-        )
+    async def execute(
+        self, *args, **kwargs
+    ) -> Optional[Awaitable[None]]:
+        return await TornadoGraphQLHandler.execute(self, *args, **kwargs)
 
     @web.authenticated
     async def run(self, *args, **kwargs):

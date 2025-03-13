@@ -81,7 +81,7 @@ from traitlets import (
 from traitlets.config.loader import LazyConfigValue
 
 from cylc.flow.network.graphql import (
-    CylcGraphQLBackend, IgnoreFieldMiddleware
+    CylcExecutionContext, IgnoreFieldMiddleware
 )
 from cylc.flow.profiler import Profiler
 from cylc.uiserver import (
@@ -106,7 +106,7 @@ from cylc.uiserver.config_util import (
 )
 from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
-from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
+from cylc.uiserver.graphql.tornado_ws import TornadoSubscriptionServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
@@ -507,11 +507,11 @@ class CylcUIServer(ExtensionApp):
                 {
                     'schema': schema,
                     'resolvers': self.resolvers,
-                    'backend': CylcGraphQLBackend(),
                     'middleware': [
                         AuthorizationMiddleware,
                         IgnoreFieldMiddleware
                     ],
+                    'execution_context_class': CylcExecutionContext,
                     'auth': self.authobj,
                 }
             ),
@@ -521,11 +521,11 @@ class CylcUIServer(ExtensionApp):
                 {
                     'schema': schema,
                     'resolvers': self.resolvers,
-                    'backend': CylcGraphQLBackend(),
                     'middleware': [
                         AuthorizationMiddleware,
                         IgnoreFieldMiddleware
                     ],
+                    'execution_context_class': CylcExecutionContext,
                     'batch': True,
                     'auth': self.authobj,
                 }
@@ -565,11 +565,11 @@ class CylcUIServer(ExtensionApp):
     def set_sub_server(self):
         self.subscription_server = TornadoSubscriptionServer(
             schema,
-            backend=CylcGraphQLBackend(),
             middleware=[
                 IgnoreFieldMiddleware,
                 AuthorizationMiddleware,
             ],
+            execution_context_class=CylcExecutionContext,
             auth=self.authobj,
         )
 
