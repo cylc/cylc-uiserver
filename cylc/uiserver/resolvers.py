@@ -16,6 +16,7 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 import asyncio
+from enum import Enum
 import errno
 import os
 import signal
@@ -137,6 +138,8 @@ def _build_cmd(cmd: List, args: Dict) -> List:
             if isinstance(value, int) and not isinstance(value, bool):
                 # Any integer items need converting to strings:
                 value = str(value)
+            elif isinstance(value, Enum):
+                value = value.value
             value = [value]
         for item in value:
             cmd.append(key)
@@ -257,8 +260,8 @@ class Services:
             elif isinstance(exc, WorkflowFilesError):  # Expected error
                 msg = str(exc)
             else:  # Unexpected error
+                log.exception(exc)
                 msg = f"{type(exc).__name__}: {exc}"
-                log.exception(msg)
             return cls._error(msg)
 
         # trigger a re-scan
@@ -286,14 +289,9 @@ class Services:
         cylc_version = args.pop('cylc_version', None)
         results: Dict[str, str] = {}
         failed = False
-        if 'mode' in args:
-            args['mode'] = args['mode'].value.value
         for tokens in workflows:
             try:
-                cmd = _build_cmd(
-                    ['cylc', 'play', '--color=never'],
-                    args
-                )
+                cmd = _build_cmd(['cylc', 'play', '--color=never'], args)
 
                 if tokens['user'] and tokens['user'] != getuser():
                     return cls._error(
@@ -335,8 +333,9 @@ class Services:
                     failed = True
                 else:
                     results[wflow] = 'started'
+
             except Exception as exc:
-                # oh noes, something went wrong, send back confirmation
+                log.exception(exc)
                 return cls._error(exc)
 
         if failed:
