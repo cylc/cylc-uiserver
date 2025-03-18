@@ -81,7 +81,11 @@ async def mutator(
     resolvers: 'Resolvers' = (
         info.context.get('resolvers')  # type: ignore[union-attr]
     )
-    res = await resolvers.service(info, command, parsed_workflows, kwargs)
+    try:
+        res = await resolvers.service(info, command, parsed_workflows, kwargs)
+    except Exception as exc:
+        resolvers.log.exception(exc)
+        raise
     return GenericResponse(result=res)
 
 
