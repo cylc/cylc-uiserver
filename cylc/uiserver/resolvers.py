@@ -16,6 +16,7 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 import asyncio
+from enum import Enum
 from contextlib import suppress
 from copy import deepcopy
 import errno
@@ -139,6 +140,8 @@ def _build_cmd(cmd: List, args: Dict) -> List:
             if isinstance(value, int) and not isinstance(value, bool):
                 # Any integer items need converting to strings:
                 value = str(value)
+            elif isinstance(value, Enum):
+                value = value.value
             value = [value]
         for item in value:
             cmd.append(key)
@@ -285,14 +288,9 @@ class Services:
         cylc_version = args.pop('cylc_version', None)
         results: Dict[str, str] = {}
         failed = False
-        if 'mode' in args:
-            args['mode'] = args['mode'].value.value
         for tokens in workflows:
             try:
-                cmd = _build_cmd(
-                    ['cylc', 'play', '--color=never'],
-                    args
-                )
+                cmd = _build_cmd(['cylc', 'play', '--color=never'], args)
 
                 if tokens['user'] and tokens['user'] != getuser():
                     return cls._error(
