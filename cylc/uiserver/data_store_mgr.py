@@ -65,7 +65,6 @@ def log_call(fcn):
     fcn_name = f'[data-store] {fcn.__name__}'
 
     def _inner(*args, **kwargs):  # works for serial & async calls
-        nonlocal fcn
         self = args[0]
         # log this method call
         self.log.info(fmt_call(fcn_name, args[1:], kwargs))
