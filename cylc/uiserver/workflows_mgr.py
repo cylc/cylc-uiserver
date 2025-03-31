@@ -299,7 +299,6 @@ class WorkflowsManager:  # noqa: SIM119
             # start tasks running as soon as possible
             # (we could be connecting to workflows whilst the scan is still
             # running)
-            nonlocal tasks
             tasks.append(asyncio.create_task(run_coros_in_order(*coros)))
 
         # handle state changes
