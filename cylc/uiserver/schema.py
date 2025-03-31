@@ -20,7 +20,7 @@ extra functionality specific to the UIS.
 """
 
 from functools import partial
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 import graphene
 from graphene.types.generic import GenericScalar
@@ -47,7 +47,16 @@ from cylc.flow.network.schema import (
     _mut_field,
     get_nodes_all
 )
+from cylc.flow.task_state import (
+    TASK_STATUS_FAILED,
+    TASK_STATUS_RUNNING,
+    TASK_STATUS_SUBMITTED,
+    TASK_STATUS_SUBMIT_FAILED,
+    TASK_STATUS_SUCCEEDED,
+    TASK_STATUS_WAITING,
+)
 from cylc.flow.util import sstrip
+
 from cylc.uiserver.resolvers import (
     Resolvers,
     list_log_files,
@@ -264,7 +273,7 @@ class Scan(graphene.Mutation):
     result = GenericScalar()
 
 
-async def get_elements(root, info, **kwargs):
+async def get_elements(query_type, root, info, **kwargs):
     if kwargs['live']:
         return await get_nodes_all(root, info, **kwargs)
 
@@ -287,10 +296,10 @@ async def get_elements(root, info, **kwargs):
     kwargs['exworkflows'] = [
         Tokens(w_id) for w_id in kwargs['exworkflows']]
 
-    return await list_elements(kwargs)
+    return await list_elements(query_type, kwargs)
 
 
-async def list_elements(args):
+async def list_elements(query_type, args):
     if not args['workflows']:
         raise Exception('At least one workflow must be provided.')
     elements = []
@@ -302,9 +311,18 @@ async def list_elements(args):
         )
         with CylcWorkflowDAO(db_file, is_public=True) as dao:
             conn = dao.connect()
-            if 'tasks' in args:
+            if query_type == 'jobs':
                 elements.extend(
-                    run_jobs_query(conn, workflow, args.get('tasks')))
+                    run_jobs_query(
+                        conn,
+                        workflow,
+                        ids=args.get('ids'),
+                        exids=args.get('exids'),
+                        states=args.get('states'),
+                        exstates=args.get('exstates'),
+                        tasks=args.get('tasks'),
+                    )
+                )
             else:
                 elements.extend(run_task_query(conn, workflow))
     return elements
@@ -321,6 +339,7 @@ SELECT
     cycle,
     submit_num,
     submit_status,
+    run_status,
     time_run,
     time_run_exit,
     job_id,
@@ -396,78 +415,299 @@ GROUP BY
             'name': row[0],
             'cycle_point': row[1],
             'submit_num': row[2],
-            'state': row[3],
-            'started_time': row[4],
-            'finished_time': row[5],
-            'job_ID': row[6],
-            'platform': row[7],
-            'submitted_time': row[8],
+            'state': _state_to_status(row[3], row[4], row[5]),
+            'started_time': row[5],
+            'finished_time': row[6],
+            'job_ID': row[7],
+            'platform': row[8],
+            'submitted_time': row[9],
             # Queue time stats
-            'min_queue_time': row[9],
-            'mean_queue_time': row[10],
-            'max_queue_time': row[11],
-            'std_dev_queue_time': (row[12] - row[10]**2)**0.5,
+            'min_queue_time': row[10],
+            'mean_queue_time': row[11],
+            'max_queue_time': row[12],
+            'std_dev_queue_time': (row[13] - row[11]**2)**0.5,
             # Prevents null entries when there are too few tasks for quartiles
-            'queue_quartiles': [row[13],
-                                row[13] if row[14] is None else row[14],
-                                row[13] if row[15] is None else row[15]],
+            'queue_quartiles': [row[14],
+                                row[14] if row[15] is None else row[15],
+                                row[14] if row[16] is None else row[16]],
             # Run time stats
-            'min_run_time': row[16],
-            'mean_run_time': row[17],
-            'max_run_time': row[18],
-            'std_dev_run_time': (row[19] - row[17]**2)**0.5,
+            'min_run_time': row[17],
+            'mean_run_time': row[18],
+            'max_run_time': row[19],
+            'std_dev_run_time': (row[20] - row[18]**2)**0.5,
             # Prevents null entries when there are too few tasks for quartiles
-            'run_quartiles': [row[20],
-                              row[20] if row[21] is None else row[21],
-                              row[20] if row[22] is None else row[22]],
+            'run_quartiles': [row[21],
+                              row[21] if row[22] is None else row[22],
+                              row[21] if row[23] is None else row[23]],
             # Total
-            'min_total_time': row[23],
-            'mean_total_time': row[24],
-            'max_total_time': row[25],
-            'std_dev_total_time': (row[26] - row[24] ** 2) ** 0.5,
+            'min_total_time': row[24],
+            'mean_total_time': row[25],
+            'max_total_time': row[26],
+            'std_dev_total_time': (row[27] - row[25] ** 2) ** 0.5,
             # Prevents null entries when there are too few tasks for quartiles
-            'total_quartiles': [row[27],
-                                row[27] if row[28] is None else row[28],
-                                row[27] if row[29] is None else row[29]],
+            'total_quartiles': [row[28],
+                                row[28] if row[29] is None else row[29],
+                                row[28] if row[30] is None else row[30]],
 
-            'count': row[30]
+            'count': row[31]
         })
 
     return tasks
 
 
-def run_jobs_query(conn, workflow, tasks):
+_JOB_STATUS_TO_STATE = {
+    # task_status: (submit_status, run_status, time_run)
+    TASK_STATUS_SUBMITTED: (0, None, None),
+    TASK_STATUS_SUBMIT_FAILED: (1, None, None),
+    TASK_STATUS_RUNNING: (0, None, True),
+    TASK_STATUS_SUCCEEDED: (0, 0, True),
+    TASK_STATUS_FAILED: (0, 1, True),
+}
 
-    # TODO: support all arguments including states
-    # https://github.com/cylc/cylc-uiserver/issues/440
-    jobs = []
 
-    # Create sql snippet used to limit which tasks are returned by query
-    if tasks:
-        where_clauses = "' OR name = '".join(tasks)
-        where_clauses = f" AND (name = '{where_clauses}')"
+def _status_to_state(
+    status: str
+) -> Tuple[Optional[int], Optional[int], Optional[bool]]:
+    """Derive job state attributes from job status.
+
+    The time_run cannot be derived from the status so is returned as a boolean.
+
+    Args:
+        status: The job status, e.g. "submitted" or "running".
+
+    Returns:
+        (submit_status, run_status, time_run)
+
+        submit_status:
+            * 0 = successful submission
+            * int = failed submission
+            * None = no submission attempt
+        run_status:
+            * 0 = successful execution
+            * int = failed execution
+            * None = no execution attempt
+        time_run:
+            * True if the job would have started running
+
+    Examples:
+        >>> _status_to_state('running')
+        (0, None, True)
+        >>> _status_to_state('waiting')
+        (None, None, None)
+
+        >>> _state_to_status(*_status_to_state('succeeded'))
+        'succeeded'
+
+    """
+    return _JOB_STATUS_TO_STATE.get(status, (None, None, None))
+
+
+def _state_to_status(
+    submit_status: Optional[int],
+    run_status: Optional[int],
+    time_run: Optional[str],
+) -> str:
+    """Derive job status from state attributes.
+
+    Args:
+        submit_status: Exit code from job submission.
+        run_status: Exit code from job execution.
+        time_run: The time the job reported that it started running.
+            (note this is interpreted as a bool, the exact value is ignored).
+
+    Returns:
+        status: The job status, e.g "submitted" or "running".
+
+    Examples:
+        >>> _state_to_status(0, None, True)
+        'running'
+        >>> _state_to_status(None, None, None)
+        'waiting'
+
+        >>> _status_to_state(_state_to_status(0, 1, True))
+        (0, 1, True)
+
+    """
+    if run_status is not None:
+        if run_status == 0:
+            status = TASK_STATUS_SUCCEEDED
+        else:
+            status = TASK_STATUS_FAILED
+    elif time_run is not None:
+        status = TASK_STATUS_RUNNING
+    elif submit_status is not None:
+        if submit_status == 0:
+            status = TASK_STATUS_SUBMITTED
+        else:
+            status = TASK_STATUS_SUBMIT_FAILED
     else:
-        where_clauses = ''
-    for row in conn.execute(f'''
-SELECT
-    name,
-    cycle,
-    submit_num,
-    submit_status,
-    time_run,
-    time_run_exit,
-    job_id,
-    platform_name,
-    time_submit,
-    STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit) AS total_time,
-    STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run) AS run_time,
-    STRFTIME('%s', time_run) - STRFTIME('%s', time_submit) AS queue_time
-FROM
-    task_jobs
-WHERE
-    run_status = 0
-    {where_clauses};
-'''):
+        status = TASK_STATUS_WAITING
+
+    return status
+
+
+def run_jobs_query(
+    conn,
+    workflow,
+    ids=None,
+    exids=None,
+    states=None,
+    exstates=None,
+    tasks=None,
+):
+    """Query jobs from the database.
+
+    Args:
+        conn: Database connection.
+        workflow: Workflow ID.
+        kwargs: GraphQL sort/filter args as per cylc-flow interfaces.
+
+    """
+    # TODO: support all arguments:
+    # * [x] ids
+    # * [ ] sort
+    # * [x] exids
+    # * [x] states
+    # * [x] exstates
+    # See https://github.com/cylc/cylc-uiserver/issues/440
+    jobs = []
+    where_stmts = []
+    where_args = []
+
+    # filter by cycle/task/job ID
+    if ids:
+        items = []
+        for id_ in ids:
+            item = []
+            for token, column in (
+                ('cycle', 'cycle'),
+                ('task', 'name'),
+                ('job', 'submit_num'),
+            ):
+                value = id_[token]
+                if value:
+                    if token == 'job':
+                        value = int(value)
+                    item.append(rf'{column} GLOB ?')
+                    where_args.append(value)
+            items.append(rf'({" AND ".join(item)})')
+
+        if items:
+            where_stmts.append(
+                r'(' + ' OR '.join(items) + ')'
+            )
+
+    # filter out cycle/task/job IDs
+    if exids:
+        for id_ in exids:
+            items = []
+            for token, column in (
+                ('cycle', 'cycle'),
+                ('task', 'name'),
+                ('job', 'submit_num'),
+            ):
+                value = id_[token]
+                if value:
+                    if token == 'job':
+                        value = int(value)
+                    items.append(rf'{column} GLOB ?')
+                    where_args.append(value)
+            if items:
+                where_stmts.append(r'NOT (' + ' AND '.join(items) + r')')
+
+    # filter by job state
+    if states:
+        items = []
+        for status in states:
+            submit_status, run_status, time_run = _status_to_state(status)
+            if submit_status is None:
+                # hasn't yet submitted (i.e. there is no job)
+                continue
+            item = [r'IFNULL(submit_status,999) = ?']
+            where_args.append(submit_status)
+
+            if run_status is None:
+                item.append('run_status IS NULL')
+            else:
+                item.append(r'IFNULL(run_status,999) = ?')
+                where_args.append(run_status)
+
+            if time_run is None:
+                item.append(r'time_run IS NULL')
+            else:
+                item.append(r'time_run NOT NULL')
+
+            items.append(r'(' + ' AND '.join(item) + r')')
+
+        if items:
+            where_stmts.append(r'(' + r' OR '.join(items) + r')')
+
+    # filter out job states
+    if exstates:
+        for status in exstates:
+            submit_status, run_status, time_run = _status_to_state(status)
+            if submit_status is None:
+                # hasn't yet submitted (i.e. there is no job)
+                continue
+            item = [r'IFNULL(submit_status,999) = ?']
+            where_args.append(submit_status)
+
+            if run_status is None:
+                item.append(r'run_status IS NULL')
+            else:
+                item.append(r'IFNULL(run_status,999) = ?')
+                where_args.append(run_status)
+
+            if time_run is None:
+                item.append(r'time_run IS NULL')
+            else:
+                item.append(r'time_run NOT NULL')
+
+            where_stmts.append(r'NOT (' + ' AND '.join(item) + r')')
+
+    # filter by task name (special UIS argument for namespace queries)
+    if tasks:
+        where_stmts.append(
+            r'(name = '
+            + r" OR name = ".join('?' for task in tasks)
+            + r')'
+        )
+        where_args.extend(tasks)
+
+    # build the SQL query
+    query = r'''
+        SELECT
+            name,
+            cycle,
+            submit_num,
+            submit_status,
+            time_run,
+            time_run_exit,
+            job_id,
+            platform_name,
+            time_submit,
+            STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit)
+                AS total_time,
+            STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run)
+                AS run_time,
+            STRFTIME('%s', time_run) - STRFTIME('%s', time_submit)
+                AS queue_time,
+            run_status
+        FROM
+            task_jobs
+        '''
+    if where_stmts:
+        query += 'WHERE\n            ' + '\n            AND '.join(where_stmts)
+
+    for row in conn.execute(query, where_args):
+        # determine job status
+        submit_status, run_status, time_run = row[3], row[12], row[4]
+        status = _state_to_status(submit_status, run_status, time_run)
+
+        # skip jobs that have not yet submitted
+        if status == TASK_STATUS_WAITING:
+            continue
+
         jobs.append({
             'id': workflow.duplicate(
                 cycle=row[1],
@@ -477,7 +717,7 @@ WHERE
             'name': row[0],
             'cycle_point': row[1],
             'submit_num': row[2],
-            'state': row[3],
+            'state': status,
             'started_time': row[4],
             'finished_time': row[5],
             'job_ID': row[6],
@@ -487,6 +727,7 @@ WHERE
             'run_time': row[10],
             'queue_time': row[11]
         })
+
     return jobs
 
 
@@ -557,7 +798,7 @@ class UISQueries(Queries):
         description=Task._meta.description,
         live=graphene.Boolean(default_value=True),
         strip_null=STRIP_NULL_DEFAULT,
-        resolver=get_elements,
+        resolver=partial(get_elements, 'tasks'),
         workflows=graphene.List(graphene.ID, default_value=[]),
         exworkflows=graphene.List(graphene.ID, default_value=[]),
         ids=graphene.List(graphene.ID, default_value=[]),
@@ -573,7 +814,7 @@ class UISQueries(Queries):
         description=Job._meta.description,
         live=graphene.Boolean(default_value=True),
         strip_null=STRIP_NULL_DEFAULT,
-        resolver=get_elements,
+        resolver=partial(get_elements, 'jobs'),
         workflows=graphene.List(graphene.ID, default_value=[]),
         exworkflows=graphene.List(graphene.ID, default_value=[]),
         ids=graphene.List(graphene.ID, default_value=[]),
@@ -581,7 +822,13 @@ class UISQueries(Queries):
         mindepth=graphene.Int(default_value=-1),
         maxdepth=graphene.Int(default_value=-1),
         sort=SortArgs(default_value=None),
-        tasks=graphene.List(graphene.ID, default_value=[])
+        tasks=graphene.List(
+            graphene.ID,
+            default_value=[],
+            description='Deprecated, use ids: ["*/<task>"].',
+        ),
+        states=graphene.List(graphene.ID, default_value=[]),
+        exstates=graphene.List(graphene.ID, default_value=[]),
     )
 
 
