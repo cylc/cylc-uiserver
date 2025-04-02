@@ -64,7 +64,6 @@ def authorised(fun: Callable) -> Callable:
         *args,
         **kwargs,
     ):
-        nonlocal fun
         user: 'JPSUser' = handler.current_user
 
         if not user or not user.username:
