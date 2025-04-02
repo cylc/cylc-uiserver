@@ -293,28 +293,18 @@ def test_make_task_query_different_platforms():
 
     https://github.com/cylc/cylc-uiserver/issues/696
     """
-    conn = sqlite3.connect(':memory:')
-    conn.execute('''CREATE TABLE task_jobs(cycle TEXT, name TEXT,
-    submit_num INTEGER, flow_nums TEXT, is_manual_submit INTEGER,
-    try_num INTEGER, time_submit TEXT, time_submit_exit TEXT,
-    submit_status INTEGER, time_run TEXT, time_run_exit TEXT,
-    run_signal TEXT, run_status INTEGER, platform_name TEXT,
-    job_runner_name TEXT, job_id TEXT,
-    PRIMARY KEY(cycle, name, submit_num));''')
 
     middle_values = (
         'Task_1', '01', '[1]', 0, 1, '2022-12-14T15:00:00Z',
         '2022-12-14T15:01:00Z', 0, '2022-12-14T15:01:00Z',
         '2022-12-14T15:10:00Z', None, 0,
     )
-    conn.executemany(
-        'INSERT into task_jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-        [
-            ('1', *middle_values, 'MyPlatform', 'User', 'UsersJob'),
-            ('2', *middle_values, 'MyPlatform2', 'User', 'UsersJob'),
-            ('3', *middle_values, 'MyPlatform3', 'User', 'UsersJob'),
-        ],
-    )
+    conn = make_db(task_entries=[
+        ('1', *middle_values, 'MyPlatform', 'User', 'UsersJob'),
+        ('2', *middle_values, 'MyPlatform2', 'User', 'UsersJob'),
+        ('3', *middle_values, 'MyPlatform3', 'User', 'UsersJob'),
+    ])
+
     conn.commit()
     workflow = Tokens('~user/workflow')
 
