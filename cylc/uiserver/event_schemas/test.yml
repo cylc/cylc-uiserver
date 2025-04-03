@@ -1,0 +1,11 @@
+$id: http://events.cylc.org/test
+version: 1
+title: Test
+description: An interesting event to collect
+properties:
+  name:
+    title: Name of Event
+    type: string
+  path:
+    title: File to open
+    type: string

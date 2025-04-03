@@ -18,6 +18,7 @@ from functools import wraps
 import json
 import getpass
 import os
+from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Callable, Dict
 
@@ -203,6 +204,26 @@ class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
             # (doesn't prevent browser storing the response):
             self.set_header('Cache-Control', 'no-cache')
         return web.StaticFileHandler.get(self, path)
+
+
+class CylcLabBridgeHandler(CylcAppHandler):
+
+    @authorised
+    @web.authenticated
+    def get(self, event, path):
+        from urllib.parse import unquote
+        path = Path(unquote(path))
+        if not path.is_absolute():
+            path = Path('~', path)
+        path.expanduser()
+        path = path.relative_to(Path('~').expanduser())
+
+        event = {'name': event, 'path': str(path)}
+        self.serverapp.event_logger.emit(
+            schema_id='http://events.cylc.org/test',
+            data=event,
+        )
+        self.write(f'<pre>{event}</pre>')
 
 
 class CylcVersionHandler(CylcAppHandler):
