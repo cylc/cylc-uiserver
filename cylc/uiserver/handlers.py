@@ -15,33 +15,42 @@
 
 from asyncio import Queue
 from functools import wraps
-import json
 import getpass
+import json
 import os
 import re
-from typing import TYPE_CHECKING, Callable, Dict
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+)
 
+from cylc.flow import __version__ as cylc_flow_version
 from graphene_tornado.tornado_graphql_handler import TornadoGraphQLHandler
 from graphql import get_default_backend
 from graphql_ws.constants import GRAPHQL_WS
 from jupyter_server.base.handlers import JupyterHandler
-from tornado import web, websocket
+from tornado import (
+    web,
+    websocket,
+)
 from tornado.ioloop import IOLoop
 
-from cylc.flow.scripts.cylc import (
-    get_version as get_cylc_version,
-    list_plugins as list_cylc_plugins,
+from cylc.uiserver import __version__
+from cylc.uiserver.authorise import (
+    Authorization,
+    AuthorizationMiddleware,
 )
-
-from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
 from cylc.uiserver.utils import is_bearer_token_authenticated
 from cylc.uiserver.websockets import authenticated as websockets_authenticated
 
+
 if TYPE_CHECKING:
-    from cylc.uiserver.resolvers import Resolvers
-    from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
     from graphql.execution import ExecutionResult
     from jupyter_server.auth.identity import User as JPSUser
+
+    from cylc.uiserver.resolvers import Resolvers
+    from cylc.uiserver.websockets.tornado import TornadoSubscriptionServer
 
 
 ME = getpass.getuser()
@@ -168,6 +177,12 @@ class CylcAppHandler(JupyterHandler):
         return None
 
 
+class CylcJSONHandler(CylcAppHandler):
+    def set_default_headers(self) -> None:
+        super().set_default_headers()
+        self.set_header("Content-Type", 'application/json')
+
+
 class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
     """Serves the Cylc UI static files.
 
@@ -205,7 +220,7 @@ class CylcStaticHandler(CylcAppHandler, web.StaticFileHandler):
         return web.StaticFileHandler.get(self, path)
 
 
-class CylcVersionHandler(CylcAppHandler):
+class CylcVersionHandler(CylcJSONHandler):
     """Renders information about the Cylc environment.
 
     Equivalent to running `cylc version --long` in the UIS environment.
@@ -215,11 +230,10 @@ class CylcVersionHandler(CylcAppHandler):
     @web.authenticated
     def get(self):
         self.write(
-            '<pre>'
-            + get_cylc_version(long=True)
-            + '\n'
-            + list_cylc_plugins()
-            + '</pre>'
+            json.dumps({
+                'cylc-flow': cylc_flow_version,
+                'cylc-uiserver': __version__,
+            })
         )
 
 
@@ -245,7 +259,7 @@ def snake_to_camel(snake):
     raise TypeError(type(snake))
 
 
-class UserProfileHandler(CylcAppHandler):
+class UserProfileHandler(CylcJSONHandler):
     """Provides information about the user in JSON format.
 
     When running via the hub this returns the hub user information.
@@ -254,27 +268,22 @@ class UserProfileHandler(CylcAppHandler):
     would have returned.
     """
 
-    def set_default_headers(self) -> None:
-        super().set_default_headers()
-        self.set_header("Content-Type", 'application/json')
-
     @web.authenticated
     def get(self):
         user_info = {
             **self.current_user.__dict__,
-            **get_user_info(self)
+            **get_user_info(self),
+            # add an entry for the workflow owner
+            # NOTE: when running behind a hub this may be different from the
+            # authenticated user
+            'owner': ME,
         }
 
-        # add an entry for the workflow owner
-        # NOTE: when running behind a hub this may be different from the
-        # authenticated user
-        user_info['owner'] = ME
-
         # Make user permissions available to the ui
-        user_info['permissions'] = [
-            snake_to_camel(perm) for perm in (
-                self.auth.get_permitted_operations(user_info['name']))
-        ]
+        user_info['permissions'] = sorted(
+            snake_to_camel(perm)
+            for perm in self.auth.get_permitted_operations(user_info['name'])
+        )
         # Pass the gui mode to the ui
         # (used for functionality not security)
         if not os.environ.get("JUPYTERHUB_SINGLEUSER_APP"):
