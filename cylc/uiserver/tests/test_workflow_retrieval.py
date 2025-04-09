@@ -56,6 +56,9 @@ def make_db(*task_entries):
     '''
     )
 
+    conn.execute('''CREATE TABLE task_events(cycle TEXT, name TEXT, submit_num INTEGER,
+     time TEXT, event TEXT, message TEXT);''')
+
     conn.executemany(
         'INSERT into task_jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
         task_entries,
@@ -121,6 +124,7 @@ def test_make_task_query_1():
     assert return_value[0]['queue_quartiles'][2] == 60
     assert return_value[0]['run_quartiles'][2] == 540
     assert return_value[0]['total_quartiles'][2] == 600
+    assert return_value[0]['total_of_totals'] == 57376768
 
 
 def test_make_task_query_2():
@@ -199,6 +203,7 @@ def test_make_task_query_2():
     assert return_value[0]['queue_quartiles'][2] == 60
     assert return_value[0]['run_quartiles'][2] == 540
     assert return_value[0]['total_quartiles'][2] == 600
+    assert return_value[0]['total_of_totals'] == 114753536
 
 
 def test_make_task_query_3():
@@ -263,6 +268,8 @@ def test_make_task_query_3():
 
     return_value = run_task_query(conn, workflow)
 
+    print(return_value)
+
     assert len(return_value) == 1
     assert return_value[0]['count'] == 3
     assert return_value[0]['cycle_point'] == '3'
@@ -270,32 +277,46 @@ def test_make_task_query_3():
     assert return_value[0]['queue_quartiles'][0] == 60
     assert return_value[0]['run_quartiles'][0] == 540
     assert return_value[0]['total_quartiles'][0] == 600
+    assert return_value[0]['max_rss_quartiles'][0] == 57376768
+    assert return_value[0]['cpu_time_quartiles'][0] == 100
     assert return_value[0]['id'].id == '~user/workflow//3/Task_1/01'
     assert return_value[0]['job_ID'] == 'UsersJob'
     assert return_value[0]['max_queue_time'] == 76
     assert return_value[0]['max_run_time'] == 644
     assert return_value[0]['max_total_time'] == 720
+    assert return_value[0]['max_max_rss'] == 57376768
+    assert return_value[0]['max_cpu_time'] == 300
     assert return_value[0]['mean_queue_time'] == pytest.approx(70.66, 0.01)
     assert return_value[0]['mean_run_time'] == pytest.approx(609.33, 0.01)
     assert return_value[0]['mean_total_time'] == pytest.approx(680.0, 0.01)
+    assert return_value[0]['mean_max_rss'] == pytest.approx(57376768.0, 0.01)
     assert return_value[0]['min_queue_time'] == 60
     assert return_value[0]['min_run_time'] == 540
     assert return_value[0]['min_total_time'] == 600
+    assert return_value[0]['min_max_rss'] == 57376768
+    assert return_value[0]['min_cpu_time'] == 100
     assert return_value[0]['name'] == 'Task_1'
     assert return_value[0]['platform'] == 'MyPlatform'
     assert return_value[0]['queue_quartiles'][1] == 76
     assert return_value[0]['run_quartiles'][1] == 644
     assert return_value[0]['total_quartiles'][1] == 720
+    assert return_value[0]['max_rss_quartiles'][1] == 57376768
+    assert return_value[0]['cpu_time_quartiles'][1] == 200
     assert return_value[0]['started_time'] == '2022-12-16T15:01:16Z'
     assert return_value[0]['state'] == 'succeeded'
     assert return_value[0]['std_dev_queue_time'] == pytest.approx(7.54, 0.01)
     assert return_value[0]['std_dev_run_time'] == pytest.approx(49.02, 0.01)
     assert return_value[0]['std_dev_total_time'] == pytest.approx(56.56, 0.01)
+    assert return_value[0]['std_dev_max_rss'] == pytest.approx(0.0, 0.01)
+    assert return_value[0]['std_dev_cpu_time'] == pytest.approx(81.64, 0.01)
     assert return_value[0]['submit_num'] == 1
     assert return_value[0]['submitted_time'] == '2022-12-16T15:00:00Z'
     assert return_value[0]['queue_quartiles'][2] == 76
     assert return_value[0]['run_quartiles'][2] == 644
     assert return_value[0]['total_quartiles'][2] == 720
+    assert return_value[0]['max_rss_quartiles'][2] == 57376768
+    assert return_value[0]['cpu_time_quartiles'][2] == 300
+    assert return_value[0]['total_of_totals'] == 600
 
 
 def test_make_jobs_query_1():
@@ -373,6 +394,8 @@ def test_make_jobs_query_1():
     assert return_value[0]['state'] == 'succeeded'
     assert return_value[0]['submit_num'] == 1
     assert return_value[0]['submitted_time'] == '2022-12-14T15:00:00Z'
+    assert return_value[0]['max_rss'] == 57376768
+    assert return_value[0]['cpu_time'] == 57376768
 
     assert return_value[1]['cycle_point'] == '2'
     assert return_value[1]['finished_time'] == '2022-12-15T15:12:00Z'
@@ -384,6 +407,8 @@ def test_make_jobs_query_1():
     assert return_value[1]['state'] == 'succeeded'
     assert return_value[1]['submit_num'] == 1
     assert return_value[1]['submitted_time'] == '2022-12-15T15:00:00Z'
+    assert return_value[1]['max_rss'] == 57376767
+    assert return_value[1]['cpu_time'] == 57376766
 
 
 async def test_list_elements(monkeypatch):
