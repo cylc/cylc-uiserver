@@ -63,7 +63,6 @@ from types import SimpleNamespace
 from typing import List, Optional, Union
 
 from jupyter_server.extension.application import ExtensionApp
-from pkg_resources import parse_version
 from tornado import ioloop
 from tornado.web import RedirectHandler
 from traitlets import (
@@ -385,7 +384,10 @@ class CylcUIServer(ExtensionApp):
                 for version in path.glob('[0-9][0-9.]*')
                 if version
             ),
-            key=parse_version
+            key=lambda x: tuple(
+                int(x) if x.isdecimal() else x
+                for x in x.split('.')
+            )
         )
 
     @default('ui_path')
