@@ -16,11 +16,19 @@
 # Configuration file for jupyterhub.
 
 from pathlib import Path
-import pkg_resources
+import sys
+
+
+if sys.version_info[:2] > (3, 8):
+    from importlib.resources import files
+else:
+    # BACK_COMPAT: importlib_resources
+    from importlib_resources import files
 
 from cylc.uiserver import (
     __file__ as uis_pkg,
-    getenv)
+    getenv,
+)
 from cylc.uiserver.app import USER_CONF_ROOT
 from cylc.uiserver.authorise import CylcAuthorizer
 
@@ -49,10 +57,7 @@ c.JupyterHub.logo_file = str(Path(uis_pkg).parent / 'logo.svg')
 c.JupyterHub.log_datefmt = '%Y-%m-%dT%H:%M:%S'  # ISO8601 (expanded)
 c.JupyterHub.template_paths = [
     # custom HTML templates
-    pkg_resources.resource_filename(
-        'cylc.uiserver',
-        'templates'
-    )
+    str(files('cylc.uiserver') / 'templates')
 ]
 
 # store JupyterHub runtime files in the user config directory
