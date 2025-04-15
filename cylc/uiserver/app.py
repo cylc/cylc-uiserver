@@ -53,16 +53,29 @@ Cylc specific configurations are documented here.
    the environment variable ``CYLC_SITE_CONF_PATH``.
 """
 
+from concurrent.futures import ProcessPoolExecutor
 import getpass
 import os
+from pathlib import (
+    Path,
+    PurePath,
+)
 import sys
-from concurrent.futures import ProcessPoolExecutor
-from pathlib import Path, PurePath
 from textwrap import dedent
 from types import SimpleNamespace
-from typing import List, Optional, Union
+from typing import (
+    List,
+    Optional,
+    Union,
+)
 
+from cylc.flow.network.graphql import (
+    CylcGraphQLBackend,
+    IgnoreFieldMiddleware,
+)
+from cylc.flow.profiler import Profiler
 from jupyter_server.extension.application import ExtensionApp
+from packaging.version import Version
 from tornado import ioloop
 from tornado.web import RedirectHandler
 from traitlets import (
@@ -79,16 +92,15 @@ from traitlets import (
 )
 from traitlets.config.loader import LazyConfigValue
 
-from cylc.flow.network.graphql import (
-    CylcGraphQLBackend, IgnoreFieldMiddleware
-)
-from cylc.flow.profiler import Profiler
-from cylc.uiserver import (
-    __file__ as uis_pkg,
-)
+from cylc.uiserver import __file__ as uis_pkg
 from cylc.uiserver.authorise import (
     Authorization,
-    AuthorizationMiddleware
+    AuthorizationMiddleware,
+)
+from cylc.uiserver.config_util import (
+    SITE_CONF_ROOT,
+    USER_CONF_ROOT,
+    get_conf_dir_hierarchy,
 )
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.handlers import (
@@ -97,11 +109,6 @@ from cylc.uiserver.handlers import (
     SubscriptionHandler,
     UIServerGraphQLHandler,
     UserProfileHandler,
-)
-from cylc.uiserver.config_util import (
-    get_conf_dir_hierarchy,
-    SITE_CONF_ROOT,
-    USER_CONF_ROOT
 )
 from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
@@ -384,10 +391,7 @@ class CylcUIServer(ExtensionApp):
                 for version in path.glob('[0-9][0-9.]*')
                 if version
             ),
-            key=lambda x: tuple(
-                int(x) if x.isdecimal() else x
-                for x in x.split('.')
-            )
+            key=Version
         )
 
     @default('ui_path')
