@@ -575,6 +575,7 @@ def run_jobs_query(
     where_args = []
 
     # filter by cycle/task/job ID
+    jobNN = False
     if ids:
         items = []
         for id_ in ids:
@@ -587,6 +588,9 @@ def run_jobs_query(
                 value = id_[token]
                 if value:
                     if token == 'job':
+                        if value == 'NN':
+                            jobNN = True
+                            continue
                         value = int(value)
                     item.append(rf'{column} GLOB ?')
                     where_args.append(value)
@@ -675,11 +679,12 @@ def run_jobs_query(
         where_args.extend(tasks)
 
     # build the SQL query
-    query = r'''
+    submit_num = 'max(submit_num)' if jobNN else 'submit_num'
+    query = rf'''
         SELECT
             name,
             cycle,
-            submit_num,
+            {submit_num},
             submit_status,
             time_run,
             time_run_exit,
@@ -697,7 +702,9 @@ def run_jobs_query(
             task_jobs
         '''
     if where_stmts:
-        query += 'WHERE\n            ' + '\n            AND '.join(where_stmts)
+        query += 'WHERE ' + ' AND '.join(where_stmts)
+    if jobNN:
+        query += ' GROUP BY name, cycle'
 
     for row in conn.execute(query, where_args):
         # determine job status
