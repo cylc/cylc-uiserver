@@ -32,6 +32,7 @@ from cylc.uiserver.schema import (
 def make_db(*task_entries):
     """Create a DB and populate the task_jobs table."""
     conn = sqlite3.connect(':memory:')
+    conn.row_factory = sqlite3.Row
     conn.execute(
         '''
         CREATE TABLE
@@ -390,7 +391,7 @@ def test_make_jobs_query_1():
 async def test_list_elements(monkeypatch):
 
     with pytest.raises(Exception) as e_info:
-        await list_elements('tasks', {'stuff': [1, 2, 3], 'workflows': []})
+        await list_elements('tasks', stuff=[1, 2, 3], workflows=[])
 
     exception_raised = e_info.value
     assert (
@@ -476,7 +477,7 @@ async def test_get_elements(
     # functions that I'm not testing
     info = None
 
-    async def mock_return_list_elements(_query_type, kwargs):
+    async def mock_return_list_elements(_query_type, **kwargs):
         return kwargs
 
     def mock_process_resolver_info(*args):
