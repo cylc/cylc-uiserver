@@ -20,48 +20,59 @@ extra functionality specific to the UIS.
 """
 
 from functools import partial
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple
+import sqlite3
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+)
 
-import graphene
-from graphene.types.generic import GenericScalar
-
+from cylc.flow.data_store_mgr import (
+    JOBS,
+    TASKS,
+)
 from cylc.flow.id import Tokens
-from cylc.flow.data_store_mgr import JOBS, TASKS
-from cylc.flow.rundb import CylcWorkflowDAO
-from cylc.flow.pathutil import get_workflow_run_dir
-from cylc.flow.workflow_files import WorkflowFiles
 from cylc.flow.network.schema import (
     NODE_MAP,
+    STRIP_NULL_DEFAULT,
     CyclePoint,
     GenericResponse,
-    SortArgs,
-    Task,
     Job,
     Mutations,
     Queries,
-    process_resolver_info,
-    STRIP_NULL_DEFAULT,
+    SortArgs,
     Subscriptions,
+    Task,
     WorkflowID,
     WorkflowRunMode as RunMode,
     _mut_field,
-    get_nodes_all
+    get_nodes_all,
+    process_resolver_info,
 )
+from cylc.flow.pathutil import get_workflow_run_dir
+from cylc.flow.rundb import CylcWorkflowDAO
 from cylc.flow.task_state import (
     TASK_STATUS_FAILED,
     TASK_STATUS_RUNNING,
-    TASK_STATUS_SUBMITTED,
     TASK_STATUS_SUBMIT_FAILED,
+    TASK_STATUS_SUBMITTED,
     TASK_STATUS_SUCCEEDED,
     TASK_STATUS_WAITING,
 )
 from cylc.flow.util import sstrip
+from cylc.flow.workflow_files import WorkflowFiles
+import graphene
+from graphene.types.generic import GenericScalar
 
 from cylc.uiserver.resolvers import (
     Resolvers,
     list_log_files,
     stream_log,
 )
+
 
 if TYPE_CHECKING:
     from graphql import ResolveInfo
@@ -296,14 +307,14 @@ async def get_elements(query_type, root, info, **kwargs):
     kwargs['exworkflows'] = [
         Tokens(w_id) for w_id in kwargs['exworkflows']]
 
-    return await list_elements(query_type, kwargs)
+    return await list_elements(query_type, **kwargs)
 
 
-async def list_elements(query_type, args):
-    if not args['workflows']:
+async def list_elements(query_type, workflows: 'Iterable[Tokens]', **kwargs):
+    if not workflows:
         raise Exception('At least one workflow must be provided.')
     elements = []
-    for workflow in args['workflows']:
+    for workflow in workflows:
         db_file = get_workflow_run_dir(
             workflow['workflow'],
             WorkflowFiles.LogDir.DIRNAME,
@@ -311,16 +322,17 @@ async def list_elements(query_type, args):
         )
         with CylcWorkflowDAO(db_file, is_public=True) as dao:
             conn = dao.connect()
+            conn.row_factory = sqlite3.Row
             if query_type == 'jobs':
                 elements.extend(
                     run_jobs_query(
                         conn,
                         workflow,
-                        ids=args.get('ids'),
-                        exids=args.get('exids'),
-                        states=args.get('states'),
-                        exstates=args.get('exstates'),
-                        tasks=args.get('tasks'),
+                        ids=kwargs.get('ids'),
+                        exids=kwargs.get('exids'),
+                        states=kwargs.get('states'),
+                        exstates=kwargs.get('exstates'),
+                        tasks=kwargs.get('tasks'),
                     )
                 )
             else:
@@ -547,14 +559,14 @@ def _state_to_status(
 
 
 def run_jobs_query(
-    conn,
-    workflow,
-    ids=None,
-    exids=None,
-    states=None,
-    exstates=None,
-    tasks=None,
-):
+    conn: 'sqlite3.Connection',
+    workflow: 'Tokens',
+    ids: 'Optional[Iterable[Tokens]]' = None,
+    exids: 'Optional[Iterable[Tokens]]' = None,
+    states: Optional[Iterable[str]] = None,
+    exstates: Optional[Iterable[str]] = None,
+    tasks: Optional[Iterable[str]] = None,
+) -> List[dict]:
     """Query jobs from the database.
 
     Args:
@@ -575,6 +587,7 @@ def run_jobs_query(
     where_args = []
 
     # filter by cycle/task/job ID
+    jobNN = False
     if ids:
         items = []
         for id_ in ids:
@@ -587,6 +600,9 @@ def run_jobs_query(
                 value = id_[token]
                 if value:
                     if token == 'job':
+                        if value == 'NN':
+                            jobNN = True
+                            continue
                         value = int(value)
                     item.append(rf'{column} GLOB ?')
                     where_args.append(value)
@@ -675,17 +691,18 @@ def run_jobs_query(
         where_args.extend(tasks)
 
     # build the SQL query
-    query = r'''
+    submit_num = 'max(submit_num)' if jobNN else 'submit_num'
+    query = rf'''
         SELECT
             name,
-            cycle,
-            submit_num,
+            cycle AS cycle_point,
+            {submit_num} AS submit_num,
             submit_status,
-            time_run,
-            time_run_exit,
-            job_id,
-            platform_name,
-            time_submit,
+            time_run AS started_time,
+            time_run_exit AS finished_time,
+            job_id AS job_ID,
+            platform_name AS platform,
+            time_submit AS submitted_time,
             STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit)
                 AS total_time,
             STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run)
@@ -697,12 +714,18 @@ def run_jobs_query(
             task_jobs
         '''
     if where_stmts:
-        query += 'WHERE\n            ' + '\n            AND '.join(where_stmts)
+        query += 'WHERE ' + ' AND '.join(where_stmts)
+    if jobNN:
+        query += ' GROUP BY name, cycle'
 
     for row in conn.execute(query, where_args):
+        row = dict(row)
         # determine job status
-        submit_status, run_status, time_run = row[3], row[12], row[4]
-        status = _state_to_status(submit_status, run_status, time_run)
+        status = _state_to_status(
+            row.pop('submit_status'),
+            row.pop('run_status'),
+            row['started_time'],
+        )
 
         # skip jobs that have not yet submitted
         if status == TASK_STATUS_WAITING:
@@ -710,22 +733,12 @@ def run_jobs_query(
 
         jobs.append({
             'id': workflow.duplicate(
-                cycle=row[1],
-                task=row[0],
-                job=row[2]
+                cycle=row['cycle_point'],
+                task=row['name'],
+                job=row['submit_num'],
             ),
-            'name': row[0],
-            'cycle_point': row[1],
-            'submit_num': row[2],
             'state': status,
-            'started_time': row[4],
-            'finished_time': row[5],
-            'job_ID': row[6],
-            'platform': row[7],
-            'submitted_time': row[8],
-            'total_time': row[9],
-            'run_time': row[10],
-            'queue_time': row[11]
+            **row,
         })
 
     return jobs

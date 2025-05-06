@@ -16,6 +16,7 @@
 """This file tests the ability for the cylc UI to retrieve workflow information
 and perform simple statistical calculations for the analysis tab"""
 
+from typing import Union
 import pytest
 import sqlite3
 
@@ -31,6 +32,7 @@ from cylc.uiserver.schema import (
 def make_db(*task_entries):
     """Create a DB and populate the task_jobs table."""
     conn = sqlite3.connect(':memory:')
+    conn.row_factory = sqlite3.Row
     conn.execute(
         '''
         CREATE TABLE
@@ -389,7 +391,7 @@ def test_make_jobs_query_1():
 async def test_list_elements(monkeypatch):
 
     with pytest.raises(Exception) as e_info:
-        await list_elements('tasks', {'stuff': [1, 2, 3], 'workflows': []})
+        await list_elements('tasks', stuff=[1, 2, 3], workflows=[])
 
     exception_raised = e_info.value
     assert (
@@ -475,7 +477,7 @@ async def test_get_elements(
     # functions that I'm not testing
     info = None
 
-    async def mock_return_list_elements(_query_type, kwargs):
+    async def mock_return_list_elements(_query_type, **kwargs):
         return kwargs
 
     def mock_process_resolver_info(*args):
@@ -653,3 +655,48 @@ async def test_job_query_filter():
         'submit-failed',
         'failed',
     }
+
+
+@pytest.mark.parametrize('jobs, query, expected', [
+    pytest.param(
+        [
+            (2025, 'a', 2),
+            (2025, 'a', 3),
+            (2025, 'a', 1),
+            (2025, 'b', 1),
+        ],
+        ['2025/*/NN'],
+        {'2025/a/03', '2025/b/01'},
+        id="selects-latest-jobs"
+    )
+])
+async def test_jobNN_query(jobs, query, expected):
+    """Jobs query should handle job 'NN'."""
+    def make_job(cycle: Union[str, int], name: str, submit_num: int):
+        return (
+            str(cycle),
+            name,
+            submit_num,
+            '[1]',
+            0,
+            1,
+            '2022-12-14T15:00:00Z',
+            '2022-12-14T15:00:03Z',
+            1,
+            '',
+            '',
+            '',
+            0,
+            'enterprise-bg',
+            'background',
+            '1701',
+        )
+
+    conn = make_db(
+        *(make_job(*job) for job in jobs)
+    )
+    workflow = Tokens('~user/workflow')
+    result = run_jobs_query(
+        conn, workflow, ids=[Tokens(i, relative=True) for i in query]
+    )
+    assert {item['id'].relative_id for item in result} == expected
