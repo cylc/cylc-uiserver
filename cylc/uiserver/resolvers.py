@@ -16,17 +16,18 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 import asyncio
-import errno
-import os
-import signal
 from contextlib import suppress
 from copy import deepcopy
+import errno
 from getpass import getuser
+import os
+import signal
 from subprocess import (
     DEVNULL,
     PIPE,
     Popen,
 )
+from textwrap import indent
 from time import time
 from typing import (
     TYPE_CHECKING,
@@ -41,13 +42,17 @@ from typing import (
     Union,
 )
 
-import psutil
 from cylc.flow.data_store_mgr import WORKFLOW
-from cylc.flow.exceptions import ServiceFileError, WorkflowFilesError
+from cylc.flow.exceptions import CylcError
 from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
-from cylc.flow.scripts.clean import CleanOptions, run
+from cylc.flow.scripts.clean import (
+    CleanOptions,
+    run,
+)
 from graphql.language.base import print_ast
+import psutil
+
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
@@ -251,14 +256,11 @@ class Services:
                 executor, _clean, workflow_ids, opts
             )
         except Exception as exc:
-            if isinstance(exc, ServiceFileError):  # Expected error
-                # The "workflow still running" msg is very long
-                msg = str(exc).split('\n')[0]
-            elif isinstance(exc, WorkflowFilesError):  # Expected error
-                msg = str(exc)
+            msg = f"{type(exc).__name__}: {exc}"
+            if isinstance(exc, CylcError):  # Expected error
+                log.error(msg)
             else:  # Unexpected error
-                msg = f"{type(exc).__name__}: {exc}"
-                log.exception(msg)
+                log.exception(exc)
             return cls._error(msg)
 
         # trigger a re-scan
@@ -322,17 +324,20 @@ class Services:
                 ret_code = proc.wait(timeout=120)
 
                 if ret_code:
-                    # command failed
+                    msg = f"Command failed ({ret_code}): {cmd_repr}"
                     out, err = proc.communicate()
-                    results[wflow] = err.strip() or out.strip() or (
-                        f'Command failed ({ret_code}): {cmd_repr}'
+                    results[wflow] = err.strip() or out.strip() or msg
+                    log.error(
+                        f"{msg}\n"
+                        f"    stdout:\n{indent(out, 8 * ' ')}\n"
+                        f"    stderr:\n{indent(err, 8 * ' ')}"
                     )
                     failed = True
                 else:
                     results[wflow] = 'started'
 
-            except Exception as exc:
-                # oh noes, something went wrong, send back confirmation
+            except Exception as exc:  # unexpected error
+                log.exception(exc)
                 return cls._error(exc)
 
         if failed:

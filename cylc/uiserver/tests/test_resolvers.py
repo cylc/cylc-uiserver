@@ -14,6 +14,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Tuple
 from async_timeout import timeout
 import logging
@@ -24,6 +25,7 @@ from subprocess import Popen, TimeoutExpired
 from types import SimpleNamespace
 
 from cylc.flow import CYLC_LOG
+from cylc.flow.exceptions import CylcError
 from cylc.flow.id import Tokens
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.uiserver.resolvers import (
@@ -155,13 +157,15 @@ async def test_play(
 
 
 @pytest.mark.parametrize(
-    'workflows, popen_ret_codes, popen_communicate, expected',
+    'workflows, popen_ret_codes, popen_communicate,'
+    'expected_ret, expected_log',
     [
         pytest.param(
             [Tokens('wflow1')],
             [1],
-            ("", "bad things!!"),
+            ("something", "bad things!!"),
             "bad things!!",
+            ["Command failed (1): cylc play", "something", "bad things!!"],
             id="one"
         ),
         pytest.param(
@@ -169,6 +173,7 @@ async def test_play(
             [1, 0],
             ("", "bad things!!"),
             "\n\nwflow1: bad things!!\n\nwflow2: started",
+            ["Command failed (1): cylc play", "bad things!!"],
             id="multiple"
         ),
         pytest.param(
@@ -176,6 +181,7 @@ async def test_play(
             [1],
             ("something", ""),
             "something",
+            ["Command failed (1): cylc play", "something"],
             id="uses stdout if stderr empty"
         ),
         pytest.param(
@@ -183,6 +189,7 @@ async def test_play(
             [4],
             ("", ""),
             "Command failed (4): cylc play",
+            ["Command failed (4): cylc play"],
             id="fallback msg if stdout/stderr empty"
         ),
     ]
@@ -192,7 +199,9 @@ async def test_play_fail(
     workflows: List[Tokens],
     popen_ret_codes: List[int],
     popen_communicate: Tuple[str, str],
-    expected: str,
+    expected_ret: str,
+    expected_log: List[str],
+    caplog: pytest.LogCaptureFixture,
 ):
     """It returns suitable error messages if cylc play fails.
 
@@ -211,15 +220,19 @@ async def test_play_fail(
         )
     )
     monkeypatch.setattr('cylc.uiserver.resolvers.Popen', mock_popen)
+    caplog.set_level(logging.ERROR)
 
     status, message = await Services.play(
         workflows,
         {},
         workflows_mgr=Mock(spec=WorkflowsManager),
-        log=Mock(),
+        log=logging.root,
     )
     assert status is False
-    assert message.startswith(expected)
+    assert message.startswith(expected_ret)
+    # Should be logged too:
+    for msg in expected_log:
+        assert msg in caplog.text
 
 
 async def test_play_timeout(monkeypatch: pytest.MonkeyPatch):
@@ -370,3 +383,25 @@ async def test_cat_log_timeout(workflow_run_dir, app, fast_sleep):
 )
 def test_process_cat_log_stderr(text: bytes, expected: str):
     assert process_cat_log_stderr(text) == expected
+
+
+async def test_clean__error(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    """It returns an error if the clean command fails."""
+    def bad_clean(*a, **k):
+        raise CylcError("bad things!!")
+
+    monkeypatch.setattr('cylc.uiserver.resolvers._clean', bad_clean)
+    caplog.set_level(logging.ERROR)
+
+    ret = Services.clean(
+        [Tokens('wflow1')],
+        {},
+        workflows_mgr=Mock(spec=WorkflowsManager),
+        executor=ThreadPoolExecutor(1),
+        log=logging.root,
+    )
+    err_msg = "CylcError: bad things!!"
+    assert (await ret) == [False, err_msg]
+    assert err_msg in caplog.text
