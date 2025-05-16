@@ -1,9 +1,27 @@
-# This Cylc solution for graphql subscriptions over websockets is essentially
-# a condensed form of the stagnant graphql-ws project:
-# https://github.com/graphql-python/graphql-ws
-# and our implementation of the tornado integration PR that never got merged:
-# https://github.com/graphql-python/graphql-ws/pull/25/files
-# upgraded to use graphql-core v3.
+# The MIT License (MIT)
+#
+# Copyright (c) 2016-Present Syrus Akbary
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# ----------------------------------------------------------------------------
+#
+# This code was derived from coded in the graphql-ws project, and code that
+# was offered to the graphql-ws project by members of the Cylc
+# development team but not merged.
+#
+# * https://github.com/graphql-python/graphql-ws
+# * https://github.com/graphql-python/graphql-ws/pull/25/files
+#
+# It has been evolved to suit and ported to graphql-core v3.
 
 import asyncio
 from asyncio.queues import QueueEmpty

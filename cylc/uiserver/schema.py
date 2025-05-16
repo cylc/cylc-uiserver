@@ -850,8 +850,10 @@ class UISQueries(Queries):
     )
 
 
-# TODO: Change to use subscribe arg/default graphql-core has a subscribe field
-# for both Meta and Field, graphene at v3.4.3 does not.. As a workaround
+# TODO: Change to use subscribe arg/default.
+# See https://github.com/cylc/cylc-flow/issues/6688
+# graphql-core has a subscribe field for both Meta and Field,
+# graphene at v3.4.3 does not. As a workaround
 # the subscribe function is looked up via the following mapping:
 SUB_RESOLVER_MAPPING.update({
     'logs': stream_log,
