@@ -26,17 +26,15 @@ the published one.
 
 Reconciliation on failed verification is done by requesting all elements of a
 topic, and replacing the respective data-store elements with this.
-
-Subscriptions are currently run in a different thread (via ThreadPoolExecutor).
-
 """
 
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
 import time
 from typing import TYPE_CHECKING, Dict, Optional, Set, cast
+
+import zmq
 
 from cylc.flow.exceptions import WorkflowStopped
 from cylc.flow.id import Tokens
@@ -82,15 +80,6 @@ class DataStoreMgr:
             Service that scans for workflows.
         log:
             Application logger.
-        max_threads:
-            Max number of threads to use for subscriptions.
-
-            Note, this determines the maximum number of active workflows that
-            can be updated.
-
-            This should be overridden for real use in the UIS app. The
-            default is here for test purposes.
-
     """
 
     INIT_DATA_WAIT_TIME = 5.  # seconds
@@ -98,14 +87,13 @@ class DataStoreMgr:
     RECONCILE_TIMEOUT = 5.  # seconds
     PENDING_DELTA_CHECK_INTERVAL = 0.5
 
-    def __init__(self, workflows_mgr, log, max_threads=10):
+    def __init__(self, workflows_mgr, log):
         self.workflows_mgr = workflows_mgr
         self.log = log
         self.data = {}
         self.w_subs: Dict[str, WorkflowSubscriber] = {}
         self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown'}
         self.loop = None
-        self.executor = ThreadPoolExecutor(max_threads)
         self.delta_queues = {}
 
     @log_call
@@ -148,11 +136,6 @@ class DataStoreMgr:
         """Initiate workflow subscriptions.
 
         Call this when a workflow has started.
-
-        Subscriptions and sync management is instantiated and run in
-        a separate thread for each workflow. This is to avoid the sync loop
-        blocking the main loop.
-
         """
         if self.loop is None:
             self.loop = asyncio.get_running_loop()
@@ -163,10 +146,7 @@ class DataStoreMgr:
 
         self.delta_queues[w_id] = {}
 
-        # Might be options other than threads to achieve
-        # non-blocking subscriptions, but this works.
-        self.executor.submit(
-            self._start_subscription,
+        self._start_subscription(
             w_id,
             contact_data['name'],
             contact_data[CFF.HOST],
@@ -256,11 +236,30 @@ class DataStoreMgr:
             context=self.workflows_mgr.context,
             topics=self.topics
         )
-        self.w_subs[w_id].loop.run_until_complete(
-            self.w_subs[w_id].subscribe(
-                process_delta_msg,
-                func=self._update_workflow_data,
-                w_id=w_id))
+
+    async def process_incoming_deltas(self):
+        """Receive and process deltas until there are none for each workflow.
+        """
+        w_empty = set()
+        w_check = set(self.w_subs.keys())
+        while w_check.difference(w_empty):
+            for w_id, sub in self.w_subs.items():
+                if w_id in w_empty:
+                    continue
+                try:
+                    [topic, delta] = await sub.socket.recv_multipart(
+                        flags=zmq.NOBLOCK
+                    )
+                except zmq.ZMQError:
+                    w_empty.add(w_id)
+                    continue
+
+                process_delta_msg(
+                    topic,
+                    delta,
+                    func=self._update_workflow_data,
+                    w_id=w_id
+                )
 
     def _update_workflow_data(self, topic, delta, w_id):
         """Manage and apply incoming data-store deltas.
@@ -303,7 +302,6 @@ class DataStoreMgr:
             if sub_delta.reloaded:
                 self._clear_data_field(w_id, field.name)
                 self.data[w_id]['delta_times'][field.name] = 0.0
-            # hard to catch errors in a threaded async app, so use try-except.
             try:
                 # Apply the delta if newer than the previously applied.
                 if delta_time >= self.data[w_id]['delta_times'][field.name]:
@@ -346,8 +344,7 @@ class DataStoreMgr:
             self.log.debug(
                 f'Out of sync with {topic} of {w_id}... Reconciling.')
             try:
-                # use threadsafe as client socket is in main loop thread.
-                future = asyncio.run_coroutine_threadsafe(
+                task = asyncio.create_task(
                     workflow_request(
                         self.workflows_mgr.workflows[w_id]['req_client'],
                         'pb_data_elements',
@@ -355,7 +352,7 @@ class DataStoreMgr:
                     ),
                     self.loop
                 )
-                new_delta_msg = future.result(self.RECONCILE_TIMEOUT)
+                new_delta_msg = task.result(self.RECONCILE_TIMEOUT)
                 new_delta = DELTAS_MAP[topic]()
                 new_delta.ParseFromString(new_delta_msg)
                 self._clear_data_field(w_id, topic)
@@ -366,7 +363,7 @@ class DataStoreMgr:
                     f'The reconcile update coroutine {w_id} {topic}'
                     f'took too long, cancelling the subscription/sync.'
                 )
-                future.cancel()
+                task.cancel()
             except Exception as exc:
                 self.log.exception(exc)
 
