@@ -29,7 +29,7 @@ from cylc.uiserver.schema import (
 )
 
 
-def make_db(*task_entries):
+def make_db(task_entries, task_events=None):
     """Create a DB and populate the task_jobs table."""
     conn = sqlite3.connect(':memory:')
     conn.row_factory = sqlite3.Row
@@ -58,21 +58,37 @@ def make_db(*task_entries):
     '''
     )
 
+    conn.execute(
+        '''
+        CREATE TABLE 
+            task_events(
+                cycle TEXT, 
+                name TEXT, 
+                submit_num INTEGER,
+                time TEXT, 
+                event TEXT, 
+                message TEXT);''')
+
     conn.executemany(
         'INSERT into task_jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-        task_entries,
+        task_entries
     )
+    if task_events:
+        conn.executemany(
+            'INSERT into task_events VALUES (?,?,?,?,?,?)',
+            task_events
+        )
     conn.commit()
     return conn
 
 
 def test_make_task_query_1():
     conn = make_db(
-        (
+        task_entries=[(
             '1',
             'Task_1',
-            '01',
-            '{1}',
+            1,
+            '[1]',
             0,
             1,
             '2022-12-14T15:00:00Z',
@@ -85,7 +101,41 @@ def test_make_task_query_1():
             'MyPlatform',
             'User',
             'UsersJob',
-        )
+        )],
+        task_events=[
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:10:00Z',
+                'message_debug',
+                'cpu_time 994 max_rss 40064'
+            )
+        ]
     )
     workflow = Tokens('~user/workflow')
 
@@ -97,72 +147,155 @@ def test_make_task_query_1():
     assert return_value[0]['queue_quartiles'][0] == 60
     assert return_value[0]['run_quartiles'][0] == 540
     assert return_value[0]['total_quartiles'][0] == 600
+    assert return_value[0]['max_rss_quartiles'][0] == 40064
+    assert return_value[0]['cpu_time_quartiles'][0] == 994
     assert return_value[0]['id'].id == '~user/workflow//1/Task_1/01'
     assert return_value[0]['job_ID'] == 'UsersJob'
     assert return_value[0]['max_queue_time'] == 60
     assert return_value[0]['max_run_time'] == 540
     assert return_value[0]['max_total_time'] == 600
+    assert return_value[0]['max_max_rss'] == 40064
+    assert return_value[0]['max_cpu_time'] == 994
     assert return_value[0]['mean_queue_time'] == pytest.approx(60.0, 0.01)
     assert return_value[0]['mean_run_time'] == pytest.approx(540.0, 0.01)
     assert return_value[0]['mean_total_time'] == pytest.approx(600.0, 0.01)
+    assert return_value[0]['mean_max_rss'] == pytest.approx(40064.0, 0.01)
+    assert return_value[0]['mean_cpu_time'] == pytest.approx(994.0, 0.01)
     assert return_value[0]['min_queue_time'] == 60
     assert return_value[0]['min_run_time'] == 540
     assert return_value[0]['min_total_time'] == 600
+    assert return_value[0]['min_max_rss'] == 40064
+    assert return_value[0]['min_cpu_time'] == 994
     assert return_value[0]['name'] == 'Task_1'
     assert return_value[0]['platform'] == 'MyPlatform'
     assert return_value[0]['queue_quartiles'][1] == 60
     assert return_value[0]['run_quartiles'][1] == 540
     assert return_value[0]['total_quartiles'][1] == 600
+    assert return_value[0]['max_rss_quartiles'][1] == 40064
+    assert return_value[0]['cpu_time_quartiles'][1] == 994
     assert return_value[0]['started_time'] == '2022-12-14T15:01:00Z'
     assert return_value[0]['state'] == 'succeeded'
     assert return_value[0]['std_dev_queue_time'] == pytest.approx(0.0, 0.01)
     assert return_value[0]['std_dev_run_time'] == pytest.approx(0.0, 0.01)
     assert return_value[0]['std_dev_total_time'] == pytest.approx(0.0, 0.01)
+    assert return_value[0]['std_dev_max_rss'] == pytest.approx(0.0, 0.01)
+    assert return_value[0]['std_dev_cpu_time'] == pytest.approx(0.0, 0.01)
     assert return_value[0]['submit_num'] == 1
     assert return_value[0]['submitted_time'] == '2022-12-14T15:00:00Z'
     assert return_value[0]['queue_quartiles'][2] == 60
     assert return_value[0]['run_quartiles'][2] == 540
     assert return_value[0]['total_quartiles'][2] == 600
+    assert return_value[0]['max_rss_quartiles'][2] == 40064
+    assert return_value[0]['cpu_time_quartiles'][2] == 994
+    assert return_value[0]['total_of_totals'] == 994
 
 
 def test_make_task_query_2():
     conn = make_db(
-        (
-            '1',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-14T15:00:00Z',
-            '2022-12-14T15:01:00Z',
-            0,
-            '2022-12-14T15:01:00Z',
-            '2022-12-14T15:10:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
-        (
-            '2',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-15T15:00:00Z',
-            '2022-12-15T15:01:15Z',
-            0,
-            '2022-12-15T15:01:16Z',
-            '2022-12-15T15:12:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
+        task_entries=[
+            (
+                '1',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-14T15:00:00Z',
+                '2022-12-14T15:01:00Z',
+                0,
+                '2022-12-14T15:01:00Z',
+                '2022-12-14T15:10:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-15T15:00:00Z',
+                '2022-12-15T15:01:15Z',
+                0,
+                '2022-12-15T15:01:16Z',
+                '2022-12-15T15:12:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            )
+        ],
+        task_events=[
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:10:00Z',
+                'message_debug',
+                'cpu_time 994 max_rss 40064'
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:10:00Z',
+                'message_debug',
+                'cpu_time 1994 max_rss 50064'
+            ),
+        ]
     )
     conn.commit()
     workflow = Tokens('~user/workflow')
@@ -175,90 +308,205 @@ def test_make_task_query_2():
     assert return_value[0]['queue_quartiles'][0] == 60
     assert return_value[0]['run_quartiles'][0] == 540
     assert return_value[0]['total_quartiles'][0] == 600
+    assert return_value[0]['max_rss_quartiles'][0] == 40064
+    assert return_value[0]['cpu_time_quartiles'][0] == 994
     assert return_value[0]['id'].id == '~user/workflow//2/Task_1/01'
     assert return_value[0]['job_ID'] == 'UsersJob'
     assert return_value[0]['max_queue_time'] == 76
     assert return_value[0]['max_run_time'] == 644
     assert return_value[0]['max_total_time'] == 720
+    assert return_value[0]['max_max_rss'] == 50064
+    assert return_value[0]['max_cpu_time'] == 1994
     assert return_value[0]['mean_queue_time'] == pytest.approx(68.0, 0.01)
     assert return_value[0]['mean_run_time'] == pytest.approx(592.0, 0.01)
     assert return_value[0]['mean_total_time'] == pytest.approx(660.0, 0.01)
+    assert return_value[0]['mean_max_rss'] == pytest.approx(45064.0, 0.01)
+    assert return_value[0]['mean_cpu_time'] == pytest.approx(1494.0, 0.01)
     assert return_value[0]['min_queue_time'] == 60
     assert return_value[0]['min_run_time'] == 540
     assert return_value[0]['min_total_time'] == 600
+    assert return_value[0]['min_max_rss'] == 40064
+    assert return_value[0]['min_cpu_time'] == 994
     assert return_value[0]['name'] == 'Task_1'
     assert return_value[0]['platform'] == 'MyPlatform'
     assert return_value[0]['queue_quartiles'][1] == 76
     assert return_value[0]['run_quartiles'][1] == 644
     assert return_value[0]['total_quartiles'][1] == 720
+    assert return_value[0]['max_rss_quartiles'][1] == 50064
+    assert return_value[0]['cpu_time_quartiles'][1] == 1994
     assert return_value[0]['started_time'] == '2022-12-15T15:01:16Z'
     assert return_value[0]['state'] == 'succeeded'
     assert return_value[0]['std_dev_queue_time'] == pytest.approx(8.00, 0.01)
     assert return_value[0]['std_dev_run_time'] == pytest.approx(52.0, 0.01)
     assert return_value[0]['std_dev_total_time'] == pytest.approx(60.0, 0.01)
+    assert return_value[0]['std_dev_max_rss'] == pytest.approx(5000.0, 0.01)
+    assert return_value[0]['std_dev_cpu_time'] == pytest.approx(500.0, 0.01)
     assert return_value[0]['submit_num'] == 1
     assert return_value[0]['submitted_time'] == '2022-12-15T15:00:00Z'
     assert return_value[0]['queue_quartiles'][2] == 60
     assert return_value[0]['run_quartiles'][2] == 540
     assert return_value[0]['total_quartiles'][2] == 600
+    assert return_value[0]['max_rss_quartiles'][2] == 40064
+    assert return_value[0]['cpu_time_quartiles'][2] == 994
+    assert return_value[0]['total_of_totals'] == 1994
 
 
 def test_make_task_query_3():
     conn = make_db(
-        (
-            '1',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-14T15:00:00Z',
-            '2022-12-14T15:01:00Z',
-            0,
-            '2022-12-14T15:01:00Z',
-            '2022-12-14T15:10:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
-        (
-            '2',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-15T15:00:00Z',
-            '2022-12-15T15:01:15Z',
-            0,
-            '2022-12-15T15:01:16Z',
-            '2022-12-15T15:12:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
-        (
-            '3',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-16T15:00:00Z',
-            '2022-12-16T15:01:15Z',
-            0,
-            '2022-12-16T15:01:16Z',
-            '2022-12-16T15:12:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
+        task_entries=[
+            (
+                '1',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-14T15:00:00Z',
+                '2022-12-14T15:01:00Z',
+                0,
+                '2022-12-14T15:01:00Z',
+                '2022-12-14T15:10:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-15T15:00:00Z',
+                '2022-12-15T15:01:15Z',
+                0,
+                '2022-12-15T15:01:16Z',
+                '2022-12-15T15:12:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-16T15:00:00Z',
+                '2022-12-16T15:01:15Z',
+                0,
+                '2022-12-16T15:01:16Z',
+                '2022-12-16T15:12:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            )
+        ],
+        task_events=[
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:10:00Z',
+                'message_debug',
+                'cpu_time 994 max_rss 40064'
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:10:00Z',
+                'message_debug',
+                'cpu_time 1994 max_rss 50064'
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:10:00Z',
+                'message_debug',
+                'cpu_time 2994 max_rss 60064'
+            ),
+        ]
     )
     conn.commit()
     workflow = Tokens('~user/workflow')
@@ -272,90 +520,204 @@ def test_make_task_query_3():
     assert return_value[0]['queue_quartiles'][0] == 60
     assert return_value[0]['run_quartiles'][0] == 540
     assert return_value[0]['total_quartiles'][0] == 600
+    assert return_value[0]['max_rss_quartiles'][0] == 40064
+    assert return_value[0]['cpu_time_quartiles'][0] == 994
     assert return_value[0]['id'].id == '~user/workflow//3/Task_1/01'
     assert return_value[0]['job_ID'] == 'UsersJob'
     assert return_value[0]['max_queue_time'] == 76
     assert return_value[0]['max_run_time'] == 644
     assert return_value[0]['max_total_time'] == 720
+    assert return_value[0]['max_max_rss'] == 60064
+    assert return_value[0]['max_cpu_time'] == 2994
     assert return_value[0]['mean_queue_time'] == pytest.approx(70.66, 0.01)
     assert return_value[0]['mean_run_time'] == pytest.approx(609.33, 0.01)
     assert return_value[0]['mean_total_time'] == pytest.approx(680.0, 0.01)
+    assert return_value[0]['mean_max_rss'] == pytest.approx(50064.0, 0.01)
     assert return_value[0]['min_queue_time'] == 60
     assert return_value[0]['min_run_time'] == 540
     assert return_value[0]['min_total_time'] == 600
+    assert return_value[0]['min_max_rss'] == 40064
+    assert return_value[0]['min_cpu_time'] == 994
     assert return_value[0]['name'] == 'Task_1'
     assert return_value[0]['platform'] == 'MyPlatform'
     assert return_value[0]['queue_quartiles'][1] == 76
     assert return_value[0]['run_quartiles'][1] == 644
     assert return_value[0]['total_quartiles'][1] == 720
+    assert return_value[0]['max_rss_quartiles'][1] == 50064
+    assert return_value[0]['cpu_time_quartiles'][1] == 1994
     assert return_value[0]['started_time'] == '2022-12-16T15:01:16Z'
     assert return_value[0]['state'] == 'succeeded'
     assert return_value[0]['std_dev_queue_time'] == pytest.approx(7.54, 0.01)
     assert return_value[0]['std_dev_run_time'] == pytest.approx(49.02, 0.01)
     assert return_value[0]['std_dev_total_time'] == pytest.approx(56.56, 0.01)
+    assert return_value[0]['std_dev_max_rss'] == pytest.approx(8164.0, 0.01)
+    assert return_value[0]['std_dev_cpu_time'] == pytest.approx(816.4, 0.01)
     assert return_value[0]['submit_num'] == 1
     assert return_value[0]['submitted_time'] == '2022-12-16T15:00:00Z'
     assert return_value[0]['queue_quartiles'][2] == 76
     assert return_value[0]['run_quartiles'][2] == 644
     assert return_value[0]['total_quartiles'][2] == 720
+    assert return_value[0]['max_rss_quartiles'][2] == 60064
+    assert return_value[0]['cpu_time_quartiles'][2] == 2994
+    assert return_value[0]['total_of_totals'] == 2994
 
 
 def test_make_jobs_query_1():
     conn = make_db(
-        (
-            '1',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-14T15:00:00Z',
-            '2022-12-14T15:01:00Z',
-            0,
-            '2022-12-14T15:01:00Z',
-            '2022-12-14T15:10:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
-        (
-            '2',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-15T15:00:00Z',
-            '2022-12-15T15:01:15Z',
-            0,
-            '2022-12-15T15:01:16Z',
-            '2022-12-15T15:12:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
-        (
-            '3',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-16T15:00:00Z',
-            '2022-12-16T15:01:15Z',
-            0,
-            '2022-12-16T15:01:16Z',
-            '2022-12-16T15:12:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
+        task_entries=[
+            (
+                '1',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-14T15:00:00Z',
+                '2022-12-14T15:01:00Z',
+                0,
+                '2022-12-14T15:01:00Z',
+                '2022-12-14T15:10:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-15T15:00:00Z',
+                '2022-12-15T15:01:15Z',
+                0,
+                '2022-12-15T15:01:16Z',
+                '2022-12-15T15:12:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-16T15:00:00Z',
+                '2022-12-16T15:01:15Z',
+                0,
+                '2022-12-16T15:01:16Z',
+                '2022-12-16T15:12:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            )
+        ],
+        task_events=[
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:10:00Z',
+                'message_debug',
+                'cpu_time 994 max_rss 40064'
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:10:00Z',
+                'message_debug',
+                'cpu_time 1994 max_rss 50064'
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:10:00Z',
+                'message_debug',
+                'cpu_time 2994 max_rss 60064'
+            ),
+        ]
     )
     conn.commit()
     workflow = Tokens('~user/workflow')
@@ -364,7 +726,6 @@ def test_make_jobs_query_1():
     return_value = run_jobs_query(conn, workflow, tasks)
 
     assert len(return_value) == 3
-
     assert return_value[0]['cycle_point'] == '1'
     assert return_value[0]['finished_time'] == '2022-12-14T15:10:00Z'
     assert return_value[0]['id'].id == '~user/workflow//1/Task_1/01'
@@ -389,7 +750,6 @@ def test_make_jobs_query_1():
 
 
 async def test_list_elements(monkeypatch):
-
     with pytest.raises(Exception) as e_info:
         await list_elements('tasks', stuff=[1, 2, 3], workflows=[])
 
@@ -515,10 +875,10 @@ async def test_job_query_filter():
         return (
             '1',
             task_name,
-            '01',
-            '{1}',
-            0,
             1,
+            '[1]',
+            0,
+            0,
             submit_start,
             submit_end,
             submit_status,
@@ -533,12 +893,13 @@ async def test_job_query_filter():
 
     # define a workflow with one job in each state
     conn = make_db(
-        make_job('waiting', None, None, None),
-        make_job('submitted', 0, None, False),
-        make_job('submit-failed', 1, None, False),
-        make_job('running', 0, None, True),
-        make_job('succeeded', 0, 0, True),
-        make_job('failed', 0, 1, True),
+        task_entries=[
+            make_job('waiting', None, None, None),
+            make_job('submitted', 0, None, False),
+            make_job('submit-failed', 1, None, False),
+            make_job('running', 0, None, True),
+            make_job('succeeded', 0, 0, True),
+            make_job('failed', 0, 1, True)],
     )
     workflow = Tokens('~user/workflow')
 
@@ -691,10 +1052,7 @@ async def test_jobNN_query(jobs, query, expected):
             'background',
             '1701',
         )
-
-    conn = make_db(
-        *(make_job(*job) for job in jobs)
-    )
+    conn = make_db(task_entries=(make_job(*job) for job in jobs))
     workflow = Tokens('~user/workflow')
     result = run_jobs_query(
         conn, workflow, ids=[Tokens(i, relative=True) for i in query]
