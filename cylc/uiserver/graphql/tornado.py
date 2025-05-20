@@ -147,7 +147,6 @@ class TornadoGraphQLHandler(web.RequestHandler):
     def get_context(self):
         return self.request
 
-    # noinspection PyUnusedLocal
     def get_root_value(self):
         return self.root_value
 
@@ -260,7 +259,6 @@ class TornadoGraphQLHandler(web.RequestHandler):
             return self.parsed_body
 
         elif content_type == "application/json":
-            # noinspection PyBroadException
             try:
                 body = self.request.body
             except Exception as e:
