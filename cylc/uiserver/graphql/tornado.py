@@ -267,17 +267,20 @@ class TornadoGraphQLHandler(web.RequestHandler):
             try:
                 request_json = json.loads(body)
                 if self.batch:
-                    assert isinstance(request_json, list), (
-                        "Batch requests should receive a list"
-                        ", but received {}."
-                    ).format(repr(request_json))
-                    assert (
-                        len(request_json) > 0
-                    ), "Received an empty list in the batch request."
+                    if not isinstance(request_json, list):
+                        raise AssertionError(
+                            "Batch requests should receive a list"
+                            ", but received {}."
+                        ).format(repr(request_json))
+                    if len(request_json <= 0):
+                        raise AssertionError(
+                            "Received an empty list in the batch request."
+                        )
                 else:
-                    assert isinstance(
-                        request_json, dict
-                    ), "The received data is not a valid JSON query."
+                    if not isinstance(request_json, dict):
+                        raise AssertionError(
+                            "The received data is not a valid JSON query."
+                        )
                 self.parsed_body = request_json
                 return self.parsed_body
             except AssertionError as e:

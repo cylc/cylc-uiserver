@@ -202,7 +202,8 @@ class TornadoSubscriptionServer:
             return self.on_connection_terminate(connection_context, op_id)
 
         elif op_type == GQL_START:
-            assert isinstance(payload, dict), "The payload must be a dict"
+            if not isinstance(payload, dict):
+                raise AssertionError("The payload must be a dict")
             params = self.get_graphql_params(connection_context, payload)
             return await self.on_start(connection_context, op_id, params)
 
@@ -345,7 +346,8 @@ class TornadoSubscriptionServer:
             message["type"] = op_type
         if payload is not None:
             message["payload"] = payload
-        assert message, "You need to send at least one thing"
+        if not message:
+            raise AssertionError("You need to send at least one thing")
         return message
 
     async def send_execution_result(
@@ -374,10 +376,11 @@ class TornadoSubscriptionServer:
         if error_type is None:
             error_type = GQL_ERROR
 
-        assert error_type in [GQL_CONNECTION_ERROR, GQL_ERROR], (
-            "error_type should be one of the allowed error messages"
-            " GQL_CONNECTION_ERROR or GQL_ERROR"
-        )
+        if error_type not in {GQL_CONNECTION_ERROR, GQL_ERROR}:
+            raise AssertionError(
+                "error_type should be one of the allowed error messages"
+                " GQL_CONNECTION_ERROR or GQL_ERROR"
+            )
 
         error_payload = {"message": str(error)}
 
@@ -388,9 +391,8 @@ class TornadoSubscriptionServer:
         try:
             if not isinstance(message, dict):
                 parsed_message = json.loads(message)
-                assert isinstance(
-                    parsed_message, dict
-                ), "Payload must be an object."
+                if not isinstance(parsed_message, dict):
+                    raise AssertionError("Payload must be an object.")
             else:
                 parsed_message = message
         except Exception as e:
