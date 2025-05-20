@@ -35,6 +35,7 @@ from typing import (
     List,
     Optional,
     Tuple,
+    Union,
 )
 
 from tornado import web
@@ -59,11 +60,10 @@ from graphql.execution.middleware import MiddlewareManager
 from graphql.pyutils import is_awaitable
 from graphql.validation import validate
 
-from graphene import Schema
-
 from cylc.flow.network.graphql import instantiate_middleware
 
 if TYPE_CHECKING:
+    from graphene import Schema
     from tornado.httputil import HTTPServerRequest
 
 MUTATION_ERRORS_FLAG = "graphene_mutation_has_errors"
@@ -109,51 +109,40 @@ class ExecutionError(Exception):
 
 class TornadoGraphQLHandler(web.RequestHandler):
 
-    schema = None
-    middleware = None
-    root_value = None
-    pretty = False
-    batch = False
-    execution_context_class = None
-    validation_rules = None
-
     document: Optional[DocumentNode]
-    graphql_params: Optional[Tuple[Any, Any, Any, Any]] = None
-    parsed_body: Optional[Dict[str, Any]] = None
-
-    headers = None
+    graphql_params: Optional[Tuple[Any, Any, Any, Any]]
+    middleware: Optional[Union[MiddlewareManager, List[Callable], None]]
+    parsed_body: Optional[Dict[str, Any]]
 
     def initialize(
         self,
-        schema=None,
-        middleware=None,
+        schema: 'Schema',
+        middleware: Union[MiddlewareManager, List[type], None] = None,
         root_value=None,
-        pretty=False,
-        batch=False,
+        pretty: bool = False,
+        batch: bool = False,
         subscription_path=None,
         execution_context_class=None,
         validation_rules=None,
-    ):
+    ) -> None:
         super(TornadoGraphQLHandler, self).initialize()
-        self.schema = schema or self.schema
-        if middleware is not None:
-            if isinstance(middleware, MiddlewareManager):
-                self.middleware = middleware
-            else:
-                self.middleware = list(instantiate_middleware(middleware))
+        self.schema = schema
         self.root_value = root_value
-        self.pretty = pretty or self.pretty
-        self.batch = batch or self.batch
-        self.execution_context_class = (
-            execution_context_class or self.execution_context_class
-        )
-        self.subscription_path = subscription_path or self.subscription_path
+        self.pretty = pretty
+        self.batch = batch
+        self.subscription_path = subscription_path
+        self.execution_context_class = execution_context_class
+        self.validation_rules = validation_rules
 
-        assert isinstance(
-            self.schema, Schema
-        ), "A Schema is required to be provided to GraphQLView."
+        self.graphql_params = None
+        self.parsed_body = None
 
-        self.validation_rules = validation_rules or self.validation_rules
+        if isinstance(middleware, MiddlewareManager):
+            self.middleware = middleware
+        elif middleware is not None:
+            self.middleware = list(instantiate_middleware(middleware))
+        else:
+            self.middleware = None
 
     def get_context(self):
         return self.request
@@ -162,7 +151,7 @@ class TornadoGraphQLHandler(web.RequestHandler):
     def get_root_value(self):
         return self.root_value
 
-    def get_middleware(self) -> Optional[List[Callable]]:
+    def get_middleware(self) -> Union[MiddlewareManager, List[Callable], None]:
         return self.middleware
 
     def get_parsed_body(self):

@@ -28,9 +28,6 @@ from tornado import (
     websocket,
 )
 from tornado.ioloop import IOLoop
-from graphql.execution.middleware import MiddlewareManager
-
-from cylc.flow.network.graphql import instantiate_middleware
 
 from cylc.uiserver import __version__
 from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
@@ -157,7 +154,7 @@ class CylcAppHandler(JupyterHandler):
 
     def initialize(self, auth):
         self.auth = auth
-        super().initialize()
+        JupyterHandler.initialize(self)
 
     @property
     def hub_users(self):
@@ -316,30 +313,34 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
         self.set_header('Server', '')
 
     def initialize(
-        self, schema=None, middleware=None, root_value=None, pretty=False,
-        batch=False, execution_context_class=None, validation_rules=None,
-        auth=None, **kwargs
+        self,
+        schema,
+        middleware=None,
+        root_value=None,
+        pretty=False,
+        batch=False,
+        execution_context_class=None,
+        validation_rules=None,
+        auth=None,
+        **kwargs,
     ):
-        super(TornadoGraphQLHandler, self).initialize()
-
-        self.schema = schema or self.schema
-        self.auth = auth
-        if middleware is not None:
-            if isinstance(middleware, MiddlewareManager):
-                self.middleware = middleware
-            else:
-                self.middleware = list(instantiate_middleware(middleware))
-        self.root_value = root_value
-        self.pretty = pretty or self.pretty
-        self.batch = batch or self.batch
-        self.execution_context_class = (
-            execution_context_class or self.execution_context_class
+        TornadoGraphQLHandler.initialize(
+            self,
+            schema,
+            middleware=middleware,
+            root_value=root_value,
+            pretty=pretty,
+            batch=batch,
+            execution_context_class=execution_context_class,
+            validation_rules=validation_rules,
         )
+        CylcAppHandler.initialize(self, auth)
 
         # Make authorization info available to auth middleware
         for mw in self.middleware:
             if isinstance(mw, AuthorizationMiddleware):
                 mw.auth = self.auth
+
         # Set extra attributes
         for key, value in kwargs.items():
             if hasattr(self, key):
