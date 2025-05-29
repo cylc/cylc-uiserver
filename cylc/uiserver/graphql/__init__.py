@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Websockets and subscriptions related code."""
+"""GraphQL, Websockets and subscriptions related code."""
 
 from typing import (
     Awaitable,
