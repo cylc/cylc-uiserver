@@ -16,6 +16,7 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 import asyncio
+from enum import Enum
 from contextlib import suppress
 from copy import deepcopy
 import errno
@@ -42,17 +43,14 @@ from typing import (
     Union,
 )
 
+from graphql.language import print_ast
+import psutil
+
 from cylc.flow.data_store_mgr import WORKFLOW
 from cylc.flow.exceptions import CylcError
 from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
-from cylc.flow.scripts.clean import (
-    CleanOptions,
-    run,
-)
-from graphql.language.base import print_ast
-import psutil
-
+from cylc.flow.scripts.clean import CleanOptions, run
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
@@ -61,7 +59,7 @@ if TYPE_CHECKING:
 
     from cylc.flow.data_store_mgr import DataStoreMgr
     from cylc.flow.option_parsers import Options
-    from graphql import ResolveInfo
+    from graphql import GraphQLResolveInfo
 
     from cylc.uiserver.app import CylcUIServer
     from cylc.uiserver.workflows_mgr import WorkflowsManager
@@ -142,6 +140,8 @@ def _build_cmd(cmd: List, args: Dict) -> List:
             if isinstance(value, int) and not isinstance(value, bool):
                 # Any integer items need converting to strings:
                 value = str(value)
+            elif isinstance(value, Enum):
+                value = value.value
             value = [value]
         for item in value:
             cmd.append(key)
@@ -537,7 +537,7 @@ class Resolvers(BaseResolvers):
     # Mutations
     async def mutator(
         self,
-        info: 'ResolveInfo',
+        info: 'GraphQLResolveInfo',
         command: str,
         w_args: Dict[str, Any],
         _kwargs: Dict[str, Any],
@@ -562,7 +562,8 @@ class Resolvers(BaseResolvers):
         # Create a modified request string,
         # containing only the current mutation/field.
         operation_ast = deepcopy(info.operation)
-        operation_ast.selection_set.selections = info.field_asts
+        operation_ast.selection_set.selections = tuple(
+            n for n in info.field_nodes)
 
         graphql_args = {
             'request_string': print_ast(operation_ast),
@@ -574,11 +575,18 @@ class Resolvers(BaseResolvers):
 
     async def service(
         self,
-        info: 'ResolveInfo',
+        info: 'GraphQLResolveInfo',
         command: str,
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any],
     ) -> List[Union[bool, str]]:
+
+        # GraphQL v3 includes all variables that are set, even if set to null.
+        kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if v is not None
+        }
 
         if command == 'clean':  # noqa: SIM116
             return await Services.clean(
@@ -605,7 +613,7 @@ class Resolvers(BaseResolvers):
 
     async def subscription_service(
         self,
-        info: 'ResolveInfo',
+        info: 'GraphQLResolveInfo',
         _command: str,
         ids: List[Tokens],
         file=None
@@ -652,7 +660,7 @@ def kill_process_tree(
 
 async def list_log_files(
     root: Optional[Any],
-    info: 'ResolveInfo',
+    info: 'GraphQLResolveInfo',
     id: str,  # noqa: required to match schema arg name
 ):
     tokens = Tokens(id)
@@ -665,7 +673,7 @@ async def list_log_files(
 
 async def stream_log(
     root: Optional[Any],
-    info: 'ResolveInfo',
+    info: 'GraphQLResolveInfo',
     *,
     command='cat_log',
     id: str,  # noqa: required to match schema arg name
