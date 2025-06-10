@@ -71,11 +71,7 @@ MAX_VALIDATION_ERRORS = None
 
 
 def get_content_type(request: 'HTTPServerRequest') -> str:
-    content_type = request.headers.get(
-        "Content-Type",
-        request.headers.get("Content-Type", "")
-    )
-    return content_type.split(";", 1)[0].lower()
+    return request.headers.get("Content-Type", "").split(";", 1)[0].lower()
 
 
 def get_accepted_content_types(request: 'HTTPServerRequest') -> list:
