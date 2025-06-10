@@ -156,9 +156,7 @@ class TornadoSubscriptionServer:
         self.schema = schema
         self.loop = loop
         self.middleware = middleware
-        self.execution_context_class = (
-            execution_context_class or self.execution_context_class
-        )
+        self.execution_context_class = execution_context_class
         self.auth = auth
 
     async def execute(self, params):
