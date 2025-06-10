@@ -60,6 +60,11 @@ c.JupyterHub.template_paths = [
     str(files('cylc.uiserver') / 'templates')
 ]
 
+# configure websocket pings (prevents clients / proxies closing seemingly idle
+# connections and helps us to detect dead connections)
+c.ServerApp.websocket_ping_interval = 5
+c.ServerApp.websocket_ping_timeout = 5
+
 # store JupyterHub runtime files in the user config directory
 USER_CONF_ROOT.mkdir(parents=True, exist_ok=True)
 c.JupyterHub.cookie_secret_file = f'{USER_CONF_ROOT / "cookie_secret"}'
