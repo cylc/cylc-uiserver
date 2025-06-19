@@ -16,13 +16,18 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Tuple
-from async_timeout import timeout
 import logging
 import os
 import pytest
 from unittest.mock import MagicMock, Mock
 from subprocess import Popen, TimeoutExpired
 from types import SimpleNamespace
+
+import sys
+if sys.version_info >= (3, 11):
+    from asyncio import timeout
+else:
+    from async_timeout import timeout
 
 from cylc.flow import CYLC_LOG
 from cylc.flow.exceptions import CylcError

@@ -161,3 +161,18 @@ async def test_multi(gql_query, monkeypatch, cylc_uis, dummy_workflow):
           }
         }
     ''').strip()
+
+    # issue clean mutation
+    response = await gql_query(
+        *('cylc', 'graphql'),
+        query='''
+            mutation {
+                clean(workflows: ["%s"]){
+                    result
+                }
+            }
+        ''' % (
+            Tokens(user='me', workflow='foo').id,
+        ),
+    )
+    assert response.code == 200

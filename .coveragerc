@@ -28,7 +28,6 @@ disable_warnings=
 omit =
     venv/*
     cylc/uiserver/tests/*
-    cylc/uiserver/websockets/*
     cylc/uiserver/jupyter*_config.py
 parallel = True
 plugins=
@@ -61,7 +60,6 @@ ignore_errors = False
 omit =
     venv/*
     cylc/uiserver/tests/*
-    cylc/uiserver/websockets/*
     cylc/uiserver/jupyter*_config.py
 precision=2
 show_missing=False
