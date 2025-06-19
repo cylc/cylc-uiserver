@@ -856,7 +856,7 @@ class UISQueries(Queries):
 # graphene at v3.4.3 does not. As a workaround
 # the subscribe function is looked up via the following mapping:
 SUB_RESOLVER_MAPPING.update({
-    'logs': stream_log,
+    'logs': stream_log,  # type: ignore
 })
 
 
