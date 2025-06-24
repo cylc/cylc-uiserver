@@ -32,10 +32,7 @@ jobs:
     strategy:
       matrix:
         os: ['ubuntu-latest', 'macos-latest']
-        python: ['3.7', '3.8', '3.9', '3.10', '3']
-        exclude:
-          - os: 'macos-latest'
-            python: '3.7'
+        python: ['3.9', '3']  # oldest/newest supported versions
     steps:
       - name: Checkout
         uses: actions/checkout@v4
