@@ -332,9 +332,8 @@ class TornadoSubscriptionServer:
     async def send_message(
         self, connection_context, op_id=None, op_type=None, payload=None
     ):
-        if op_id is None or connection_context.has_operation(op_id):
-            message = self.build_message(op_id, op_type, payload)
-            return await connection_context.send(message)
+        message = self.build_message(op_id, op_type, payload)
+        return await connection_context.send(message)
 
     def build_message(self, _id, op_type, payload):
         message = {}
