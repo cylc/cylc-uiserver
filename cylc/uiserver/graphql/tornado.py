@@ -60,7 +60,11 @@ from graphql.execution.middleware import MiddlewareManager
 from graphql.pyutils import is_awaitable
 from graphql.validation import validate
 
-from cylc.flow.network.graphql import instantiate_middleware
+from cylc.flow.network.graphql import (
+    NULL_VALUE,
+    instantiate_middleware,
+    strip_null
+)
 
 if TYPE_CHECKING:
     from graphene import Schema
@@ -68,6 +72,20 @@ if TYPE_CHECKING:
 
 MUTATION_ERRORS_FLAG = "graphene_mutation_has_errors"
 MAX_VALIDATION_ERRORS = None
+
+
+def data_search_action(data, action):
+    if isinstance(data, dict):
+        return {
+            key: data_search_action(val, action)
+            for key, val in data.items()
+        }
+    if isinstance(data, list):
+        return [
+            data_search_action(val, action)
+            for val in data
+        ]
+    return action(data)
 
 
 def get_content_type(request: 'HTTPServerRequest') -> str:
@@ -233,8 +251,31 @@ class TornadoGraphQLHandler(web.RequestHandler):
             if self.batch:
                 response["id"] = _id
                 response["status"] = status_code
+            try:
+                result = self.json_encode(response)
+            except TypeError:
+                # Catch exceptions in response
+                errors = []
 
-            result = self.json_encode(response)
+                def exc_to_errors(data):
+                    if isinstance(data, Exception):
+                        errors.append({
+                            'message': (
+                                f'{data.value}'
+                                if hasattr(data, 'value') else f'{data}'
+                            )
+                        })
+                        return NULL_VALUE
+                    return data
+
+                response = data_search_action(
+                    response,
+                    exc_to_errors
+                )
+                response.setdefault("errors", []).extend(errors)
+                response = strip_null(response)
+
+                result = self.json_encode(response)
         else:
             result = None
 
