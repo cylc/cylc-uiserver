@@ -17,11 +17,11 @@ from contextlib import suppress
 from functools import lru_cache
 from getpass import getuser
 import grp
-from inspect import iscoroutinefunction
 import os
 from typing import List, Optional, Union, Set, Tuple
 
 import graphene
+from graphql.pyutils import is_awaitable
 from jupyter_server.auth import Authorizer
 from tornado import web
 
@@ -508,10 +508,15 @@ class AuthorizationMiddleware:
 
     def resolve(self, next_, root, info, **args):
         current_user = info.context["current_user"]
-        # We won't be re-checking auth for return variables
-        if len(info.path) > 1:
+        # The resolving starts at the top of the path, so only the first
+        # entry is guarded, and any subsequent fields do not need to be
+        # checked.
+        if len(info.path.as_list()) > 1:
             return next_(root, info, **args)
-        op_name = self.get_op_name(info.field_name, info.operation.operation)
+        op_name = self.get_op_name(
+            info.field_name,
+            info.operation.operation.value
+        )
         # It shouldn't get here but worth checking for zero trust
         if not op_name:
             self.auth_failed(
@@ -527,12 +532,7 @@ class AuthorizationMiddleware:
             authorised = False
         if not authorised:
             self.auth_failed(current_user, op_name, http_code=403)
-        if (
-            info.operation.operation in Authorization.ASYNC_OPS
-            or iscoroutinefunction(next_)
-        ):
-            return self.async_resolve(next_, root, info, **args)
-        return next_(root, info, **args)
+        return self.async_resolve(next_, root, info, **args)
 
     def auth_failed(
         self,
@@ -588,7 +588,10 @@ class AuthorizationMiddleware:
 
     async def async_resolve(self, next_, root, info, **args):
         """Return awaited coroutine"""
-        return await next_(root, info, **args)
+        result = next_(root, info, **args)
+        if is_awaitable(result):
+            return await result
+        return result
 
 
 def get_groups(username: str) -> Tuple[List[str], List[str]]:
