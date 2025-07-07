@@ -31,8 +31,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          # return to 3.x once cylc-flow is compatible with 3.10+ (pyuv)
-          python-version: '3.9'
+          python-version: '3'
 
       - name: Create & checkout PR branch
         uses: cylc/release-actions/stage-1/checkout-pr-branch@v1
