@@ -20,11 +20,11 @@ from unittest import mock
 from unittest.mock import MagicMock
 import pytest
 
-from graphql_ws.constants import GRAPHQL_WS
 from tornado.httputil import HTTPServerRequest
 from tornado.testing import AsyncHTTPTestCase, get_async_test_timeout
 from tornado.web import Application
 
+from cylc.uiserver.graphql.tornado_ws import GRAPHQL_WS
 from cylc.uiserver.handlers import SubscriptionHandler
 
 

@@ -14,9 +14,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import importlib
+import pytest
 
 import cylc.uiserver.schema
-from cylc.uiserver.schema import NODE_MAP as UIS_NODE_MAP
+from cylc.uiserver.schema import NODE_MAP as UIS_NODE_MAP, mutator
 
 
 def test_node_map():
@@ -30,3 +31,19 @@ def test_node_map():
         _class = getattr(cylc.uiserver.schema, type_name)
         # It is not straightforward to check that _class is a Graphene class
         assert 'graphene' in type(_class).__module__
+
+
+async def test_mutator(cylc_uis):
+    """Test exception and arg variants."""
+    class Info:
+        context = {'resolvers': cylc_uis.resolvers, 'id': 1}
+
+    with pytest.raises(Exception) as exc:
+        await mutator(
+            None,
+            Info(),
+            command='NotACommand',
+            workflows=None,
+            args={'This': 'That'}
+        )
+    assert 'NotImplementedError' in f'{exc}'

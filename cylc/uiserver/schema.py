@@ -30,6 +30,10 @@ from typing import (
     Tuple,
 )
 
+import graphene
+from graphene.types.generic import GenericScalar
+from graphene.types.schema import identity_resolve
+
 from cylc.flow.data_store_mgr import (
     JOBS,
     TASKS,
@@ -38,6 +42,7 @@ from cylc.flow.id import Tokens
 from cylc.flow.network.schema import (
     NODE_MAP,
     STRIP_NULL_DEFAULT,
+    SUB_RESOLVER_MAPPING,
     CyclePoint,
     GenericResponse,
     Job,
@@ -47,7 +52,7 @@ from cylc.flow.network.schema import (
     Subscriptions,
     Task,
     WorkflowID,
-    WorkflowRunMode as RunMode,
+    WorkflowRunMode,
     _mut_field,
     get_nodes_all,
     process_resolver_info,
@@ -64,8 +69,6 @@ from cylc.flow.task_state import (
 )
 from cylc.flow.util import sstrip
 from cylc.flow.workflow_files import WorkflowFiles
-import graphene
-from graphene.types.generic import GenericScalar
 
 from cylc.uiserver.resolvers import (
     Resolvers,
@@ -75,12 +78,12 @@ from cylc.uiserver.resolvers import (
 
 
 if TYPE_CHECKING:
-    from graphql import ResolveInfo
+    from graphql import GraphQLResolveInfo
 
 
 async def mutator(
     root: Optional[Any],
-    info: 'ResolveInfo',
+    info: 'GraphQLResolveInfo',
     *,
     command: str,
     workflows: Optional[List[str]] = None,
@@ -98,7 +101,11 @@ async def mutator(
     resolvers: 'Resolvers' = (
         info.context.get('resolvers')  # type: ignore[union-attr]
     )
-    res = await resolvers.service(info, command, parsed_workflows, kwargs)
+    try:
+        res = await resolvers.service(info, command, parsed_workflows, kwargs)
+    except Exception as exc:
+        resolvers.log.exception(exc)
+        raise
     return GenericResponse(result=res)
 
 
@@ -167,9 +174,7 @@ class Play(graphene.Mutation):
                 Hold all tasks after this cycle point.
             ''')
         )
-        mode = RunMode(
-            default_value=RunMode.Live.name
-        )
+        mode = WorkflowRunMode(default_value=WorkflowRunMode.Live)
         host = graphene.String(
             description=sstrip('''
                 Specify the host on which to start-up the workflow. If not
@@ -845,6 +850,16 @@ class UISQueries(Queries):
     )
 
 
+# TODO: Change to use subscribe arg/default.
+# See https://github.com/cylc/cylc-flow/issues/6688
+# graphql-core has a subscribe field for both Meta and Field,
+# graphene at v3.4.3 does not. As a workaround
+# the subscribe function is looked up via the following mapping:
+SUB_RESOLVER_MAPPING.update({
+    'logs': stream_log,  # type: ignore
+})
+
+
 class UISSubscriptions(Subscriptions):
     # Example graphiql workflow log subscription:
     # subscription {
@@ -872,7 +887,7 @@ class UISSubscriptions(Subscriptions):
             required=False,
             description='File name of job log to fetch, e.g. job.out'
         ),
-        resolver=stream_log
+        resolver=identity_resolve
     )
 
 
