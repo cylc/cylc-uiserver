@@ -435,7 +435,7 @@ GROUP BY
             'state': _state_to_status(row[3], row[4], row[5]),
             'started_time': row[5],
             'finished_time': row[6],
-            'job_ID': row[7],
+            'job_id': row[7],
             'platform': row[8],
             'submitted_time': row[9],
             # Queue time stats
@@ -705,7 +705,8 @@ def run_jobs_query(
             submit_status,
             time_run AS started_time,
             time_run_exit AS finished_time,
-            job_id AS job_ID,
+            job_id,
+            job_runner_name,
             platform_name AS platform,
             time_submit AS submitted_time,
             STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit)
