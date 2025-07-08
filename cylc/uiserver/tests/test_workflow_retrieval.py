@@ -17,12 +17,16 @@
 and perform simple statistical calculations for the analysis tab"""
 
 from typing import Union
+from unittest.mock import Mock
 import pytest
 import sqlite3
+
+from graphene.test import Client
 
 from cylc.flow.id import Tokens
 from cylc.uiserver.schema import (
     run_task_query,
+    schema,
     run_jobs_query,
     list_elements,
     get_elements,
@@ -700,3 +704,61 @@ async def test_jobNN_query(jobs, query, expected):
         conn, workflow, ids=[Tokens(i, relative=True) for i in query]
     )
     assert {item['id'].relative_id for item in result} == expected
+
+
+async def test_e2e_jobs_query(monkeypatch: pytest.MonkeyPatch):
+    """End-to-end test for non-live jobs query."""
+    entry = {
+        'id': 'wflow//5/mytask/02',
+        'submitNum': 2,
+        'state': 'succeeded',
+        'name': 'mytask',
+        'cyclePoint': '5',
+        'submittedTime': '2022-12-14T15:00:00Z',
+        'startedTime': '2022-12-14T15:00:02Z',
+        'finishedTime': '2022-12-14T15:01:40Z',
+        'jobId': '1494401',
+        'jobRunnerName': 'horatio',
+        'platform': 'intrepid',
+        'totalTime': 100,
+        'queueTime': 2,
+        'runTime': 98,
+    }
+    conn = make_db((
+        entry['cyclePoint'],
+        entry['name'],
+        entry['submitNum'],
+        '[1]',
+        0,
+        1,
+        entry['submittedTime'],
+        '2022-12-14T15:00:01Z',
+        0,
+        entry['startedTime'],
+        entry['finishedTime'],
+        None,
+        0,
+        entry['platform'],
+        entry['jobRunnerName'],
+        entry['jobId'],
+    ))
+    mock_dao = Mock(
+        return_value=Mock(
+            __enter__=Mock(return_value=Mock(connect=lambda: conn)),
+            __exit__=Mock(),
+        )
+    )
+    monkeypatch.setattr('cylc.uiserver.schema.CylcWorkflowDAO', mock_dao)
+    client = Client(schema, context={})
+
+    executed = await client.execute_async(
+        '''
+        query {
+            jobs(live: false, ids: ["5/mytask/2"], workflows: ["wflow"]) {
+                %s
+            }
+        }
+        ''' % ','.join(entry.keys())
+    )
+    assert 'errors' not in executed, executed['errors']
+    assert executed['data']['jobs'] == [entry]
