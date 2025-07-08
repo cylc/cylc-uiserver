@@ -116,6 +116,7 @@ from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
 INFO_FILES_DIR = Path(USER_CONF_ROOT / "info_files")
+DELTA_PROCESSING_INTERVAL = 0.5
 
 
 class PathType(TraitType):
@@ -326,16 +327,6 @@ class CylcUIServer(ExtensionApp):
         ''',
         default_value=1
     )
-    max_threads = Int(
-        config=True,
-        help='''
-            Set the maximum number of threads the Cylc UI Server can use.
-
-            This determines the maximum number of active workflows that the
-            server can track.
-        ''',
-        default_value=100,
-    )
     profile = Bool(
         config=True,
         help='''
@@ -430,7 +421,6 @@ class CylcUIServer(ExtensionApp):
         self.data_store_mgr = DataStoreMgr(
             self.workflows_mgr,
             self.log,
-            self.max_threads,
         )
         # sub_status dictionary storing status of subscriptions
         self.sub_statuses = {}
@@ -494,6 +484,12 @@ class CylcUIServer(ExtensionApp):
         ioloop.PeriodicCallback(
             self.workflows_mgr.scan,
             self.scan_interval * 1000
+        ).start()
+
+        # process incoming ZeroMQ deltas from the scheduler(s)
+        ioloop.PeriodicCallback(
+            self.data_store_mgr.process_incoming_deltas,
+            DELTA_PROCESSING_INTERVAL * 1000
         ).start()
 
     def initialize_handlers(self):
@@ -624,9 +620,6 @@ class CylcUIServer(ExtensionApp):
         # stop active subscriptions
         for sub in self.data_store_mgr.w_subs.values():
             sub.stop()
-
-        # Shutdown the thread pool executor (used for subscription processing)
-        self.data_store_mgr.executor.shutdown(wait=False)
 
         # stop the process pool (used for background commands)
         self.executor.shutdown()
