@@ -16,16 +16,20 @@
 """This file tests the ability for the cylc UI to retrieve workflow information
 and perform simple statistical calculations for the analysis tab"""
 
-from typing import Union
-import pytest
 import sqlite3
+from typing import Union
+from unittest.mock import Mock
 
 from cylc.flow.id import Tokens
+from graphene.test import Client
+import pytest
+
 from cylc.uiserver.schema import (
-    run_task_query,
-    run_jobs_query,
-    list_elements,
     get_elements,
+    list_elements,
+    run_jobs_query,
+    run_task_query,
+    schema,
 )
 
 
@@ -89,40 +93,34 @@ def test_make_task_query_1():
     )
     workflow = Tokens('~user/workflow')
 
-    return_value = run_task_query(conn, workflow)
+    ret = run_task_query(conn, workflow)[0]
 
-    assert return_value[0]['count'] == 1
-    assert return_value[0]['cycle_point'] == '1'
-    assert return_value[0]['finished_time'] == '2022-12-14T15:10:00Z'
-    assert return_value[0]['queue_quartiles'][0] == 60
-    assert return_value[0]['run_quartiles'][0] == 540
-    assert return_value[0]['total_quartiles'][0] == 600
-    assert return_value[0]['id'].id == '~user/workflow//1/Task_1/01'
-    assert return_value[0]['job_ID'] == 'UsersJob'
-    assert return_value[0]['max_queue_time'] == 60
-    assert return_value[0]['max_run_time'] == 540
-    assert return_value[0]['max_total_time'] == 600
-    assert return_value[0]['mean_queue_time'] == pytest.approx(60.0, 0.01)
-    assert return_value[0]['mean_run_time'] == pytest.approx(540.0, 0.01)
-    assert return_value[0]['mean_total_time'] == pytest.approx(600.0, 0.01)
-    assert return_value[0]['min_queue_time'] == 60
-    assert return_value[0]['min_run_time'] == 540
-    assert return_value[0]['min_total_time'] == 600
-    assert return_value[0]['name'] == 'Task_1'
-    assert return_value[0]['platform'] == 'MyPlatform'
-    assert return_value[0]['queue_quartiles'][1] == 60
-    assert return_value[0]['run_quartiles'][1] == 540
-    assert return_value[0]['total_quartiles'][1] == 600
-    assert return_value[0]['started_time'] == '2022-12-14T15:01:00Z'
-    assert return_value[0]['state'] == 'succeeded'
-    assert return_value[0]['std_dev_queue_time'] == pytest.approx(0.0, 0.01)
-    assert return_value[0]['std_dev_run_time'] == pytest.approx(0.0, 0.01)
-    assert return_value[0]['std_dev_total_time'] == pytest.approx(0.0, 0.01)
-    assert return_value[0]['submit_num'] == 1
-    assert return_value[0]['submitted_time'] == '2022-12-14T15:00:00Z'
-    assert return_value[0]['queue_quartiles'][2] == 60
-    assert return_value[0]['run_quartiles'][2] == 540
-    assert return_value[0]['total_quartiles'][2] == 600
+    assert ret['count'] == 1
+    assert ret['cycle_point'] == '1'
+    assert ret['finished_time'] == '2022-12-14T15:10:00Z'
+    assert ret['queue_quartiles'] == [60, 60, 60]
+    assert ret['run_quartiles'] == [540, 540, 540]
+    assert ret['total_quartiles'] == [600, 600, 600]
+    assert ret['id'].id == '~user/workflow//1/Task_1/01'
+    assert ret['job_id'] == 'UsersJob'
+    assert ret['max_queue_time'] == 60
+    assert ret['max_run_time'] == 540
+    assert ret['max_total_time'] == 600
+    assert ret['mean_queue_time'] == pytest.approx(60.0, 0.01)
+    assert ret['mean_run_time'] == pytest.approx(540.0, 0.01)
+    assert ret['mean_total_time'] == pytest.approx(600.0, 0.01)
+    assert ret['min_queue_time'] == 60
+    assert ret['min_run_time'] == 540
+    assert ret['min_total_time'] == 600
+    assert ret['name'] == 'Task_1'
+    assert ret['platform'] == 'MyPlatform'
+    assert ret['started_time'] == '2022-12-14T15:01:00Z'
+    assert ret['state'] == 'succeeded'
+    assert ret['std_dev_queue_time'] == pytest.approx(0.0, 0.01)
+    assert ret['std_dev_run_time'] == pytest.approx(0.0, 0.01)
+    assert ret['std_dev_total_time'] == pytest.approx(0.0, 0.01)
+    assert ret['submit_num'] == 1
+    assert ret['submitted_time'] == '2022-12-14T15:00:00Z'
 
 
 def test_make_task_query_2():
@@ -167,40 +165,34 @@ def test_make_task_query_2():
     conn.commit()
     workflow = Tokens('~user/workflow')
 
-    return_value = run_task_query(conn, workflow)
+    ret = run_task_query(conn, workflow)[0]
 
-    assert return_value[0]['count'] == 2
-    assert return_value[0]['cycle_point'] == '2'
-    assert return_value[0]['finished_time'] == '2022-12-15T15:12:00Z'
-    assert return_value[0]['queue_quartiles'][0] == 60
-    assert return_value[0]['run_quartiles'][0] == 540
-    assert return_value[0]['total_quartiles'][0] == 600
-    assert return_value[0]['id'].id == '~user/workflow//2/Task_1/01'
-    assert return_value[0]['job_ID'] == 'UsersJob'
-    assert return_value[0]['max_queue_time'] == 76
-    assert return_value[0]['max_run_time'] == 644
-    assert return_value[0]['max_total_time'] == 720
-    assert return_value[0]['mean_queue_time'] == pytest.approx(68.0, 0.01)
-    assert return_value[0]['mean_run_time'] == pytest.approx(592.0, 0.01)
-    assert return_value[0]['mean_total_time'] == pytest.approx(660.0, 0.01)
-    assert return_value[0]['min_queue_time'] == 60
-    assert return_value[0]['min_run_time'] == 540
-    assert return_value[0]['min_total_time'] == 600
-    assert return_value[0]['name'] == 'Task_1'
-    assert return_value[0]['platform'] == 'MyPlatform'
-    assert return_value[0]['queue_quartiles'][1] == 76
-    assert return_value[0]['run_quartiles'][1] == 644
-    assert return_value[0]['total_quartiles'][1] == 720
-    assert return_value[0]['started_time'] == '2022-12-15T15:01:16Z'
-    assert return_value[0]['state'] == 'succeeded'
-    assert return_value[0]['std_dev_queue_time'] == pytest.approx(8.00, 0.01)
-    assert return_value[0]['std_dev_run_time'] == pytest.approx(52.0, 0.01)
-    assert return_value[0]['std_dev_total_time'] == pytest.approx(60.0, 0.01)
-    assert return_value[0]['submit_num'] == 1
-    assert return_value[0]['submitted_time'] == '2022-12-15T15:00:00Z'
-    assert return_value[0]['queue_quartiles'][2] == 60
-    assert return_value[0]['run_quartiles'][2] == 540
-    assert return_value[0]['total_quartiles'][2] == 600
+    assert ret['count'] == 2
+    assert ret['cycle_point'] == '2'
+    assert ret['finished_time'] == '2022-12-15T15:12:00Z'
+    assert ret['queue_quartiles'] == [60, 76, 60]
+    assert ret['run_quartiles'] == [540, 644, 540]
+    assert ret['total_quartiles'] == [600, 720, 600]
+    assert ret['id'].id == '~user/workflow//2/Task_1/01'
+    assert ret['job_id'] == 'UsersJob'
+    assert ret['max_queue_time'] == 76
+    assert ret['max_run_time'] == 644
+    assert ret['max_total_time'] == 720
+    assert ret['mean_queue_time'] == pytest.approx(68.0, 0.01)
+    assert ret['mean_run_time'] == pytest.approx(592.0, 0.01)
+    assert ret['mean_total_time'] == pytest.approx(660.0, 0.01)
+    assert ret['min_queue_time'] == 60
+    assert ret['min_run_time'] == 540
+    assert ret['min_total_time'] == 600
+    assert ret['name'] == 'Task_1'
+    assert ret['platform'] == 'MyPlatform'
+    assert ret['started_time'] == '2022-12-15T15:01:16Z'
+    assert ret['state'] == 'succeeded'
+    assert ret['std_dev_queue_time'] == pytest.approx(8.00, 0.01)
+    assert ret['std_dev_run_time'] == pytest.approx(52.0, 0.01)
+    assert ret['std_dev_total_time'] == pytest.approx(60.0, 0.01)
+    assert ret['submit_num'] == 1
+    assert ret['submitted_time'] == '2022-12-15T15:00:00Z'
 
 
 def test_make_task_query_3():
@@ -263,41 +255,36 @@ def test_make_task_query_3():
     conn.commit()
     workflow = Tokens('~user/workflow')
 
-    return_value = run_task_query(conn, workflow)
+    ret = run_task_query(conn, workflow)
 
-    assert len(return_value) == 1
-    assert return_value[0]['count'] == 3
-    assert return_value[0]['cycle_point'] == '3'
-    assert return_value[0]['finished_time'] == '2022-12-16T15:12:00Z'
-    assert return_value[0]['queue_quartiles'][0] == 60
-    assert return_value[0]['run_quartiles'][0] == 540
-    assert return_value[0]['total_quartiles'][0] == 600
-    assert return_value[0]['id'].id == '~user/workflow//3/Task_1/01'
-    assert return_value[0]['job_ID'] == 'UsersJob'
-    assert return_value[0]['max_queue_time'] == 76
-    assert return_value[0]['max_run_time'] == 644
-    assert return_value[0]['max_total_time'] == 720
-    assert return_value[0]['mean_queue_time'] == pytest.approx(70.66, 0.01)
-    assert return_value[0]['mean_run_time'] == pytest.approx(609.33, 0.01)
-    assert return_value[0]['mean_total_time'] == pytest.approx(680.0, 0.01)
-    assert return_value[0]['min_queue_time'] == 60
-    assert return_value[0]['min_run_time'] == 540
-    assert return_value[0]['min_total_time'] == 600
-    assert return_value[0]['name'] == 'Task_1'
-    assert return_value[0]['platform'] == 'MyPlatform'
-    assert return_value[0]['queue_quartiles'][1] == 76
-    assert return_value[0]['run_quartiles'][1] == 644
-    assert return_value[0]['total_quartiles'][1] == 720
-    assert return_value[0]['started_time'] == '2022-12-16T15:01:16Z'
-    assert return_value[0]['state'] == 'succeeded'
-    assert return_value[0]['std_dev_queue_time'] == pytest.approx(7.54, 0.01)
-    assert return_value[0]['std_dev_run_time'] == pytest.approx(49.02, 0.01)
-    assert return_value[0]['std_dev_total_time'] == pytest.approx(56.56, 0.01)
-    assert return_value[0]['submit_num'] == 1
-    assert return_value[0]['submitted_time'] == '2022-12-16T15:00:00Z'
-    assert return_value[0]['queue_quartiles'][2] == 76
-    assert return_value[0]['run_quartiles'][2] == 644
-    assert return_value[0]['total_quartiles'][2] == 720
+    assert len(ret) == 1
+    ret = ret[0]
+    assert ret['count'] == 3
+    assert ret['cycle_point'] == '3'
+    assert ret['finished_time'] == '2022-12-16T15:12:00Z'
+    assert ret['queue_quartiles'] == [60, 76, 76]
+    assert ret['run_quartiles'] == [540, 644, 644]
+    assert ret['total_quartiles'] == [600, 720, 720]
+    assert ret['id'].id == '~user/workflow//3/Task_1/01'
+    assert ret['job_id'] == 'UsersJob'
+    assert ret['max_queue_time'] == 76
+    assert ret['max_run_time'] == 644
+    assert ret['max_total_time'] == 720
+    assert ret['mean_queue_time'] == pytest.approx(70.66, 0.01)
+    assert ret['mean_run_time'] == pytest.approx(609.33, 0.01)
+    assert ret['mean_total_time'] == pytest.approx(680.0, 0.01)
+    assert ret['min_queue_time'] == 60
+    assert ret['min_run_time'] == 540
+    assert ret['min_total_time'] == 600
+    assert ret['name'] == 'Task_1'
+    assert ret['platform'] == 'MyPlatform'
+    assert ret['started_time'] == '2022-12-16T15:01:16Z'
+    assert ret['state'] == 'succeeded'
+    assert ret['std_dev_queue_time'] == pytest.approx(7.54, 0.01)
+    assert ret['std_dev_run_time'] == pytest.approx(49.02, 0.01)
+    assert ret['std_dev_total_time'] == pytest.approx(56.56, 0.01)
+    assert ret['submit_num'] == 1
+    assert ret['submitted_time'] == '2022-12-16T15:00:00Z'
 
 
 def test_make_jobs_query_1():
@@ -361,31 +348,31 @@ def test_make_jobs_query_1():
     workflow = Tokens('~user/workflow')
     tasks = []
 
-    return_value = run_jobs_query(conn, workflow, tasks)
+    ret = run_jobs_query(conn, workflow, tasks)
 
-    assert len(return_value) == 3
+    assert len(ret) == 3
 
-    assert return_value[0]['cycle_point'] == '1'
-    assert return_value[0]['finished_time'] == '2022-12-14T15:10:00Z'
-    assert return_value[0]['id'].id == '~user/workflow//1/Task_1/01'
-    assert return_value[0]['job_ID'] == 'UsersJob'
-    assert return_value[0]['name'] == 'Task_1'
-    assert return_value[0]['platform'] == 'MyPlatform'
-    assert return_value[0]['started_time'] == '2022-12-14T15:01:00Z'
-    assert return_value[0]['state'] == 'succeeded'
-    assert return_value[0]['submit_num'] == 1
-    assert return_value[0]['submitted_time'] == '2022-12-14T15:00:00Z'
+    assert ret[0]['cycle_point'] == '1'
+    assert ret[0]['finished_time'] == '2022-12-14T15:10:00Z'
+    assert ret[0]['id'].id == '~user/workflow//1/Task_1/01'
+    assert ret[0]['job_id'] == 'UsersJob'
+    assert ret[0]['name'] == 'Task_1'
+    assert ret[0]['platform'] == 'MyPlatform'
+    assert ret[0]['started_time'] == '2022-12-14T15:01:00Z'
+    assert ret[0]['state'] == 'succeeded'
+    assert ret[0]['submit_num'] == 1
+    assert ret[0]['submitted_time'] == '2022-12-14T15:00:00Z'
 
-    assert return_value[1]['cycle_point'] == '2'
-    assert return_value[1]['finished_time'] == '2022-12-15T15:12:00Z'
-    assert return_value[1]['id'].id == '~user/workflow//2/Task_1/01'
-    assert return_value[1]['job_ID'] == 'UsersJob'
-    assert return_value[1]['name'] == 'Task_1'
-    assert return_value[1]['platform'] == 'MyPlatform'
-    assert return_value[1]['started_time'] == '2022-12-15T15:01:16Z'
-    assert return_value[1]['state'] == 'succeeded'
-    assert return_value[1]['submit_num'] == 1
-    assert return_value[1]['submitted_time'] == '2022-12-15T15:00:00Z'
+    assert ret[1]['cycle_point'] == '2'
+    assert ret[1]['finished_time'] == '2022-12-15T15:12:00Z'
+    assert ret[1]['id'].id == '~user/workflow//2/Task_1/01'
+    assert ret[1]['job_id'] == 'UsersJob'
+    assert ret[1]['name'] == 'Task_1'
+    assert ret[1]['platform'] == 'MyPlatform'
+    assert ret[1]['started_time'] == '2022-12-15T15:01:16Z'
+    assert ret[1]['state'] == 'succeeded'
+    assert ret[1]['submit_num'] == 1
+    assert ret[1]['submitted_time'] == '2022-12-15T15:00:00Z'
 
 
 async def test_list_elements(monkeypatch):
@@ -700,3 +687,61 @@ async def test_jobNN_query(jobs, query, expected):
         conn, workflow, ids=[Tokens(i, relative=True) for i in query]
     )
     assert {item['id'].relative_id for item in result} == expected
+
+
+async def test_e2e_jobs_query(monkeypatch: pytest.MonkeyPatch):
+    """End-to-end test for non-live jobs query."""
+    entry = {
+        'id': 'wflow//5/mytask/02',
+        'submitNum': 2,
+        'state': 'succeeded',
+        'name': 'mytask',
+        'cyclePoint': '5',
+        'submittedTime': '2022-12-14T15:00:00Z',
+        'startedTime': '2022-12-14T15:00:02Z',
+        'finishedTime': '2022-12-14T15:01:40Z',
+        'jobId': '1494401',
+        'jobRunnerName': 'horatio',
+        'platform': 'intrepid',
+        'totalTime': 100,
+        'queueTime': 2,
+        'runTime': 98,
+    }
+    conn = make_db((
+        entry['cyclePoint'],
+        entry['name'],
+        entry['submitNum'],
+        '[1]',
+        0,
+        1,
+        entry['submittedTime'],
+        '2022-12-14T15:00:01Z',
+        0,
+        entry['startedTime'],
+        entry['finishedTime'],
+        None,
+        0,
+        entry['platform'],
+        entry['jobRunnerName'],
+        entry['jobId'],
+    ))
+    mock_dao = Mock(
+        return_value=Mock(
+            __enter__=Mock(return_value=Mock(connect=lambda: conn)),
+            __exit__=Mock(),
+        )
+    )
+    monkeypatch.setattr('cylc.uiserver.schema.CylcWorkflowDAO', mock_dao)
+    client = Client(schema, context={})
+
+    executed = await client.execute_async(
+        '''
+        query {
+            jobs(live: false, ids: ["5/mytask/2"], workflows: ["wflow"]) {
+                %s
+            }
+        }
+        ''' % ','.join(entry.keys())
+    )
+    assert 'errors' not in executed, executed['errors']
+    assert executed['data']['jobs'] == [entry]
