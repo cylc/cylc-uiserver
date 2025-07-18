@@ -207,7 +207,12 @@ def test_make_task_query_3():
     assert return_value[0]['total_quartiles'][2] == 720
 
 
-def test_make_task_query_4_different_platforms():
+def test_make_task_query_different_platforms():
+    """We should get different entries for tasks that submited to different
+    platforms on different cycles.
+
+    https://github.com/cylc/cylc-uiserver/issues/696
+    """
     conn = sqlite3.connect(':memory:')
     conn.execute('''CREATE TABLE task_jobs(cycle TEXT, name TEXT,
     submit_num INTEGER, flow_nums TEXT, is_manual_submit INTEGER,
@@ -217,21 +222,19 @@ def test_make_task_query_4_different_platforms():
     job_runner_name TEXT, job_id TEXT,
     PRIMARY KEY(cycle, name, submit_num));''')
 
+    middle_values = (
+        'Task_1', '01', '[1]', 0, 1, '2022-12-14T15:00:00Z',
+        '2022-12-14T15:01:00Z', 0, '2022-12-14T15:01:00Z',
+        '2022-12-14T15:10:00Z', None, 0,
+    )
     conn.executemany(
         'INSERT into task_jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-        [('1', 'Task_1', '01', '{1}', 0, 1,
-          '2022-12-14T15:00:00Z', '2022-12-14T15:01:00Z', 0,
-          '2022-12-14T15:01:00Z', '2022-12-14T15:10:00Z', None, 0,
-          'MyPlatform', 'User', 'UsersJob'),
-         ('2', 'Task_1', '01', '{1}', 0, 1,
-          '2022-12-15T15:00:00Z', '2022-12-15T15:01:15Z', 0,
-          '2022-12-15T15:01:16Z', '2022-12-15T15:12:00Z', None, 0,
-          'MyPlatform2', 'User', 'UsersJob'),
-         ('3', 'Task_1', '01', '{1}', 0, 1,
-          '2022-12-16T15:00:00Z', '2022-12-16T15:01:15Z', 0,
-          '2022-12-16T15:01:16Z', '2022-12-16T15:12:00Z', None, 0,
-          'MyPlatform3', 'User', 'UsersJob')
-         ])
+        [
+            ('1', *middle_values, 'MyPlatform', 'User', 'UsersJob'),
+            ('2', *middle_values, 'MyPlatform2', 'User', 'UsersJob'),
+            ('3', *middle_values, 'MyPlatform3', 'User', 'UsersJob'),
+        ],
+    )
     conn.commit()
     workflow = Tokens('~user/workflow')
 
