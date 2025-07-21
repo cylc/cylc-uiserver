@@ -421,7 +421,7 @@ FROM
         WHERE
             run_status = 0))
 GROUP BY
-    name;
+    name, platform_name;
 '''):
         tasks.append({
             'id': workflow.duplicate(
