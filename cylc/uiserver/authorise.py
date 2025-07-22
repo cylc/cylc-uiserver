@@ -227,6 +227,9 @@ class Authorization:
                 permission_set.remove(action_group)
                 permission_set.update(expansion)
 
+        # lowercase all before negation i.e. Play -> play
+        permission_set = {p.lower() for p in permission_set}
+
         # Remove negated permissions
         remove = set()
         for perm in permission_set:
