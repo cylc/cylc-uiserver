@@ -20,6 +20,8 @@ jobs:
     timeout-minutes: 5
     env:
       HEAD_BRANCH: update-ui-${{ github.run_number }}
+    permissions:
+      pull-requests: write
 
     steps:
       - name: checkout cylc-uiserver
