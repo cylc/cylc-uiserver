@@ -21,6 +21,7 @@ jobs:
     env:
       HEAD_BRANCH: update-ui-${{ github.run_number }}
     permissions:
+      contents: write
       pull-requests: write
 
     steps:
