@@ -1,0 +1,1 @@
+import{ak as o,aq as p}from"./index-EpcknQ5m.js";const O={type:Object,required:!1,default:()=>({})},l="update:initialOptions";function c(t,{props:i,emit:n},e){const a=o(i.initialOptions[t]??e);return p(a,(s,r)=>n(l,{...i.initialOptions,[t]:s}),{deep:!0}),a}export{c as a,O as i,l as u};

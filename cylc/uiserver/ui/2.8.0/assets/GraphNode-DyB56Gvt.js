@@ -1,0 +1,9 @@
+import{_ as f,b1 as b,bk as h,x as r,bl as m,z as s,bm as k,g as l,C as u,t as c,y as x,F as J,r as g,o}from"./index-EpcknQ5m.js";const v={name:"GraphNode",components:{SVGTask:h,Job:b},props:{task:{type:Object,required:!0},jobs:{type:Array,required:!0},maxJobs:{default:6,required:!1},mostRecentJobScale:{default:1.2,required:!1},jobTheme:{required:!0}},computed:{nodeID(){return`graph-node-${this.task.id}`},startTime(){return this.jobs?.[0]?.node?.startedTime},jobsForDisplay(){return this.jobs.slice(0,this.maxJobs)},numOverflowJobs(){return this.jobs.length>this.maxJobs?this.jobs.length-this.maxJobs:0},labelTransform(){return this.jobs.length?"":"translate(0, 20)"},previousJobOffset(){return this.mostRecentJobScale*100-100}}},y={class:"c-graph-node"},T=["transform"],j={x:"130",y:"25","font-size":"45"},p={x:"130",y:"65","font-size":"30"},S={transform:`
+        translate(130, 75)
+        scale(0.3, 0.3)
+      `},w=["transform"],D=["transform"],G={x:"25",y:"75","font-size":"80"};function O(V,q,e,z,B,t){const d=u("SVGTask"),_=u("Job"),i=k("command-menu");return o(),r("g",y,[m(l(d,{task:e.task.node,modifierSize:.5,startTime:t.startTime,viewBox:"-40 -40 140 140",x:"0",y:"0"},null,8,["task","startTime"]),[[i,e.task]]),s("g",{transform:t.labelTransform},[s("text",j,c(e.task.name),1),s("text",p,c(e.task.tokens.cycle),1)],8,T),s("g",S,[(o(!0),r(J,null,g(t.jobsForDisplay,(a,n)=>(o(),r("g",{class:"jobs",key:a.id,transform:`
+          translate(${n*100+(n===0?0:t.previousJobOffset)}, 0)
+          scale(${n===0?e.mostRecentJobScale:"1"})
+        `},[m(l(_,{svg:!0,status:a.node.state,viewBox:"0 0 100 100"},null,8,["status"]),[[i,a]])],8,w))),128)),t.numOverflowJobs?(o(),r("g",{key:0,class:"job-overflow",transform:`
+          translate(${e.maxJobs*100+20}, 0)
+        `},[s("text",G," +"+c(t.numOverflowJobs),1)],8,D)):x("",!0)])])}const F=f(v,[["render",O]]);export{F as G};
