@@ -12,6 +12,29 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.7.0 (Released 2025-07-24)
+
+[Updated cylc-ui to 2.8.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### ⚠ Breaking Changes
+
+[#557](https://github.com/cylc/cylc-uiserver/pull/557) - The minimum Python version has increased to 3.9.
+
+### 🚀 Enhancements
+
+[#586](https://github.com/cylc/cylc-uiserver/pull/586) - The UI Server is now configured to regularly ping active clients to ensure they
+  are alive. This helps the server to detect closed connections sooner, it also
+  ensures that open connections do not appear idle to proxy servers which are
+  sometimes configured to kill websockets after a period of inactivity.
+  You can override or modify this behaviour in your jupyter configuration using
+  the `websocket_ping_interval` and `websocket_ping_timeout` configurations, see
+  the Jupyter Server reference for more information.
+
+[#657](https://github.com/cylc/cylc-uiserver/pull/657), [#686](https://github.com/cylc/cylc-uiserver/pull/686) - graphql: Added the ability to query stopped workflows for jobs in all states and
+  added support for the `ids`, `exids`, `states` and `exstates` fields.
+
+[#672](https://github.com/cylc/cylc-uiserver/pull/672) - Major version upgrade for graphene/graphql-core dependencies. Removed the graphene-tornado and graphql-ws dependencies which had blocked Python 3.10 adoption.
+
 ## cylc-uiserver-1.6.1 (Released 2025-01-15)
 
 ### 🚀 Enhancements
