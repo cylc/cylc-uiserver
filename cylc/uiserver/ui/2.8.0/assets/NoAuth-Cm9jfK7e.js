@@ -1,0 +1,1 @@
+import{_ as t,e as o,o as s,w as a,z as r}from"./index-EpcknQ5m.js";import{V as c}from"./VEmptyState-EVYtxHIB.js";const i={};function n(m,e){return s(),o(c,{image:"/img/logo.svg"},{headline:a(()=>e[0]||(e[0]=[r("div",{class:"text-h4 mt-4"},"You do not have permission to access this server",-1)])),_:1})}const f=t(i,[["render",n]]);export{f as default};

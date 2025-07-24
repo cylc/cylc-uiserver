@@ -1,0 +1,1 @@
+.c-view-toolbar{display:flex}.c-view-toolbar .group{display:flex;align-items:center}.c-view-toolbar .group:not(:first-child):before{content:"";height:70%;width:2px;background:#00000038;margin:0 .5rem}
