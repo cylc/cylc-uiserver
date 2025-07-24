@@ -77,5 +77,7 @@ jobs:
           ASSIGNEE: ${{ github.triggering_actor }}
         run: |
           gh pr create -R "$GITHUB_REPOSITORY" \
-            -H "$HEAD_BRANCH" -B "$BASE_BRANCH" -t "$TITLE" -b "$BODY" \
-            -a "$ASSIGNEE" -r "$ASSIGNEE"
+            -H "$HEAD_BRANCH" -B "$BASE_BRANCH" -t "$TITLE" -b "$BODY"
+          # Separate commands in case they fail:
+          gh pr edit --add-assignee "$ASSIGNEE" || true
+          gh pr edit --add-reviewer "$ASSIGNEE" || true
