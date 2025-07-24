@@ -20,10 +20,6 @@ jobs:
     timeout-minutes: 5
     env:
       HEAD_BRANCH: update-ui-${{ github.run_number }}
-    permissions:
-      contents: write
-      pull-requests: write
-
     steps:
       - name: checkout cylc-uiserver
         uses: actions/checkout@v4
@@ -72,7 +68,7 @@ jobs:
 
       - name: Create pull request
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE_BRANCH: ${{ inputs.base-branch }}
           TITLE: 'Update UI'
           BODY: |
