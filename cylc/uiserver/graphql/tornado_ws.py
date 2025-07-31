@@ -320,6 +320,12 @@ class TornadoSubscriptionServer:
                         connection_context, op_id, single_result)
         except (GeneratorExit, asyncio.CancelledError):
             raise
+        except WebSocketClosedError:
+            resolvers = connection_context.request_context.get('resolvers')
+            if resolvers is not None:
+                resolvers.log.warning(
+                    f'[GraphQL WS] Websocket closed on send, Sub. ID: {op_id}'
+                )
         except Exception as e:
             await self.send_error(connection_context, op_id, e)
         finally:
