@@ -22,6 +22,7 @@ from copy import deepcopy
 import errno
 from getpass import getuser
 import os
+import re
 import signal
 from subprocess import (
     DEVNULL,
@@ -501,11 +502,26 @@ class Services:
                 f"Command failed ({ret_code}): {' '.join(cmd)}\n{err.decode()}"
             )
         if out:
+
+            def alphanum_key(s):
+                """Turn a string into a list of string and number chunks.
+
+                This allows for human-friendly sorting.
+
+                >>> alphanum_key("z23a")
+                ["z", 23, "a"]
+                """
+                try:
+                    return [int(c) if c.isdecimal() else c for c in re.split(r"(\d+)", s)]
+                except TypeError:
+                    return s
+
             return sorted(
                 # return the log files in reverse sort order
                 # this means that the most recent log file rotations
                 # will be at the top of the list
                 out.decode().splitlines(),
+                key=alphanum_key,
                 reverse=True,
             )
         return []
