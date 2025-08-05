@@ -51,6 +51,7 @@ from cylc.flow.exceptions import CylcError
 from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.scripts.clean import CleanOptions, run
+from cylc.flow.util import natural_sort_key
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
@@ -506,6 +507,7 @@ class Services:
                 # this means that the most recent log file rotations
                 # will be at the top of the list
                 out.decode().splitlines(),
+                key=natural_sort_key,
                 reverse=True,
             )
         return []
