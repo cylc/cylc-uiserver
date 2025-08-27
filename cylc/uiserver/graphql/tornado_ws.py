@@ -62,6 +62,15 @@ GQL_ERROR = "error"  # Server -> Client
 GQL_COMPLETE = "complete"  # Server -> Client
 GQL_STOP = "stop"  # Client -> Server
 
+REQ_HEADER_INFO = {
+    'Host',
+    'User-Agent',
+    'Origin',
+    'Connection',
+    'Sec-Websocket-Version',
+    'Sec-Websocket-Protocol',
+}
+
 
 class ConnectionClosedException(Exception):
     pass
@@ -349,15 +358,14 @@ class TornadoSubscriptionServer:
                     f' (Op.Type: {op_type}, Op.ID: {op_id})'
                     f' to remote IP: {request.remote_ip}'
                 )
-                if headers and headers.get('Cookie'):
-                    headers.update({'Cookie': '*****'})
                 headers_string = ''
-                for key, item in headers.items():
-                    headers_string += f'        {key}: {item} \n'
+                for key, val in headers.items():
+                    if key in REQ_HEADER_INFO:
+                        headers_string += f'        {key}: {val} \n'
                 resolvers.log.debug(
                     'Websocket closed on send, with request context: \n'
                     f'    Remote IP: {request.remote_ip} \n'
-                    '    Request Headers: \n'
+                    '    Request Header Info: \n'
                     f'{headers_string}'
                 )
             # Raise exception, in order to exit the on_start subscription loop.
