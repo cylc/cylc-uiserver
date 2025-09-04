@@ -12,6 +12,18 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.7.1 (Released 2025-09-04)
+
+[Updated cylc-ui to 2.9.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🚀 Enhancements
+
+[#715](https://github.com/cylc/cylc-uiserver/pull/715) - Improve the ordering of numeric log file, such as those produced by rose-bunch, when listing job log files in the UI.
+
+### 🔧 Fixes
+
+[#714](https://github.com/cylc/cylc-uiserver/pull/714) - Handle websocket closed error showing as traceback in the log.
+
 ## cylc-uiserver-1.7.0 (Released 2025-07-24)
 
 [Updated cylc-ui to 2.8.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
