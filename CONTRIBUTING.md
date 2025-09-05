@@ -60,6 +60,7 @@ below.
  - Christopher Bennett
  - Mark Dawson
  - Min RK
+ - James Frost
  <!-- end-shortlog -->
 
 (All contributors are identifiable with email addresses in the git version

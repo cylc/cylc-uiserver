@@ -62,6 +62,15 @@ GQL_ERROR = "error"  # Server -> Client
 GQL_COMPLETE = "complete"  # Server -> Client
 GQL_STOP = "stop"  # Client -> Server
 
+REQ_HEADER_INFO = {
+    'Host',
+    'User-Agent',
+    'Origin',
+    'Connection',
+    'Sec-Websocket-Version',
+    'Sec-Websocket-Protocol',
+}
+
 
 class ConnectionClosedException(Exception):
     pass
@@ -106,7 +115,9 @@ class TornadoConnectionContext:
         return self.ws.close_code is not None
 
     async def close(self, code):
-        await self.ws.close(code)
+        ws_close = self.ws.close(code)
+        if ws_close is not None:
+            await ws_close
 
     def remember_task(self, task):
         self.pending_tasks.add(task)
@@ -325,7 +336,8 @@ class TornadoSubscriptionServer:
         finally:
             if iterator:
                 await iterator.aclose()
-        await self.send_message(connection_context, op_id, GQL_COMPLETE)
+        with suppress(WebSocketClosedError):
+            await self.send_message(connection_context, op_id, GQL_COMPLETE)
         await connection_context.unsubscribe(op_id)
         await self.on_operation_complete(connection_context, op_id)
 
@@ -333,7 +345,31 @@ class TornadoSubscriptionServer:
         self, connection_context, op_id=None, op_type=None, payload=None
     ):
         message = self.build_message(op_id, op_type, payload)
-        return await connection_context.send(message)
+        try:
+            return await connection_context.send(message)
+        except WebSocketClosedError:
+            resolvers = connection_context.request_context.get('resolvers')
+            if resolvers is not None:
+                request = connection_context.request_context.get('request')
+                headers = {}
+                headers.update(getattr(request, 'headers', {}))
+                resolvers.log.warning(
+                    '[GraphQL WS] Websocket closed on send'
+                    f' (Op.Type: {op_type}, Op.ID: {op_id})'
+                    f' to remote IP: {request.remote_ip}'
+                )
+                headers_string = ''
+                for key, val in headers.items():
+                    if key in REQ_HEADER_INFO:
+                        headers_string += f'        {key}: {val} \n'
+                resolvers.log.debug(
+                    'Websocket closed on send, with request context: \n'
+                    f'    Remote IP: {request.remote_ip} \n'
+                    '    Request Header Info: \n'
+                    f'{headers_string}'
+                )
+            # Raise exception, in order to exit the on_start subscription loop.
+            raise
 
     def build_message(self, _id, op_type, payload):
         message = {}
@@ -381,8 +417,9 @@ class TornadoSubscriptionServer:
 
         error_payload = {"message": str(error)}
 
-        return await self.send_message(
-            connection_context, op_id, error_type, error_payload)
+        with suppress(WebSocketClosedError):
+            return await self.send_message(
+                connection_context, op_id, error_type, error_payload)
 
     async def on_message(self, connection_context, message):
         try:
