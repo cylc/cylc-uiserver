@@ -15,15 +15,8 @@
 
 # Configuration file for jupyterhub.
 
+from importlib.resources import files
 from pathlib import Path
-import sys
-
-
-if sys.version_info[:2] > (3, 8):
-    from importlib.resources import files
-else:
-    # BACK_COMPAT: importlib_resources
-    from importlib_resources import files
 
 from cylc.uiserver import (
     __file__ as uis_pkg,
