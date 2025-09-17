@@ -273,10 +273,10 @@ class DataStoreMgr:
         """
         # Wait until data-store is populated for this workflow,
         # carry on otherwise, errors will be reconciled with data validation.
-        if w_id not in self.data:
+        if self.data[w_id][WORKFLOW].last_updated == 0:
             loop_cnt = 0
             while loop_cnt < self.INIT_DATA_WAIT_CHECKS:
-                if w_id in self.data:
+                if self.data[w_id][WORKFLOW].last_updated > 0:
                     break
                 time.sleep(self.INIT_DATA_RETRY_DELAY)
                 loop_cnt += 1
