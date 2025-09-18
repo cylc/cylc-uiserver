@@ -14,11 +14,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Test code and fixtures."""
 
+import asyncio
 import inspect
 import logging
 from pathlib import Path
 from shutil import rmtree
 from tempfile import TemporaryDirectory
+import threading
 from uuid import uuid4
 
 import pytest
@@ -33,7 +35,10 @@ from cylc.flow.data_messages_pb2 import (  # type: ignore
     PbEntireWorkflow,
     PbWorkflow,
     PbFamilyProxy,
+    PbTaskProxy,
+    AllDeltas,
 )
+from cylc.flow.data_store_mgr import generate_checksum
 from cylc.flow.network.client import WorkflowRuntimeClient
 from cylc.flow.workflow_files import ContactFileFields as CFF
 
@@ -43,6 +48,21 @@ from cylc.uiserver.workflows_mgr import WorkflowsManager
 from cylc.flow.cfgspec.globalcfg import SPEC
 from cylc.flow.parsec.config import ParsecConfig
 from cylc.flow.parsec.validate import cylc_config_validate
+
+
+# Custom fixture to run an event loop in a separate thread
+@pytest.fixture
+def threadsafe_loop():
+    loop = asyncio.new_event_loop()
+    thread = threading.Thread(target=loop.run_forever)
+    thread.start()
+
+    yield loop
+
+    # Cleanup: stop the loop and thread
+    loop.call_soon_threadsafe(loop.stop)
+    thread.join()
+    loop.close()
 
 
 class AsyncClientFixture(WorkflowRuntimeClient):
@@ -104,6 +124,26 @@ def make_entire_workflow():
         return entire_workflow
 
     return _make_entire_workflow
+
+
+@pytest.fixture
+def make_all_delta():
+    def _make_all_delta(workflow_id, delta_type, tp_id, tp_state, time):
+        workflow = PbWorkflow()
+        workflow.id = workflow_id
+        all_delta = AllDeltas()
+        all_delta.workflow.time = time
+        getattr(all_delta.workflow, delta_type).CopyFrom(workflow)
+        tp = PbTaskProxy()
+        tp.id = tp_id
+        tp.state = tp_state
+        tp.stamp = f'{tp_id}@{time}'
+        all_delta.task_proxies.time = time
+        all_delta.task_proxies.checksum = generate_checksum([tp.stamp])
+        getattr(all_delta.task_proxies, delta_type).extend([tp])
+        return all_delta
+
+    return _make_all_delta
 
 
 @pytest.fixture

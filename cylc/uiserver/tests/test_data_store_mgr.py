@@ -16,6 +16,7 @@
 """Tests for the ``data_store_mgr`` module and its objects and functions."""
 
 import logging
+from time import time
 
 import pytest
 import zmq
@@ -25,7 +26,7 @@ from cylc.flow.id import Tokens
 from cylc.flow.network import ZMQSocketBase
 from cylc.flow.workflow_files import ContactFileFields as CFF
 
-from cylc.uiserver.data_store_mgr import DataStoreMgr
+from cylc.uiserver.data_store_mgr import DataStoreMgr, ALL_DELTAS
 
 from .conftest import AsyncClientFixture
 
@@ -281,3 +282,51 @@ async def test_workflow_connect_fail(
         # tidy up
         server.stop()
         context.destroy()
+
+
+async def test_update_workflow_data(
+    async_client: AsyncClientFixture,
+    data_store_mgr: DataStoreMgr,
+    make_all_delta,
+    threadsafe_loop,
+):
+    """Test that ``_update_workflow_data`` is executed successfully.
+
+    Along with ``_reconcile_update``, triggered via update before added delta.
+    """
+
+    w_tokens = Tokens(user='user', workflow='workflow_id')
+    w_id = w_tokens.id
+
+    # Register for data-store entry
+    await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
+
+    # Create a delta that will force conciliation,
+    # i.e. the running of ``_reconcile_update``.
+    tp_id = w_tokens.duplicate(cycle='1', task='foo').id
+    all_updated_delta = make_all_delta(w_id, 'updated', tp_id, 'waiting', time())
+    all_updated_delta.workflow.updated.status = 'running'
+    all_updated_delta.workflow.reloaded = True
+
+    # Reference to data-store, which should not contain delta info.
+    w_id_data = data_store_mgr.data[w_id]
+    assert w_id_data['workflow'].status != 'running'
+
+    # Create the reconciliation delta, for the task proxies field.
+    all_added_delta = make_all_delta(w_id, 'added', tp_id, 'running', time())
+    tp_added_delta = all_added_delta.task_proxies
+
+    # Set the client used by our test workflow.
+    async_client.will_return(tp_added_delta.SerializeToString())
+    data_store_mgr.workflows_mgr.workflows[w_id] = {
+        'req_client': async_client
+    }
+
+    # loop used in the reconcile request.
+    data_store_mgr.loop = threadsafe_loop
+    # Call the _update_workflow_data function.
+    data_store_mgr._update_workflow_data(ALL_DELTAS, all_updated_delta, w_id)
+
+    # The data-store sould now contain info from the delta
+    assert w_id_data['workflow'].status == 'running'
+    assert w_id_data['task_proxies'][tp_id].state == 'running'
