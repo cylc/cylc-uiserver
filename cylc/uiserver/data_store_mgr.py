@@ -93,7 +93,7 @@ class DataStoreMgr:
 
     """
 
-    INIT_DATA_WAIT_TIME = 5.  # seconds
+    INIT_DATA_WAIT_CHECKS = 30  # check attempts
     INIT_DATA_RETRY_DELAY = 0.5  # seconds
     RECONCILE_TIMEOUT = 5.  # seconds
     PENDING_DELTA_CHECK_INTERVAL = 0.5
@@ -271,11 +271,12 @@ class DataStoreMgr:
             w_id (str): Workflow external ID.
 
         """
-        # wait until data-store is populated for this workflow
-        if w_id not in self.data:
+        # Wait until data-store is populated for this workflow,
+        # carry on otherwise, errors will be reconciled with data validation.
+        if self.data[w_id][WORKFLOW].last_updated == 0:
             loop_cnt = 0
-            while loop_cnt < self.INIT_DATA_WAIT_TIME:
-                if w_id in self.data:
+            while loop_cnt < self.INIT_DATA_WAIT_CHECKS:
+                if self.data[w_id][WORKFLOW].last_updated > 0:
                     break
                 time.sleep(self.INIT_DATA_RETRY_DELAY)
                 loop_cnt += 1
@@ -296,19 +297,20 @@ class DataStoreMgr:
 
     def _apply_all_delta(self, w_id, delta):
         """Apply the AllDeltas delta."""
+        delta_times = self.data[w_id]['delta_times']
         for field, sub_delta in delta.ListFields():
             delta_time = getattr(sub_delta, 'time', 0.0)
             # If the workflow has reloaded clear the data before
             # delta application.
             if sub_delta.reloaded:
                 self._clear_data_field(w_id, field.name)
-                self.data[w_id]['delta_times'][field.name] = 0.0
+                delta_times[field.name] = 0.0
             # hard to catch errors in a threaded async app, so use try-except.
             try:
                 # Apply the delta if newer than the previously applied.
-                if delta_time >= self.data[w_id]['delta_times'][field.name]:
+                if delta_time >= delta_times.get(field.name, 0.0):
                     apply_delta(field.name, sub_delta, self.data[w_id])
-                    self.data[w_id]['delta_times'][field.name] = delta_time
+                    delta_times[field.name] = delta_time
                     if not sub_delta.reloaded:
                         self._reconcile_update(field.name, sub_delta, w_id)
             except Exception as exc:
