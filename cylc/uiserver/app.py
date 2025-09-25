@@ -469,6 +469,18 @@ class CylcUIServer(ExtensionApp):
 
         # startup messages
         self.log.info("Starting Cylc UI Server")
+        from socket import gethostname
+        self.log.info(f"Host: {gethostname()}")
+        self.log.info(f"Port: {self.serverapp.port}")
+
+        # ['_get_urlparts', '_update_base_url', 'base_url', 'connection_url', 'custom_display_url', 'default_url', 'display_url', 'file_url_prefix', 'local_url', 'public_url', 'websocket_url']
+
+        self.log.info(f"base_url: {self.serverapp.base_url}")
+        self.log.info(f"connection_url: {self.serverapp.connection_url}")
+        self.log.info(f"display_url: {self.serverapp.display_url}")
+        self.log.info(f"public_url: {self.serverapp.public_url}")
+        self.log.info(f"local_url: {self.serverapp.local_url}")
+
         self.log.info(f'Serving UI from: {self.ui_path}')
         self.log.debug(
             'CylcUIServer config:\n' + '\n'.join(
