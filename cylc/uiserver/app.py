@@ -74,10 +74,10 @@ from packaging.version import Version
 from tornado import ioloop
 from tornado.web import RedirectHandler
 from traitlets import (
-    Bool,
     Dict,
     Float,
     Int,
+    Unicode,
     TraitError,
     TraitType,
     Undefined,
@@ -109,6 +109,7 @@ from cylc.uiserver.handlers import (
     UIServerGraphQLHandler,
     UserProfileHandler,
 )
+from cylc.uiserver.profilers import get_profiler
 from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
 from cylc.uiserver.graphql.tornado_ws import TornadoSubscriptionServer
@@ -336,15 +337,25 @@ class CylcUIServer(ExtensionApp):
         ''',
         default_value=100,
     )
-    profile = Bool(
+    profile = Unicode(
         config=True,
         help='''
-            Turn on Python profiling.
+            Turn on the specified profiler.
 
-            The profile results will be saved to ~/.cylc/uiserver/profile.prof
-            in cprofile format.
+            The default (empty string) does not invoke a profiler.
+
+            Options:
+                cprofile:
+                    Profile Python code execution time with cprofile.
+
+                    Results will be saved to ~/.cylc/uiserver/profile.prof
+                    in cprofile format.
+                object_tracker:
+                    Track Python object memory usage with Pympler.
+
+                    Results will be saved to ~/.cylc/uiserver/objects.pdf.
         ''',
-        default_value=False,
+        default_value='',
     )
 
     log_timeout = Float(
@@ -477,14 +488,13 @@ class CylcUIServer(ExtensionApp):
             )
         )
 
-        # start profiling
-        self.profiler = Profiler(
-            # the profiler is designed to attach to a Cylc scheduler
-            schd=SimpleNamespace(workflow_log_dir=USER_CONF_ROOT),
-            # profiling is turned on via the "profile" traitlet
-            enabled=self.profile,
-        )
-        self.profiler.start()
+        profiler_cls = get_profiler(self.profile)
+        if profiler_cls:
+            self.profiler = profiler_cls(self)
+            ioloop.PeriodicCallback(
+                self.profiler.periodic,
+                1000,  # PT1S
+            ).start()
 
         # start the async scan task running (do this on server start not init)
         ioloop.IOLoop.current().add_callback(
@@ -633,4 +643,7 @@ class CylcUIServer(ExtensionApp):
 
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()
-        self.profiler.stop()
+
+        # stop the profiler
+        if getattr(self, 'profiler', None):
+            self.profiler.shutdown()
