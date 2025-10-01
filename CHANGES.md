@@ -12,6 +12,19 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.8.0 (Released 2025-10-01)
+
+[Updated cylc-ui to 2.10.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### ⚠ Breaking Changes
+
+[#729](https://github.com/cylc/cylc-uiserver/pull/729) - Minimum supported Python version is now 3.12.
+
+### 🔧 Fixes
+
+[#721](https://github.com/cylc/cylc-uiserver/pull/721) - Fixes a race condition in the UIS data-store sync which showed as a
+  traceback in the log.
+
 ## cylc-uiserver-1.7.1 (Released 2025-09-04)
 
 [Updated cylc-ui to 2.9.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
