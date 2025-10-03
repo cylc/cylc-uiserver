@@ -106,9 +106,8 @@ class TornadoConnectionContext:
             raise ConnectionClosedException()
 
     async def send(self, data):
-        if self.closed:
-            return
-        await self.ws.write_message(data)
+        if not self.ws.ws_connection.is_closing():
+            await self.ws.write_message(data)
 
     @property
     def closed(self):
