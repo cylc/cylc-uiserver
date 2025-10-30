@@ -25,12 +25,6 @@ from unittest.mock import MagicMock, Mock
 from subprocess import Popen, TimeoutExpired
 from types import SimpleNamespace
 
-import sys
-if sys.version_info >= (3, 11):
-    from asyncio import timeout
-else:
-    from async_timeout import timeout
-
 from cylc.flow import CYLC_LOG
 from cylc.flow.exceptions import CylcError
 from cylc.flow.id import Tokens
@@ -145,6 +139,7 @@ async def test_start_services(
         return_value=Mock(
             spec=Popen,
             wait=Mock(return_value=0),
+            communicate=lambda: ('out', 'err'),
         )
     )
     monkeypatch.setattr('cylc.uiserver.resolvers.Popen', mock_popen)
@@ -260,7 +255,11 @@ async def test_play_timeout(monkeypatch: pytest.MonkeyPatch):
 
     mock_popen = Mock(
         spec=Popen,
-        return_value=Mock(spec=Popen, wait=wait)
+        return_value=Mock(
+            spec=Popen,
+            wait=wait,
+            communicate=lambda: ('out', 'err'),
+        ),
     )
     monkeypatch.setattr('cylc.uiserver.resolvers.Popen', mock_popen)
 
@@ -270,9 +269,9 @@ async def test_play_timeout(monkeypatch: pytest.MonkeyPatch):
         {},
         log=Mock(),
     )
-    assert ret == [
-        False, "Command 'cylc play wflow1' timed out after 120 seconds"
-    ]
+    assert ret == (
+        False, "Command 'cylc play wflow1' timed out after 120 seconds\nerr"
+    )
 
 
 @pytest.fixture
@@ -331,7 +330,7 @@ async def test_cat_log(workflow_run_dir, app, fast_sleep):
 
     # note - timeout tests that the cat-log process is being stopped correctly
     first_response = None
-    async with timeout(20):
+    async with asyncio.timeout(20):
         ret = services.cat_log(workflow, app, info)
         actual = ''
         is_first = True
@@ -380,7 +379,7 @@ async def test_cat_log_timeout(workflow_run_dir, app, fast_sleep):
 
     ret = services.cat_log(workflow, app, info)
     responses = []
-    async with timeout(5):
+    async with asyncio.timeout(5):
         async for response in ret:
             responses.append(response)
             await asyncio.sleep(0)
