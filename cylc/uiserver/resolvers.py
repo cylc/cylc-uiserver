@@ -28,6 +28,7 @@ from subprocess import (
     DEVNULL,
     PIPE,
     Popen,
+    TimeoutExpired,
 )
 from textwrap import indent
 from time import time
@@ -309,6 +310,7 @@ class Services:
                 The application log, used to record this command invocation.
             timeout:
                 Length of time to wait for the command to complete.
+                The command will be killed if the timeout elapses.
             success_msg:
                 Message to be used in the response if the command succeeds.
             fail_msg:
@@ -344,7 +346,7 @@ class Services:
                     env.pop('CYLC_ENV_NAME', None)
                     env['CYLC_VERSION'] = cylc_version
 
-                # run cylc play
+                # run command
                 proc = Popen(
                     cmd,
                     env=env,
@@ -353,11 +355,21 @@ class Services:
                     stderr=PIPE,
                     text=True
                 )
-                ret_code = proc.wait(timeout=timeout)
+
+                try:
+                    ret_code = proc.wait(timeout=timeout)
+                except TimeoutExpired as exc:
+                    proc.kill()
+                    ret_code = 124  # mimic `timeout` command error code
+                    # NOTE: preserve any stderr that the command produced this
+                    # far as this may help with debugging
+                    out, err = proc.communicate()
+                    err = str(exc) + (('\n' + err) if err else '')
+                else:
+                    out, err = proc.communicate()
 
                 if ret_code:
                     msg = f"{fail_msg} ({ret_code}): {cmd_repr}"
-                    out, err = proc.communicate()
                     results[wflow] = err.strip() or out.strip() or msg
                     log.error(
                         f"{msg}\n"
