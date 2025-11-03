@@ -112,7 +112,8 @@ def get_accepted_content_types(request: 'HTTPServerRequest') -> list:
 
 
 class ExecutionError(Exception):
-    def __init__(self, status_code=400, errors=None):
+    def __init__(self, status_code, errors):
+        super().__init__(status_code, errors)
         self.status_code = status_code
         if errors is None:
             self.errors = []
