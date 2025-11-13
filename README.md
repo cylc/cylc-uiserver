@@ -285,11 +285,27 @@ Contributions welcome:
    c.CylcUIServer.ui_build_dir = os.path.expanduser('~/cylc-ui/dist')
    ```
 
-Note about testing: unlike cylc-flow, cylc-uiserver uses the
+**Note about testing:**
+
+Unlike cylc-flow, cylc-uiserver uses the
 [pytest-tornasync](https://github.com/eukaryote/pytest-tornasync/) plugin
 instead of [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio).
 This means you should not decorate async test functions with
 `@pytest.mark.asyncio`.
+
+**Profiling:**
+
+There are some built-in profilers in the server, activate them using the
+`profile` trait, e.g:
+
+```
+cylc gui --CylcUIServer.profile=track_data_store
+```
+
+
+See the
+[config docs](https://cylc.github.io/cylc-doc/stable/html/reference/config/ui-server.html#cylc.uiserver.app.CylcUIServer.profile)
+for more details.
 
 ## Copyright and Terms of Use
 
