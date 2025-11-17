@@ -25,12 +25,15 @@ import argparse
 import asyncio
 from contextlib import suppress
 from glob import glob
+from importlib.util import spec_from_loader, module_from_spec
+from importlib.machinery import SourceFileLoader
 import os
 import re
 from requests.exceptions import RequestException
 import requests
 import sys
 from textwrap import dedent
+from traitlets.config import Config
 from typing import Optional
 import webbrowser
 from getpass import getuser
@@ -49,8 +52,41 @@ from cylc.uiserver.app import (
     CylcUIServer,
     INFO_FILES_DIR
 )
+from cylc.uiserver.config_util import (
+    USER_CONF_ROOT,
+    get_conf_dir_hierarchy,
+)
+
 
 CLI_OPT_NEW = "--new"
+
+
+def inspect_user_config_files(config_paths):
+    not_allowed = ["site_authorization"]
+    for conf_file in config_paths:
+        if not os.path.exists(conf_file):
+            continue
+        loader = SourceFileLoader("module_name", conf_file)
+        spec = spec_from_loader(loader.name, loader)
+        if spec is None:
+            continue
+        user_module = module_from_spec(spec)
+        if user_module is None:
+            continue
+        # inject the "c" traitlets config object into the user config.
+        user_module.c = Config()
+
+        # import the module without adding it to sys.modules
+        loader.exec_module(user_module)
+
+        for item in not_allowed:
+            if item in user_module.c.CylcUIServer:
+                print(
+                    f"ERROR {conf_file}: "
+                    f"'{item}' cannot be set in user config files",
+                    file=sys.stderr
+                )
+                sys.exit(1)
 
 
 def main(*argv):
@@ -99,6 +135,14 @@ def main(*argv):
                 if '--no-browser' not in sys.argv:
                     webbrowser.open(url, autoraise=True)
                 return
+        inspect_user_config_files(
+            get_conf_dir_hierarchy(
+                [
+                    USER_CONF_ROOT,  # user configuration
+                ], filename=True
+            )
+        )
+
     return CylcUIServer.launch_instance(
         jp_server_opts or None, workflow_id=workflow_id
     )
