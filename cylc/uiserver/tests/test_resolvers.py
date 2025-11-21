@@ -15,6 +15,7 @@
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import re
 from typing import Any, Dict, List, Tuple
 import logging
 import os
@@ -22,12 +23,6 @@ import pytest
 from unittest.mock import MagicMock, Mock
 from subprocess import Popen, TimeoutExpired
 from types import SimpleNamespace
-
-import sys
-if sys.version_info >= (3, 11):
-    from asyncio import timeout
-else:
-    from async_timeout import timeout
 
 from cylc.flow import CYLC_LOG
 from cylc.flow.exceptions import CylcError
@@ -64,8 +59,8 @@ def test__schema_opts_to_api_opts(schema_opts, schema, expect):
 @pytest.mark.parametrize(
     'func, message, expect',
     [
-        (services._return, 'Hello.', [True, 'Hello.']),
-        (services._error, 'Goodbye.', [False, 'Goodbye.'])
+        (services._return, 'Hello.', (True, 'Hello.')),
+        (services._error, 'Goodbye.', (False, 'Goodbye.'))
     ]
 )
 def test_Services_anciliary_methods(func, message, expect):
@@ -75,13 +70,16 @@ def test_Services_anciliary_methods(func, message, expect):
 
 
 @pytest.mark.parametrize(
+    'service', (Services.play, Services.validate_reinstall)
+)
+@pytest.mark.parametrize(
     'workflows, args, env, expected_ret, expected_env',
     [
         pytest.param(
             [Tokens('wflow1'), Tokens('~murray/wflow2')],
             {},
             {},
-            [True, "Workflow(s) started"],
+            (True, r"Workflow\(s\) .*ed"),
             {},
             id="multiple"
         ),
@@ -89,7 +87,7 @@ def test_Services_anciliary_methods(func, message, expect):
             [Tokens('~feynman/wflow1')],
             {},
             {},
-            [False, "Cannot start workflows for other users."],
+            (False, "Cannot start workflows for other users."),
             {},
             id="other user's wflow"
         ),
@@ -97,7 +95,7 @@ def test_Services_anciliary_methods(func, message, expect):
             [Tokens('wflow1')],
             {'cylc_version': 'top'},
             {'CYLC_VERSION': 'bottom', 'CYLC_ENV_NAME': 'quark'},
-            [True, "Workflow(s) started"],
+            (True, r"Workflow\(s\) .*ed"),
             {'CYLC_VERSION': 'top'},
             id="cylc version overrides env"
         ),
@@ -105,13 +103,14 @@ def test_Services_anciliary_methods(func, message, expect):
             [Tokens('wflow1')],
             {},
             {'CYLC_VERSION': 'charm', 'CYLC_ENV_NAME': 'quark'},
-            [True, "Workflow(s) started"],
+            (True, r"Workflow\(s\) .*ed"),
             {'CYLC_VERSION': 'charm', 'CYLC_ENV_NAME': 'quark'},
             id="cylc env not overriden if no version specified"
         ),
     ]
 )
-async def test_play(
+async def test_start_services(
+    service,
     monkeypatch: pytest.MonkeyPatch,
     workflows: List[Tokens],
     args: Dict[str, Any],
@@ -119,7 +118,7 @@ async def test_play(
     expected_ret: list,
     expected_env: Dict[str, str],
 ):
-    """It runs cylc play correctly.
+    """It runs cylc play / vr correctly.
 
     Params:
         workflows: list of workflow tokens
@@ -139,28 +138,33 @@ async def test_play(
         return_value=Mock(
             spec=Popen,
             wait=Mock(return_value=0),
+            communicate=lambda: ('out', 'err'),
         )
     )
     monkeypatch.setattr('cylc.uiserver.resolvers.Popen', mock_popen)
 
-    ret = await Services.play(
+    status, message = await service(
+        Mock(spec=WorkflowsManager),
         workflows,
         {'some': 'opt', **args},
-        workflows_mgr=Mock(spec=WorkflowsManager),
         log=Mock(),
     )
 
-    assert ret == expected_ret
+    assert status == expected_ret[0]
+    assert re.match(expected_ret[1], message)
 
     for i, call_args in enumerate(mock_popen.call_args_list):
         cmd_str = ' '.join(call_args.args[0])
-        assert cmd_str.startswith('cylc play')
+        assert cmd_str.startswith('cylc ')
         assert '--some opt' in cmd_str
         assert workflows[i]['workflow'] in cmd_str
 
         assert call_args.kwargs['env'] == expected_env
 
 
+@pytest.mark.parametrize(
+    'service', (Services.play, Services.validate_reinstall)
+)
 @pytest.mark.parametrize(
     'workflows, popen_ret_codes, popen_communicate,'
     'expected_ret, expected_log',
@@ -169,37 +173,38 @@ async def test_play(
             [Tokens('wflow1')],
             [1],
             ("something", "bad things!!"),
-            "bad things!!",
-            ["Command failed (1): cylc play", "something", "bad things!!"],
+            r"bad things!!.*",
+            ["Command failed \(1\): cylc ", "something", "bad things!!"],
             id="one"
         ),
         pytest.param(
             [Tokens('wflow1'), Tokens('wflow2')],
             [1, 0],
             ("", "bad things!!"),
-            "\n\nwflow1: bad things!!\n\nwflow2: started",
-            ["Command failed (1): cylc play", "bad things!!"],
+            r"\n\nwflow1: bad things!!\n\nwflow2: .*ed.*",
+            [r"Command failed \(1\): cylc ", "bad things!!"],
             id="multiple"
         ),
         pytest.param(
             [Tokens('wflow1')],
             [1],
             ("something", ""),
-            "something",
-            ["Command failed (1): cylc play", "something"],
+            r"something.*",
+            [r"Command failed \(1\): cylc ", "something"],
             id="uses stdout if stderr empty"
         ),
         pytest.param(
             [Tokens('wflow1')],
             [4],
             ("", ""),
-            "Command failed (4): cylc play",
-            ["Command failed (4): cylc play"],
+            r"Command failed \(4\): cylc .*",
+            [r"Command failed \(4\): cylc "],
             id="fallback msg if stdout/stderr empty"
         ),
     ]
 )
-async def test_play_fail(
+async def test_start_services_fail(
+    service,
     monkeypatch: pytest.MonkeyPatch,
     workflows: List[Tokens],
     popen_ret_codes: List[int],
@@ -208,7 +213,7 @@ async def test_play_fail(
     expected_log: List[str],
     caplog: pytest.LogCaptureFixture,
 ):
-    """It returns suitable error messages if cylc play fails.
+    """It returns suitable error messages if cylc play / vr fails.
 
     Params:
         workflows: list of workflow tokens
@@ -216,6 +221,7 @@ async def test_play_fail(
         popen_communicate: stdout, stderr for cylc play
         expected: (beginning of) expected returned error message
     """
+    popen_ret_codes = list(popen_ret_codes)
     mock_popen = Mock(
         spec=Popen,
         return_value=Mock(
@@ -227,17 +233,18 @@ async def test_play_fail(
     monkeypatch.setattr('cylc.uiserver.resolvers.Popen', mock_popen)
     caplog.set_level(logging.ERROR)
 
-    status, message = await Services.play(
+    status, message = await service(
+        Mock(spec=WorkflowsManager),
         workflows,
         {},
-        workflows_mgr=Mock(spec=WorkflowsManager),
         log=logging.root,
     )
     assert status is False
-    assert message.startswith(expected_ret)
+    assert re.match(expected_ret, message)
+
     # Should be logged too:
     for msg in expected_log:
-        assert msg in caplog.text
+        assert re.search(msg, caplog.text)
 
 
 async def test_play_timeout(monkeypatch: pytest.MonkeyPatch):
@@ -247,19 +254,23 @@ async def test_play_timeout(monkeypatch: pytest.MonkeyPatch):
 
     mock_popen = Mock(
         spec=Popen,
-        return_value=Mock(spec=Popen, wait=wait)
+        return_value=Mock(
+            spec=Popen,
+            wait=wait,
+            communicate=lambda: ('out', 'err'),
+        ),
     )
     monkeypatch.setattr('cylc.uiserver.resolvers.Popen', mock_popen)
 
     ret = await Services.play(
+        Mock(spec=WorkflowsManager),
         [Tokens('wflow1')],
         {},
-        workflows_mgr=Mock(spec=WorkflowsManager),
         log=Mock(),
     )
-    assert ret == [
-        False, "Command 'cylc play wflow1' timed out after 120 seconds"
-    ]
+    assert ret == (
+        False, "Command 'cylc play wflow1' timed out after 120 seconds\nerr"
+    )
 
 
 @pytest.fixture
@@ -318,7 +329,7 @@ async def test_cat_log(workflow_run_dir, app, fast_sleep):
 
     # note - timeout tests that the cat-log process is being stopped correctly
     first_response = None
-    async with timeout(20):
+    async with asyncio.timeout(20):
         ret = services.cat_log(workflow, app, info)
         actual = ''
         is_first = True
@@ -367,7 +378,7 @@ async def test_cat_log_timeout(workflow_run_dir, app, fast_sleep):
 
     ret = services.cat_log(workflow, app, info)
     responses = []
-    async with timeout(5):
+    async with asyncio.timeout(5):
         async for response in ret:
             responses.append(response)
             await asyncio.sleep(0)
@@ -401,12 +412,12 @@ async def test_clean__error(
     caplog.set_level(logging.ERROR)
 
     ret = Services.clean(
+        Mock(spec=WorkflowsManager),
         [Tokens('wflow1')],
         {},
-        workflows_mgr=Mock(spec=WorkflowsManager),
         executor=ThreadPoolExecutor(1),
         log=logging.root,
     )
     err_msg = "CylcError: bad things!!"
-    assert (await ret) == [False, err_msg]
+    assert (await ret) == (False, err_msg)
     assert err_msg in caplog.text

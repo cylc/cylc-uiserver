@@ -27,6 +27,7 @@ from subprocess import (
     DEVNULL,
     PIPE,
     Popen,
+    TimeoutExpired,
 )
 from textwrap import indent
 from time import time
@@ -216,31 +217,34 @@ class Services:
     # log file stream lag
     CAT_LOG_SLEEP = 1
 
+    #  command timeout for commands which start schedulers
+    START_TIMEOUT = 120
+
     @staticmethod
     def _error(message: Union[Exception, str]):
         """Format error case response."""
-        return [
+        return (
             False,
             str(message)
-        ]
+        )
 
     @staticmethod
     def _return(message: str):
         """Format success case response."""
-        return [
+        return (
             True,
             message
-        ]
+        )
 
     @classmethod
     async def clean(
         cls,
+        workflows_mgr: 'WorkflowsManager',
         workflows: Iterable['Tokens'],
         args: dict,
-        workflows_mgr: 'WorkflowsManager',
         executor: 'Executor',
         log: 'Logger'
-    ):
+    ) -> tuple[bool, str]:
         """Calls `cylc clean`"""
         # Convert Schema options → cylc.flow.workflow_files.init_clean opts:
         opts = _schema_opts_to_api_opts(args, schema=CleanOptions)
@@ -273,25 +277,51 @@ class Services:
         cls,
         args: dict,
         workflows_mgr: 'WorkflowsManager',
-    ):
+    ) -> tuple[bool, str]:
         await workflows_mgr.scan()
         return cls._return("Scan requested")
 
     @classmethod
-    async def play(
+    async def run_command(
         cls,
+        command: Iterable[str],
         workflows: Iterable[Tokens],
         args: Dict[str, Any],
-        workflows_mgr: 'WorkflowsManager',
         log: 'Logger',
-    ) -> List[Union[bool, str]]:
-        """Calls `cylc play`."""
+        timeout: int,
+        success_msg: str = 'Command succeeded',
+        fail_msg: str = 'Command failed',
+    ) -> tuple[bool, str]:
+        """Calls the specified Cylc command.
+
+        Args:
+            command:
+                The Cylc subcommand to run.
+                e.g ["play"] or ["cat-log", "-m", "p"].
+            workflows:
+                The workflows to run this command against.
+            args:
+                CLI arguments to be provided to this command.
+                e.g {'color': 'never'} would result in "--color=never".
+            log:
+                The application log, used to record this command invocation.
+            timeout:
+                Length of time to wait for the command to complete.
+                The command will be killed if the timeout elapses.
+            success_msg:
+                Message to be used in the response if the command succeeds.
+            fail_msg:
+                Message to be used in the response if the command fails.
+
+        Returns:
+
+        """
         cylc_version = args.pop('cylc_version', None)
         results: Dict[str, str] = {}
         failed = False
         for tokens in workflows:
             try:
-                cmd = _build_cmd(['cylc', 'play', '--color=never'], args)
+                cmd = _build_cmd(['cylc', *command, '--color=never'], args)
 
                 if tokens['user'] and tokens['user'] != getuser():
                     return cls._error(
@@ -313,7 +343,7 @@ class Services:
                     env.pop('CYLC_ENV_NAME', None)
                     env['CYLC_VERSION'] = cylc_version
 
-                # run cylc play
+                # run command
                 proc = Popen(
                     cmd,
                     env=env,
@@ -322,11 +352,21 @@ class Services:
                     stderr=PIPE,
                     text=True
                 )
-                ret_code = proc.wait(timeout=120)
+
+                try:
+                    ret_code = proc.wait(timeout=timeout)
+                except TimeoutExpired as exc:
+                    proc.kill()
+                    ret_code = 124  # mimic `timeout` command error code
+                    # NOTE: preserve any stderr that the command produced this
+                    # far as this may help with debugging
+                    out, err = proc.communicate()
+                    err = str(exc) + (('\n' + err) if err else '')
+                else:
+                    out, err = proc.communicate()
 
                 if ret_code:
-                    msg = f"Command failed ({ret_code}): {cmd_repr}"
-                    out, err = proc.communicate()
+                    msg = f"{fail_msg} ({ret_code}): {cmd_repr}"
                     results[wflow] = err.strip() or out.strip() or msg
                     log.error(
                         f"{msg}\n"
@@ -335,7 +375,7 @@ class Services:
                     )
                     failed = True
                 else:
-                    results[wflow] = 'started'
+                    results[wflow] = success_msg
 
             except Exception as exc:  # unexpected error
                 log.exception(exc)
@@ -343,18 +383,71 @@ class Services:
 
         if failed:
             if len(results) == 1:
+                # all commands failed
                 return cls._error(results.popitem()[1])
-            # else log each workflow result on separate lines
+
+            # some commands failed
             return cls._error(
+                # log each workflow result on separate lines
                 "\n\n" + "\n\n".join(
                     f"{wflow}: {msg}" for wflow, msg in results.items()
                 )
             )
 
+        # all commands succeeded
+        return cls._return(f'Workflow(s) {success_msg}')
+
+    @classmethod
+    async def play(
+        cls,
+        workflows_mgr: 'WorkflowsManager',
+        workflows: Iterable[Tokens],
+        args: dict,
+        log,
+        **kwargs,
+    ) -> tuple[bool, str]:
+        """Calls `cylc play`."""
+        ret = await cls.run_command(
+            ('play',),
+            workflows,
+            args,
+            log,
+            cls.START_TIMEOUT,
+            **kwargs,
+            success_msg='started',
+        )
+
         # trigger a re-scan
         await workflows_mgr.scan()
-        # send a success message
-        return cls._return('Workflow(s) started')
+
+        # return results
+        return ret
+
+    @classmethod
+    async def validate_reinstall(
+        cls,
+        workflows_mgr: 'WorkflowsManager',
+        workflows: Iterable[Tokens],
+        args: dict,
+        log,
+        **kwargs,
+    ) -> tuple[bool, str]:
+        """Calls `cylc validate-reinstall`."""
+        ret = await cls.run_command(
+            ('validate-reinstall', '--yes'),
+            workflows,
+            args,
+            log,
+            cls.START_TIMEOUT,
+            **kwargs,
+            success_msg='reinstalled',
+        )
+
+        # trigger a re-scan
+        await workflows_mgr.scan()
+
+        # return results
+        return ret
 
     @staticmethod
     async def enqueue(stream, queue):
@@ -581,8 +674,7 @@ class Resolvers(BaseResolvers):
         command: str,
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any],
-    ) -> List[Union[bool, str]]:
-
+    ) -> tuple[bool, str]:
         # GraphQL v3 includes all variables that are set, even if set to null.
         kwargs = {
             k: v
@@ -592,18 +684,25 @@ class Resolvers(BaseResolvers):
 
         if command == 'clean':  # noqa: SIM116
             return await Services.clean(
+                self.workflows_mgr,
                 workflows,
                 kwargs,
-                self.workflows_mgr,
                 log=self.log,
                 executor=self.executor
             )
-        elif command == 'play':
+        elif command == 'play':  # noqa: SIM116
             return await Services.play(
+                self.workflows_mgr,
                 workflows,
                 kwargs,
-                self.workflows_mgr,
                 log=self.log
+            )
+        elif command == 'validate_reinstall':
+            return await Services.validate_reinstall(
+                self.workflows_mgr,
+                workflows,
+                kwargs,
+                log=self.log,
             )
         elif command == 'scan':
             return await Services.scan(

@@ -52,31 +52,13 @@ CONTROL_OPS = [
     "set_verbosity",
     "stop",
     "trigger",
+    "validate_reinstall",
 ]
 
 ALL_OPS = [
-    "clean",
+    *CONTROL_OPS,
     "read",
     "broadcast",
-    "ext_trigger",
-    "hold",
-    "kill",
-    "message",
-    "pause",
-    "play",
-    "poll",
-    "release",
-    "release_hold_point",
-    "reload",
-    "remove",
-    "resume",
-    "scan",
-    "set",
-    "set_graph_window_extent",
-    "set_hold_point",
-    "set_verbosity",
-    "stop",
-    "trigger",
 ]
 
 FAKE_SITE_CONF = {
@@ -154,6 +136,7 @@ FAKE_USER_CONF = {
                 "pause",
                 "set",
                 "release",
+                "validate_reinstall",
             },
             id="user in * and groups, owner in * and groups",
         ),
