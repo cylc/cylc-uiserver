@@ -23,6 +23,7 @@ With no arguments, the status of the ad-hoc web service server is printed.
 For 'cylc review start', if 'PORT' is not specified, port 8080 is used."""
 
 import cherrypy
+import contextlib
 from fnmatch import fnmatch
 from glob import glob
 import jinja2
@@ -40,15 +41,12 @@ from time import gmtime, strftime
 import traceback
 from urllib.parse import quote
 
-from cylc.flow.hostuserutil import get_host
-from cylc.uiserver.review_dao import CylcReviewDAO
-from cylc.flow.task_state import (
-    TASK_STATUSES_ORDERED,
-)
 from cylc.flow import __version__ as CYLC_VERSION
-from cylc.uiserver.ws import get_util_home
-from cylc.uiserver.review_dao import TASK_STATUS_GROUPS
+from cylc.flow.hostuserutil import get_host
+from cylc.flow.task_state import TASK_STATUSES_ORDERED
 from cylc.flow.workflow_files import WorkflowFiles
+from cylc.uiserver.review_dao import TASK_STATUS_GROUPS, CylcReviewDAO
+from cylc.uiserver.ws import get_util_home
 
 
 # Cylc 7 Task states.
@@ -69,7 +67,7 @@ CYLC7_TASK_STATUSES_ORDERED = [
 ]
 
 
-class CylcReviewService(object):
+class CylcReviewService:
     """'Cylc Review Service."""
 
     NS = "cylc"
@@ -509,14 +507,12 @@ class CylcReviewService(object):
             item = os.path.relpath(dirpath, user_suite_dir_root)
             if not any(fnmatch(item, glob_) for glob_ in name_globs):
                 continue
-            try:
+            with contextlib.suppress(OSError):
                 data["entries"].append({
                     "name": str(item),
                     "info": {},
                     "last_activity_time": (
                         self.get_last_activity_time(user, item))})
-            except OSError:
-                pass
 
         if order == "name_asc":
             data["entries"].sort(key=lambda entry: entry["name"])
@@ -542,14 +538,14 @@ class CylcReviewService(object):
             rosie_suite_info = os.path.join(user_suite_dir, "rose-suite.info")
             if os.path.isfile(rosie_suite_info):
                 rosie_info = {}
-                try:
-                    for line in open(rosie_suite_info, 'r').readlines():
+                with contextlib.suppress(IOError):
+                    for line in open(   # noqa: SIM115
+                        rosie_suite_info, 'r'
+                    ).readlines():
                         if not line.strip().startswith('#') and '=' in line:
                             rosie_key, rosie_val = line.strip().split("=", 1)
                             if rosie_key in ("project", "title"):
                                 rosie_info[rosie_key] = rosie_val
-                except IOError:
-                    pass
                 entry["info"].update(rosie_info)
 
         data["time"] = strftime("%Y-%m-%dT%H:%M:%SZ", gmtime())
@@ -600,7 +596,7 @@ class CylcReviewService(object):
             text = handle.read()
         else:
             f_size = os.stat(f_name).st_size
-            if open(f_name).read(2) == "#!":
+            if open(f_name).read(2) == "#!":  # noqa: SIM115
                 mime = self.MIME_TEXT_PLAIN
             else:
                 mime = mimetypes.guess_type(quote(f_name))[0]
@@ -614,7 +610,7 @@ class CylcReviewService(object):
             ):
                 cherrypy.response.headers["Content-Type"] = mime
                 return cherrypy.lib.static.serve_file(f_name, mime)
-            text = open(f_name).read()
+            text = open(f_name).read()  # noqa: SIM115
         try:
             text = str(text)
             if mode in [None, "text"]:

@@ -15,22 +15,23 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Provide data access object for the suite runtime database."""
 
-import sqlite3
+import contextlib
+from glob import glob
 import os
 from pathlib import Path
-import tarfile
 import re
-from glob import glob
+import sqlite3
 from sqlite3 import OperationalError
+import tarfile
 
 from cylc.flow.rundb import CylcWorkflowDAO
-from cylc.flow.workflow_files import WorkflowFiles
 from cylc.flow.task_state import (
     TASK_STATUSES_ACTIVE,
     TASK_STATUSES_FAILURE,
     TASK_STATUSES_NEVER_ACTIVE,
     TASK_STATUSES_SUCCESS,
 )
+from cylc.flow.workflow_files import WorkflowFiles
 
 TASK_STATUS_GROUPS = {
     "active": list(TASK_STATUSES_ACTIVE | TASK_STATUSES_NEVER_ACTIVE),
@@ -39,7 +40,7 @@ TASK_STATUS_GROUPS = {
 }
 
 
-class CylcReviewDAO(object):
+class CylcReviewDAO:
     """Cylc Review data access object to the suite runtime database."""
 
     CYCLE_ORDERS = {"time_desc": " DESC", "time_asc": " ASC"}
@@ -455,9 +456,11 @@ class CylcReviewDAO(object):
                             "exists": True,
                             "seq_key": None}
                         continue
-            if entry["cycle"] in targzip_log_cycles:
-                if entry["cycle"] not in relevant_targzip_log_cycles:
-                    relevant_targzip_log_cycles.append(entry["cycle"])
+            if (
+                entry["cycle"] in targzip_log_cycles
+                and entry["cycle"] not in relevant_targzip_log_cycles
+            ):
+                relevant_targzip_log_cycles.append(entry["cycle"])
 
         for cycle in relevant_targzip_log_cycles:
             path = os.path.join("log", "job-%s.tar.gz" % cycle)
@@ -561,12 +564,10 @@ class CylcReviewDAO(object):
         user_suite_dir = os.path.expanduser(os.path.join(
             prefix, os.path.join("cylc-run", suite_name)))
         targzip_log_cycles = []
-        try:
+        with contextlib.suppress(OSError):
             for item in os.listdir(os.path.join(user_suite_dir, "log")):
                 if item.startswith("job-") and item.endswith(".tar.gz"):
                     targzip_log_cycles.append(item[4:-7])
-        except OSError:
-            pass
 
         if self.is_cylc8:
             # Cylc 8 has a smaller set of task states.
@@ -695,7 +696,7 @@ class CylcReviewDAO(object):
         try:
             host = None
             port_str = None
-            for line in open(port_file_path):
+            for line in open(port_file_path):   # noqa: SIM115
                 key, value = [item.strip() for item in line.split("=", 1)]
                 if key in ["CYLC_SUITE_HOST", "CYLC_WORKFLOW_HOST"]:
                     host = value
@@ -710,16 +711,13 @@ class CylcReviewDAO(object):
 
         stmt = "SELECT status FROM task_states WHERE status GLOB ? LIMIT 1"
         stmt_args = ["*failed"]
-        try:
+        with contextlib.suppress(sqlite3.Error):
             for _ in self._db_exec(user_name, suite_name, stmt, stmt_args):
                 ret["is_failed"] = True
                 break
-        except sqlite3.Error:
-            pass  # case with no task_states table.
         self._db_close(user_name, suite_name)
 
         return ret
-
 
     def pre_select_broadcast_events(self, order=None):
         """Query statement and args formation for select_broadcast_events."""

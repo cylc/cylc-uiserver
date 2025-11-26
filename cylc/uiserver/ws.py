@@ -20,6 +20,7 @@ wsgi_app - Return a WSGI application for a web service.
 ws_cli - Parse CLI. Start/Stop ad-hoc server.
 """
 
+from annotated_types import Ge
 import cherrypy
 from glob import glob
 import os
@@ -27,7 +28,6 @@ from pathlib import Path
 from random import shuffle
 import socket
 from typing import Annotated
-from annotated_types import Ge
 
 LOG_ROOT_TMPL = "~/.cylc/%(ns)s-%(util)s-%(host)s-%(port)s"
 
@@ -77,9 +77,9 @@ def _ws_init(service_cls, port, service_root, *args, **kwargs):
         handle.write("pid=%d\n" % os.getpid())
 
     cherrypy.config["log.access_file"] = log_root + "-access.log"
-    open(cherrypy.config["log.access_file"], "w").close()
+    open(cherrypy.config["log.access_file"], "w").close()   # noqa: SIM115
     cherrypy.config["log.error_file"] = log_root + "-error.log"
-    open(cherrypy.config["log.error_file"], "w").close()
+    open(cherrypy.config["log.error_file"], "w").close()   # noqa: SIM115
 
     root = '/'
     if service_root != '/':
@@ -144,7 +144,7 @@ def _get_server_status(service_cls):
     )
     for filename in glob(log_root_glob):
         try:
-            for line in open(filename):
+            for line in open(filename):   # noqa: SIM115
                 key, value = line.strip().split("=", 1)
                 ret[key] = value
             break
@@ -162,7 +162,7 @@ def get_util_home(*args):
     return str(Path(__file__).parent / '/'.join(args))
 
 
-def get_review_service(
+def get_review_service_config(
     ports: tuple[Annotated[int, Ge(0)], Annotated[int, Ge(0)]] = (8000, 8999),
     service_root: str = 'services/cylc'
 ) -> dict:
