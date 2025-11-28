@@ -1,0 +1,80 @@
+name: Test Cylc Review
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - '*.*.x'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: 2
+
+defaults:
+  run:
+    shell: bash -c "exec $CONDA_PREFIX/bin/bash -elo pipefail {0}"
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest']
+        python-version: ['3.12']
+    env:
+      PYTEST_ADDOPTS: --cov --color=yes
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Patch DNS
+        uses: cylc/release-actions/patch-dns@v1
+
+      - name: Install System Dependencies
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          cache-environment: true
+          post-cleanup: 'all'
+          environment-name: cylc-uiserver
+          create-args: >-
+            python=${{ matrix.python-version }}
+            pip
+            bash
+            coreutils
+
+      - name: install cylc-flow
+        uses: cylc/release-actions/install-cylc-components@v1
+        with:
+          cylc_flow: true
+          cylc_flow_opts: ''
+
+      - name: install cylc-uiserver
+        run: pip install -e .[all]
+
+      - name: Functional Tests
+        run: |
+          CONF_PATH="$HOME/.cylc/flow/8"
+          mkdir -p "$CONF_PATH"
+          touch "$CONF_PATH/global.cylc"
+          ln -s "$CONF_PATH/global.cylc" "$CONF_PATH/global-tests.cylc"
+
+          cat >> "$CONF_PATH/global.cylc" <<__HERE__
+          [platforms]
+            [[_local_background_indep_tcp]]
+              hosts = localhost
+              install target = localhost
+              ssh command = ssh -oBatchMode=yes -oConnectTimeout=8 -oStrictHostKeyChecking=no
+          __HERE__
+
+          # Check that Cylc Review is ready to run
+          cylc review --help || exit 1
+
+          ./etc/bin/run-functional-tests
