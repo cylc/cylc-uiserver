@@ -12,6 +12,14 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.8.1 (Released 2025-11-27)
+
+[Updated cylc-ui to 2.11.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🔧 Fixes
+
+[#740](https://github.com/cylc/cylc-uiserver/pull/740) - Improve the logic for handling closed connections. This results in better memory management.
+
 ## cylc-uiserver-1.8.0 (Released 2025-10-01)
 
 [Updated cylc-ui to 2.10.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
