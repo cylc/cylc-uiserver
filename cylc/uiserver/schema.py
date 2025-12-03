@@ -241,6 +241,48 @@ class Play(graphene.Mutation):
     result = GenericScalar()
 
 
+class ValidateReinstall(graphene.Mutation):
+    class Meta:
+        description = sstrip('''
+            Validate, reinstall, then reload or restart as appropriate.
+
+            This command updates a workflow to reflect any new changes made in
+            the workflow source directory since it was installed.
+
+            The workflow will be reinstalled, then either:
+            * Reloaded (if the workflow is running),
+            * or restarted (if it is stopped).
+        ''')
+        resolver = partial(mutator, command='validate_reinstall')
+
+    class Arguments:
+        workflows = graphene.List(WorkflowID, required=True)
+        cylc_version = CylcVersion(
+            description=sstrip('''
+                Set the Cylc version that the workflow starts with.
+            ''')
+        )
+        set = graphene.List(  # noqa: A003 (graphql field name)
+            graphene.String,
+            description=sstrip('''
+                Set the value of a Jinja2 template variable in the workflow
+                definition. Values should be valid Python literals so strings
+                must be quoted e.g. `STR="string"`, `INT=43`, `BOOL=True`.
+                This option can be used multiple  times on the command line.
+                NOTE: these settings persist across workflow restarts, but can
+                be set again on the `cylc play` command line if they need to be
+                overridden.
+            ''')
+        )
+        reload_global = graphene.Boolean(
+            default_value=False,
+            required=False,
+            description="Reload global config as well as the workflow config"
+        )
+
+    result = GenericScalar()
+
+
 class Clean(graphene.Mutation):
     class Meta:
         description = sstrip('''
@@ -894,6 +936,7 @@ class UISSubscriptions(Subscriptions):
 
 class UISMutations(Mutations):
     play = _mut_field(Play)
+    validate_reinstall = _mut_field(ValidateReinstall)
     clean = _mut_field(Clean)
     scan = _mut_field(Scan)
 
