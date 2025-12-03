@@ -22,7 +22,7 @@ jobs:
       HEAD_BRANCH: update-ui-${{ github.run_number }}
     steps:
       - name: checkout cylc-uiserver
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.base-branch }}
 
