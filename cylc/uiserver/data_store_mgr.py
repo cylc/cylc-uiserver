@@ -93,8 +93,6 @@ class DataStoreMgr:
 
     """
 
-    INIT_DATA_WAIT_CHECKS = 30  # check attempts
-    INIT_DATA_RETRY_DELAY = 0.5  # seconds
     RECONCILE_TIMEOUT = 5.  # seconds
     PENDING_DELTA_CHECK_INTERVAL = 0.5
 
@@ -271,16 +269,6 @@ class DataStoreMgr:
             w_id (str): Workflow external ID.
 
         """
-        # Wait until data-store is populated for this workflow,
-        # carry on otherwise, errors will be reconciled with data validation.
-        if self.data[w_id][WORKFLOW].last_updated == 0:
-            loop_cnt = 0
-            while loop_cnt < self.INIT_DATA_WAIT_CHECKS:
-                if self.data[w_id][WORKFLOW].last_updated > 0:
-                    break
-                time.sleep(self.INIT_DATA_RETRY_DELAY)
-                loop_cnt += 1
-                continue
         if topic == 'shutdown':
             self._delta_store_to_queues(w_id, topic, delta)
             # close connections
