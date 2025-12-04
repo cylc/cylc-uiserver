@@ -51,6 +51,25 @@ Cylc specific configurations are documented here.
    ``c.CylcUIServer.site_authorization`` should be defined in
    ``/etc/cylc/uiserver/jupyter_config.py``, or, alternatively, via
    the environment variable ``CYLC_SITE_CONF_PATH``.
+
+Cylc Review Service
+^^^^^^^^^^^^^^^^^^^
+
+Cylc hub can be configured to automatically serve the Cylc Review static
+log-file viewer. To enable Cylc Review, add the following to your
+`jupyterhub_config.py`:
+
+.. code-block:: python
+
+   from cylc.uiserver.ws import get_review_service_config
+   c.JupyterHub.services = [get_review_service_config()]
+   c.JupyterHub.load_roles = [
+       {
+           "name": "user",
+           "scopes": ["self", "access:services!service=cylc-review"],
+       },
+   ]
+
 """
 
 from concurrent.futures import ProcessPoolExecutor
