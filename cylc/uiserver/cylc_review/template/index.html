@@ -15,6 +15,9 @@ rel="stylesheet" media="screen" />
 {% if logo -%}
 <img {{logo}} />
 {% endif -%}
+{% if jupythub_base %}
+<a href="{{jupythub_base}}">Return to Cylc GUI</a>
+{% endif %}
 <h1>{{title}} <small>@ {{host}}</small></h1>
 <p>Browse User Suite-logs on HTTP</p>
 <p class="pull-right"><small>Cylc {{cylc_version}}</small></p>
