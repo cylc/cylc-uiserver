@@ -1,1 +1,1300 @@
-../lib/bash/test_header
+#!/usr/bin/env bash
+# THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
+# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+# NAME
+#     test_header
+#
+# SYNOPSIS
+#     . $CYLC_REPO_DIR/tests/lib/bash/test_header
+#
+# DESCRIPTION
+#     Interface for constructing tests under a TAP harness (the "prove"
+#     command).
+#
+# FUNCTIONS
+#     set_test_number N
+#         echo a total number of tests for TAP to read.
+#     ok TEST_NAME
+#         echo a TAP OK message for TEST_NAME.
+#     fail TEST_NAME
+#         echo a TAP fail message for TEST_NAME. If $CYLC_TEST_DEBUG is set,
+#         cat $TEST_NAME.stderr to stderr.
+#     run_ok TEST_NAME COMMAND ...
+#         Run COMMAND with any following options/arguments and store stdout
+#         and stderr in TEST_NAME.stdout and TEST_NAME.stderr.
+#         This is expected to have a return code of 0, which ok's the test.
+#     run_fail TEST_NAME COMMAND ...
+#         Run COMMAND with any following options/arguments and store stdout
+#         and stderr in TEST_NAME.stdout and TEST_NAME.stderr.
+#         This is expected to have a non-zero return code, which ok's the test.
+#     run_graphql_ok TEST_NAME WORKFLOW JSON
+#         Send a graphql query to the workflow, extract the result from
+#         ${TEST_NAME}.stdout
+#     cmp_ok FILE_TEST FILE_CONTROL
+#         Compare FILE_TEST with a file or stdin given by FILE_CONTROL (stdin
+#         if FILE_CONTROL is "-" or missing). By default, it uses "diff -u" to
+#         compare files. However, if an alternate command such as "xxdiff -D"
+#         is desirable (e.g. for debugging),
+#         "export CYLC_TEST_DIFF_CMD=xxdiff -D".
+#     cmp_ok_re FILE_TEST FILE_CONTROL
+#         Match a file against a regex file line by line.
+#         Reads in the test and control files line by line and checks the test
+#         line re.match'es the control line.
+#     cmp_json TEST_NAME FILE_TEST [FILE_CONTROL]
+#         Alternative implementation to cmp_json_ok, compare two JSON files
+#         and display any differences as a unified(ish) diff:
+#         * Works with nested dictionaries.
+#         * Impervious to dictionary order.
+#     contains_ok FILE_TEST [FILE_CONTROL]
+#         Make sure that each line in FILE_TEST is present in FILE_CONTROL
+#         (stdin if FILE_CONTROL is "-" or missing).
+#     grep_ok PATTERN FILE [$OPTS]
+#         Run "grep [$OPTS] -q -e PATTERN FILE".
+#     grep_workflow_log_ok TEST_NAME PATTERN [$OPTS]
+#         Run "grep [$OPTS] -s -e PATTERN <workflow-log>".
+#     named_grep_ok NAME PATTERN FILE [$OPTS]
+#         Run grep_ok with a custom test name.
+#         OPTS: put grep options like '-E' (extended regex) at end of line.
+#     grep_fail PATTERN FILE [$OPTS]
+#         Run "grep [$OPTS] -q -e PATTERN FILE", expect no match.
+#     count_ok PATTERN FILE COUNT
+#         Test that PATTERN occurs in exactly COUNT lines of FILE.
+#     exists_ok FILE
+#         Test that FILE exists
+#     exists_fail FILE
+#         Test that FILE does not exist
+#     init_workflow TEST_NAME [SOURCE] [[RUN_NUMS]]
+#         Create a workflow from SOURCE's "flow.cylc" called:
+#         "cylctb-${CYLC_TEST_TIME_INIT}/${TEST_SOURCE_DIR##*tests/}/${TEST_NAME}"
+#         Provides WORKFLOW_NAME and WORKFLOW_RUN_DIR variables.
+#         RUN_NUMS (defaults to false): If false run cylc install --no-rundir
+#     install_workflow TEST_NAME SOURCE [RUN_NUMS]
+#         Same as init_workflow, but SOURCE must be a directory containing a
+#         "flow.cylc" file.
+#     log_scan TEST_NAME FILE ATTEMPTS DELAY PATTERN...
+#         Monitor FILE polling every DELAY seconds for maximum of ATTEMPTS
+#         tries grepping for each PATTERN in turn. Tests will only pass if the
+#         PATTERNs appear in FILE in the correct order. Runs one test per
+#         pattern, each prefixed by TEST_NAME.
+#         set LOG_SCAN_GREP_OPTS in the environment, e.g. "-E" for "grep -E"
+#     make_rnd_workflow
+#         Create a randomly-named workflow source directory.
+#     mock_smtpd_init
+#         Start a mock SMTP server daemon for testing. Write host:port setting
+#         to the variable TEST_SMTPD_HOST. Write pid of daemon to
+#         TEST_SMTPD_PID. Write log to TEST_SMTPD_LOG.
+#     mock_smtpd_kill
+#         Kill the mock SMTP server daemon process.
+#     poll COMMAND
+#         Run COMMAND in 1 second intervals for a minute until COMMAND returns
+#         a zero value, or exit 1 (abort test) with a timeout message.
+#     poll_grep ...
+#         Shorthand for 'poll grep -s ...'.
+#     poll_grep_workflow_log ...
+#         Shorthand for 'poll_grep ... "${WORKFLOW_RUN_DIR}/log/scheduler/log"'
+#     poll_pid_done PID
+#         Poll until process with PID is done.
+#     poll_workflow_running
+#         Shorthand for 'poll test -e "${WORKFLOW_RUN_DIR}/.service/contact"'
+#     poll_workflow_stopped
+#         Shorthand for 'poll "!" test -e "${WORKFLOW_RUN_DIR}/.service/contact"'.
+#         Note that you might want to call poll_workflow_running before this as
+#         it may return before contact file is created in the first place.
+#     get_workflow_uuid
+#         Extract the UUID from the contact file or echo '' if not present.
+#     poll_workflow_restart [TIMEOUT [UUID]]
+#         Wait for the workflow to restart.
+#         Provide the UUID from the current run if workflow is not
+#         guaranteed to be running.
+#     port_is_busy $PORT
+#         Return 0 if $PORT is busy or 1 if $PORT is not busy.
+#     purge [WORKFLOW_NAME [PLATFORM]]
+#         Remove a workflow from the filesystem.
+#         Defaults to removing $WORKFLOW_NAME on $CYLC_TEST_PLATFORM
+#     purge_rnd_workflow
+#         Remove a workflow source dir and rundir.
+#         Typically used with make_rnd_workflow
+#     skip N SKIP_REASON
+#         echo "ok $((++T)) # skip SKIP_REASON" N times.
+#     skip_all SKIP_REASON
+#         echo "1..0 # SKIP SKIP_REASON" and exit.
+#     ssh_install_cylc HOST
+#         Install cylc on a remote host.
+#     reftest [TEST_NAME [SOURCE]]
+#         Install a reference workflow using `install_workflow`, run a validation
+#         test on the workflow and run the reference workflow with `workflow_run_ok`.
+#         Expect 2 OK tests.
+#     requires_cherrypy
+#         Will skip all tests if CherryPy hasn't been installed.
+#     install_and_validate
+#         The first part of reftest, to allow separate use.
+#         Expect 1 OK test.
+#     reftest_run
+#         The guts of reftest, to allow separate use.
+#         Expect 1 OK test.
+#     create_test_global_config [PRE [POST]]
+#         Create a new global config file $PWD/etc from global-tests.cylc
+#         with PRE and POST pre- and ap-pended.
+#         PRE and POST are strings.
+#         The global config starts with #!Jinja2 in case Jinja2 is used.
+#     localhost_fqdn
+#         Get the FQDN of the current host using the same mechanism Cylc uses.
+#     get_fqdn [TARGET]
+#         SSH to TARGET and return `hostname -f`.
+#     dump_std TEST_NAME
+#         Dump stdout and stderr of TEST_NAME to the test log dir.
+#     delete_db [WORKFLOW_RUN_DIR]
+#         Delete private/public workflow databases for a cold start.
+#
+# VARIABLES
+#     LOG_INDENT
+#         indentation width of secondary log lines
+#     # TODO: document other variables used by test scripts
+#
+#-------------------------------------------------------------------------------
+
+set -eu
+shopt -s extglob
+
+# For indented secondary log lines; must match the width in cylc.flow.loggingutil
+export LOG_INDENT="    "
+
+FAILURES=0
+SIGNALS="EXIT INT"
+TEST_DIR=
+TEST_RHOST_CYLC_DIR=
+
+FINALLY() {
+    for S in ${SIGNALS}; do
+        trap '' "${S}"
+    done
+    if [[ -n "${TEST_DIR}" ]]; then
+        cd ~
+        rm -rf "${TEST_DIR}"
+    fi
+    if [[ -n "${TEST_RHOST_CYLC_DIR}" ]]; then
+        # TEST_RHOST_CYLC_DIR is a local variable of this script
+        # shellcheck disable=SC2029
+        ssh -oBatchMode=yes -oConnectTimeout=5 "${TEST_RHOST_CYLC_DIR%%:*}" \
+            "rm -fr ${TEST_RHOST_CYLC_DIR#*:}"
+    fi
+    if [[ -n "${TEST_SMTPD_PID:-}" ]]; then
+        kill "${TEST_SMTPD_PID}"
+    fi
+    if ((FAILURES > 0)); then
+        echo -e "\n    stdout and stderr stored in: ${TEST_LOG_DIR}" >&2
+        if "${WORKFLOW_RUN_FAILS}"; then
+            echo -e "    workflow logs can be found under: ${WORKFLOW_LOG_DIR}/" >&2
+        fi
+    fi
+}
+for S in ${SIGNALS}; do
+    # Signal as argument to FINALLY
+    # shellcheck disable=SC2064
+    trap "FINALLY ${S}" "${S}"
+done
+
+TEST_NUMBER=0
+
+if command -v lsof >/dev/null; then
+    HAS_LSOF=true
+else
+    HAS_LSOF=false
+fi
+
+set_test_number() {
+    echo "1..$1"
+}
+
+ok() {
+    echo "ok $((++TEST_NUMBER)) - $*"
+}
+
+fail() {
+    ((++FAILURES))
+    echo "not ok $((++TEST_NUMBER)) - $*"
+    if [[ -n "${CYLC_TEST_DEBUG:-}" ]]; then
+        echo >'/dev/tty'
+        echo "${TEST_NAME_BASE} ${TEST_NAME}" >'/dev/tty'
+        cat "${TEST_NAME}.stderr" >'/dev/tty'
+    fi
+}
+
+dump_std() {
+    local TEST_NAME="$1"
+    mkdir -p "${TEST_LOG_DIR}"  # directory may not exist if run fails very early
+    if [[ -s "${TEST_NAME}.stdout" ]]; then
+        cp -p "${TEST_NAME}.stdout" "${TEST_LOG_DIR}/${TEST_NAME}.stdout"
+    fi
+    cp -p "${TEST_NAME}.stderr" "${TEST_LOG_DIR}/${TEST_NAME}.stderr"
+}
+
+run_ok() {
+    local TEST_NAME="$1"
+    shift 1
+    if ! "$@" 1>"${TEST_NAME}.stdout" 2>"${TEST_NAME}.stderr"; then
+        fail "${TEST_NAME}"
+        dump_std "${TEST_NAME}"
+        return
+    fi
+    ok "${TEST_NAME}"
+}
+
+run_fail() {
+    local TEST_NAME="$1"
+    shift 1
+    if "$@" 1>"${TEST_NAME}.stdout" 2>"${TEST_NAME}.stderr"; then
+        fail "${TEST_NAME}"
+        dump_std "${TEST_NAME}"
+        return
+    fi
+    ok "${TEST_NAME}"
+}
+
+run_graphql_ok () {
+    # this is a thin wrapper to `cylc client` which strips newlines from $2 to
+    # make it valid JSON
+    local TEST_NAME="$1"
+    local WORKFLOW="$2"
+    local JSON="$3"
+    # shellcheck disable=SC2086
+    run_ok "${TEST_NAME}" cylc client \
+        "${WORKFLOW}" \
+        'graphql' \
+        < <(echo ${JSON})
+}
+
+workflow_run_ok() {
+    local TEST_NAME="$1"
+    shift 1
+    if "$@" 1>"${TEST_NAME}.stdout" 2>"${TEST_NAME}.stderr"; then
+        ok "${TEST_NAME}"
+        return
+    fi
+    fail "${TEST_NAME}"
+    WORKFLOW_RUN_FAILS=true
+    WORKFLOW_LOG_DIR="${WORKFLOW_RUN_DIR}/log/scheduler"
+    mkdir -p "${WORKFLOW_LOG_DIR}" # directory may not exist if run fails very early
+    dump_std "${TEST_NAME}"
+}
+
+workflow_run_fail() {
+    local TEST_NAME="$1"
+    shift 1
+    if ! "$@" 1>"${TEST_NAME}.stdout" 2>"${TEST_NAME}.stderr"; then
+        ok "${TEST_NAME}"
+        return
+    fi
+    fail "${TEST_NAME}"
+    WORKFLOW_RUN_FAILS=true
+    WORKFLOW_LOG_DIR="${WORKFLOW_RUN_DIR}/log/scheduler"
+    mkdir -p "${WORKFLOW_LOG_DIR}" # directory may not exist if run fails very early
+    dump_std "${TEST_NAME}"
+}
+
+cmp_ok() {
+    local FILE_TEST="$1"
+    local FILE_CONTROL="${2:--}"
+    local TEST_NAME
+    TEST_NAME="$(basename "${FILE_TEST}")-cmp-ok"
+    local DIFF_CMD=${CYLC_TEST_DIFF_CMD:-'diff -u'}
+    if ${DIFF_CMD} "${FILE_CONTROL}" "${FILE_TEST}" >"${TEST_NAME}.stderr" 2>&1
+    then
+        ok "${TEST_NAME}"
+        return
+    else
+        cat "${TEST_NAME}.stderr" >&2
+    fi
+    dump_std "$TEST_NAME"
+    fail "${TEST_NAME}"
+}
+
+cmp_ok_re() {
+    local FILE_TEST="$1"
+    local FILE_CONTROL="${2:--}"
+    local TEST_NAME
+    TEST_NAME="$(basename "${FILE_TEST}")-cmp-ok"
+    if python3 -c '
+import re
+import sys
+
+def compare(test_file, control_file):
+    for ind, (test_line, control_line) in enumerate(
+        zip(test_file, control_file)
+    ):
+        if test_line is None:
+            sys.stderr.write("Test file is missing lines")
+            sys.exit(1)
+        if control_line is None:
+            sys.stderr.write("Test file has extra lines")
+            sys.exit(1)
+        if not re.match(control_line, test_line):
+            sys.stderr.write(
+                f"Line {ind+1}: \"{test_line}\" does not match /{control_line}/"
+                .replace("\n", "")
+            )
+            sys.exit(1)
+
+test_filename, control_filename = sys.argv[1:3]
+with open(test_filename, "r") as test_file:
+    if control_filename == "-":
+        compare(test_file, sys.stdin)
+    else:
+        with open(control_filename, "r") as control_file:
+            compare(test_file, control_file)
+' "${FILE_TEST}" "${FILE_CONTROL}"; then
+        ok "${TEST_NAME}"
+    else
+        (
+            echo -e '\n# Test file:'
+            cat "${FILE_TEST}"
+        ) >&2
+        fail "${TEST_NAME}"
+    fi
+}
+
+cmp_json() {
+    local TEST_NAME="$1"
+    local FILE_TEST="$2"
+    local FILE_CONTROL="${3:--}"
+
+    if python3 "$CYLC_REPO_DIR/tests/f/lib/python/diffr.py" \
+        "$(cat "$FILE_CONTROL")" "$(cat "$FILE_TEST")" \
+        >"${TEST_NAME}.stdout" 2>"${TEST_NAME}.stderr"
+    then
+        ok "${TEST_NAME}"
+        return
+    else
+        cat "${TEST_NAME}.stderr" >&2
+    fi
+    dump_std "$TEST_NAME"
+    fail "${TEST_NAME}"
+}
+
+contains_ok() {
+    local FILE_TEST="$1"
+    local FILE_CONTROL="${2:--}"
+    local TEST_NAME
+    TEST_NAME="$(basename "${FILE_TEST}")-contains-ok"
+    LANG=C comm -13 <(LANG=C sort "${FILE_TEST}") <(LANG=C sort "${FILE_CONTROL}") \
+        1>"${TEST_NAME}.stdout" 2>"${TEST_NAME}.stderr"
+    if [[ -s "${TEST_NAME}.stdout" ]]; then
+        mkdir -p "${TEST_LOG_DIR}"
+        {
+            echo 'Missing lines:'
+            cat "${TEST_NAME}.stdout"
+            echo 'Test File:'
+            cat "${FILE_TEST}"
+        } >>"${TEST_NAME}.stderr"
+        cp -p "${TEST_NAME}.stderr" "${TEST_LOG_DIR}/${TEST_NAME}.stderr"
+        fail "${TEST_NAME}"
+        return
+    fi
+    ok "${TEST_NAME}"
+}
+
+count_ok() {
+    local BRE="$1"
+    local FILE="$2"
+    local COUNT="$3"
+    local TEST_NAME NEW_COUNT
+    TEST_NAME="$(basename "${FILE}")-count-ok"
+    NEW_COUNT=$(grep -c "${BRE}" "${FILE}")
+    if (( NEW_COUNT == COUNT )); then
+        ok "${TEST_NAME}"
+        return
+    fi
+    mkdir -p "${TEST_LOG_DIR}"
+    echo "Found ${NEW_COUNT} (not ${COUNT}) of ${BRE} in ${FILE}" \
+        >"${TEST_LOG_DIR}/${TEST_NAME}.stderr"
+    fail "${TEST_NAME}"
+}
+
+
+requires_cherrypy() {
+    if ! python3 -c 'import cherrypy' 2>'/dev/null'; then
+        skip_all '"cherrypy" not installed: Use pip install .[review]'
+    fi
+}
+
+
+port_is_busy() {
+    local WS_PORT="${1}"
+    if type -P netcat 1>/dev/null; then
+        WS_HOSTNAME="${WS_HOSTNAME:-"$(hostname)"}"
+        WS_HOSTNAME="${WS_HOSTNAME:-'localhost'}"
+        netcat -z "${WS_HOSTNAME}" "${WS_PORT}"
+    else
+        netstat -atun | grep -q "0.0.0.0:${WS_PORT}"
+    fi
+}
+
+TEST_CYLC_WS_PID=
+TEST_CYLC_WS_PORT=
+TEST_CYLC_WS_URL=
+
+
+cylc_ws_init() {
+    local NS="$1"
+    local UTIL="$2"
+
+    local WS_PORT="$((RANDOM + 10000))"
+    while port_is_busy "${WS_PORT}"; do
+        WS_PORT="$((RANDOM + 10000))"
+    done
+
+    TEST_NAME="${TEST_NAME_BASE}-${NS}-${UTIL}"
+    "${NS}" "${UTIL}" 'start' '--port' "${WS_PORT}" >&2 \
+        0<'/dev/null' 1>"${NS}-${UTIL}.stdout" 2>"${NS}-${UTIL}.stderr" &
+    TEST_CYLC_WS_PID="$!"
+    T_INIT="$(date '+%s')"
+    while ! port_is_busy "${WS_PORT}" && (($(date '+%s') < T_INIT + 30)); do
+        sleep 1
+    done
+    TEST_CYLC_WS_PORT="${WS_PORT}"
+    if port_is_busy "${TEST_CYLC_WS_PORT}"; then
+        ok "${TEST_NAME}"
+        TEST_CYLC_WS_URL="http://localhost:${TEST_CYLC_WS_PORT}"
+    else
+        fail "${TEST_NAME}"
+        cylc_ws_kill
+    fi
+}
+
+cylc_ws_kill() {
+    if [[ -n "${TEST_CYLC_WS_PID}" ]]; then
+        kill "${TEST_CYLC_WS_PID}" 2>'/dev/null'
+        wait 2>'/dev/null'
+    fi
+    if [[ -n "${TEST_CYLC_WS_PORT}" ]]; then
+        rm -fr "${HOME}/.cylc/"*"-0.0.0.0-${TEST_CYLC_WS_PORT}"* 2>'/dev/null'
+    fi
+    TEST_CYLC_WS_PID=
+    TEST_CYLC_WS_PORT=
+    TEST_CYLC_WS_URL=
+}
+
+cylc_ws_json_greps() {
+    local TEST_NAME="$1"
+    shift 1
+    run_ok "${TEST_NAME}" python3 - "$@" <<'__PYTHON__'
+import ast
+import json
+import sys
+
+data = json.load(open(sys.argv[1]))
+for item in sys.argv[2:]:
+    keys, value = ast.literal_eval(item)
+    datum = data
+    try:
+        for key in keys:
+            if isinstance(key, dict):
+                for datum_item in datum:
+                    if all([datum_item.get(k) == v for k, v in key.items()]):
+                        datum = datum_item
+                        break
+                else:
+                    raise KeyError
+            else:
+                datum = datum[key]
+        if datum != value:
+            raise ValueError((item, datum))
+    except IndexError:
+        print(data)
+        raise IndexError(item)
+    except KeyError:
+        raise KeyError(item)
+__PYTHON__
+    if [[ -s "${TEST_NAME}.stderr" ]]; then
+        # Only print the final exception line - change to cat for details
+        tail -n 1 "${TEST_NAME}.stderr" >&2
+    fi
+}
+
+grep_ok() {
+    # (Put extra grep options like '-E' at end of the command line)
+    local BRE="$1"
+    local FILE="$2"
+    shift 2
+    OPTS="$*"
+    named_grep_ok "$(basename "${FILE}")-grep-ok" "$BRE" "$FILE" "$OPTS"
+}
+
+grep_workflow_log_ok() {
+    local TEST_NAME="$1"
+    local PATTERN="$2"
+    shift 2
+    OPTS="$*"
+    local LOG_FILE="${WORKFLOW_RUN_DIR}/log/scheduler/log"
+    # shellcheck disable=SC2086
+    if grep ${OPTS} -s -e "$PATTERN" "$LOG_FILE"; then
+        ok "${TEST_NAME}"
+        return
+    fi
+    mkdir -p "${TEST_LOG_DIR}"
+    {
+        cat <<__ERR__
+Can't find:
+===========
+${PATTERN}
+===========
+in:
+===========
+__ERR__
+        cat "$LOG_FILE"
+    } >"${TEST_LOG_DIR}/${TEST_NAME}.stderr"
+    fail "${TEST_NAME}"
+}
+
+named_grep_ok() {
+    # (Put extra grep options like '-E' at end of the command line)
+    local TEST_NAME="$1"
+    local BRE="$2"
+    local FILE="$3"
+    shift 3
+    local OPTS="$*"
+    # shellcheck disable=SC2086
+    if grep ${OPTS} -q -e "${BRE}" "${FILE}"; then
+        ok "${TEST_NAME}"
+        return
+    fi
+    mkdir -p "${TEST_LOG_DIR}"
+    {
+        cat <<__ERR__
+Can't find:
+===========
+${BRE}
+===========
+in:
+===========
+__ERR__
+        cat "${FILE}"
+    } >"${TEST_LOG_DIR}/${TEST_NAME}.stderr"
+    fail "${TEST_NAME}"
+}
+
+grep_fail() {
+    local BRE="$1"
+    local FILE="$2"
+    shift 2
+    local OPTS="$*"
+    local TEST_NAME
+    TEST_NAME="$(basename "${FILE}")-grep-fail"
+    if [[ ! -f "${FILE}" ]]; then
+        fail "${TEST_NAME}-file to be grepped does not exist."
+        return
+    fi
+    # shellcheck disable=SC2086
+    if grep ${OPTS} -q -e "${BRE}" "${FILE}"; then
+        mkdir -p "${TEST_LOG_DIR}"
+        echo "ERROR: Found ${BRE} in ${FILE}" \
+          >"${TEST_LOG_DIR}/${TEST_NAME}.stderr"
+        fail "${TEST_NAME}"
+        return
+    fi
+    ok "${TEST_NAME}"
+}
+
+exists_ok() {
+    local FILE="$1"
+    local TEST_NAME
+    TEST_NAME="$(basename "${FILE}")-file-exists-ok"
+    if [[ -a $FILE ]]; then
+        ok "${TEST_NAME}"
+        return
+    fi
+    mkdir -p "${TEST_LOG_DIR}"
+    echo "Does not exist: ${FILE}" >"${TEST_LOG_DIR}/${TEST_NAME}.stderr"
+    fail "${TEST_NAME}"
+}
+
+exists_fail() {
+    local FILE="$1"
+    local TEST_NAME
+    TEST_NAME="$(basename "${FILE}")-file-exists-fail"
+    if [[ ! -a "${FILE}" ]]; then
+        ok "${TEST_NAME}"
+        return
+    fi
+    mkdir -p "${TEST_LOG_DIR}"
+    echo "Exists: ${FILE}" >"${TEST_LOG_DIR}/${TEST_NAME}.stderr"
+    fail "${TEST_NAME}"
+}
+
+graph_workflow() {
+    # Generate a graphviz "plain" format graph of a workflow.
+    local WORKFLOW_NAME="${1}"
+    local OUTPUT_FILE="${2}"
+    shift 2
+    mkdir -p "$(dirname "${OUTPUT_FILE}")"
+    cylc graph --reference "${WORKFLOW_NAME}" "$@" \
+        >"${OUTPUT_FILE}" 2>"${OUTPUT_FILE}".err
+}
+
+workflow_id() {
+    local TEST_NAME="${1:-${TEST_NAME_BASE}}"
+    local TEST_SOURCE_BASE="${2:-${TEST_NAME}}"
+    echo "${CYLC_TEST_REG_BASE}/${TEST_SOURCE_DIR_BASE}/${TEST_NAME}"
+}
+
+init_workflow() {
+    local TEST_NAME="$1"
+    local FLOW_CONFIG="${2:--}"
+    local RUN_NUMS="${3:-false}"
+    WORKFLOW_NAME="$(workflow_id "${TEST_NAME}")"
+    WORKFLOW_RUN_DIR="${RUN_DIR}/${WORKFLOW_NAME}"
+    mkdir -p "${TEST_DIR}/${WORKFLOW_NAME}/"
+    cat "${FLOW_CONFIG}" >"${TEST_DIR}/${WORKFLOW_NAME}/flow.cylc"
+    cd "${TEST_DIR}/${WORKFLOW_NAME}"
+    if "${RUN_NUMS}"; then
+        cylc install "${TEST_DIR}/${WORKFLOW_NAME}" --workflow-name="${WORKFLOW_NAME}"
+    else
+        cylc install "${TEST_DIR}/${WORKFLOW_NAME}" --no-run-name --workflow-name="${WORKFLOW_NAME}"
+    fi
+}
+
+install_workflow() {
+    local TEST_NAME="${1:-${TEST_NAME_BASE}}"
+    local TEST_SOURCE_BASE="${2:-${TEST_NAME}}"
+    local RUN_NUMS="${3:-false}"
+    WORKFLOW_NAME="$(workflow_id "${TEST_NAME}" "${TEST_SOURCE_BASE}")"
+    WORKFLOW_RUN_DIR="${RUN_DIR}/${WORKFLOW_NAME}"
+    mkdir -p "${TEST_DIR}/${WORKFLOW_NAME}/" # make source dir
+    cp -r "${TEST_SOURCE_DIR}/${TEST_SOURCE_BASE}/"* "${TEST_DIR}/${WORKFLOW_NAME}/"
+    cd "${TEST_DIR}/${WORKFLOW_NAME}"
+    if "$RUN_NUMS"; then
+        cylc install "${TEST_DIR}/${WORKFLOW_NAME}" --workflow-name="${WORKFLOW_NAME}"
+    else
+        cylc install "${TEST_DIR}/${WORKFLOW_NAME}" --no-run-name --workflow-name="${WORKFLOW_NAME}"
+    fi
+}
+
+log_scan () {
+    local TEST_NAME="$1"
+    local FILE="$2"
+    local REPS=$3
+    local DELAY=$4
+    local OPTS=${LOG_SCAN_GREP_OPTS:-}
+    if ${CYLC_TEST_DEBUG:-false}; then
+        local ERR=2
+    else
+        local ERR=1
+    fi
+    shift 4
+    local count=0
+    local success=false
+    local position=0
+    local newposition=
+    for pattern in "$@"; do
+        count=$(( count + 1 ))
+        success=false
+        echo -n "scanning for '${pattern:0:30}'" >& $ERR
+        for _ in $(seq 1 "${REPS}"); do
+            echo -n '.' >& $ERR
+            # shellcheck disable=SC2086
+            newposition=$(grep -n $OPTS "$pattern" "$FILE" | \
+                tail -n 1 | cut -d ':' -f 1)
+            if (( newposition > position )); then
+                position=$newposition
+                echo ': succeeded' >& $ERR
+                ok "${TEST_NAME}-${count}"
+                success=true
+                break
+            fi
+            sleep "${DELAY}"
+        done
+        shift
+        if ! "${success}"; then
+            echo ': failed' >& $ERR
+            fail "${TEST_NAME}-${count}"
+            if "${CYLC_TEST_DEBUG:-false}"; then
+                cat "${FILE}" >&2
+            fi
+            mkdir -p "${TEST_LOG_DIR}"
+            ERR_FILE="${TEST_LOG_DIR}/${TEST_NAME}.stderr"
+            echo "ERR_FILE=$ERR_FILE" >&2
+            echo "Could not find: ${pattern}" > "${ERR_FILE}"
+            echo -e '\n=======================\n' >> "${ERR_FILE}"
+            cat "${FILE}" >> "${ERR_FILE}"
+            skip "$#"
+            return 1
+        fi
+    done
+}
+
+make_rnd_workflow() {
+    # Create a randomly-named workflow source directory.
+    # Define its run directory.
+    # TODO: export a WORKFLOW_NAME variable so tests can get cylc-install
+    # to install under the regular test hierarchy
+    RND_WORKFLOW_NAME="cylctb-x$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c6)"
+    RND_WORKFLOW_SOURCE="$PWD/${RND_WORKFLOW_NAME}"
+    mkdir -p "${RND_WORKFLOW_SOURCE}"
+    touch "${RND_WORKFLOW_SOURCE}/flow.cylc"
+    RND_WORKFLOW_RUNDIR="${RUN_DIR}/${RND_WORKFLOW_NAME}"
+    export RND_WORKFLOW_NAME
+    export RND_WORKFLOW_SOURCE
+    export RND_WORKFLOW_RUNDIR
+}
+
+# shellcheck disable=2120
+# these arguments are intentionally optional
+purge () {
+    # workflow to remove - defaults to $WORKFLOW_NAME
+    local WORKFLOW_NAME="${1:-$WORKFLOW_NAME}"
+    # job platform to remove it on - defaults to $CYLC_TEST_PLATFORM
+    local PLATFORM="${2:-$CYLC_TEST_PLATFORM}"
+
+    if ((FAILURES != 0)); then
+        # if tests have failed then don't clean up
+        return 0
+    fi
+
+    if [[ -z $WORKFLOW_NAME ]]; then
+        echo 'no flow to purge' >&2
+        return 1
+    fi
+
+    local WORKFLOW_RUN_DIR="${RUN_DIR}/${WORKFLOW_NAME}"
+
+    # wait for local processes to let go of their file handles
+    if ${HAS_LSOF}; then
+        # NOTE: lsof can hang, so call with "timeout".
+        # NOTE: lsof can raise warnings with some filesystems so ignore stderr
+        # shellcheck disable=SC2034
+        for try in $(seq 1 5); do
+            if ! grep -q "${WORKFLOW_RUN_DIR}" < <(timeout 5 lsof 2>/dev/null); then
+                break
+            fi
+            sleep 1
+        done
+    fi
+
+    # shellcheck disable=SC2016
+    # shellcheck disable=SC2089
+    local CMD='
+        cd '~/cylc-run' &&
+        rm -rf "'"$WORKFLOW_NAME"'" &&
+        rmdir -p "$(dirname "'"$WORKFLOW_NAME"'")"
+    '
+
+    # remove the workflow run directory on the platform if remote
+    if [[ -n "$PLATFORM" && "${PLATFORM}" != _local* ]]; then
+        local HOST
+        HOST="$(get_host_from_platform "$PLATFORM")"
+        # shellcheck disable=SC2029
+        # we want this to expand client side
+        (ssh "$HOST" "$CMD" 2>/dev/null) || true
+    fi
+
+    # remove the workflow run directory tree locally - if empty
+    # NOTE: do this after remote purge as this removes the test config too
+    bash -c "$CMD" 2>/dev/null || true
+}
+purge_rnd_workflow() {
+    if ((FAILURES != 0)); then
+        # if tests have failed then don't clean up
+        return 0
+    fi
+    # Remove the workflow source created by make_rnd_workflow().
+    # And remove its run-directory too.
+    rm -rf "${RND_WORKFLOW_SOURCE}"
+    rm -rf "${RND_WORKFLOW_RUNDIR}"
+}
+
+poll() {
+    local TIMEOUT="$(($(date +%s) + 60))" # wait 1 minute
+    while ! "$@"; do
+        sleep 1
+        if (($(date +%s) > TIMEOUT)); then
+            echo "ERROR: poll timed out: $*" >&2
+            exit 1
+        fi
+    done
+}
+
+poll_grep() {
+    poll grep -s "$@"
+}
+
+poll_grep_workflow_log() {
+    poll grep -s "$@" "${WORKFLOW_RUN_DIR}/log/scheduler/log"
+}
+
+poll_pid_done() {
+    local TIMEOUT="$(($(date +%s) + 60))" # wait 1 minute
+    while ps --no-headers "$@" 1>'/dev/null' 2>&1; do
+        sleep 1
+        if (($(date +%s) > TIMEOUT)); then
+            echo "ERROR: poll timed out: ! ps --no-headers $*" >&2
+            exit 1
+        fi
+    done
+}
+
+poll_workflow_running() {
+    poll test -e "${WORKFLOW_RUN_DIR}/.service/contact"
+}
+
+poll_workflow_stopped() {
+    poll test '!' -e "${WORKFLOW_RUN_DIR}/.service/contact"
+}
+
+get_workflow_uuid() {
+    sed -n 's|CYLC_WORKFLOW_UUID=\(.*\)|\1|p' "${WORKFLOW_RUN_DIR}/.service/contact" 2>/dev/null
+}
+
+poll_workflow_restart() {
+    TIMEOUT="${1:-10}"
+    STEP=1
+    UUID="${2:-$(get_workflow_uuid)}"
+    TIME=0
+    while true; do
+        if [[ ${TIME} -gt $TIMEOUT ]]; then
+            return 1
+        fi
+        if [[ $(get_workflow_uuid) != "${UUID}" ]]; then
+            return 0
+        else
+            TIME=$(( TIME + STEP ))
+            sleep "${STEP}"
+        fi
+    done
+}
+
+skip() {
+    local N_TO_SKIP="$1"
+    shift 1
+    local COUNT=0
+    while ((COUNT++ < N_TO_SKIP)); do
+        echo "ok $((++TEST_NUMBER)) # skip $*"
+    done
+}
+
+skip_all() {
+    echo "1..0 # SKIP $*"
+    exit
+}
+
+skip_macos_gh_actions() {
+    # https://github.com/cylc/cylc-flow/issues/6276
+    if [[ "${CI:-}" && "$OSTYPE" == "darwin"* ]]; then
+        skip_all "Skipped due to performance issues on GH Actions MacOS runner"
+    fi
+}
+
+ssh_install_cylc() {
+    local RHOST="$1"
+    local RHOST_CYLC_DIR=
+    RHOST_CYLC_DIR=$(_ssh_mkdtemp_cylc_dir "${RHOST}")
+    TEST_RHOST_CYLC_DIR="${RHOST}:${RHOST_CYLC_DIR}"
+    rsync -a '--exclude=*.pyc' "${CYLC_REPO_DIR}"/* "${RHOST}:${RHOST_CYLC_DIR}/"
+    # RHOST_CYLC_DIR is a variable of this function
+    # shellcheck disable=SC2029
+    ssh -n -oBatchMode=yes -oConnectTimeout=5 "${RHOST}" \
+        "make -C '${RHOST_CYLC_DIR}' 'version'" 1>'/dev/null' 2>&1
+}
+
+_ssh_mkdtemp_cylc_dir() {
+    local RHOST="$1"
+    ssh -oBatchMode=yes -oConnectTimeout=5 "${RHOST}" python3 - <<'__PYTHON__'
+import os
+from tempfile import mkdtemp
+print(mkdtemp(dir=os.path.expanduser("~"), prefix="cylc-"))
+__PYTHON__
+}
+
+mock_smtpd_init() {  # Logic borrowed from Rose
+    local SMTPD_PORT=
+    # Try several ports in case any are in use:
+    for SMTPD_PORT in 8025 8125 8225 8325 8425 8525 8625 8725 8825 8925; do
+        local SMTPD_LOG="${TEST_DIR}/smtpd.log"
+        local SMTPD_HOST="localhost:${SMTPD_PORT}"
+        # Set up fake SMTP server to catch outgoing mail & redirect to log:
+        python3 -u -m 'aiosmtpd' \
+            --class aiosmtpd.handlers.Debugging stdout \
+            --debug --nosetuid \
+            --listen "${SMTPD_HOST}" \
+            1>"${SMTPD_LOG}" 2>&1 &  # Runs in background
+        local SMTPD_PID="$!"
+        while ! grep -q 'is listening' "${SMTPD_LOG}" 2>'/dev/null'
+        do
+            if ps "${SMTPD_PID}" 1>/dev/null 2>&1; then
+                sleep 1  # Still waiting for fake server to start
+            else  # Server process failed
+                rm -f "${SMTPD_LOG}"
+                unset SMTPD_HOST SMTPD_LOG SMTPD_PID
+                break
+            fi
+        done
+        if [[ -n "${SMTPD_PID:-}" ]]; then
+            # Variables used by tests
+            # shellcheck disable=SC2034
+            TEST_SMTPD_HOST="${SMTPD_HOST}"
+            # shellcheck disable=SC2034
+            TEST_SMTPD_LOG="${SMTPD_LOG}"
+            TEST_SMTPD_PID="${SMTPD_PID}"
+            break
+        fi
+    done
+}
+
+mock_smtpd_kill() {  # Logic borrowed from Rose
+    if [[ -n "${TEST_SMTPD_PID:-}" ]] && ps "${TEST_SMTPD_PID}" >'/dev/null' 2>&1
+    then
+        kill "${TEST_SMTPD_PID}"
+        wait "${TEST_SMTPD_PID}" 2>/dev/null || true
+        unset TEST_SMTPD_HOST TEST_SMTPD_LOG TEST_SMTPD_PID
+    fi
+}
+
+install_and_validate() {
+    # First part of the reftest function, to allow separate use.
+    # Expect 1 OK test.
+    local TEST_NAME="${1:-${TEST_NAME_BASE}}"
+    install_workflow "$@"
+    run_ok "${TEST_NAME}-validate" cylc validate "${WORKFLOW_NAME}"
+}
+
+reftest_run() {
+    # Guts of the reftest function, to allow separate use.
+    # Expect 1 OK test.
+    local TEST_NAME="${1:-${TEST_NAME_BASE}}-run"
+    if [[ -n "${REFTEST_OPTS:-}" ]]; then
+        # shellcheck disable=SC2086
+        workflow_run_ok "${TEST_NAME}" \
+            cylc play --reference-test --debug --no-detach \
+            ${REFTEST_OPTS} "${WORKFLOW_NAME}"
+    else
+        workflow_run_ok "${TEST_NAME}" \
+            cylc play --reference-test --debug --no-detach \
+            "${WORKFLOW_NAME}"
+    fi
+}
+
+reftest() {
+    # Install, validate, run, and purge, a reference test.
+    # Expect 2 OK tests.
+    install_and_validate "$@"
+    reftest_run "$@"
+    # shellcheck disable=SC2119
+    purge
+}
+
+_get_test_config_file() {
+    # print the path to the most specific global-tests.cylc on the system
+    # (or print nothing if no test configs are present)
+    python3 -c "
+from pathlib import Path
+from cylc.flow.cfgspec.globalcfg import get_version_hierarchy
+for version in reversed(get_version_hierarchy('$(cylc version)')):
+    path = Path('${HOME}/.cylc/flow', version, 'global-tests.cylc')
+    if path.exists():
+        print(path)
+        break
+    "
+}
+
+create_test_global_config() {
+    # (Documented in file header).
+    local PRE=
+    local POST=
+    if (( $# == 1 )); then
+        PRE=$1
+    elif (( $# == 2 )); then
+        PRE=$1
+        POST=$2
+    elif (( $# > 2 )); then
+        echo 'ERROR, create_test_global_config: too many args' >&2
+        exit 1
+    fi
+    # Tidy in case of previous use of this function.
+    rm -fr 'etc'
+    mkdir 'etc'
+    # Start with Jinja2 hashbang. Harmless if not needed.
+    echo "#!Jinja2" >'etc/global.cylc'
+    echo "$PRE" >>'etc/global.cylc'
+    # add defaults
+    cat >>'etc/global.cylc' <<__HERE__
+    # set a default timeout for all flow runs to avoid hanging tests
+    [scheduler]
+        [[events]]
+            inactivity timeout = PT5M
+            stall timeout = PT5M
+            abort on inactivity timeout = true
+            abort on workflow timeout = true
+    [install]
+        max depth = 5
+__HERE__
+    # add global-tests.cylc
+    USER_TESTS_CONF_FILE="$(_get_test_config_file)"
+    if [[ -n "${USER_TESTS_CONF_FILE}" ]]; then
+        cat "${USER_TESTS_CONF_FILE}" >>'etc/global.cylc'
+    fi
+    # add platform config
+    if [[ -n "${CYLC_TEST_PLATFORM:-}" ]]; then
+        _add_platform_to_test_global_conf "$CYLC_TEST_PLATFORM"
+    fi
+    echo "$POST" >>'etc/global.cylc'
+    export CYLC_CONF_PATH="${PWD}/etc"
+}
+
+_parse_platform_spec () {
+    # the requirement string: e.g. comms:tcp
+    local requirement="$1"
+
+    local locality='local'
+    local job_runner='*'
+    local file_system='*'
+    local comms='*'
+    for req in ${requirement}; do
+        case "$req" in
+            loc:*)
+                locality="${req/loc:/}"
+                ;;
+            runner:*)
+                job_runner="${req/runner:/}"
+                ;;
+            fs:*)
+                file_system="${req/fs:/}"
+                ;;
+            comms:*)
+                comms="${req/comms:/}"
+                ;;
+            *)
+                echo "Invalid option $req" >&2
+                return 1
+                ;;
+        esac
+    done
+    echo "_${locality}_${job_runner}_${file_system}_${comms}"
+}
+
+_get_test_platform () {
+    # the requirement string: e.g. comms:tcp
+    local requirement="$1"
+
+    local platform
+    local required_platform
+    required_platform="$(_parse_platform_spec "${requirement}")"
+
+    for platform in "${PLATFORMS[@]}"; do
+        # we are purposefully allowing pattern matching here
+        # shellcheck disable=SC2053
+        if [[ "$platform" == $required_platform ]]; then
+            CYLC_TEST_PLATFORM="$platform"
+            CYLC_TEST_JOB_RUNNER="$(cut -d '_' -f 3 <<< "$platform")"
+            export CYLC_TEST_PLATFORM CYLC_TEST_JOB_RUNNER
+            return 0
+        fi
+    done
+    return 1
+}
+
+_get_test_host () {
+    # extract a test host from the test platform
+    # NOTE: this will cause a failure if the platform is not configured
+    CYLC_TEST_HOST="$(get_host_from_platform "$CYLC_TEST_PLATFORM")"
+    if [[ -z "${CYLC_TEST_HOST}" ]]; then
+        echo "Could not find host for platform $CYLC_TEST_PLATFORM" >&2
+        exit 1
+    fi
+    export CYLC_TEST_HOST
+}
+
+_get_test_install_target () {
+    # extract a test host from the test platform
+    # NOTE: this will cause a failure if the platform is not configured
+    CYLC_TEST_INSTALL_TARGET="$(
+        get_install_target_from_platform "$CYLC_TEST_PLATFORM"
+    )"
+    if [[ -z "${CYLC_TEST_INSTALL_TARGET}" ]]; then
+        CYLC_TEST_INSTALL_TARGET="$CYLC_TEST_PLATFORM"
+    fi
+    export CYLC_TEST_INSTALL_TARGET
+}
+
+get_host_from_platform () {
+    local platform="$1"
+
+    cylc config -i "[platforms][${platform}]hosts" \
+        | cut -d ',' -f 1
+}
+
+get_install_target_from_platform () {
+    local platform="$1"
+
+    cylc config -d -i "[platforms][${platform}]install target" \
+        | cut -d ',' -f 1
+}
+
+localhost_fqdn () {
+python -c "
+from cylc.flow.hostuserutil import get_fqdn_by_host
+print(get_fqdn_by_host(None))
+"
+}
+
+get_fqdn () {
+    local HOST="${1}"
+    ssh "$HOST" hostname -f
+}
+
+_get_test_platforms () {
+    CYLC_CONF_PATH='' cylc config -i '[platforms]' \
+        | sed -n 's/\[\[\(_.*\)\]\]/\1/p'
+}
+
+_expand_test_platforms () {
+    # convert sting of space separated platforms to array
+    read -r -a PLATFORMS <<< "${1}"
+
+    local ret=()
+    local pattern
+    local platform
+    local all_platforms
+
+    # get list of all configured test platforms
+    # NOTE: when we drop bash3 convert to
+    # mapfile -t all_platforms < <(_get_test_platforms)
+    all_platforms=()
+    while IFS='' read -r line; do
+        all_platforms+=("$line");
+    done < <(_get_test_platforms)
+
+    # perform pattern matching on the PLATFORMS variable
+    if [[ "${#PLATFORMS[@]}" -eq 0 ]]; then
+        # default to all local platforms
+        PLATFORMS=('_local_background*' '_local_at*')
+    fi
+
+    # perform pattern matching
+    for pattern in "${PLATFORMS[@]}"; do
+        for platform in "${all_platforms[@]}"; do
+            # shellcheck disable=SC2053
+            # we are purposefully performing glob matching here
+            if [[ ${platform} == ${pattern} ]]; then
+                ret+=("${platform}")
+            fi
+        done
+    done
+
+    # set PLATFORMS to the unique results
+    # NOTE: when we drop bash3 convert to
+    # mapfile -t PLATFORMS < <(
+    PLATFORMS=()
+    while IFS='' read -r line; do
+        PLATFORMS+=("$line");
+    done < <(
+        for platform in "${ret[@]}"; do
+            echo "${platform}";
+        done | sort -u
+    )
+    export PLATFORMS
+}
+
+_check_test_requirements () {
+    # check the test requirements against the array of test platforms
+    if [[ -z "${REQUIRE_PLATFORM:-}" ]]; then
+        # if no requirement string is provided default to local, background
+        REQUIRE_PLATFORM='loc:local runner:background'
+    fi
+    if ! _get_test_platform "${REQUIRE_PLATFORM}"; then
+        skip_all "requires $REQUIRE_PLATFORM"
+    fi
+    _add_platform_to_test_global_conf "$CYLC_TEST_PLATFORM"
+}
+
+_add_platform_to_test_global_conf () {
+    # add a test platform from the global config to the test global config
+    # NOTE: Uses global.cylc NOT global-tests.cylc
+    #       Do not configure test platforms in the global-tests.cylc file
+    PLATFORM="$1"
+    cat >> "${CYLC_CONF_PATH}/global.cylc" <<__HERE__
+[platforms]
+    [[$PLATFORM]]
+$(
+    CYLC_CONF_PATH='' cylc config \
+        -i "[platforms][$PLATFORM]" \
+        | sed 's/^/        /'
+)
+__HERE__
+}
+
+delete_db() {
+    # Delete private/public workflow databases for a cold start
+    local WORKFLOW_RUN_DIR="${1:-$WORKFLOW_RUN_DIR}"
+    rm "${WORKFLOW_RUN_DIR}/.service/db" "${WORKFLOW_RUN_DIR}/log/db"
+}
+
+
+# tags
+
+PATH="${CYLC_REPO_DIR}/bin:${PATH}"
+
+RUN_DIR="${HOME}/cylc-run"
+export RUN_DIR
+TEST_NAME_BASE="$(basename "$0" '.t')"
+TEST_SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)"
+TEST_DIR="$(mktemp -d)"
+cd "${TEST_DIR}"
+TEST_SOURCE_DIR_BASE="${TEST_SOURCE_DIR##*tests/}"
+# this prevents test runs started at the same time from conflicting
+TEST_LOG_DIR_BASE="${TMPDIR:-/tmp}/${USER}/${CYLC_TEST_REG_BASE}"
+TEST_LOG_DIR="${TEST_LOG_DIR_BASE}/${TEST_SOURCE_DIR_BASE}/${TEST_NAME_BASE}"
+WORKFLOW_RUN_FAILS=false
+
+CYLC_TEST_SKIP="${CYLC_TEST_SKIP:-}"
+# Is this test in the skip list?
+THIS="${0#./}"
+THIS_DIR="$(dirname "${THIS}")"
+for SKIP in ${CYLC_TEST_SKIP}; do
+    RSKIP="${SKIP#./}"
+    if [[ "${THIS}" == "${RSKIP}" || "${THIS_DIR%/}" == "${RSKIP%/}" ]]; then
+        # Deliberately print variable substitution syntax unexpanded
+        # shellcheck disable=SC2016
+        skip_all 'this test is in $CYLC_TEST_SKIP.'
+    fi
+done
+
+# Ignore the normal site/user global config, use global-tests.cylc.
+create_test_global_config "$@"
+
+# get array of test platforms to run tests with
+_expand_test_platforms "${PLATFORMS}"
+
+# run or skip tests based on the test requirements and provided test platforms
+# provides: CYLC_TEST_PLATFORM
+_check_test_requirements
+
+# extract a test host from the test platform
+# provides: CYLC_TEST_HOST
+_get_test_host
+
+# extract a test install target from the test platform
+# provides: CYLC_TEST_INSTALL_TARGET
+_get_test_install_target
+
+if ${CYLC_SHOW_TEST_EXECUTION:-false}; then
+    # write the name of tests as they are run
+    # (helpful for debugging hanging tests)
+    echo "# $TEST_NAME_BASE" >&2
+fi
+
+set +x
+set +e
