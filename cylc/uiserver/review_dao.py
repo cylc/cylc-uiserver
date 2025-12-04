@@ -1,6 +1,4 @@
-#!/usr/bin/env python2
-
-# THIS FILE IS PART OF THE CYLC SUITE ENGINE.
+# THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
 # Copyright (C) NIWA & British Crown (Met Office) & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,19 +15,32 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Provide data access object for the suite runtime database."""
 
-import sqlite3
-import os
-import tarfile
-import re
+import contextlib
 from glob import glob
+import os
+from pathlib import Path
+import re
+import sqlite3
 from sqlite3 import OperationalError
+import tarfile
 
-from cylc.rundb import CylcSuiteDAO
-from cylc.task_state import TASK_STATUS_GROUPS
-"""Provide data access object to the suite runtime database for Cylc Review."""
+from cylc.flow.rundb import CylcWorkflowDAO
+from cylc.flow.task_state import (
+    TASK_STATUSES_ACTIVE,
+    TASK_STATUSES_FAILURE,
+    TASK_STATUSES_NEVER_ACTIVE,
+    TASK_STATUSES_SUCCESS,
+)
+from cylc.flow.workflow_files import WorkflowFiles
+
+TASK_STATUS_GROUPS = {
+    "active": list(TASK_STATUSES_ACTIVE | TASK_STATUSES_NEVER_ACTIVE),
+    "fail": list(TASK_STATUSES_FAILURE),
+    "success": list(TASK_STATUSES_SUCCESS)
+}
 
 
-class CylcReviewDAO(object):
+class CylcReviewDAO:
     """Cylc Review data access object to the suite runtime database."""
 
     CYCLE_ORDERS = {"time_desc": " DESC", "time_asc": " ASC"}
@@ -105,29 +116,30 @@ class CylcReviewDAO(object):
         self.daos = {}
 
     def _db_init(self, user_name, suite_name):
-        """Initialise a named CylcSuiteDAO database connection."""
+        """Initialise a named CylcWorkflowDAO database connection."""
         key = (user_name, suite_name)
         if key not in self.daos:
             prefix = "~"
             if user_name:
                 prefix += user_name
             for name in [os.path.join("log", "db"), "cylc-suite.db"]:
-                db_f_name = os.path.expanduser(os.path.join(
-                    prefix, os.path.join("cylc-run", suite_name, name)))
-                self.daos[key] = CylcSuiteDAO(db_f_name, is_public=True)
+                db_f_name = os.path.expanduser(
+                    os.path.join(
+                        prefix, os.path.join("cylc-run", suite_name, name)))
+                self.daos[key] = CylcWorkflowDAO(db_f_name, is_public=True)
                 if os.path.exists(db_f_name):
                     break
         self.is_cylc8 = self.set_is_cylc8(user_name, suite_name)
         return self.daos[key]
 
     def _db_close(self, user_name, suite_name):
-        """Close a named CylcSuiteDAO database connection."""
+        """Close a named CylcWorkflowDAO database connection."""
         key = (user_name, suite_name)
         if self.daos.get(key) is not None:
             self.daos[key].close()
 
     def _db_exec(self, user_name, suite_name, stmt, stmt_args=None):
-        """Execute a query on a named CylcSuiteDAO database connection."""
+        """Execute a query on a named CylcWorkflowDAO database connection."""
         daos = self._db_init(user_name, suite_name)
         if stmt_args is None:
             stmt_args = []
@@ -140,10 +152,12 @@ class CylcReviewDAO(object):
             except sqlite3.OperationalError as exc:
                 # At Cylc 8.0.1+ Workflows installed but not run will not yet
                 # have a database.
-                if (os.path.exists(os.path.dirname(
-                    self.daos.values()[0].db_file_name) + '/flow.cylc') or
-                    os.path.exists(os.path.dirname(
-                        self.daos.values()[0].db_file_name) + '/suite.rc')):
+                wf_dir = Path(
+                    list(self.daos.values())[0].db_file_name
+                ).parent
+                if (wf_dir / WorkflowFiles.FLOW_FILE).exists() or (
+                    wf_dir / WorkflowFiles.SUITE_RC
+                ).exists():
                     return []
                 else:
                     raise exc
@@ -152,7 +166,7 @@ class CylcReviewDAO(object):
         """Return broadcast states of a suite.
         [[point, name, key, value], ...]
         """
-        stmt = CylcSuiteDAO.pre_select_broadcast_states(
+        stmt = self.pre_select_broadcast_states(
             self._db_init(user_name, suite_name), order="ASC")[0]
         broadcast_states = []
         for row in self._db_exec(user_name, suite_name, stmt):
@@ -164,7 +178,7 @@ class CylcReviewDAO(object):
         """Return broadcast events of a suite.
         [[time, change, point, name, key, value], ...]
         """
-        stmt = CylcSuiteDAO.pre_select_broadcast_events(
+        stmt = self.pre_select_broadcast_events(
             self._db_init(user_name, suite_name), order="DESC")[0]
         broadcast_events = []
         for row in self._db_exec(user_name, suite_name, stmt):
@@ -175,7 +189,8 @@ class CylcReviewDAO(object):
 
     @staticmethod
     def set_is_cylc8(user_name, suite_name):
-        from cylc.review import CylcReviewService
+        from cylc.uiserver.review import CylcReviewService
+
         suite_dir = os.path.join(
             CylcReviewService._get_user_home(user_name),
             "cylc-run",
@@ -183,8 +198,18 @@ class CylcReviewDAO(object):
         return CylcReviewService.is_cylc8(suite_dir)
 
     def get_suite_job_entries(
-            self, user_name, suite_name, cycles, tasks, task_status,
-            job_status, order, limit, offset, flow_nums='flow_nums'):
+        self,
+        user_name,
+        suite_name,
+        cycles,
+        tasks,
+        task_status,
+        job_status,
+        order,
+        limit,
+        offset,
+        flow_nums='flow_nums',
+    ):
         """Query suite runtime database to return a listing of task jobs.
         user -- A string containing a valid user ID
         suite -- A string containing a valid suite ID
@@ -226,20 +251,22 @@ class CylcReviewDAO(object):
 
         # Get number of entries
         of_n_entries = 0
-        stmt = ("SELECT COUNT(*)" +
-                " FROM task_states LEFT JOIN task_jobs USING (name, cycle)" +
-                where_expr)
+        stmt = (
+            "SELECT COUNT(*)"
+            + " FROM task_states LEFT JOIN task_jobs USING (name, cycle)"
+            + where_expr
+        )
         try:
             for row in self._db_exec(user_name, suite_name, stmt, where_args):
                 of_n_entries = row[0]
                 break
             else:
                 self._db_close(user_name, suite_name)
-                return ([], 0)
+                return ([], 0, self.is_cylc8)
         except sqlite3.Error:
-            return ([], 0)
+            return ([], 0, self.is_cylc8)
         if self.is_cylc8:
-            stmt = (
+            stmt = (   # nosec B608
                 "SELECT" +
                 " task_states.time_updated AS time," +
                 " cycle, name," +
@@ -256,7 +283,7 @@ class CylcReviewDAO(object):
                 self.JOB_ORDERS.get(order, self.JOB_ORDERS["time_desc"])
             )
         else:
-            stmt = (
+            stmt = (   # nosec B608
                 "SELECT" +
                 " task_states.time_updated AS time," +
                 " cycle, name," +
@@ -293,7 +320,7 @@ class CylcReviewDAO(object):
             if exc.message == self.CANNOT_JOIN_FLOW_NUMS:
                 stmt = stmt.replace('flow_nums', 'submit_num')
                 db_data = self._db_exec(
-                   user_name, suite_name, stmt, where_args + limit_args
+                    user_name, suite_name, stmt, where_args + limit_args
                 )
                 eight_zero_warning = True
             else:
@@ -301,10 +328,20 @@ class CylcReviewDAO(object):
 
         for row in db_data:
             (
-                cycle, name, submit_num, submit_num_max, task_status,
-                time_submit, submit_status,
-                time_run, time_run_exit, run_signal, run_status,
-                user_at_host, batch_sys_name, batch_sys_job_id
+                cycle,
+                name,
+                submit_num,
+                submit_num_max,
+                task_status,
+                time_submit,
+                submit_status,
+                time_run,
+                time_run_exit,
+                run_signal,
+                run_status,
+                user_at_host,
+                batch_sys_name,
+                batch_sys_job_id,
             ) = row[1:]
             entry = {
                 "cycle": cycle,
@@ -419,9 +456,11 @@ class CylcReviewDAO(object):
                             "exists": True,
                             "seq_key": None}
                         continue
-            if entry["cycle"] in targzip_log_cycles:
-                if entry["cycle"] not in relevant_targzip_log_cycles:
-                    relevant_targzip_log_cycles.append(entry["cycle"])
+            if (
+                entry["cycle"] in targzip_log_cycles
+                and entry["cycle"] not in relevant_targzip_log_cycles
+            ):
+                relevant_targzip_log_cycles.append(entry["cycle"])
 
         for cycle in relevant_targzip_log_cycles:
             path = os.path.join("log", "job-%s.tar.gz" % cycle)
@@ -469,7 +508,7 @@ class CylcReviewDAO(object):
                     entry["seq_logs_indexes"][seq_key] = int_indexes
                 except ValueError:
                     pass
-            for filename, log_dict in entry["logs"].items():
+            for _, log_dict in entry["logs"].items():
                 # Unset seq_key for singular items
                 if log_dict["seq_key"] not in entry["seq_logs_indexes"]:
                     log_dict["seq_key"] = None
@@ -525,12 +564,10 @@ class CylcReviewDAO(object):
         user_suite_dir = os.path.expanduser(os.path.join(
             prefix, os.path.join("cylc-run", suite_name)))
         targzip_log_cycles = []
-        try:
+        with contextlib.suppress(OSError):
             for item in os.listdir(os.path.join(user_suite_dir, "log")):
                 if item.startswith("job-") and item.endswith(".tar.gz"):
                     targzip_log_cycles.append(item[4:-7])
-        except OSError:
-            pass
 
         if self.is_cylc8:
             # Cylc 8 has a smaller set of task states.
@@ -550,7 +587,7 @@ class CylcReviewDAO(object):
             states_stmt[key] = " OR ".join(
                 ["status=='%s'" % (name) for name in names])
 
-        stmt = (
+        stmt = (   # nosec B608
             "SELECT" +
             " cycle," +
             " max(time_updated)," +
@@ -601,7 +638,7 @@ class CylcReviewDAO(object):
         check_query = self._db_exec(user_name, suite_name, check_stmt,
                                     ["task_jobs"])
         if check_query.fetchone() is not None:
-            stmt = (
+            stmt = (   # nosec B608
                 "SELECT cycle," +
                 " sum(" + self.JOB_STATUS_COMBOS["submitted,running"] +
                 ") AS n_job_active," +
@@ -614,7 +651,7 @@ class CylcReviewDAO(object):
             fail_events_stmt = " OR ".join(
                 ["event=='%s'" % (name)
                  for name in TASK_STATUS_GROUPS["fail"]])
-            stmt = (
+            stmt = (   # nosec B608
                 "SELECT cycle," +
                 " sum(" + fail_events_stmt + ") AS n_job_fail" +
                 " FROM task_events GROUP BY cycle")
@@ -659,7 +696,7 @@ class CylcReviewDAO(object):
         try:
             host = None
             port_str = None
-            for line in open(port_file_path):
+            for line in open(port_file_path):   # noqa: SIM115
                 key, value = [item.strip() for item in line.split("=", 1)]
                 if key in ["CYLC_SUITE_HOST", "CYLC_WORKFLOW_HOST"]:
                     host = value
@@ -674,12 +711,19 @@ class CylcReviewDAO(object):
 
         stmt = "SELECT status FROM task_states WHERE status GLOB ? LIMIT 1"
         stmt_args = ["*failed"]
-        try:
+        with contextlib.suppress(sqlite3.Error):
             for _ in self._db_exec(user_name, suite_name, stmt, stmt_args):
                 ret["is_failed"] = True
                 break
-        except sqlite3.Error:
-            pass  # case with no task_states table.
         self._db_close(user_name, suite_name)
 
         return ret
+
+    def pre_select_broadcast_events(self, order=None):
+        """Query statement and args formation for select_broadcast_events."""
+        form_stmt = r"SELECT time,change,point,namespace,key,value FROM %s"
+        if order == "DESC":
+            ordering = (" ORDER BY " +
+                        "time DESC, point DESC, namespace DESC, key DESC")
+            form_stmt = form_stmt + ordering
+        return form_stmt % self.TABLE_BROADCAST_EVENTS, []

@@ -29,6 +29,11 @@ rel="stylesheet" media="screen" />
         <span class="icon-bar"></span>
         <span class="icon-bar"></span>
       </button>
+
+      {% if jupythub_base %}
+      <a class="navbar-brand" href="{{jupythub_base}}">Cylc GUI</a>
+      <div class="navbar-brand">|</div>
+      {% endif %}
       <a class="navbar-brand" href="{{script}}/">
         {% if logo -%}
         <img {{logo}} />
