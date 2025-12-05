@@ -435,9 +435,12 @@ requires_cherrypy() {
 
 port_is_busy() {
     local WS_PORT="${1}"
+    type -P netcat >&2
+    echo $? >&2
     if type -P netcat 1>/dev/null; then
         WS_HOSTNAME="${WS_HOSTNAME:-"$(hostname)"}"
         WS_HOSTNAME="${WS_HOSTNAME:-'localhost'}"
+        echo "${SYS_NET_CONFIG}" >&2
         netcat -z "${WS_HOSTNAME}" "${WS_PORT}"
     else
         netstat -atun | grep -q "0.0.0.0:${WS_PORT}"
