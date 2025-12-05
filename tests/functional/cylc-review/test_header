@@ -440,7 +440,6 @@ port_is_busy() {
     if type -P netcat 1>/dev/null; then
         WS_HOSTNAME="${WS_HOSTNAME:-"$(hostname)"}"
         WS_HOSTNAME="${WS_HOSTNAME:-'localhost'}"
-        echo "${SYS_NET_CONFIG}" >&2
         netcat -z "${WS_HOSTNAME}" "${WS_PORT}"
     else
         netstat -atun | grep -q "0.0.0.0:${WS_PORT}"
