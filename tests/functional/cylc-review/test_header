@@ -445,6 +445,7 @@ port_is_busy() {
         echo "${WS_PORT}" >&2
         netcat -z "${WS_HOSTNAME}" "${WS_PORT}"
     else
+        nestart -atun >&2
         netstat -atun | grep -q "0.0.0.0:${WS_PORT}"
     fi
 }
