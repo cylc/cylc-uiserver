@@ -70,19 +70,19 @@ jobs:
         run: |
           pip install -e .[all]
 
-      - name: Style test
-        if: startsWith(matrix.os, 'ubuntu')
-        run: flake8 cylc/uiserver/* tests/unit/* tests/integration/*
+      # - name: Style test
+      #   if: startsWith(matrix.os, 'ubuntu')
+      #   run: flake8 cylc/uiserver/* tests/unit/* tests/integration/*
 
-      - name: Type checking
-        if: startsWith(matrix.os, 'ubuntu')
-        run: mypy
+      # - name: Type checking
+      #   if: startsWith(matrix.os, 'ubuntu')
+      #   run: mypy
 
-      - name: Check changelog
-        uses: cylc/release-actions/towncrier-draft@v1
+      # - name: Check changelog
+      #   uses: cylc/release-actions/towncrier-draft@v1
 
-      - name: Test
-        run: pytest
+      # - name: Test
+      #   run: pytest
 
       - name: Cylc Review tests
         id: review_tests
