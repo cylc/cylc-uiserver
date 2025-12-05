@@ -21,8 +21,6 @@ extra functionality specific to the UIS.
 
 from functools import partial
 import sqlite3
-import json
-import math
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -141,8 +139,8 @@ class Play(graphene.Mutation):
         )
         start_cycle_point = CyclePoint(
             description=sstrip('''
-                Set the start cycle point, which may be after the initial cycle
-                point.
+                Set the start cycle point, which may be after the initial
+                cycle point.
 
                 If the specified start point is not in the sequence, the next
                 on-sequence point will be used.
@@ -314,48 +312,7 @@ async def get_elements(query_type, root, info, **kwargs):
     kwargs['exworkflows'] = [
         Tokens(w_id) for w_id in kwargs['exworkflows']]
 
-    # ret = []
-    # if resource fields requested
-    # ret.append(get_job_resource_request(info, kwargs))
-    # if database fields requested
-    # ret.append(await list_elements(kwargs))
-    # merge results if both sets of fields were requested
-    # return merge_results(ret)
     return await list_elements(query_type, **kwargs)
-
-
-def get_job_resource_request(info, args):
-    """Return the resource request for a task as configured.
-    TODO:
-    * Determine the batch system by mapping the task onto the specified
-      platform.
-    * We will likely want the resource requested by a task when it was
-      submitted (which may be altered by reloads or broadcasts) rather than the
-      resource that is configured in the workflow.
-    """
-
-    ret = {}
-
-    for workflow_id in args['workflows']:
-
-        for namespace in args['tasks']:
-            namespace_id = (Tokens(workflow_id).duplicate(
-                namespace=namespace).id)
-
-            namespace = info.context['resolvers'].data_store_mgr.data[
-                workflow_id][TASKS][namespace_id]
-
-            directives = {item['key']: item['value']
-                          for item in json.loads(namespace.runtime.directives)}
-
-            memory = int(directives.get('--mem', 0))
-            cpus = math.ceil(int(directives.get('--tasks', 0)) / 2)
-            time = float(directives.get('--time', 0))
-
-            # TODO: put the results into the format GraphQL is expecting
-            ret[...] = {'memory': memory, 'cpus': cpus, 'time': time}
-    breakpoint()
-    return ret
 
 
 async def list_elements(query_type, workflows: 'Iterable[Tokens]', **kwargs):
@@ -395,8 +352,8 @@ def run_task_query(conn, workflow):
     tasks = []
     total_of_totals = 0
     for row in conn.execute('''
-WITH data AS (
-  SELECT 
+WITH profiler_stats AS (
+  SELECT
     tj.name,
     tj.cycle,
     tj.submit_num,
@@ -406,22 +363,40 @@ WITH data AS (
     tj.job_id,
     tj.platform_name,
     tj.time_submit,
-    te.message as max_rss,
+    tj.run_status,
+    CASE
+      WHEN te.event = 'message debug' THEN COALESCE(CAST(SUBSTR(te.message,
+      INSTR(te.message, 'mem_alloc ') + 10) AS INT), 0)
+      ELSE 0
+    END AS mem_alloc,
+    CASE
+      WHEN te.event = 'message debug' THEN COALESCE(
+      CAST(SUBSTR(te.message, INSTR(te.message, 'max_rss ') + 8,
+      INSTR(te.message, ' mem_alloc') -
+      (INSTR(te.message, 'max_rss ') + 8)) AS INT), 0)
+      ELSE 0
+    END AS max_rss,
+    CASE
+      WHEN te.event = 'message debug' THEN COALESCE(
+      CAST(SUBSTR(te.message, INSTR(te.message, 'cpu_time ') + 9,
+      INSTR(te.message, ' max_rss') -
+      (INSTR(te.message, 'cpu_time ') + 8)) AS INT), 0)
+      ELSE 0
+    END AS cpu_time,
     STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit) AS total_time,
     STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run) AS run_time,
     STRFTIME('%s', time_run) - STRFTIME('%s', time_submit) AS queue_time
-  FROM task_jobs tj 
-  LEFT JOIN task_events te ON tj.name = te.name AND tj.cycle = te.cycle AND tj.submit_num = te.submit_num  
-  WHERE te.message LIKE 'max_rss%'
+    FROM
+      task_jobs tj
+    LEFT JOIN
+      task_events te
+    ON
+      tj.name = te.name
+      AND tj.cycle = te.cycle
+      AND tj.submit_num = te.submit_num
+  GROUP BY tj.name, tj.cycle, tj.submit_num, tj.platform_name
 ),
-data1 AS (
-  SELECT *,
-    te.message as cpu_time
-  FROM data
-  LEFT JOIN task_events te ON data.name = te.name AND data.cycle = te.cycle AND data.submit_num = te.submit_num  
-  WHERE te.message LIKE 'cpu_time%'
-),
-data2 AS (
+time_stats AS (
   SELECT
     name,
     cycle,
@@ -436,40 +411,53 @@ data2 AS (
     queue_time,
     run_time,
     total_time,
-    NTILE(4) OVER (PARTITION BY name ORDER BY queue_time) AS queue_time_quartile,
-    NTILE(4) OVER (PARTITION BY name ORDER BY run_time) AS run_time_quartile,
-    NTILE(4) OVER (PARTITION BY name ORDER BY total_time) AS total_time_quartile,
-    NTILE(4) OVER (PARTITION BY name ORDER BY CAST(TRIM(REPLACE(max_rss, 'max_rss ', '')) AS INT)) AS max_rss_quartile,
+    mem_alloc,
+    NTILE(4) OVER (PARTITION BY name ORDER BY queue_time)
+    AS queue_time_quartile,
+    NTILE(4) OVER (PARTITION BY name ORDER BY run_time)
+    AS run_time_quartile,
+    NTILE(4) OVER (PARTITION BY name ORDER BY total_time)
+    AS total_time_quartile,
+    NTILE(4) OVER (PARTITION BY name ORDER BY CAST
+    (TRIM(REPLACE(max_rss, 'max_rss ', '')) AS INT)) AS max_rss_quartile,
     CAST(TRIM(REPLACE(max_rss, 'max_rss ', '')) AS INT) AS max_rss,
-    NTILE(4) OVER (PARTITION BY name ORDER BY CAST(TRIM(REPLACE(cpu_time, 'cpu_time ', '')) AS INT)) AS cpu_time_quartile,
+    NTILE(4) OVER (PARTITION BY name ORDER BY CAST
+    (TRIM(REPLACE(cpu_time, 'cpu_time ', '')) AS INT)) AS cpu_time_quartile,
     CAST(TRIM(REPLACE(cpu_time, 'cpu_time ', '')) AS INT) AS cpu_time
-  FROM data1
+  FROM profiler_stats
 )
 SELECT
   name,
   cycle,
   submit_num,
   submit_status,
+  run_status,
   time_run,
   time_run_exit,
   job_id,
   platform_name,
   time_submit,
-  
+  mem_alloc,
+
   -- Calculate Queue time stats
   MIN(queue_time) AS min_queue_time,
   CAST(AVG(queue_time) AS INT) AS mean_queue_time,
   MAX(queue_time) AS max_queue_time,
-  CAST(AVG(queue_time * queue_time) AS INT) AS mean_squares_queue_time,
-  MAX(CASE WHEN queue_time_quartile = 1 THEN queue_time END) AS queue_quartile_1,
-  MAX(CASE WHEN queue_time_quartile = 2 THEN queue_time END) AS queue_quartile_2,
-  MAX(CASE WHEN queue_time_quartile = 3 THEN queue_time END) AS queue_quartile_3,
+  SQRT(AVG(queue_time * queue_time) - AVG(queue_time) * AVG(queue_time))
+  AS stddev_queue_time,
+  MAX(CASE WHEN queue_time_quartile = 1 THEN queue_time END)
+  AS queue_quartile_1,
+  MAX(CASE WHEN queue_time_quartile = 2 THEN queue_time END)
+  AS queue_quartile_2,
+  MAX(CASE WHEN queue_time_quartile = 3 THEN queue_time END)
+  AS queue_quartile_3,
 
   -- Calculate Run time stats
   MIN(run_time) AS min_run_time,
   CAST(AVG(run_time) AS INT) AS mean_run_time,
   MAX(run_time) AS max_run_time,
-  CAST(AVG(run_time * run_time) AS INT) AS mean_squares_run_time,
+  SQRT(AVG(run_time * run_time) - AVG(run_time) * AVG(run_time))
+  AS stddev_run_time,
   MAX(CASE WHEN run_time_quartile = 1 THEN run_time END) AS run_quartile_1,
   MAX(CASE WHEN run_time_quartile = 2 THEN run_time END) AS run_quartile_2,
   MAX(CASE WHEN run_time_quartile = 3 THEN run_time END) AS run_quartile_3,
@@ -478,16 +466,21 @@ SELECT
   MIN(total_time) AS min_total_time,
   CAST(AVG(total_time) AS INT) AS mean_total_time,
   MAX(total_time) AS max_total_time,
-  CAST(AVG(total_time * total_time) AS INT) AS mean_squares_total_time,
-  MAX(CASE WHEN total_time_quartile = 1 THEN total_time END) AS total_quartile_1,
-  MAX(CASE WHEN total_time_quartile = 2 THEN total_time END) AS total_quartile_2,
-  MAX(CASE WHEN total_time_quartile = 3 THEN total_time END) AS total_quartile_3,
+  SQRT(AVG(total_time * total_time) - AVG(total_time) * AVG(total_time))
+  AS stddev_total_time,
+  MAX(CASE WHEN total_time_quartile = 1 THEN total_time END)
+  AS total_quartile_1,
+  MAX(CASE WHEN total_time_quartile = 2 THEN total_time END)
+  AS total_quartile_2,
+  MAX(CASE WHEN total_time_quartile = 3 THEN total_time END)
+  AS total_quartile_3,
 
   -- Calculate RSS stats
   MIN(max_rss) AS min_max_rss,
   CAST(AVG(max_rss) AS INT) AS mean_max_rss,
   MAX(max_rss) AS max_max_rss,
-  CAST(AVG(max_rss * max_rss) AS INT) AS mean_squares_max_rss,
+  SQRT(AVG(max_rss * max_rss) - AVG(max_rss) * AVG(max_rss))
+  AS stddev_max_rss,
   MAX(CASE WHEN max_rss_quartile = 1 THEN max_rss END) AS max_rss_quartile_1,
   MAX(CASE WHEN max_rss_quartile = 2 THEN max_rss END) AS max_rss_quartile_2,
   MAX(CASE WHEN max_rss_quartile = 3 THEN max_rss END) AS max_rss_quartile_3,
@@ -497,13 +490,17 @@ SELECT
   CAST(AVG(cpu_time) AS INT) AS mean_cpu_time,
   MAX(cpu_time) AS max_cpu_time,
   CAST(TOTAL(cpu_time) AS INT) AS total_cpu_time,
-  CAST(AVG(cpu_time * cpu_time) AS INT) AS mean_squares_cpu_time,
-  MAX(CASE WHEN cpu_time_quartile = 1 THEN cpu_time END) AS cpu_time_quartile_1,
-  MAX(CASE WHEN cpu_time_quartile = 2 THEN cpu_time END) AS cpu_time_quartile_2,
-  MAX(CASE WHEN cpu_time_quartile = 3 THEN cpu_time END) AS cpu_time_quartile_3,
-  
+  SQRT(AVG(cpu_time * cpu_time) - AVG(cpu_time) * AVG(cpu_time))
+  AS stddev_cpu_time,
+  MAX(CASE WHEN cpu_time_quartile = 1 THEN cpu_time END)
+  AS cpu_time_quartile_1,
+  MAX(CASE WHEN cpu_time_quartile = 2 THEN cpu_time END)
+  AS cpu_time_quartile_2,
+  MAX(CASE WHEN cpu_time_quartile = 3 THEN cpu_time END)
+  AS cpu_time_quartile_3,
+
   COUNT(*) AS n
-FROM data2
+FROM time_stats
 GROUP BY name, platform_name;
 '''):
         total_of_totals += row[40]
@@ -522,53 +519,54 @@ GROUP BY name, platform_name;
             'job_id': row[7],
             'platform': row[8],
             'submitted_time': row[9],
+            'mem_alloc': row[10],
             # Queue time stats
-            'min_queue_time': row[10],
-            'mean_queue_time': row[11],
-            'max_queue_time': row[12],
-            'std_dev_queue_time': (row[13] - row[11]**2)**0.5,
+            'min_queue_time': row[11],
+            'mean_queue_time': row[12],
+            'max_queue_time': row[13],
+            'std_dev_queue_time': row[14],
             # Prevents null entries when there are too few tasks for quartiles
-            'queue_quartiles': [row[14],
-                                row[14] if row[15] is None else row[15],
-                                row[14] if row[16] is None else row[16]],
+            'queue_quartiles': [row[15],
+                                row[15] if row[16] is None else row[16],
+                                row[15] if row[17] is None else row[17]],
             # Run time stats
-            'min_run_time': row[17],
-            'mean_run_time': row[18],
-            'max_run_time': row[19],
-            'std_dev_run_time': (row[20] - row[18]**2)**0.5,
+            'min_run_time': row[18],
+            'mean_run_time': row[19],
+            'max_run_time': row[20],
+            'std_dev_run_time': row[21],
             # Prevents null entries when there are too few tasks for quartiles
-            'run_quartiles': [row[21],
-                              row[21] if row[22] is None else row[22],
-                              row[21] if row[23] is None else row[23]],
+            'run_quartiles': [row[22],
+                              row[22] if row[23] is None else row[23],
+                              row[22] if row[24] is None else row[24]],
             # Total
-            'min_total_time': row[24],
-            'mean_total_time': row[25],
-            'max_total_time': row[26],
-            'std_dev_total_time': (row[27] - row[25] ** 2) ** 0.5,
+            'min_total_time': row[25],
+            'mean_total_time': row[26],
+            'max_total_time': row[27],
+            'std_dev_total_time': row[28],
             # Prevents null entries when there are too few tasks for quartiles
-            'total_quartiles': [row[27],
-                                row[27] if row[28] is None else row[28],
-                                row[27] if row[29] is None else row[29]],
+            'total_quartiles': [row[29],
+                                row[29] if row[30] is None else row[30],
+                                row[29] if row[31] is None else row[31]],
             # Max RSS stats
-            'min_max_rss': row[30],
-            'mean_max_rss': row[31],
-            'max_max_rss': row[32],
-            'std_dev_max_rss': (row[33] - row[31] ** 2) ** 0.5,
+            'min_max_rss': row[32],
+            'mean_max_rss': row[33],
+            'max_max_rss': row[34],
+            'std_dev_max_rss': row[35],
             # Prevents null entries when there are too few tasks for quartiles
-            'max_rss_quartiles': [row[34],
-                                  row[34] if row[35] is None else row[35],
-                                  row[34] if row[36] is None else row[36]],
+            'max_rss_quartiles': [row[36],
+                                  row[36] if row[37] is None else row[37],
+                                  row[36] if row[38] is None else row[38]],
             # CPU time stats
-            'min_cpu_time': row[37],
-            'mean_cpu_time': row[38],
-            'max_cpu_time': row[39],
-            'total_cpu_time': row[40],
-            'std_dev_cpu_time': (row[41] - row[38] ** 2) ** 0.5,
+            'min_cpu_time': row[39],
+            'mean_cpu_time': row[40],
+            'max_cpu_time': row[41],
+            'total_cpu_time': row[42],
+            'std_dev_cpu_time': row[43],
             # Prevents null entries when there are too few tasks for quartiles
-            'cpu_time_quartiles': [row[42],
-                                   row[42] if row[43] is None else row[43],
-                                   row[42] if row[44] is None else row[44]],
-            'count': row[45]
+            'cpu_time_quartiles': [row[44],
+                                   row[44] if row[45] is None else row[45],
+                                   row[44] if row[46] is None else row[46]],
+            'count': row[47]
         })
 
     for task in tasks:
@@ -702,9 +700,9 @@ def run_jobs_query(
         for id_ in ids:
             item = []
             for token, column in (
-                ('cycle', 'cycle'),
-                ('task', 'name'),
-                ('job', 'submit_num'),
+                ('cycle', 'data.cycle'),
+                ('task', 'data.name'),
+                ('job', 'data.submit_num'),
             ):
                 value = id_[token]
                 if value:
@@ -727,9 +725,9 @@ def run_jobs_query(
         for id_ in exids:
             items = []
             for token, column in (
-                ('cycle', 'cycle'),
-                ('task', 'name'),
-                ('job', 'submit_num'),
+                ('cycle', 'data.cycle'),
+                ('task', 'data.name'),
+                ('job', 'data.submit_num'),
             ):
                 value = id_[token]
                 if value:
@@ -793,8 +791,8 @@ def run_jobs_query(
     # filter by task name (special UIS argument for namespace queries)
     if tasks:
         where_stmts.append(
-            r'(name = '
-            + r" OR name = ".join('?' for task in tasks)
+            r'(data.name = '
+            + r" OR data.name = ".join('?' for task in tasks)
             + r')'
         )
         where_args.extend(tasks)
@@ -802,32 +800,64 @@ def run_jobs_query(
     # build the SQL query
     submit_num = 'max(data.submit_num)' if jobNN else 'data.submit_num'
     query = rf'''
+WITH data AS (
+    SELECT
+        tj.*,
+        CAST(
+            SUBSTR(
+                te.message,
+                INSTR(te.message, 'mem_alloc ') + 10
+            ) AS INT
+        ) AS mem_alloc,
+        CAST(
+            SUBSTR(
+                te.message,
+                INSTR(te.message, 'max_rss ') + 9,
+                INSTR(te.message, ' mem_alloc') -
+                (INSTR(te.message, 'max_rss ') + 9)
+            ) AS INT
+        ) AS max_rss,
+        CAST(
+            SUBSTR(
+                te.message,
+                INSTR(te.message, 'cpu_time ') + 9,
+                INSTR(te.message, ' max_rss') -
+                (INSTR(te.message, 'cpu_time ') + 9)
+            ) AS INT
+        ) AS cpu_time
+    FROM
+        task_jobs tj
+    LEFT JOIN
+        task_events te ON tj.name = te.name AND tj.cycle = te.cycle AND
+        tj.submit_num = te.submit_num AND te.message LIKE '%cpu_time%'
+)
         SELECT
-            name,
-            cycle AS cycle_point,
+            data.name,
+            data.cycle AS cycle_point,
             {submit_num} AS submit_num,
-            submit_status,
-            time_run AS started_time,
-            time_run_exit AS finished_time,
-            job_id,
+            data.submit_status,
+            data.time_run AS started_time,
+            data.time_run_exit AS finished_time,
+            data.job_id,
             job_runner_name,
-            platform_name AS platform,
-            time_submit AS submitted_time,
-            STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit)
-                AS total_time,
-            STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run)
-                AS run_time,
-            STRFTIME('%s', time_run) - STRFTIME('%s', time_submit)
-                AS queue_time,
-            run_status
-        FROM
-            task_jobs
+            data.platform_name AS platform,
+            data.time_submit AS submitted_time,
+            STRFTIME('%s', data.time_run_exit) -
+                STRFTIME('%s', data.time_submit) AS total_time,
+            STRFTIME('%s', data.time_run_exit) -
+                STRFTIME('%s', data.time_run) AS run_time,
+            STRFTIME('%s', data.time_run) -
+                STRFTIME('%s', data.time_submit) AS queue_time,
+            data.run_status,
+            data.max_rss,
+            data.cpu_time,
+            data.mem_alloc
+        FROM data
         '''
     if where_stmts:
-        query += 'WHERE ' + ' AND '.join(where_stmts)
+        query += 'WHERE ' + '            AND '.join(where_stmts)
     if jobNN:
-        query += ' GROUP BY name, cycle'
-
+        query += ' GROUP BY data.name, data.cycle'
     for row in conn.execute(query, where_args):
         row = dict(row)
         # determine job status
@@ -849,7 +879,6 @@ def run_jobs_query(
             ),
             'state': status,
             **row,
-            'cpu_time': row[13]
         })
 
     return jobs
@@ -907,6 +936,7 @@ class UISTask(Task):
                 List containing the first, second,
                 third and forth quartile for CPU time.'''))
     total_of_totals = graphene.Int()
+    mem_alloc = graphene.Int()
     count = graphene.Int()
 
 
