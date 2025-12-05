@@ -85,6 +85,7 @@ jobs:
         run: pytest
 
       - name: Cylc Review tests
+        id: review_tests
         run: |
           CONF_PATH="$HOME/.cylc/flow/8"
           mkdir -p "$CONF_PATH"
@@ -106,6 +107,17 @@ jobs:
           # Run tests on Cylc Review
           export CYLC_COVERAGE=1
           ./etc/bin/run-functional-tests
+
+      - name: Debug
+        if: failure() && steps.review_tests.outcome == 'failure'
+        timeout-minutes: 1
+        run: |
+          find "$HOME/cylc-run" -name '*.err' -type f \
+            -exec echo \; -exec echo '====== {} ======' \; -exec cat '{}' \;
+          find "$HOME/cylc-run" -name '*.log' -type f \
+            -exec echo \; -exec echo '====== {} ======' \; -exec cat '{}' \;
+          find "${TMPDIR:-/tmp}/${USER}/cylctb-"* -type f \
+            -exec echo \; -exec echo '====== {} ======' \; -exec cat '{}' \;
 
       - name: Coverage report
         run: |
