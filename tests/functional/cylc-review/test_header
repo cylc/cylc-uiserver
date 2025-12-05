@@ -462,9 +462,10 @@ cylc_ws_init() {
     "${NS}" "${UTIL}" 'start' '--port' "${WS_PORT}" >&2 \
         0<'/dev/null' 1>"${NS}-${UTIL}.stdout" 2>"${NS}-${UTIL}.stderr" &
     TEST_CYLC_WS_PID="$!"
+    echo "started" >&2
     T_INIT="$(date '+%s')"
     while ! port_is_busy "${WS_PORT}" && (($(date '+%s') < T_INIT + 30)); do
-        echo "Port not busy?"
+        echo "Port not busy?" >&2
         sleep 1
     done
     TEST_CYLC_WS_PORT="${WS_PORT}"
