@@ -435,15 +435,14 @@ requires_cherrypy() {
 
 port_is_busy() {
     local WS_PORT="${1}"
-    type -P netcat >&2
-    echo $? >&2
-    cylc review >&2
     if type -P netcat 1>/dev/null; then
         WS_HOSTNAME="${WS_HOSTNAME:-"$(hostname)"}"
         WS_HOSTNAME="${WS_HOSTNAME:-'localhost'}"
-        echo "${WS_HOSTNAME}" >&2
-        echo "${WS_PORT}" >&2
         netcat -z "${WS_HOSTNAME}" "${WS_PORT}"
+    elif type -P gnetcat 1>/dev/null; then
+        WS_HOSTNAME="${WS_HOSTNAME:-"$(hostname)"}"
+        WS_HOSTNAME="${WS_HOSTNAME:-'localhost'}"
+        gnetcat -z "${WS_HOSTNAME}" "${WS_PORT}"
     else
         netstat -atun >&2
         netstat -atun | grep -q "0.0.0.0:${WS_PORT}"
@@ -468,10 +467,8 @@ cylc_ws_init() {
     "${NS}" "${UTIL}" 'start' '--port' "${WS_PORT}" >&2 \
         0<'/dev/null' 1>"${NS}-${UTIL}.stdout" 2>"${NS}-${UTIL}.stderr" &
     TEST_CYLC_WS_PID="$!"
-    echo "started" >&2
     T_INIT="$(date '+%s')"
     while ! port_is_busy "${WS_PORT}" && (($(date '+%s') < T_INIT + 30)); do
-        echo "Port not busy?" >&2
         sleep 1
     done
     TEST_CYLC_WS_PORT="${WS_PORT}"
