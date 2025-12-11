@@ -25,7 +25,6 @@ import cherrypy
 from glob import glob
 import os
 from pathlib import Path
-import socket
 from typing import Annotated
 
 LOG_ROOT_TMPL = "~/.cylc/%(ns)s-%(util)s-%(host)s-%(port)s"
@@ -162,33 +161,18 @@ def get_util_home(*args):
 
 
 def get_review_service_config(
-    ports: tuple[Annotated[int, Ge(0)], Annotated[int, Ge(0)]] = (8000, 8999),
+    port: Annotated[int, Ge(0)] = 8042,
     service_root: str = 'services/cylc'
 ) -> dict:
     """Get a configuration for Cylc Review as a service.
 
     Args:
-        ports: A range of ports to attempt to make the Cylc Review service
-            available on.
+        port: The port to make the Cylc Review service available on.
         service_root: Include web service name under root of URL.
 
     Returns:
         Dictionary of settings for Cylc Review to be run as a hub service.
     """
-    port_found = False
-    for port in range(ports[0], ports[1]):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.bind(('localhost', port))
-            except Exception:
-                pass
-            else:
-                port_found = True
-                break
-
-    if not port_found:
-        print('No suitable port found.')
-
     return {
         "name": "cylc-review",
         "command": [
@@ -196,5 +180,5 @@ def get_review_service_config(
             f"--port={port}",
             f"--service-root={service_root}",
         ],
-        "url": f"http://127.0.0.1:{port}/",
+        "url": f"http://0.0.0.0:{port}/",
     }

@@ -57,8 +57,8 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('page',), 1]" \
     "[('per_page',), 100]" \
     "[('of_n_entries',), 2]" \
-    "[('entries', 0, 'name'), '${PREFIX_GROUP1}a']" \
-    "[('entries', 1, 'name'), '${PREFIX_GROUP1}b']"
+    "[('entries', 0, 'name'), '${PREFIX_GROUP1}b']" \
+    "[('entries', 1, 'name'), '${PREFIX_GROUP1}a']"
 #-------------------------------------------------------------------------------
 # Data transfer output check for [abc], sort by time_asc
 TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-time-asc"
@@ -69,8 +69,8 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('page',), 1]" \
     "[('per_page',), 100]" \
     "[('of_n_entries',), 2]" \
-    "[('entries', 0, 'name'), '${PREFIX_GROUP1}b']" \
-    "[('entries', 1, 'name'), '${PREFIX_GROUP1}a']"
+    "[('entries', 0, 'name'), '${PREFIX_GROUP1}a']" \
+    "[('entries', 1, 'name'), '${PREFIX_GROUP1}b']"
 #-------------------------------------------------------------------------------
 # Data transfer output check for [abc], sort by name_asc
 TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-name-asc"
@@ -105,7 +105,7 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('page',), 1]" \
     "[('per_page',), 1]" \
     "[('of_n_entries',), 3]" \
-    "[('entries', 0, 'name'), '${PREFIX_GROUP2}1']"
+    "[('entries', 0, 'name'), '${PREFIX_GROUP2}3']"
 #-------------------------------------------------------------------------------
 # Data transfer output check for [1-10], page 2
 TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-2-page-2"
@@ -127,7 +127,7 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('page',), 3]" \
     "[('per_page',), 1]" \
     "[('of_n_entries',), 3]" \
-    "[('entries', 0, 'name'), '${PREFIX_GROUP2}3']"
+    "[('entries', 0, 'name'), '${PREFIX_GROUP2}1']"
 #-------------------------------------------------------------------------------
 # Tidy up - note suites trivial so stop early on by themselves
 rm -fr "${HOME}/cylc-run/${TOP_LEVEL_TEST_DIR}"
