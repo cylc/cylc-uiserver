@@ -34,7 +34,7 @@ init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
         T06 = bar[-PT6H] => baz
 [runtime]
     [[foo]]
-        script = cylc stop $CYLC_WORKFLOW_NAME bar.20100101T0000Z; sleep 5
+        script = cylc stop "${CYLC_WORKFLOW_ID}//20100101T0000Z/bar"; sleep 5
     [[bar, baz]]
         script = true
 __SUITE_RC__

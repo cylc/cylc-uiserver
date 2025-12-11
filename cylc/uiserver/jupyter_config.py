@@ -107,5 +107,6 @@ c.CylcUIServer.logging_config = {
 c.ServerApp.authorizer_class = CylcAuthorizer
 
 
-# Setup Cylc Review
-c.JupyterHub.services = [get_review_service_config()]
+# Setup Cylc Review - uncomment to start Cylc review with Cylc Hub
+# n.b. if installed with pip optional dependence [review] must be specified.
+# c.JupyterHub.services = [get_review_service_config()]

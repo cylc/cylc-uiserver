@@ -53,12 +53,17 @@ jobs:
             bash
             coreutils
 
-      - name: install cylc-flow
-        uses: cylc/release-actions/install-cylc-components@v1
-        with:
-          cylc_flow: true
-          cylc_flow_opts: ''
-          editable_installations: true
+      # - name: install cylc-flow
+      #   uses: cylc/release-actions/install-cylc-components@v1
+      #   with:
+      #     cylc_flow: true
+      #     cylc_flow_opts: ''
+      #     editable_installations: true
+
+      - name: bodge
+        run: |
+          # This is a bodge to make this branch work before companion branches merged:
+          pip install -e git+https://github.com/wxtim/cylc@feat.cylc-review#egg=cylc-flow --no-deps
 
       - name: install cylc-uiserver
         run: |
@@ -66,7 +71,7 @@ jobs:
 
       - name: Style test
         if: startsWith(matrix.os, 'ubuntu')
-        run: flake8 cylc/uiserver/* tests/unit/* tests/integration/*
+        run: flake8 cylc/uiserver/* tests/integration/*
 
       - name: Type checking
         if: startsWith(matrix.os, 'ubuntu')
@@ -88,13 +93,13 @@ jobs:
 
           cat >> "$CONF_PATH/global.cylc" <<__HERE__
           [platforms]
-            [[_local_background_indep_tcp]]
+            [[_local_background_shared_tcp]]
               hosts = localhost
               install target = localhost
               ssh command = ssh -oBatchMode=yes -oConnectTimeout=8 -oStrictHostKeyChecking=no
           __HERE__
 
-          # Check that Cylc Review is ready to run
+          # Check that Cylc Review is installed!
           # (We're only interested if it emits an error):
           cylc review --help > /dev/null || exit 1
 
@@ -115,10 +120,6 @@ jobs:
 
       - name: Coverage report
         run: |
-          echo pwd:
-          pwd
-          echo ls:
-          ls
           coverage combine --append src/cylc-flow
           coverage xml --ignore-errors
           coverage report

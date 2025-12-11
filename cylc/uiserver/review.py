@@ -527,9 +527,9 @@ class CylcReviewService:
         elif order == "name_desc":
             data["entries"].sort(key=lambda entry: entry["name"], reverse=True)
         elif order == "time_asc":
-            data["entries"].sort(key=self._sort_summary_entries, reverse=True)
+            data["entries"].sort(key=self._sort_summary_entries, reverse=False)
         else:  # order == "time_desc"
-            data["entries"].sort(key=self._sort_summary_entries)
+            data["entries"].sort(key=self._sort_summary_entries, reverse=True)
         data["of_n_entries"] = len(data["entries"])
         if per_page:
             data["n_pages"] = data["of_n_entries"] // per_page

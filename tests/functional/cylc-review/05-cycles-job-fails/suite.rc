@@ -14,6 +14,6 @@
         script = false
     [[rehab]]
         script = """
-            cylc set "${CYLC_WORKFLOW_NAME}//${CYLC_TASK_CYCLE_POINT}/loser"
+            cylc set "${CYLC_WORKFLOW_ID}//${CYLC_TASK_CYCLE_POINT}/loser"
             sleep 1
         """

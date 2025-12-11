@@ -16,13 +16,16 @@
 
 from contextlib import suppress
 import json
+from multiprocessing import Process
 import pytest
 import socket
-import subprocess
 import requests
 from time import sleep
 
 from cylc.flow import __version__ as CYLC_VERSION
+
+from cylc.uiserver.review import CylcReviewService
+from cylc.uiserver.ws import _ws_init
 
 
 @pytest.fixture(scope='module')
@@ -35,18 +38,12 @@ def run_cylc_review(request):
     Yields:
         Server process, request to home page as json
     """
-
-    proc = subprocess.Popen(
-        [
-            'cylc',
-            'review',
-            'start',
-            '--port', port,
-            f'--service-root={service_root}',
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
+    proc = Process(target=_ws_init, kwargs={
+        'service_cls': CylcReviewService,
+        'port': port,
+        'service_root': service_root
+    })
+    proc.start()
 
     # Ensure that home-page is accessible:
     timeout_counter = 0
@@ -80,6 +77,7 @@ def test_basic_path(run_cylc_review):
         'host': socket.gethostname(),
         'cylc_version': CYLC_VERSION,
         'script': '/foo/cylc-review',
+        'jupythub_base': None,
     }
     data = json.loads(run_cylc_review[1].text)
     assert data == expect

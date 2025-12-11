@@ -166,8 +166,8 @@ class CylcReviewDAO:
         """Return broadcast states of a suite.
         [[point, name, key, value], ...]
         """
-        stmt = self.pre_select_broadcast_states(
-            self._db_init(user_name, suite_name), order="ASC")[0]
+        stmt = CylcWorkflowDAO.pre_select_broadcast_states(
+            self=self._db_init(user_name, suite_name), order="ASC")[0]
         broadcast_states = []
         for row in self._db_exec(user_name, suite_name, stmt):
             point, namespace, key, value = row
