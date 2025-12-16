@@ -22,7 +22,7 @@ requires_cherrypy
 
 set_test_number 4
 #-------------------------------------------------------------------------------
-# Initialise, validate and run a suite for testing with
+# Initialise, validate and run a workflow for testing with
 install_workflow "${TEST_NAME_BASE}" "${TEST_NAME_BASE}"
 
 TEST_NAME=$TEST_NAME_BASE-validate
@@ -36,11 +36,11 @@ if [[ -z "${TEST_CYLC_WS_PORT}" ]]; then
     exit 1
 fi
 
-# Set up standard URL escaping of forward slashes in 'cylctb-' suite names.
+# Set up standard URL escaping of forward slashes in 'cylctb-' workflow names.
 # shellcheck disable=SC2001
 ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
-# Data transfer output check for a specific suite page for suite with failed job
+# Data transfer output check for a specific workflow page for workflow with failed job
 TEST_NAME="${TEST_NAME_BASE}-200-curl-cycles"
 run_ok "${TEST_NAME}" curl \
     "${TEST_CYLC_WS_URL}/cycles/${USER}/${ESC_WORKFLOW_NAME}?form=json"
@@ -50,7 +50,7 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('entries', {'cycle': '20000101T0000Z'}, 'n_states', 'fail',), 0]" \
     "[('entries', {'cycle': '20000101T0000Z'}, 'n_states', 'job_fail',), 1]"
 #-------------------------------------------------------------------------------
-# Tidy up - note suite trivial so stops early on by itself
+# Tidy up - note workflow trivial so stops early on by itself
 purge "${WORKFLOW_NAME}"
 cylc_ws_kill
 exit

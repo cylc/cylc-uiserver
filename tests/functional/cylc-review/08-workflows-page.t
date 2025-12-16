@@ -15,14 +15,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #-------------------------------------------------------------------------------
-# Test for "cylc review", suites list, glob, sort and page.
+# Test for "cylc review", workflows list, glob, sort and page.
 #-------------------------------------------------------------------------------
 . "$(dirname "$0")/test_header"
 requires_cherrypy
 
 set_test_number 15
 #-------------------------------------------------------------------------------
-# Initialise multiple suites with same 'suite.rc' file; name [abc] and [1-10]
+# Initialise multiple workflows with same 'flow.cylc' file; name [abc] and [1-10]
 TOP_LEVEL_TEST_DIR="cylctb-${CYLC_TEST_TIME_INIT}"
 PREFIX="${TOP_LEVEL_TEST_DIR}/${TEST_SOURCE_DIR_BASE}/${TEST_NAME_BASE}"
 
@@ -30,14 +30,14 @@ PREFIX="${TOP_LEVEL_TEST_DIR}/${TEST_SOURCE_DIR_BASE}/${TEST_NAME_BASE}"
 PREFIX_GROUP1="${PREFIX}-1-"
 for SUFFIX in 'a' 'b'; do
     cylc vip "${TEST_SOURCE_DIR}/${TEST_NAME_BASE}" --no-run-name --no-detach --debug --workflow-name "${PREFIX_GROUP1}${SUFFIX}" 2>'/dev/null' \
-        || cat "${HOME}/cylc-run/${PREFIX_GROUP1}${SUFFIX}/log/suite/err" >&2
+        || cat "${HOME}/cylc-run/${PREFIX_GROUP1}${SUFFIX}/log/workflow/err" >&2
 done
 
 # Group '2'
 PREFIX_GROUP2="${PREFIX}-2-"
 for SUFFIX in $(seq -w 1 3); do
     cylc vip "${TEST_SOURCE_DIR}/${TEST_NAME_BASE}" --no-run-name --no-detach --debug --workflow-name "${PREFIX_GROUP2}${SUFFIX}" 2>'/dev/null' \
-        || cat "${HOME}/cylc-run/${PREFIX_GROUP2}${SUFFIX}/log/suite/err" >&2
+        || cat "${HOME}/cylc-run/${PREFIX_GROUP2}${SUFFIX}/log/workflow/err" >&2
 done
 
 #-------------------------------------------------------------------------------
@@ -49,10 +49,10 @@ if [[ -z "${TEST_CYLC_WS_PORT}" ]]; then
 fi
 #-------------------------------------------------------------------------------
 # Data transfer output check for [abc], sort by time_desc
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites"
+TEST_NAME="${TEST_NAME_BASE}-200-curl-workflows"
 ARGS="&names=${PREFIX_GROUP1}*"
 run_ok "${TEST_NAME}" curl \
-    "${TEST_CYLC_WS_URL}/suites/${USER}?form=json${ARGS}"
+    "${TEST_CYLC_WS_URL}/workflows/${USER}?form=json${ARGS}"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('page',), 1]" \
     "[('per_page',), 100]" \
@@ -61,10 +61,10 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('entries', 1, 'name'), '${PREFIX_GROUP1}a']"
 #-------------------------------------------------------------------------------
 # Data transfer output check for [abc], sort by time_asc
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-time-asc"
+TEST_NAME="${TEST_NAME_BASE}-200-curl-workflows-time-asc"
 ARGS="&names=${PREFIX_GROUP1}*&order=time_asc"
 run_ok "${TEST_NAME}" curl \
-    "${TEST_CYLC_WS_URL}/suites/${USER}?form=json${ARGS}"
+    "${TEST_CYLC_WS_URL}/workflows/${USER}?form=json${ARGS}"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('page',), 1]" \
     "[('per_page',), 100]" \
@@ -73,10 +73,10 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('entries', 1, 'name'), '${PREFIX_GROUP1}b']"
 #-------------------------------------------------------------------------------
 # Data transfer output check for [abc], sort by name_asc
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-name-asc"
+TEST_NAME="${TEST_NAME_BASE}-200-curl-workflows-name-asc"
 ARGS="&names=${PREFIX_GROUP1}*&order=name_asc"
 run_ok "${TEST_NAME}" curl \
-    "${TEST_CYLC_WS_URL}/suites/${USER}?form=json${ARGS}"
+    "${TEST_CYLC_WS_URL}/workflows/${USER}?form=json${ARGS}"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('page',), 1]" \
     "[('per_page',), 100]" \
@@ -85,10 +85,10 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('entries', 1, 'name'), '${PREFIX_GROUP1}b']"
 #-------------------------------------------------------------------------------
 # Data transfer output check for [abc], sort by name_desc
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-name-desc"
+TEST_NAME="${TEST_NAME_BASE}-200-curl-workflows-name-desc"
 ARGS="&names=${PREFIX_GROUP1}*&order=name_desc"
 run_ok "${TEST_NAME}" curl \
-    "${TEST_CYLC_WS_URL}/suites/${USER}?form=json${ARGS}"
+    "${TEST_CYLC_WS_URL}/workflows/${USER}?form=json${ARGS}"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('page',), 1]" \
     "[('per_page',), 100]" \
@@ -97,10 +97,10 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('entries', 1, 'name'), '${PREFIX_GROUP1}a']"
 #-------------------------------------------------------------------------------
 # Data transfer output check for [1-10], page 1
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-2-page-1"
+TEST_NAME="${TEST_NAME_BASE}-200-curl-workflows-2-page-1"
 ARGS="&names=${PREFIX_GROUP2}*&per_page=1&page=1"
 run_ok "${TEST_NAME}" curl \
-    "${TEST_CYLC_WS_URL}/suites/${USER}?form=json${ARGS}"
+    "${TEST_CYLC_WS_URL}/workflows/${USER}?form=json${ARGS}"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('page',), 1]" \
     "[('per_page',), 1]" \
@@ -108,10 +108,10 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('entries', 0, 'name'), '${PREFIX_GROUP2}3']"
 #-------------------------------------------------------------------------------
 # Data transfer output check for [1-10], page 2
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-2-page-2"
+TEST_NAME="${TEST_NAME_BASE}-200-curl-workflows-2-page-2"
 ARGS="&names=${PREFIX_GROUP2}*&per_page=1&page=2"
 run_ok "${TEST_NAME}" curl \
-    "${TEST_CYLC_WS_URL}/suites/${USER}?form=json${ARGS}"
+    "${TEST_CYLC_WS_URL}/workflows/${USER}?form=json${ARGS}"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('page',), 2]" \
     "[('per_page',), 1]" \
@@ -119,17 +119,17 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('entries', 0, 'name'), '${PREFIX_GROUP2}2']"
 #-------------------------------------------------------------------------------
 # Data transfer output check for [1-10], page 3
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-2-page-3"
+TEST_NAME="${TEST_NAME_BASE}-200-curl-workflows-2-page-3"
 ARGS="&names=${PREFIX_GROUP2}*&per_page=1&page=3"
 run_ok "${TEST_NAME}" curl \
-    "${TEST_CYLC_WS_URL}/suites/${USER}?form=json${ARGS}"
+    "${TEST_CYLC_WS_URL}/workflows/${USER}?form=json${ARGS}"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('page',), 3]" \
     "[('per_page',), 1]" \
     "[('of_n_entries',), 3]" \
     "[('entries', 0, 'name'), '${PREFIX_GROUP2}1']"
 #-------------------------------------------------------------------------------
-# Tidy up - note suites trivial so stop early on by themselves
+# Tidy up - note workflows trivial so stop early on by themselves
 rm -fr "${HOME}/cylc-run/${TOP_LEVEL_TEST_DIR}"
 cylc_ws_kill
 exit

@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #-------------------------------------------------------------------------------
-# Test for "cylc review", cycles/taskjobs list, suite server host:port.
+# Test for "cylc review", cycles/taskjobs list, workflow server host:port.
 # Require a version of cylc with cylc/cylc-flow#1705 merged in.
 #-------------------------------------------------------------------------------
 . "$(dirname "$0")/test_header"
@@ -23,8 +23,8 @@ requires_cherrypy
 
 set_test_number 6
 #-------------------------------------------------------------------------------
-# Initialise, validate and run a suite for testing with
-init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
+# Initialise, validate and run a workflow for testing with
+init_workflow "${TEST_NAME_BASE}" <<'__FLOW_CYLC__'
 [scheduler]
     UTC mode = True
     [[events]]
@@ -38,7 +38,7 @@ init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
 [runtime]
     [[loser]]
         script = false
-__SUITE_RC__
+__FLOW_CYLC__
 
 TEST_NAME=$TEST_NAME_BASE-validate
 run_ok "${TEST_NAME}" cylc validate "${WORKFLOW_NAME}"
@@ -53,11 +53,11 @@ if [[ -z "${TEST_CYLC_WS_PORT}" ]]; then
     exit 1
 fi
 
-# Set up standardURL escaping of forward slashes in 'cylctb-' suite names.
+# Set up standardURL escaping of forward slashes in 'cylctb-' workflow names.
 # shellcheck disable=SC2001
 ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
-# Data transfer output check for a specific suite's host and port
+# Data transfer output check for a specific workflow's host and port
 
 SRV_D="${HOME}/cylc-run/${WORKFLOW_NAME}/.service"
 CONTACT="${SRV_D}/contact"
@@ -70,12 +70,12 @@ HOST=${HOST%%.*} # strip domain
 if [[ -n "${HOST}" && -n "${PORT}" ]]; then
     for METHOD in 'cycles' 'taskjobs'; do
         TEST_NAME="${TEST_NAME_BASE}-ws-run-${METHOD}"
-        URL_NAME="${TEST_CYLC_WS_URL}/${METHOD}/${USER}?suite=${ESC_WORKFLOW_NAME}&form=json"
+        URL_NAME="${TEST_CYLC_WS_URL}/${METHOD}/${USER}?workflow=${ESC_WORKFLOW_NAME}&form=json"
         run_ok "${TEST_NAME}" curl "${URL_NAME}"
         cylc_ws_json_greps "${TEST_NAME}-json" "${TEST_NAME}.stdout" "[('states', 'server',), '${HOST}:${PORT}']"
     done
 else
-    skip 4 'Cannot determine suite host or port'
+    skip 4 'Cannot determine workflow host or port'
 fi
 #-------------------------------------------------------------------------------
 # Tidy up - requires the stop because we deliberately left it stalled.

@@ -1,5 +1,5 @@
 /******************************************************************************
- * THIS FILE IS PART OF THE CYLC SUITE ENGINE.
+ * THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
  * Copyright (C) NIWA & British Crown (Met Office) & Contributors.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,7 +23,7 @@ var FileLoader = ( function () {
     var previous_mode = null;
 
     var user = null;
-    var suite = null;
+    var workflow = null;
     var path = null;
     var path_in_tar = null;
     var mode = null;
@@ -43,7 +43,7 @@ var FileLoader = ( function () {
         // the search url
         var url = script_path + '/viewsearch/' + user;
         // search data
-        var kwargs = {'suite': suite, 'path': path, 'path_in_tar': path_in_tar,
+        var kwargs = {'workflow': workflow, 'path': path, 'path_in_tar': path_in_tar,
                 'search_string': search_string, 'search_mode': search_mode,
                 'mode': mode};
         // args passed as strings so remove null, 'None' values here
@@ -126,7 +126,7 @@ var FileLoader = ( function () {
     this.init = function () {
         var form = document.forms['file-search'];
         user = form['user'].value;
-        suite = form['suite'].value;
+        workflow = form['workflow'].value;
         path = form['path'].value;
         path_in_tar = form['path_in_tar'].value;
         mode = form['mode'].value;

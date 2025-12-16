@@ -5,11 +5,11 @@
 {% endif -%}
 {% set cycle_str = entry.cycle|replace('+', '%2B') -%}
 {% set taskjobs_link = (
-    (script ~ "/taskjobs/" ~ user ~ "?&amp;suite=" ~
-     suite|urlencode|replace('/', '%2F') ~ no_fuzzy_time_str) | safe
+    (script ~ "/taskjobs/" ~ user ~ "?&amp;workflow=" ~
+     workflow|urlencode|replace('/', '%2F') ~ no_fuzzy_time_str) | safe
 ) -%}
 {% set view_link = (
-    (script ~ "/view/" ~ user ~ "?&amp;suite=" ~ suite|urlencode|replace('/', '%2F') ~
+    (script ~ "/view/" ~ user ~ "?&amp;workflow=" ~ workflow|urlencode|replace('/', '%2F') ~
      no_fuzzy_time_str) | safe
 ) -%}
 <tr class="entry"><!-- entry row -->
@@ -50,8 +50,8 @@
     <!-- entry: submit_status, run_status -->
     <small>
     {% set link = (
-        (script ~ "/taskjobs/" ~ user ~ "?&amp;suite=" ~
-         suite|urlencode|replace('/', '%2F') ~ no_fuzzy_time_str) | safe
+        (script ~ "/taskjobs/" ~ user ~ "?&amp;workflow=" ~
+         workflow|urlencode|replace('/', '%2F') ~ no_fuzzy_time_str) | safe
     ) -%}
     {% if entry.run_status == 0 -%}
       <a href="{{taskjobs_link}}&amp;job_status=succeeded"
@@ -203,7 +203,7 @@
               <form action="{{script}}/view" class="form-inline"
                 autocomplete="off">
                 <input type="hidden" name="user" value="{{user}}"/>
-                <input type="hidden" name="suite" value="{{suite|urlencode|replace("/", "%2F")}}"/>
+                <input type="hidden" name="workflow" value="{{workflow|urlencode|replace("/", "%2F")}}"/>
                 <input type="hidden" name="no_fuzzy_time"
                 value="{{no_fuzzy_time}}"/>
                 {% if entry.logs[indexes.values()|first].path_in_tar -%}

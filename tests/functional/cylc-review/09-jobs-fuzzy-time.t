@@ -22,8 +22,8 @@ requires_cherrypy
 
 set_test_number 14
 #-------------------------------------------------------------------------------
-# Initialise, validate and run a suite for testing with
-init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
+# Initialise, validate and run a workflow for testing with
+init_workflow "${TEST_NAME_BASE}" <<'__FLOW_CYLC__'
 [scheduler]
     UTC mode = True
 [scheduling]
@@ -34,7 +34,7 @@ init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
 [runtime]
     [[foo]]
         script = true
-__SUITE_RC__
+__FLOW_CYLC__
 
 TEST_NAME=$TEST_NAME_BASE-validate
 run_ok "${TEST_NAME}" cylc validate "${WORKFLOW_NAME}"
@@ -48,20 +48,20 @@ if [[ -z "${TEST_CYLC_WS_PORT}" ]]; then
     exit 1
 fi
 
-# Set up standard URL escaping of forward slashes in 'cylctb-' suite names.
+# Set up standard URL escaping of forward slashes in 'cylctb-' workflow names.
 # shellcheck disable=SC2001
 ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
-# Data transfer output check for a specific user's/suite's 'fuzzy time'
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites"
+# Data transfer output check for a specific user's/workflow's 'fuzzy time'
+TEST_NAME="${TEST_NAME_BASE}-200-curl-workflows"
 run_ok "${TEST_NAME}" curl \
-    "${TEST_CYLC_WS_URL}/suites/${USER}?form=json"
+    "${TEST_CYLC_WS_URL}/workflows/${USER}?form=json"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('no_fuzzy_time',), '0']"
 
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-no-fuzzy-time"
+TEST_NAME="${TEST_NAME_BASE}-200-curl-workflows-no-fuzzy-time"
 run_ok "${TEST_NAME}" curl \
-    "${TEST_CYLC_WS_URL}/suites/${USER}?form=json&no_fuzzy_time=1"
+    "${TEST_CYLC_WS_URL}/workflows/${USER}?form=json&no_fuzzy_time=1"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('no_fuzzy_time',), '1']"
 
@@ -89,7 +89,7 @@ run_ok "${TEST_NAME}" curl \
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('no_fuzzy_time',), '1']"
 #-------------------------------------------------------------------------------
-# Tidy up - note suite trivial so stops early on by itself
+# Tidy up - note workflow trivial so stops early on by itself
 purge "${WORKFLOW_NAME}"
 cylc_ws_kill
 exit

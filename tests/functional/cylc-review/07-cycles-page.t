@@ -22,8 +22,8 @@ requires_cherrypy
 
 set_test_number 18
 #-------------------------------------------------------------------------------
-# Initialise, validate and run a suite for testing with
-init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
+# Initialise, validate and run a workflow for testing with
+init_workflow "${TEST_NAME_BASE}" <<'__FLOW_CYLC__'
 #!Jinja2
 [cylc]
     UTC mode = True
@@ -36,7 +36,7 @@ init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
 [runtime]
     [[foo]]
         script = true
-__SUITE_RC__
+__FLOW_CYLC__
 
 TEST_NAME=$TEST_NAME_BASE-validate
 run_ok "${TEST_NAME}" cylc validate "${WORKFLOW_NAME}"
@@ -50,11 +50,11 @@ if [[ -z "${TEST_CYLC_WS_PORT}" ]]; then
     exit 1
 fi
 
-# Set up standard URL escaping of forward slashes in 'cylctb-' suite names.
+# Set up standard URL escaping of forward slashes in 'cylctb-' workflow names.
 # shellcheck disable=SC2001
 ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
-# Data transfer output check for the suite's cycles page, sorted by time_desc
+# Data transfer output check for the workflow's cycles page, sorted by time_desc
 TEST_NAME_PREFIX="${TEST_NAME_BASE}-200-curl-cycles-page-"
 for PAGE in {1..4}; do
     TEST_NAME="${TEST_NAME_PREFIX}${PAGE}"
@@ -91,7 +91,7 @@ cylc_ws_json_greps "${TEST_NAME_PREFIX}4.stdout" "${TEST_NAME_PREFIX}4.stdout" \
     "[('of_n_entries',), 10]" \
     "[('entries', 0, 'cycle'), '20000101T0000Z']"
 #-------------------------------------------------------------------------------
-# Data transfer output check for the suite's cycles page, sorted by time_asc
+# Data transfer output check for the workflow's cycles page, sorted by time_asc
 TEST_NAME_PREFIX="${TEST_NAME_BASE}-200-curl-cycles-asc-page-"
 for PAGE in {1..4}; do
     TEST_NAME="${TEST_NAME_PREFIX}${PAGE}"
@@ -128,7 +128,7 @@ cylc_ws_json_greps "${TEST_NAME_PREFIX}4.stdout" "${TEST_NAME_PREFIX}4.stdout" \
     "[('of_n_entries',), 10]" \
     "[('entries', 0, 'cycle'), '20090101T0000Z']"
 #-------------------------------------------------------------------------------
-# Tidy up - note suite trivial so stops early on by itself
+# Tidy up - note workflow trivial so stops early on by itself
 purge "${WORKFLOW_NAME}"
 cylc_ws_kill
 exit

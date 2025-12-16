@@ -22,8 +22,8 @@ requires_cherrypy
 
 set_test_number 8
 #-------------------------------------------------------------------------------
-# Initialise, validate and run a suite for testing with
-init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
+# Initialise, validate and run a workflow for testing with
+init_workflow "${TEST_NAME_BASE}" <<'__FLOW_CYLC__'
 [scheduler]
     UTC mode = True
     [[events]]
@@ -39,7 +39,7 @@ init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
         script = echo 1
     [[echo2]]
         script = echo 2
-__SUITE_RC__
+__FLOW_CYLC__
 
 TEST_NAME=$TEST_NAME_BASE-validate
 run_ok "${TEST_NAME}" cylc validate "${WORKFLOW_NAME}"
@@ -53,7 +53,7 @@ if [[ -z "${TEST_CYLC_WS_PORT}" ]]; then
     exit 1
 fi
 
-# Set up standard URL escaping of forward slashes in 'cylctb-' suite names.
+# Set up standard URL escaping of forward slashes in 'cylctb-' workflow names.
 # shellcheck disable=SC2001
 ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
@@ -112,7 +112,7 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('entries', ${ECHO2}, 'logs', 'job.err', 'path_in_tar'), '${ECHO2_JOB}.err']" \
     "[('entries', ${ECHO2}, 'logs', 'job.out', 'path_in_tar'), '${ECHO2_JOB}.out']"
 #-------------------------------------------------------------------------------
-# Tidy up - note suite trivial so stops early on by itself
+# Tidy up - note workflow trivial so stops early on by itself
 purge "${WORKFLOW_NAME}"
 cylc_ws_kill
 exit

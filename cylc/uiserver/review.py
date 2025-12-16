@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """cylc [info] review [OPTIONS] ARGS
 
-Start/stop ad-hoc Cylc Review web service server for browsing users' suite
+Start/stop ad-hoc Cylc Review web service server for browsing users' workflow
 logs via an HTTP interface.
 
 With no arguments, the status of the ad-hoc web service server is printed.
@@ -81,20 +81,20 @@ class CylcReviewService:
     REC_URL = re.compile(r"((https?):\/\/[^\s\(\)&\[\]\{\}]+)")
     SEARCH_MODE_REGEX = "REGEX"
     SEARCH_MODE_TEXT = "TEXT"
-    SUITES_PER_PAGE = 100
+    WORKFLOWS_PER_PAGE = 100
     VIEW_SIZE_MAX = 10 * 1024 * 1024  # 10MB
     WORKFLOW_FILES = [
         'suite.rc',
         'suite.rc.processed',
         'flow.cylc',
-        'rose-suite.info',
-        'opt/rose-suite-cylc-install.conf',
-        'rose-suite.conf'
+        'rose-workflow.info',
+        'opt/rose-workflow-cylc-install.conf',
+        'rose-workflow.conf'
     ]
 
     def __init__(self, *args, **kwargs):
         self.exposed = True
-        self.suite_dao = CylcReviewDAO()
+        self.workflow_dao = CylcReviewDAO()
         self.logo = os.path.basename(
             get_util_home("doc", "src", "cylc-logo.png"))
         self.title = self.TITLE
@@ -119,7 +119,7 @@ class CylcReviewService:
 
     @cherrypy.expose
     def index(self, form=None):
-        """Display a page to input user ID and suite ID."""
+        """Display a page to input user ID and workflow ID."""
         data = {
             "logo": self.logo,
             "title": self.title,
@@ -136,14 +136,14 @@ class CylcReviewService:
             traceback.print_exc()
 
     @cherrypy.expose
-    def broadcast_states(self, user, suite, form=None):
-        """List current broadcasts of a running or completed suite."""
+    def broadcast_states(self, user, workflow, form=None):
+        """List current broadcasts of a running or completed workflow."""
         data = {
             "logo": self.logo,
             "title": self.title,
             "host": self.host_name,
             "user": user,
-            "suite": suite,
+            "workflow": workflow,
             "cylc_version": self.cylc_version,
             "script": cherrypy.request.script_name,
             "method": "broadcast_states",
@@ -153,14 +153,14 @@ class CylcReviewService:
 
         }
         data["states"].update(
-            self.suite_dao.get_suite_state_summary(user, suite))
+            self.workflow_dao.get_workflow_state_summary(user, workflow))
         data["states"]["last_activity_time"] = (
-            self.get_last_activity_time(user, suite))
-        data.update(self._get_suite_logs_info(user, suite))
+            self.get_last_activity_time(user, workflow))
+        data.update(self._get_workflow_logs_info(user, workflow))
 
         try:
             data["broadcast_states"] = (
-                self.suite_dao.get_suite_broadcast_states(user, suite))
+                self.workflow_dao.get_workflow_broadcast_states(user, workflow))
         except OperationalError:
             data["broadcast_states"] = ()
 
@@ -174,14 +174,14 @@ class CylcReviewService:
         return json.dumps(data)
 
     @cherrypy.expose
-    def broadcast_events(self, user, suite, form=None):
-        """List broadcasts history of a running or completed suite."""
+    def broadcast_events(self, user, workflow, form=None):
+        """List broadcasts history of a running or completed workflow."""
         data = {
             "logo": self.logo,
             "title": self.title,
             "host": self.host_name,
             "user": user,
-            "suite": suite,
+            "workflow": workflow,
             "cylc_version": self.cylc_version,
             "script": cherrypy.request.script_name,
             "method": "broadcast_events",
@@ -191,12 +191,12 @@ class CylcReviewService:
 
         }
         data["states"].update(
-            self.suite_dao.get_suite_state_summary(user, suite))
-        data.update(self._get_suite_logs_info(user, suite))
+            self.workflow_dao.get_workflow_state_summary(user, workflow))
+        data.update(self._get_workflow_logs_info(user, workflow))
 
         try:
             data["broadcast_events"] = (
-                self.suite_dao.get_suite_broadcast_events(user, suite))
+                self.workflow_dao.get_workflow_broadcast_events(user, workflow))
         except OperationalError:
             data["broadcast_events"] = ()
 
@@ -213,17 +213,17 @@ class CylcReviewService:
     def cycles(
         self,
         user,
-        suite,
+        workflow,
         page=1,
         order=None,
         per_page=None,
         no_fuzzy_time="0",
         form=None,
     ):
-        """List cycles of a running or completed suite."""
+        """List cycles of a running or completed workflow."""
 
-        # Call to ensure user and suite args valid (together), else raise 404.
-        self._get_user_suite_dir(user, suite)
+        # Call to ensure user and workflow args valid (together), else raise 404.
+        self._get_user_workflow_dir(user, workflow)
 
         per_page_default = self.CYCLES_PER_PAGE
         if not isinstance(per_page, int):
@@ -240,7 +240,7 @@ class CylcReviewService:
             "title": self.title,
             "host": self.host_name,
             "user": user,
-            "suite": suite,
+            "workflow": workflow,
             "is_option_on": (
                 order is not None and order != "time_desc" or
                 per_page is not None and per_page != per_page_default
@@ -258,19 +258,19 @@ class CylcReviewService:
             "jupythub_base": os.environ.get('JUPYTERHUB_BASE_URL', None),
         }
         data["entries"], data["of_n_entries"] = (
-            self.suite_dao.get_suite_cycles_summary(
-                user, suite, order, per_page, (page - 1) * per_page))
+            self.workflow_dao.get_workflow_cycles_summary(
+                user, workflow, order, per_page, (page - 1) * per_page))
         if per_page:
             data["n_pages"] = data["of_n_entries"] // per_page
             if data["of_n_entries"] % per_page != 0:
                 data["n_pages"] += 1
         else:
             data["n_pages"] = 1
-        data.update(self._get_suite_logs_info(user, suite))
+        data.update(self._get_workflow_logs_info(user, workflow))
         data["states"].update(
-            self.suite_dao.get_suite_state_summary(user, suite))
+            self.workflow_dao.get_workflow_state_summary(user, workflow))
         data["states"]["last_activity_time"] = (
-            self.get_last_activity_time(user, suite))
+            self.get_last_activity_time(user, workflow))
         data["time"] = strftime("%Y-%m-%dT%H:%M:%SZ", gmtime())
         if form == "json":
             return json.dumps(data)
@@ -284,7 +284,7 @@ class CylcReviewService:
     def taskjobs(
         self,
         user,
-        suite,
+        workflow,
         page=1,
         cycles=None,
         tasks=None,
@@ -298,7 +298,7 @@ class CylcReviewService:
         """List task jobs.
 
         user -- A string containing a valid user ID
-        suite -- A string containing a valid suite ID
+        workflow -- A string containing a valid workflow ID
         page -- The page number to display
         cycles -- Display only task jobs matching these cycles. A value in the
                   list can be a cycle, the string "before|after CYCLE", or a
@@ -328,8 +328,8 @@ class CylcReviewService:
                 return a JSON data structure.
         """
 
-        # Call to ensure user and suite args valid (together), else raise 404.
-        self._get_user_suite_dir(user, suite)
+        # Call to ensure user and workflow args valid (together), else raise 404.
+        self._get_user_workflow_dir(user, workflow)
 
         per_page_default = self.JOBS_PER_PAGE
         per_page_max = self.JOBS_PER_PAGE_MAX
@@ -353,11 +353,11 @@ class CylcReviewService:
 
         # Set list of task states depending on Cylc version 7 or 8
         task_statuses_ordered = CYLC7_TASK_STATUSES_ORDERED
-        suite_dir = os.path.join(
+        workflow_dir = os.path.join(
             self._get_user_home(user),
             "cylc-run",
-            suite)
-        is_c8 = self.is_cylc8(suite_dir)
+            workflow)
+        is_c8 = self.is_cylc8(workflow_dir)
         if is_c8:
             task_statuses_ordered = TASK_STATUSES_ORDERED
         # get selected task states
@@ -389,7 +389,7 @@ class CylcReviewService:
             "cylc_version": self.cylc_version,
             "script": cherrypy.request.script_name,
             "states": {},
-            "suite": suite,
+            "workflow": workflow,
             "tasks": tasks,
             "task_status_groups": TASK_STATUS_GROUPS,
             "title": self.title,
@@ -400,15 +400,15 @@ class CylcReviewService:
             cycles = shlex.split(str(cycles))
         if tasks:
             tasks = shlex.split(str(tasks))
-        data.update(self._get_suite_logs_info(user, suite))
+        data.update(self._get_workflow_logs_info(user, workflow))
         data["states"].update(
-            self.suite_dao.get_suite_state_summary(user, suite))
+            self.workflow_dao.get_workflow_state_summary(user, workflow))
         data["states"]["last_activity_time"] = (
-            self.get_last_activity_time(user, suite))
+            self.get_last_activity_time(user, workflow))
         (entries, of_n_entries, eight_point_zero) = (
-            self.suite_dao.get_suite_job_entries(
+            self.workflow_dao.get_workflow_job_entries(
                 user,
-                suite,
+                workflow,
                 cycles,
                 tasks,
                 task_status,
@@ -437,7 +437,7 @@ class CylcReviewService:
             traceback.print_exc()
 
     @cherrypy.expose
-    def suites(
+    def workflows(
         self,
         user,
         names=None,
@@ -447,15 +447,15 @@ class CylcReviewService:
         no_fuzzy_time="0",
         form=None,
     ):
-        """List (installed) suites of a user.
+        """List (installed) workflows of a user.
 
         user -- A string containing a valid user ID
         form -- Specify return format. If None, display HTML page. If "json",
                 return a JSON data structure.
 
         """
-        user_suite_dir_root = self._get_user_suite_dir_root(user)
-        per_page_default = self.SUITES_PER_PAGE
+        user_workflow_dir_root = self._get_user_workflow_dir_root(user)
+        per_page_default = self.WORKFLOWS_PER_PAGE
         if not isinstance(per_page, int):
             if per_page:
                 per_page = int(per_page)
@@ -471,7 +471,7 @@ class CylcReviewService:
             "host": self.host_name,
             "cylc_version": self.cylc_version,
             "script": cherrypy.request.script_name,
-            "method": "suites",
+            "method": "workflows",
             "no_fuzzy_time": no_fuzzy_time,
             "user": user,
             "is_option_on": (
@@ -498,9 +498,9 @@ class CylcReviewService:
             "work"
         ]
         for dirpath, dnames, fnames in os.walk(
-            user_suite_dir_root, followlinks=True
+            user_workflow_dir_root, followlinks=True
         ):
-            if dirpath != user_suite_dir_root and (
+            if dirpath != user_workflow_dir_root and (
                 any(name in dnames or name in fnames for name in sub_names)
             ):
                 dnames[:] = []
@@ -508,11 +508,11 @@ class CylcReviewService:
                 continue
 
             # Don't display the symlink to the latest version of
-            # the Cylc8 Suite
+            # the Cylc8 Workflow
             if re.match(r'.*runN$', dirpath):
                 continue
 
-            item = os.path.relpath(dirpath, user_suite_dir_root)
+            item = os.path.relpath(dirpath, user_workflow_dir_root)
             if not any(fnmatch(item, glob_) for glob_ in name_globs):
                 continue
             with contextlib.suppress(OSError):
@@ -540,15 +540,15 @@ class CylcReviewService:
         else:
             data["n_pages"] = 1
 
-        # Get basic ros(i)e suite info (project and title) per entry if found
+        # Get basic ros(i)e workflow info (project and title) per entry if found
         for entry in data["entries"]:
-            user_suite_dir = os.path.join(user_suite_dir_root, entry["name"])
-            rosie_suite_info = os.path.join(user_suite_dir, "rose-suite.info")
-            if os.path.isfile(rosie_suite_info):
+            user_workflow_dir = os.path.join(user_workflow_dir_root, entry["name"])
+            rosie_workflow_info = os.path.join(user_workflow_dir, "rose-workflow.info")
+            if os.path.isfile(rosie_workflow_info):
                 rosie_info = {}
                 with contextlib.suppress(IOError):
                     for line in open(   # noqa: SIM115
-                        rosie_suite_info, 'r'
+                        rosie_workflow_info, 'r'
                     ).readlines():
                         if not line.strip().startswith('#') and '=' in line:
                             rosie_key, rosie_val = line.strip().split("=", 1)
@@ -559,15 +559,15 @@ class CylcReviewService:
         data["time"] = strftime("%Y-%m-%dT%H:%M:%SZ", gmtime())
         if form == "json":
             return json.dumps(data)
-        template = self.template_env.get_template("suites.html")
+        template = self.template_env.get_template("workflows.html")
         return template.render(**data)
 
-    def get_file(self, user, suite, path, path_in_tar=None, mode=None):
+    def get_file(self, user, workflow, path, path_in_tar=None, mode=None):
         """Returns file information / content or a cherrypy response."""
-        suite = suite.replace('%2F', '/')
-        f_name = self._get_user_suite_dir(user, suite, path)
+        workflow = workflow.replace('%2F', '/')
+        f_name = self._get_user_workflow_dir(user, workflow, path)
         self._check_file_path(path)
-        self._check_link_path(f_name, suite)
+        self._check_link_path(f_name, workflow)
         view_size_max = self.VIEW_SIZE_MAX
         if path_in_tar:
             tar_f = tarfile.open(f_name, "r:gz")
@@ -649,8 +649,8 @@ class CylcReviewService:
             names = name.replace("log/job/", "").split("/", 3)
             if len(names) == 4:
                 cycle, task, submit_num, _ = names
-                entries = self.suite_dao.get_suite_job_entries(
-                    user, suite, [cycle], [task],
+                entries = self.workflow_dao.get_workflow_job_entries(
+                    user, workflow, [cycle], [task],
                     None, None, None, None, None)[0]
                 for entry in entries:
                     if entry["submit_num"] == int(submit_num):
@@ -659,10 +659,10 @@ class CylcReviewService:
 
         # Set the file_content type for syntax highlighting.
         if (
-            fnmatch(os.path.basename(path), "suite*.rc*")
+            fnmatch(os.path.basename(path), "workflow*.rc*")
             or fnmatch(os.path.basename(path), "*.cylc")
         ):
-            file_content = "cylc-suite-rc"
+            file_content = "cylc-workflow-rc"
         elif fnmatch(os.path.basename(path), "*rose*.conf"):
             file_content = "rose-conf"
         else:
@@ -670,10 +670,10 @@ class CylcReviewService:
 
         return lines, job_entry, file_content, f_name
 
-    def get_last_activity_time(self, user, suite):
-        """Returns last activity time for a suite based on database stat"""
-        for name in [os.path.join("log", "db"), "cylc-suite.db"]:
-            fname = os.path.join(self._get_user_suite_dir(user, suite), name)
+    def get_last_activity_time(self, user, workflow):
+        """Returns last activity time for a workflow based on database stat"""
+        for name in [os.path.join("log", "db"), "cylc-workflow.db"]:
+            fname = os.path.join(self._get_user_workflow_dir(user, workflow), name)
             try:
                 return strftime(
                     "%Y-%m-%dT%H:%M:%SZ", gmtime(os.stat(fname).st_mtime))
@@ -684,7 +684,7 @@ class CylcReviewService:
     def viewsearch(
         self,
         user,
-        suite,
+        workflow,
         path=None,
         path_in_tar=None,
         mode=None,
@@ -694,10 +694,10 @@ class CylcReviewService:
         """Search a text log file."""
         # get file or serve raw
         file_output = self.get_file(
-            user, suite, path, path_in_tar=path_in_tar, mode=mode)
+            user, workflow, path, path_in_tar=path_in_tar, mode=mode)
         if isinstance(file_output, tuple):
             lines, _, file_content, _ = self.get_file(
-                user, suite, path, path_in_tar=path_in_tar, mode=mode)
+                user, workflow, path, path_in_tar=path_in_tar, mode=mode)
         else:
             return file_output
 
@@ -745,30 +745,30 @@ class CylcReviewService:
 
     @cherrypy.expose
     def view(
-        self, user, suite, path, path_in_tar=None, mode=None, no_fuzzy_time="0"
+        self, user, workflow, path, path_in_tar=None, mode=None, no_fuzzy_time="0"
     ):
         """View a text log file."""
         # Log files with +TZ in name end up with space instead of plus sign, so
         # put plus sign back in (https://github.com/cylc/cylc-flow/issues/4260)
         path = re.sub(r"(log\.\S+\d{2})\s(\d{2,4})$", r"\1+\2", path)
         path = re.sub(
-            r"(log\/config\/\d*T?\d*)\s(\d*-rose-suite.conf)", r"\1+\2", path
+            r"(log\/config\/\d*T?\d*)\s(\d*-rose-workflow.conf)", r"\1+\2", path
         )
-        suite = suite.replace('%2F', '/')
+        workflow = workflow.replace('%2F', '/')
 
         # get file or serve raw data
         file_output = self.get_file(
-            user, suite, path, path_in_tar=path_in_tar, mode=mode)
+            user, workflow, path, path_in_tar=path_in_tar, mode=mode)
         if isinstance(file_output, tuple):
             lines, job_entry, file_content, f_name = self.get_file(
-                user, suite, path, path_in_tar=path_in_tar, mode=mode)
+                user, workflow, path, path_in_tar=path_in_tar, mode=mode)
         else:
             return file_output
 
         template = self.template_env.get_template("view.html")
 
         data = {}
-        data.update(self._get_suite_logs_info(user, suite))
+        data.update(self._get_workflow_logs_info(user, workflow))
         return template.render(
             cylc_version=self.cylc_version,
             script=cherrypy.request.script_name,
@@ -778,7 +778,7 @@ class CylcReviewService:
             title=self.title,
             host=self.host_name,
             user=user,
-            suite=suite,
+            workflow=workflow,
             path=path,
             path_in_tar=path_in_tar,
             f_name=f_name,
@@ -790,20 +790,20 @@ class CylcReviewService:
             task_status_groups=TASK_STATUS_GROUPS,
             **data)
 
-    def _get_suite_logs_info(self, user, suite):
-        """Return a dict of suite-related files including suite logs."""
+    def _get_workflow_logs_info(self, user, workflow):
+        """Return a dict of workflow-related files including workflow logs."""
         data = {"files": {}}
-        user_suite_dir = self._get_user_suite_dir(user, suite)  # cylc files
+        user_workflow_dir = self._get_user_workflow_dir(user, workflow)  # cylc files
         rose_logs_dest = "rose"
-        if self.is_cylc8(user_suite_dir):
+        if self.is_cylc8(user_workflow_dir):
             rose_logs_dest = "cylc"
 
         # Rose files: to recognise & group, but not process, standard formats
         data["files"][rose_logs_dest] = {}
 
-        # Rosie suite info
-        for fname in ['rose-suite.info', 'rose-suite.conf']:
-            info_name = os.path.join(user_suite_dir, fname)
+        # Rosie workflow info
+        for fname in ['rose-workflow.info', 'rose-workflow.conf']:
+            info_name = os.path.join(user_workflow_dir, fname)
             if os.path.isfile(info_name):
                 stat = os.stat(info_name)
                 data["files"][rose_logs_dest][fname] = {
@@ -813,16 +813,16 @@ class CylcReviewService:
 
         # Get Rose log files
         for key in ["conf", "log", "version"]:
-            f_name = os.path.join(user_suite_dir, "log/rose-suite-run." + key)
+            f_name = os.path.join(user_workflow_dir, "log/rose-workflow-run." + key)
             if os.path.isfile(f_name):
                 stat = os.stat(f_name)
-                data["files"][rose_logs_dest]["log/rose-suite-run." + key] = {
-                    "path": "log/rose-suite-run." + key,
+                data["files"][rose_logs_dest]["log/rose-workflow-run." + key] = {
+                    "path": "log/rose-workflow-run." + key,
                     "mtime": stat.st_mtime,
                     "size": stat.st_size}
 
         for key in ["html", "txt", "version"]:
-            for f_name in glob(os.path.join(user_suite_dir, "log/*." + key)):
+            for f_name in glob(os.path.join(user_workflow_dir, "log/*." + key)):
                 if os.path.basename(f_name).startswith("rose-"):
                     continue
                 name = os.path.join("log", os.path.basename(f_name))
@@ -834,14 +834,14 @@ class CylcReviewService:
 
         # Returns a tuple that looks like:
         #    ("cylc-run",
-        #     {"err": {"path": "log/suite/err", "mtime": mtime, "size": size},
-        #      "log": {"path": "log/suite/log", "mtime": mtime, "size": size},
-        #      "out": {"path": "log/suite/out", "mtime": mtime, "size": size}})
+        #     {"err": {"path": "log/workflow/err", "mtime": mtime, "size": size},
+        #      "log": {"path": "log/workflow/log", "mtime": mtime, "size": size},
+        #      "out": {"path": "log/workflow/out", "mtime": mtime, "size": size}})
         logs_info = {}
         prefix = "~"
         if user:
             prefix += user
-        d_rel = os.path.join("cylc-run", suite)
+        d_rel = os.path.join("cylc-run", workflow)
         dir_ = os.path.expanduser(os.path.join(prefix, d_rel))
 
         # Get cylc files
@@ -855,12 +855,12 @@ class CylcReviewService:
                     "size": f_stat.st_size,
                 }
 
-        # Get cylc suite/workflow log files and other files:
+        # Get cylc workflow/workflow log files and other files:
         EXTRA_FILES = [
             "log/workflow/log*",
             "log/workflow/file-installation-log.*",
-            "log/suite/log*",
-            "log/suite/file-installation-log.*",
+            "log/workflow/log*",
+            "log/workflow/file-installation-log.*",
             "log/install/*",
             "log/flow-config/*",
             "log/config/*",
@@ -886,17 +886,17 @@ class CylcReviewService:
         return data
 
     @staticmethod
-    def is_cylc8(user_suite_dir):
-        """Does user_suite_dir contain a Cylc 8 workflow.
+    def is_cylc8(user_workflow_dir):
+        """Does user_workflow_dir contain a Cylc 8 workflow.
         If the workflow file is suite.rc, it then checks for existence of
         "log/scheduler" dir which is cylc 8 specific.
         """
-        flow_file = os.path.join(user_suite_dir, "flow.cylc")
-        log_dir = os.path.join(user_suite_dir, "log", "scheduler")
-        suite_file = os.path.join(user_suite_dir, "suite.rc")
+        flow_file = os.path.join(user_workflow_dir, "flow.cylc")
+        log_dir = os.path.join(user_workflow_dir, "log", "scheduler")
+        workflow_file = os.path.join(user_workflow_dir, "suite.rc")
         return os.path.exists(flow_file) or (
             # following check for back compat workflows which have run
-            os.path.exists(suite_file) and os.path.exists(log_dir))
+            os.path.exists(workflow_file) and os.path.exists(log_dir))
 
     @classmethod
     def _check_dir_access(cls, path):
@@ -918,7 +918,7 @@ class CylcReviewService:
 
     @staticmethod
     def _get_user_home(user):
-        """Return, e.g. ~/cylc-run/ for a cylc suite.
+        """Return, e.g. ~/cylc-run/ for a cylc workflow.
 
         N.B. os.path.expanduser does not fail if ~user is invalid.
 
@@ -931,8 +931,8 @@ class CylcReviewService:
         except KeyError:
             raise cherrypy.HTTPError(404) from None
 
-    def _get_user_suite_dir_root(self, user):
-        """Return, e.g. ~user/cylc-run/ for a cylc suite."""
+    def _get_user_workflow_dir_root(self, user):
+        """Return, e.g. ~user/cylc-run/ for a cylc workflow."""
         return self._check_dir_access(
             os.path.join(self._get_user_home(user), "cylc-run"))
 
@@ -955,13 +955,13 @@ class CylcReviewService:
             raise cherrypy.HTTPError(403)
 
     @classmethod
-    def _check_link_path(cls, path, suite):
-        """Raise HTTP 403 error if the path is not under cylc-run/<suite>.
+    def _check_link_path(cls, path, workflow):
+        """Raise HTTP 403 error if the path is not under cylc-run/<workflow>.
 
         The files "cylc review" is intended to serve may be symlinked to
         other parts of the filesystem, however, the linked files should
         always reside in directories managed by Cylc which should always
-        sit under the path "cylc-run/<suite>".
+        sit under the path "cylc-run/<workflow>".
 
         Examples:
             # OK
@@ -989,7 +989,7 @@ class CylcReviewService:
             cherrypy.HTTPError(403)
 
         """
-        rel = os.path.join('cylc-run', suite)
+        rel = os.path.join('cylc-run', workflow)
         if rel not in os.path.realpath(path):
             raise cherrypy.HTTPError(403)
 
@@ -1028,7 +1028,7 @@ class CylcReviewService:
         if not (
             head == 'log' or
             (not head and tail in cls.WORKFLOW_FILES) or
-            (head, tail) == ('opt', 'rose-suite-cylc-install.conf')
+            (head, tail) == ('opt', 'rose-workflow-cylc-install.conf')
         ):
             raise cherrypy.HTTPError(403)
 
@@ -1067,8 +1067,8 @@ class CylcReviewService:
         if os.path.normpath(path) != path:
             raise cherrypy.HTTPError(403)
 
-    def _get_user_suite_dir(self, user, suite, *paths):
-        """Return, e.g. ~user/cylc-run/suite/... for a cylc suite.
+    def _get_user_workflow_dir(self, user, workflow, *paths):
+        """Return, e.g. ~user/cylc-run/workflow/... for a cylc workflow.
 
         Raises:
             - cherrypy.HTTPError(404) if path does not exist
@@ -1076,24 +1076,24 @@ class CylcReviewService:
 
         """
         self._check_string_for_path(user)
-        self._check_path_normalised(suite)
+        self._check_path_normalised(workflow)
         for path in paths:
             self._check_path_normalised(path)
-        suite_dir = os.path.join(
+        workflow_dir = os.path.join(
             self._get_user_home(user),
             "cylc-run",
-            suite)
+            workflow)
         if not paths:
-            return self._check_dir_access(suite_dir)
-        path = os.path.join(suite_dir, *paths)
-        if not path.startswith(suite_dir):
-            # Raise HTTP 403 if path lies outside of the suite directory. Note:
+            return self._check_dir_access(workflow_dir)
+        path = os.path.join(workflow_dir, *paths)
+        if not path.startswith(workflow_dir):
+            # Raise HTTP 403 if path lies outside of the workflow directory. Note:
             # >>> os.path.join('/foo', '/bar')
             # '/bar'
             raise cherrypy.HTTPError(403)
         return self._check_dir_access(path)
 
     @staticmethod
-    def _sort_summary_entries(suite1):
-        """Sort suites by last_activity_time."""
-        return suite1.get("last_activity_time") or suite1["name"]
+    def _sort_summary_entries(workflow1):
+        """Sort workflows by last_activity_time."""
+        return workflow1.get("last_activity_time") or workflow1["name"]

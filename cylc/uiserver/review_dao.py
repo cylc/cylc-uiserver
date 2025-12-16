@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""Provide data access object for the suite runtime database."""
+"""Provide data access object for the workflow runtime database."""
 
 import contextlib
 from glob import glob
@@ -41,7 +41,7 @@ TASK_STATUS_GROUPS = {
 
 
 class CylcReviewDAO:
-    """Cylc Review data access object to the suite runtime database."""
+    """Cylc Review data access object to the workflow runtime database."""
 
     CYCLE_ORDERS = {"time_desc": " DESC", "time_asc": " ASC"}
     JOB_ORDERS = {
@@ -115,32 +115,32 @@ class CylcReviewDAO:
     def __init__(self):
         self.daos = {}
 
-    def _db_init(self, user_name, suite_name):
+    def _db_init(self, user_name, workflow_name):
         """Initialise a named CylcWorkflowDAO database connection."""
-        key = (user_name, suite_name)
+        key = (user_name, workflow_name)
         if key not in self.daos:
             prefix = "~"
             if user_name:
                 prefix += user_name
-            for name in [os.path.join("log", "db"), "cylc-suite.db"]:
+            for name in [os.path.join("log", "db"), "cylc-workflow.db"]:
                 db_f_name = os.path.expanduser(
                     os.path.join(
-                        prefix, os.path.join("cylc-run", suite_name, name)))
+                        prefix, os.path.join("cylc-run", workflow_name, name)))
                 self.daos[key] = CylcWorkflowDAO(db_f_name, is_public=True)
                 if os.path.exists(db_f_name):
                     break
-        self.is_cylc8 = self.set_is_cylc8(user_name, suite_name)
+        self.is_cylc8 = self.set_is_cylc8(user_name, workflow_name)
         return self.daos[key]
 
-    def _db_close(self, user_name, suite_name):
+    def _db_close(self, user_name, workflow_name):
         """Close a named CylcWorkflowDAO database connection."""
-        key = (user_name, suite_name)
+        key = (user_name, workflow_name)
         if self.daos.get(key) is not None:
             self.daos[key].close()
 
-    def _db_exec(self, user_name, suite_name, stmt, stmt_args=None):
+    def _db_exec(self, user_name, workflow_name, stmt, stmt_args=None):
         """Execute a query on a named CylcWorkflowDAO database connection."""
-        daos = self._db_init(user_name, suite_name)
+        daos = self._db_init(user_name, workflow_name)
         if stmt_args is None:
             stmt_args = []
         # only connect if db exists to avoid creating db if none there
@@ -156,51 +156,51 @@ class CylcReviewDAO:
                     list(self.daos.values())[0].db_file_name
                 ).parent
                 if (wf_dir / WorkflowFiles.FLOW_FILE).exists() or (
-                    wf_dir / WorkflowFiles.SUITE_RC
+                    wf_dir / WorkflowFiles.FLOW_CYLC
                 ).exists():
                     return []
                 else:
                     raise exc
 
-    def get_suite_broadcast_states(self, user_name, suite_name):
-        """Return broadcast states of a suite.
+    def get_workflow_broadcast_states(self, user_name, workflow_name):
+        """Return broadcast states of a workflow.
         [[point, name, key, value], ...]
         """
         stmt = CylcWorkflowDAO.pre_select_broadcast_states(
-            self=self._db_init(user_name, suite_name), order="ASC")[0]
+            self=self._db_init(user_name, workflow_name), order="ASC")[0]
         broadcast_states = []
-        for row in self._db_exec(user_name, suite_name, stmt):
+        for row in self._db_exec(user_name, workflow_name, stmt):
             point, namespace, key, value = row
             broadcast_states.append([point, namespace, key, value])
         return broadcast_states
 
-    def get_suite_broadcast_events(self, user_name, suite_name):
-        """Return broadcast events of a suite.
+    def get_workflow_broadcast_events(self, user_name, workflow_name):
+        """Return broadcast events of a workflow.
         [[time, change, point, name, key, value], ...]
         """
         stmt = self.pre_select_broadcast_events(
-            self._db_init(user_name, suite_name), order="DESC")[0]
+            self._db_init(user_name, workflow_name), order="DESC")[0]
         broadcast_events = []
-        for row in self._db_exec(user_name, suite_name, stmt):
+        for row in self._db_exec(user_name, workflow_name, stmt):
             time_, change, point, namespace, key, value = row
             broadcast_events.append(
                 (time_, change, point, namespace, key, value))
         return broadcast_events
 
     @staticmethod
-    def set_is_cylc8(user_name, suite_name):
+    def set_is_cylc8(user_name, workflow_name):
         from cylc.uiserver.review import CylcReviewService
 
-        suite_dir = os.path.join(
+        workflow_dir = os.path.join(
             CylcReviewService._get_user_home(user_name),
             "cylc-run",
-            suite_name)
-        return CylcReviewService.is_cylc8(suite_dir)
+            workflow_name)
+        return CylcReviewService.is_cylc8(workflow_dir)
 
-    def get_suite_job_entries(
+    def get_workflow_job_entries(
         self,
         user_name,
-        suite_name,
+        workflow_name,
         cycles,
         tasks,
         task_status,
@@ -210,9 +210,9 @@ class CylcReviewDAO:
         offset,
         flow_nums='flow_nums',
     ):
-        """Query suite runtime database to return a listing of task jobs.
+        """Query workflow runtime database to return a listing of task jobs.
         user -- A string containing a valid user ID
-        suite -- A string containing a valid suite ID
+        workflow -- A string containing a valid workflow ID
         cycles -- If specified, display only task jobs matching these cycles.
                   A value in the list can be a cycle, the string "before|after
                   CYCLE", or a glob to match cycles.
@@ -246,7 +246,7 @@ class CylcReviewDAO:
         eight_zero_warning - boolean flag indicating that the database is
             a Cylc 8.0 database and we can only get the latest task job.
         """
-        where_expr, where_args = self._get_suite_job_entries_where(
+        where_expr, where_args = self._get_workflow_job_entries_where(
             cycles, tasks, task_status, job_status)
 
         # Get number of entries
@@ -257,11 +257,11 @@ class CylcReviewDAO:
             + where_expr
         )
         try:
-            for row in self._db_exec(user_name, suite_name, stmt, where_args):
+            for row in self._db_exec(user_name, workflow_name, stmt, where_args):
                 of_n_entries = row[0]
                 break
             else:
-                self._db_close(user_name, suite_name)
+                self._db_close(user_name, workflow_name)
                 return ([], 0, self.is_cylc8)
         except sqlite3.Error:
             return ([], 0, self.is_cylc8)
@@ -314,13 +314,13 @@ class CylcReviewDAO:
         eight_zero_warning = False
         try:
             db_data = self._db_exec(
-                user_name, suite_name, stmt, where_args + limit_args
+                user_name, workflow_name, stmt, where_args + limit_args
             )
         except OperationalError as exc:
             if exc.message == self.CANNOT_JOIN_FLOW_NUMS:
                 stmt = stmt.replace('flow_nums', 'submit_num')
                 db_data = self._db_exec(
-                    user_name, suite_name, stmt, where_args + limit_args
+                    user_name, workflow_name, stmt, where_args + limit_args
                 )
                 eight_zero_warning = True
             else:
@@ -360,14 +360,14 @@ class CylcReviewDAO:
                 "seq_logs_indexes": {}}
             entries.append(entry)
             entry_of[(cycle, name, submit_num)] = entry
-        self._db_close(user_name, suite_name)
+        self._db_close(user_name, workflow_name)
         if entries:
-            self._get_job_logs(user_name, suite_name, entries, entry_of)
+            self._get_job_logs(user_name, workflow_name, entries, entry_of)
         return (entries, of_n_entries, eight_zero_warning)
 
-    def _get_suite_job_entries_where(
+    def _get_workflow_job_entries_where(
             self, cycles, tasks, task_status, job_status):
-        """Helper for get_suite_job_entries.
+        """Helper for get_workflow_job_entries.
         Get query's "WHERE" expression and its arguments.
         """
         where_exprs = []
@@ -410,8 +410,8 @@ class CylcReviewDAO:
         else:
             return ("", where_args)
 
-    def _get_job_logs(self, user_name, suite_name, entries, entry_of):
-        """Helper for "get_suite_job_entries". Get job logs.
+    def _get_job_logs(self, user_name, workflow_name, entries, entry_of):
+        """Helper for "get_workflow_job_entries". Get job logs.
         Recent job logs are likely to be in the file system, so we can get a
         listing of the relevant "log/job/CYCLE/NAME/SUBMI_NUM/" directory.
         Older job logs may be archived in "log/job-CYCLE.tar.gz", we should
@@ -422,15 +422,15 @@ class CylcReviewDAO:
         prefix = "~"
         if user_name:
             prefix += user_name
-        user_suite_dir = os.path.expanduser(os.path.join(
-            prefix, os.path.join("cylc-run", suite_name)))
+        user_workflow_dir = os.path.expanduser(os.path.join(
+            prefix, os.path.join("cylc-run", workflow_name)))
         try:
             fs_log_cycles = os.listdir(
-                os.path.join(user_suite_dir, "log", "job"))
+                os.path.join(user_workflow_dir, "log", "job"))
         except OSError:
             fs_log_cycles = []
         targzip_log_cycles = []
-        for name in glob(os.path.join(user_suite_dir, "log", "job-*.tar.gz")):
+        for name in glob(os.path.join(user_workflow_dir, "log", "job-*.tar.gz")):
             targzip_log_cycles.append(os.path.basename(name)[4:-7])
 
         relevant_targzip_log_cycles = []
@@ -438,13 +438,13 @@ class CylcReviewDAO:
             if entry["cycle"] in fs_log_cycles:
                 pathd = "log/job/%(cycle)s/%(name)s/%(submit_num)02d" % entry
                 try:
-                    filenames = os.listdir(os.path.join(user_suite_dir, pathd))
+                    filenames = os.listdir(os.path.join(user_workflow_dir, pathd))
                 except OSError:
                     continue
                 for filename in filenames:
                     try:
                         stat = os.stat(
-                            os.path.join(user_suite_dir, pathd, filename))
+                            os.path.join(user_workflow_dir, pathd, filename))
                     except OSError:
                         pass
                     else:
@@ -464,7 +464,7 @@ class CylcReviewDAO:
 
         for cycle in relevant_targzip_log_cycles:
             path = os.path.join("log", "job-%s.tar.gz" % cycle)
-            tar = tarfile.open(os.path.join(user_suite_dir, path), "r:gz")
+            tar = tarfile.open(os.path.join(user_workflow_dir, path), "r:gz")
             for member in tar.getmembers():
                 # member.name expected to be "job/cycle/task/submit_num/*"
                 if not member.isfile():
@@ -513,11 +513,11 @@ class CylcReviewDAO:
                 if log_dict["seq_key"] not in entry["seq_logs_indexes"]:
                     log_dict["seq_key"] = None
 
-    def get_suite_cycles_summary(
-            self, user_name, suite_name, order, limit, offset):
-        """Return a the state summary (of each cycle) of a user's suite.
+    def get_workflow_cycles_summary(
+            self, user_name, workflow_name, order, limit, offset):
+        """Return a the state summary (of each cycle) of a user's workflow.
         user -- A string containing a valid user ID
-        suite -- A string containing a valid suite ID
+        workflow -- A string containing a valid workflow ID
         limit -- Limit number of returned entries
         offset -- Offset entry number
         Return (entries, of_n_entries), where entries is a data structure that
@@ -541,31 +541,31 @@ class CylcReviewDAO:
         stmt = ("SELECT COUNT(DISTINCT cycle) FROM task_states WHERE " +
                 "submit_num > 0")
         try:
-            for row in self._db_exec(user_name, suite_name, stmt):
+            for row in self._db_exec(user_name, workflow_name, stmt):
                 of_n_entries = row[0]
                 break
         except sqlite3.Error:
             return ([], 0)
         if not of_n_entries:
-            self._db_close(user_name, suite_name)
+            self._db_close(user_name, workflow_name)
             return ([], 0)
 
         # Not strictly correct, if cycle is in basic date-only format,
         # but should not matter for most cases
         integer_mode = False
         stmt = "SELECT cycle FROM task_states LIMIT 1"
-        for row in self._db_exec(user_name, suite_name, stmt):
+        for row in self._db_exec(user_name, workflow_name, stmt):
             integer_mode = row[0].isdigit()
             break
 
         prefix = "~"
         if user_name:
             prefix += user_name
-        user_suite_dir = os.path.expanduser(os.path.join(
-            prefix, os.path.join("cylc-run", suite_name)))
+        user_workflow_dir = os.path.expanduser(os.path.join(
+            prefix, os.path.join("cylc-run", workflow_name)))
         targzip_log_cycles = []
         with contextlib.suppress(OSError):
-            for item in os.listdir(os.path.join(user_suite_dir, "log")):
+            for item in os.listdir(os.path.join(user_workflow_dir, "log")):
                 if item.startswith("job-") and item.endswith(".tar.gz"):
                     targzip_log_cycles.append(item[4:-7])
 
@@ -611,7 +611,7 @@ class CylcReviewDAO:
             stmt_args += [limit, offset]
         entry_of = {}
         entries = []
-        for row in self._db_exec(user_name, suite_name, stmt, stmt_args):
+        for row in self._db_exec(user_name, workflow_name, stmt, stmt_args):
             cycle, max_time_updated, n_active, n_success, n_fail = row
             entry_of[cycle] = {
                 "cycle": cycle,
@@ -627,7 +627,7 @@ class CylcReviewDAO:
                 },
             }
             entries.append(entry_of[cycle])
-        self._db_close(user_name, suite_name)
+        self._db_close(user_name, workflow_name)
 
         # Check if "task_jobs" table is available or not.
         # Note: A single query with a JOIN is probably a more elegant solution.
@@ -635,7 +635,7 @@ class CylcReviewDAO:
         # This 2nd query may return more results than is necessary, but should
         # be a very cheap query as it does not have to do a lot of work.
         check_stmt = "SELECT name FROM sqlite_master WHERE name==?"
-        check_query = self._db_exec(user_name, suite_name, check_stmt,
+        check_query = self._db_exec(user_name, workflow_name, check_stmt,
                                     ["task_jobs"])
         if check_query.fetchone() is not None:
             stmt = (   # nosec B608
@@ -655,9 +655,9 @@ class CylcReviewDAO:
                 "SELECT cycle," +
                 " sum(" + fail_events_stmt + ") AS n_job_fail" +
                 " FROM task_events GROUP BY cycle")
-        self._db_close(user_name, suite_name)
+        self._db_close(user_name, workflow_name)
         for cycle, n_job_active, n_job_success, n_job_fail in self._db_exec(
-                user_name, suite_name, stmt):
+                user_name, workflow_name, stmt):
             try:
                 entry_of[cycle]["n_states"]["job_active"] = n_job_active
                 entry_of[cycle]["n_states"]["job_success"] = n_job_success
@@ -668,15 +668,15 @@ class CylcReviewDAO:
                 del entry_of[cycle]
                 if not entry_of:
                     break
-        self._db_close(user_name, suite_name)
+        self._db_close(user_name, workflow_name)
 
         return entries, of_n_entries
 
-    def get_suite_state_summary(self, user_name, suite_name):
-        """Return a the state summary of a user's suite.
+    def get_workflow_state_summary(self, user_name, workflow_name):
+        """Return a the state summary of a user's workflow.
         Return {"is_running": b, "is_failed": b, "server": s}
         where:
-        * is_running is a boolean to indicate if the suite is running
+        * is_running is a boolean to indicate if the workflow is running
         * is_failed: a boolean to indicate if any tasks (submit) failed
         * server: host:port of server, if available
         """
@@ -684,23 +684,23 @@ class CylcReviewDAO:
             "is_running": False,
             "is_failed": False,
             "server": None}
-        dao = self._db_init(user_name, suite_name)
+        dao = self._db_init(user_name, workflow_name)
         if not os.access(dao.db_file_name, os.F_OK | os.R_OK):
-            self._db_close(user_name, suite_name)
+            self._db_close(user_name, workflow_name)
             return ret
 
         port_file_path = os.path.expanduser(
             os.path.join(
-                "~" + user_name, "cylc-run", suite_name, ".service",
+                "~" + user_name, "cylc-run", workflow_name, ".service",
                 "contact"))
         try:
             host = None
             port_str = None
             for line in open(port_file_path):   # noqa: SIM115
                 key, value = [item.strip() for item in line.split("=", 1)]
-                if key in ["CYLC_SUITE_HOST", "CYLC_WORKFLOW_HOST"]:
+                if key in ["CYLC_WORKFLOW_HOST", "CYLC_WORKFLOW_HOST"]:
                     host = value
-                elif key in ["CYLC_SUITE_PORT", "CYLC_WORKFLOW_PORT"]:
+                elif key in ["CYLC_WORKFLOW_PORT", "CYLC_WORKFLOW_PORT"]:
                     port_str = value
         except (IOError, ValueError):
             pass
@@ -712,10 +712,10 @@ class CylcReviewDAO:
         stmt = "SELECT status FROM task_states WHERE status GLOB ? LIMIT 1"
         stmt_args = ["*failed"]
         with contextlib.suppress(sqlite3.Error):
-            for _ in self._db_exec(user_name, suite_name, stmt, stmt_args):
+            for _ in self._db_exec(user_name, workflow_name, stmt, stmt_args):
                 ret["is_failed"] = True
                 break
-        self._db_close(user_name, suite_name)
+        self._db_close(user_name, workflow_name)
 
         return ret
 

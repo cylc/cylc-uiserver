@@ -42,7 +42,7 @@ rel="stylesheet" media="screen" />
       <ul class="nav navbar-nav navbar-right">
         <li>
           <span class="navbar-text">
-            {{entries|length}} installed suite(s)
+            {{entries|length}} installed workflow(s)
             <span class="label label-default">
               <abbr class="livestamp" title="{{time}}">{{time}}</abbr>
             </span>
@@ -102,8 +102,8 @@ rel="stylesheet" media="screen" />
                   {% for k, v in [
                       ("time_desc", "new-&gt;old" | safe ),
                       ("time_asc", "old-&gt;new" | safe ),
-                      ("name_asc", "a-z suite name"),
-                      ("name_desc", "z-a suite name"),
+                      ("name_asc", "a-z workflow name"),
+                      ("name_desc", "z-a workflow name"),
                   ] -%}
                     <option
                     {% if order and order == k -%}selected="selected"{% endif -%}
@@ -142,11 +142,11 @@ rel="stylesheet" media="screen" />
   </div>
 </div>
 
-<table summary="suites entries"
+<table summary="workflows entries"
 class="table table-bordered table-condensed table-striped">
   <thead>
     <tr>
-      <th>suite name</th>
+      <th>workflow name</th>
 
       <th>
         cycles list
@@ -174,13 +174,13 @@ class="table table-bordered table-condensed table-striped">
       <td><small>{{entry.name}}</small></td>
       <td>
         <small>
-          <a href="{{script}}/cycles/{{user}}/?suite={{entry.name|urlencode|replace('/', '%2F')}}">cycles list</a>
+          <a href="{{script}}/cycles/{{user}}/?workflow={{entry.name|urlencode|replace('/', '%2F')}}">cycles list</a>
         </small>
       </td>
 
       <td>
         <small>
-          <a href="{{script}}/taskjobs/{{user}}/?suite={{entry.name|urlencode|replace('/', '%2F')}}">task jobs list</a>
+          <a href="{{script}}/taskjobs/{{user}}/?workflow={{entry.name|urlencode|replace('/', '%2F')}}">task jobs list</a>
         </small>
       </td>
 

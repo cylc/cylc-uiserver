@@ -1,6 +1,6 @@
 /**
  * @fileoverview
- * Registers a language handler for cylc suite.rc files.
+ * Registers a language handler for flow.cylc files.
  */
 
 PR['registerLangHandler'](

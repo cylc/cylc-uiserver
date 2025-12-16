@@ -22,8 +22,8 @@ requires_cherrypy
 
 set_test_number 16
 #-------------------------------------------------------------------------------
-# Initialise, validate and run a suite for testing with
-init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
+# Initialise, validate and run a workflow for testing with
+init_workflow "${TEST_NAME_BASE}" <<'__FLOW_CYLC__'
 [scheduler]
     UTC mode = True
     [[events]]
@@ -51,7 +51,7 @@ init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
                 cylc broadcast %(workflow)s -p '*' -n 'baz' -s 'script = echo hello world'
                 cylc trigger %(workflow)s//%(id)s
             """
-__SUITE_RC__
+__FLOW_CYLC__
 
 TEST_NAME=$TEST_NAME_BASE-validate
 run_ok "${TEST_NAME}" cylc validate "${WORKFLOW_NAME}"
@@ -65,14 +65,14 @@ if [[ -z "${TEST_CYLC_WS_PORT}" ]]; then
     exit 1
 fi
 
-# Set up standard URL escaping of forward slashes in 'cylctb-' suite names.
+# Set up standard URL escaping of forward slashes in 'cylctb-' workflow names.
 # shellcheck disable=SC2001
 ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
-# Data transfer output check for a specific suite's jobs page
+# Data transfer output check for a specific workflow's jobs page
 
 # Key variable for core tests up to end of file
-TASKJOBS_URL="${TEST_CYLC_WS_URL}/taskjobs/${USER}?suite=${ESC_WORKFLOW_NAME}&form=json"
+TASKJOBS_URL="${TEST_CYLC_WS_URL}/taskjobs/${USER}?workflow=${ESC_WORKFLOW_NAME}&form=json"
 
 TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs"
 run_ok "${TEST_NAME}" curl "${TASKJOBS_URL}"
@@ -114,7 +114,7 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('entries', ${BAZ2}, 'run_signal',), None]"
 
 #-------------------------------------------------------------------------------
-# Data transfer output check for suite's job page, job status filters
+# Data transfer output check for workflow's job page, job status filters
 TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs-failed"
 run_ok "${TEST_NAME}" curl "${TASKJOBS_URL}&job_status=failed"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
@@ -139,7 +139,7 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('job_status',), 'succeeded,failed']" \
     "[('of_n_entries',), 8]"
 #-------------------------------------------------------------------------------
-# Data transfer output check for suite's job page, task status filters
+# Data transfer output check for workflow's job page, task status filters
 TEST_NAME="${TEST_NAME_BASE}-200-curl-task-succeeded"
 run_ok "${TEST_NAME}" curl "${TASKJOBS_URL}&task_status=succeeded"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
@@ -150,7 +150,7 @@ run_ok "${TEST_NAME}" curl "${TASKJOBS_URL}&task_status=succeeded&job_status=fai
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('of_n_entries',), 2]"
 #-------------------------------------------------------------------------------
-# Tidy up - note suite trivial so stops early on by itself
+# Tidy up - note workflow trivial so stops early on by itself
 purge "${WORKFLOW_NAME}"
 cylc_ws_kill
 exit

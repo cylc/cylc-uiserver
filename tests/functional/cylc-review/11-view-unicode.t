@@ -22,8 +22,8 @@ requires_cherrypy
 
 set_test_number 8
 #-------------------------------------------------------------------------------
-# Initialise, validate and run a suite for testing with
-init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
+# Initialise, validate and run a workflow for testing with
+init_workflow "${TEST_NAME_BASE}" <<'__FLOW_CYLC__'
 [scheduler]
     UTC mode = True
     [[events]]
@@ -37,7 +37,7 @@ init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
 [runtime]
     [[echo-euro]]
         script = echo-euro >"$0.txt"
-__SUITE_RC__
+__FLOW_CYLC__
 
 mkdir -p 'bin'
 cat >'bin/echo-euro' <<'__BASH__'
@@ -58,7 +58,7 @@ if [[ -z "${TEST_CYLC_WS_PORT}" ]]; then
     exit 1
 fi
 
-# Set up standard URL escaping of forward slashes in 'cylctb-' suite names.
+# Set up standard URL escaping of forward slashes in 'cylctb-' workflow names.
 # shellcheck disable=SC2001
 ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
@@ -84,7 +84,7 @@ run_ok "${TEST_NAME}" curl \
     "${TEST_CYLC_WS_URL}/view/${USER}/${ESC_WORKFLOW_NAME}?path=log/${TAR_FILE}&path_in_tar=job/19990101T0000Z/echo-euro/01/job.txt&mode=text"
 cmp_ok "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" <<<'€'
 #-------------------------------------------------------------------------------
-# Tidy up - note suite trivial so stops early on by itself
+# Tidy up - note workflow trivial so stops early on by itself
 purge "${WORKFLOW_NAME}"
 cylc_ws_kill
 exit

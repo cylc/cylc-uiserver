@@ -75,10 +75,10 @@ Options:
                    using the CYLC_TEST_PLATFORMS environment variable.
 
 Examples:
-  # Run the full test suite with the default options.
+  # Run the full test workflow with the default options.
   $ run-functional-tests
 
-  # Run the full test suite with 12 processes
+  # Run the full test workflow with 12 processes
   $ run-functional-tests -j 12
 
   # Run only tests under "tests/f/cyclers/"

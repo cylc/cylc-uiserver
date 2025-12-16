@@ -1,4 +1,4 @@
-{% extends "suite-base.html" %}
+{% extends "workflow-base.html" %}
 {% block title_name %}task jobs list{% endblock %}
 {% block auto_refresh %}<meta http-equiv="refresh" content="120">{% endblock %}
 {% block content %}
@@ -19,7 +19,7 @@
     <div class="panel-body">
       <form action="{{script}}/{{method}}">
         <input type="hidden" name="user" value="{{user}}" />
-        <input type="hidden" name="suite" value="{{suite}}" />
+        <input type="hidden" name="workflow" value="{{workflow}}" />
         <input type="hidden" name="no_fuzzy_time" value="{{no_fuzzy_time}}" />
         <fieldset class="container-fluid">
           <div class="row">
@@ -191,7 +191,7 @@
     </div>
     {% endif %}
     <div class="col-md-11">
-      {% include "suite-state.html" -%}
+      {% include "workflow-state.html" -%}
     </div>
     <div class="col-md-1 text-right">
       <a id="toggle-fuzzy-time" data-no-fuzzy-time="{{no_fuzzy_time}}" href="#">

@@ -1,4 +1,4 @@
-{% extends "suite-base.html" %}
+{% extends "workflow-base.html" %}
 {% block title_name %}broadcasts list{% endblock %}
 {% block auto_refresh %}<meta http-equiv="refresh" content="120">{% endblock %}
 {% block content %}
@@ -6,7 +6,7 @@
 
 <div class="row"><div class="col-md-12">
 <ul class="list-inline pull-right">
-  <li><a href="{{script}}/broadcast_states/{{user}}/?&amp;suite={{suite|urlencode|replace("/", "%2F")}}">states</a></li>
+  <li><a href="{{script}}/broadcast_states/{{user}}/?&amp;workflow={{workflow|urlencode|replace("/", "%2F")}}">states</a></li>
   <li>events</li>
 </ul>
 

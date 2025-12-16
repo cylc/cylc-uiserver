@@ -22,7 +22,7 @@ requires_cherrypy
 
 set_test_number 56
 #-------------------------------------------------------------------------------
-# Initialise, validate and run a suite for testing with
+# Initialise, validate and run a workflow for testing with
 install_workflow "${TEST_NAME_BASE}" "${TEST_NAME_BASE}"
 
 TEST_NAME=$TEST_NAME_BASE-validate
@@ -38,7 +38,7 @@ if [[ -z "${TEST_CYLC_WS_PORT}" ]]; then
     exit 1
 fi
 
-# Set up standard URL escaping of forward slashes in 'cylctb-' suite names.
+# Set up standard URL escaping of forward slashes in 'cylctb-' workflow names.
 # shellcheck disable=SC2001
 ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
@@ -59,22 +59,22 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
 
 #-------------------------------------------------------------------------------
 # Data transfer output check for a specific user's page including non-existent
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites"
-run_ok "${TEST_NAME}" curl -I "${TEST_CYLC_WS_URL}/suites/${USER}"
+TEST_NAME="${TEST_NAME_BASE}-200-curl-workflows"
+run_ok "${TEST_NAME}" curl -I "${TEST_CYLC_WS_URL}/workflows/${USER}"
 grep_ok 'HTTP/.* 200 OK' "${TEST_NAME}.stdout"
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-json"
-run_ok "${TEST_NAME}" curl "${TEST_CYLC_WS_URL}/suites/${USER}?form=json"
+TEST_NAME="${TEST_NAME_BASE}-200-curl-workflows-json"
+run_ok "${TEST_NAME}" curl "${TEST_CYLC_WS_URL}/workflows/${USER}?form=json"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('cylc_version',), '$(cylc version | cut -d' ' -f 2)']" \
     "[('title',), 'Cylc Review']" \
     "[('host',), '${HOSTNAME}']" \
     "[('user',), '${USER}']"
 
-TEST_NAME="${TEST_NAME_BASE}-404-curl-suites"
-run_ok "${TEST_NAME}" curl -I "${TEST_CYLC_WS_URL}/suites/no-such-user"
+TEST_NAME="${TEST_NAME_BASE}-404-curl-workflows"
+run_ok "${TEST_NAME}" curl -I "${TEST_CYLC_WS_URL}/workflows/no-such-user"
 grep_ok 'HTTP/.* 404 Not Found' "${TEST_NAME}.stdout"
 #-------------------------------------------------------------------------------
-# Connection check for a specific suite's cycles & jobs page
+# Connection check for a specific workflow's cycles & jobs page
 TEST_NAME="${TEST_NAME_BASE}-200-curl-cycles"
 run_ok "${TEST_NAME}" \
     curl -I "${TEST_CYLC_WS_URL}/cycles/${USER}/${ESC_WORKFLOW_NAME}"
@@ -87,10 +87,10 @@ grep_ok 'HTTP/.* 404 Not Found' "${TEST_NAME}.stdout"
 
 TEST_NAME="${TEST_NAME_BASE}-404-2-curl-cycles"
 run_ok "${TEST_NAME}" \
-    curl -I "${TEST_CYLC_WS_URL}/cycles/${USER}?suite=no-such-suite"
+    curl -I "${TEST_CYLC_WS_URL}/cycles/${USER}?workflow=no-such-workflow"
 grep_ok 'HTTP/.* 404 Not Found' "${TEST_NAME}.stdout"
 #-------------------------------------------------------------------------------
-# Data transfer output check for a specific suite's cycles & jobs page
+# Data transfer output check for a specific workflow's cycles & jobs page
 TEST_NAME="${TEST_NAME_BASE}-200-curl-cycles"
 
 run_ok "${TEST_NAME}" \
@@ -101,7 +101,7 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('title',), 'Cylc Review']" \
     "[('host',), '${HOSTNAME}']" \
     "[('user',), '${USER}']" \
-    "[('suite',), '${WORKFLOW_NAME}']" \
+    "[('workflow',), '${WORKFLOW_NAME}']" \
     "[('page',), 1]" \
     "[('n_pages',), 1]" \
     "[('per_page',), 100]" \
@@ -124,7 +124,7 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('title',), 'Cylc Review']" \
     "[('host',), '${HOSTNAME}']" \
     "[('user',), '${USER}']" \
-    "[('suite',), '${WORKFLOW_NAME}']" \
+    "[('workflow',), '${WORKFLOW_NAME}']" \
     "[('is_option_on',), False]" \
     "[('page',), 1]" \
     "[('n_pages',), 1]" \
@@ -186,7 +186,7 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('entries', ${FOO1}, 'seq_logs_indexes', 'job.trace.*.html', '256'), 'job.trace.256.html']"
 
 #-------------------------------------------------------------------------------
-# Data transfer output check for a suite run directory with only a "log/db"
+# Data transfer output check for a workflow run directory with only a "log/db"
 COPY_NAME="${WORKFLOW_NAME}-copy"
 
 CYLC_RUN_DIR="${HOME}/cylc-run"
@@ -197,10 +197,10 @@ cp "${WORKFLOW_RUN_DIR}/flow.cylc" "${CYLC_RUN_DIR}/${COPY_NAME}/"
 # shellcheck disable=SC2001
 ESC_COPY_NAME="$(echo "${COPY_NAME}" | sed 's|/|%2F|g')"
 run_ok "${TEST_NAME}-bare" \
-    curl "${TEST_CYLC_WS_URL}/taskjobs/${USER}?suite=${ESC_COPY_NAME}&form=json"
+    curl "${TEST_CYLC_WS_URL}/taskjobs/${USER}?workflow=${ESC_COPY_NAME}&form=json"
 
 cylc_ws_json_greps "${TEST_NAME}-bare.stdout" "${TEST_NAME}-bare.stdout" \
-    "[('suite',), '${COPY_NAME}']"
+    "[('workflow',), '${COPY_NAME}']"
 
 for FILE in \
     'log/scheduler/log' \
@@ -242,18 +242,18 @@ run_ok "${TEST_NAME}" \
 grep_ok '<span class="highlight">Hello from</span>' \
     "${TEST_NAME}.stdout"
 #-------------------------------------------------------------------------------
-# Test requesting a file outside of the suite directory tree:
+# Test requesting a file outside of the workflow directory tree:
 # 1. By absolute path.
 TEST_NAME="${TEST_NAME_BASE}-403-curl-view-outside-absolute"
 run_ok "${TEST_NAME}" \
     curl -I \
     "${TEST_CYLC_WS_URL}/view/${USER}/${ESC_WORKFLOW_NAME}?path=/dev/null"
 grep_ok 'HTTP/.* 403 Forbidden' "${TEST_NAME}.stdout"
-# 2. By absolute path to imaginary suite directory.
+# 2. By absolute path to imaginary workflow directory.
 TEST_NAME="${TEST_NAME_BASE}-403-curl-view-outside-imag"
 IMG_TEST_DIR="${WORKFLOW_RUN_DIR}-imag"
 mkdir -p "${IMG_TEST_DIR}"
-echo 'Welcome to the imaginary suite.'>"${IMG_TEST_DIR}/welcome.txt"
+echo 'Welcome to the imaginary workflow.'>"${IMG_TEST_DIR}/welcome.txt"
 run_ok "${TEST_NAME}" \
     curl -I \
     "${TEST_CYLC_WS_URL}/view/${USER}/${ESC_WORKFLOW_NAME}?path=${IMG_TEST_DIR}/welcome.txt"

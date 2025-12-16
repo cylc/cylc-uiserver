@@ -22,14 +22,14 @@ requires_cherrypy
 
 set_test_number 5
 #-------------------------------------------------------------------------------
-# Initialise, validate and run a suite for testing with
+# Initialise, validate and run a workflow for testing with
 install_workflow "${TEST_NAME_BASE}" "${TEST_NAME_BASE}"
 
 run_ok "${TEST_NAME_BASE}-validate" cylc validate "${WORKFLOW_NAME}"
 
 run_ok "${TEST_NAME_BASE}-play" cylc play --no-detach --debug "${WORKFLOW_NAME}" 2>'/dev/null'
 
-# Remove the "job.out" entry from the suite's public database.
+# Remove the "job.out" entry from the workflow's public database.
 sqlite3 "${TEST_DIR}/log/db" \
     'DELETE FROM task_job_logs WHERE filename=="job.out";' 2>'/dev/null' || true
 #-------------------------------------------------------------------------------
@@ -39,14 +39,14 @@ if [[ -z "${TEST_CYLC_WS_PORT}" ]]; then
     exit 1
 fi
 
-# Set up standard URL escaping of forward slashes in 'cylctb-' suite names.
+# Set up standard URL escaping of forward slashes in 'cylctb-' workflow names.
 # shellcheck disable=SC2001
 ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
 # Data transfer output check for case with no job output publicly viewable
 TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs"
 run_ok "${TEST_NAME}" \
-    curl "${TEST_CYLC_WS_URL}/taskjobs/${USER}?suite=${ESC_WORKFLOW_NAME}&form=json"
+    curl "${TEST_CYLC_WS_URL}/taskjobs/${USER}?workflow=${ESC_WORKFLOW_NAME}&form=json"
 
 FOO0="{'cycle': '20000101T0000Z', 'name': 'foo0', 'submit_num': 1}"
 FOO0_OUT='log/job/20000101T0000Z/foo0/01/job.out'
@@ -59,7 +59,7 @@ cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('entries', ${FOO0}, 'logs', 'job.out', 'mtime'), ${FOO0_OUT_MTIME}]" \
     "[('entries', ${FOO0}, 'logs', 'job.out', 'exists'), True]"
 #-------------------------------------------------------------------------------
-# Tidy up - note suite trivial so stops early on by itself
+# Tidy up - note workflow trivial so stops early on by itself
 purge "${WORKFLOW_NAME}"
 cylc_ws_kill
 exit
