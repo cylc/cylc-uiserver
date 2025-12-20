@@ -57,6 +57,64 @@ def gql_query(jp_fetch):
     return _fetch
 
 
+@pytest.fixture
+def gql_subscription(jp_ws_fetch):
+    """Open a GraphQL subscription.
+
+    E.G:
+
+    ws = await gql_subscription(
+        *('cylc', 'subscriptions'),
+        sub={
+            'id': '1',
+            'type': 'start',
+            'payload': {
+                'query': '''
+                    subscription {
+                      workflows {
+                        id
+                        status
+                      }
+                    }
+                '''
+            }
+        }
+    )
+    # Can loop on this
+    response = json.loads(await ws.read_message())
+    assert response == . . .
+
+    ws.close()
+    """
+
+    async def _fetch(*endpoint, sub=None, headers=None):
+        headers = headers or {}
+        headers = {
+            **headers,
+            'Content-Type': 'application/json',
+            'Sec-Websocket-Protocol': 'graphql-ws',
+        }
+        ws = await jp_ws_fetch(
+            *endpoint,
+            headers=headers,
+        )
+
+        # Using graphql-ws protocol, so send connection_init
+        await ws.write_message(
+            json.dumps({"type": "connection_init", "payload": {}})
+        )
+        ack = json.loads(await ws.read_message())
+        assert ack["type"] == "connection_ack"
+
+        # Start subscription
+        sub = sub or {}
+        await ws.write_message(json.dumps(sub))
+
+        return ws
+
+    return _fetch
+
+
 async def test_query(gql_query, dummy_workflow):
     """Test sending the most basic GraphQL query."""
     # configure two dummy workflows so we have something to look at
@@ -176,3 +234,53 @@ async def test_multi(gql_query, monkeypatch, cylc_uis, dummy_workflow):
         ),
     )
     assert response.code == 200
+
+
+async def test_graphql_subscription(gql_subscription, dummy_workflow):
+    """Test opening a GraphQL subscription and receive a message."""
+
+    # Start a workflow for subscription content.
+    await dummy_workflow('foo')
+
+    # Start subscription
+    sub_id = "1"
+    ws = await gql_subscription(
+        *('cylc', 'subscriptions'),
+        sub={
+            "id": sub_id,
+            "type": "start",
+            "payload": {
+                "query": """
+                    subscription {
+                      workflows {
+                        id
+                        status
+                      }
+                    }
+                """
+            }
+        }
+    )
+
+    # Receive the next message
+    response = json.loads(await ws.read_message())
+
+    assert response == {
+        'id': sub_id,
+        'type': 'data',
+        'payload': {
+            'data': {
+                'workflows': [
+                    {
+                        'id': '~me/foo',
+                        'status': 'stopped'
+                    }
+                ]
+            }
+        }
+    }
+
+    # Run the stop/cleanup code
+    await ws.write_message(json.dumps({"id": sub_id, "type": "stop"}))
+
+    ws.close()
