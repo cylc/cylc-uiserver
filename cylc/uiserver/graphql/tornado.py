@@ -24,7 +24,6 @@
 
 from asyncio import iscoroutinefunction
 import json
-import re
 import sys
 import traceback
 from typing import (
@@ -90,25 +89,6 @@ def data_search_action(data, action):
 
 def get_content_type(request: 'HTTPServerRequest') -> str:
     return request.headers.get("Content-Type", "").split(";", 1)[0].lower()
-
-
-def get_accepted_content_types(request: 'HTTPServerRequest') -> list:
-    def qualify(x):
-        parts = x.split(";", 1)
-        if len(parts) == 2:
-            match = re.match(
-                r"(^|;)q=(0(\.\d{,3})?|1(\.0{,3})?)(;|$)", parts[1])
-            if match:
-                return parts[0].strip(), float(match.group(2))
-        return parts[0].strip(), 1
-
-    raw_content_types = request.headers.get("Accept", "*/*").split(",")
-    qualified_content_types = map(qualify, raw_content_types)
-    return [
-        x[0]
-        for x in sorted(
-            qualified_content_types, key=lambda x: x[1], reverse=True)
-    ]
 
 
 class ExecutionError(Exception):
@@ -406,24 +386,6 @@ class TornadoGraphQLHandler(web.RequestHandler):
 
     async def execute(self, *args, **kwargs):
         return execute(*args, **kwargs)
-
-    def request_wants_html(self):
-        accepted = get_accepted_content_types(self.request)
-        accepted_length = len(accepted)
-        # the list will be ordered in preferred first - so we have to make
-        # sure the most preferred gets the highest number
-        html_priority = (
-            accepted_length - accepted.index("text/html")
-            if "text/html" in accepted
-            else 0
-        )
-        json_priority = (
-            accepted_length - accepted.index("application/json")
-            if "application/json" in accepted
-            else 0
-        )
-
-        return html_priority > json_priority
 
     def get_graphql_params(self, request, data):
         if self.graphql_params:
