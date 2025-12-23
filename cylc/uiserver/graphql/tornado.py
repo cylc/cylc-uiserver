@@ -263,7 +263,11 @@ class TornadoGraphQLHandler(web.RequestHandler):
         return result, status_code
 
     def json_encode(self, d, pretty=False):
-        if (self.pretty or pretty) or self.get_query_argument("pretty", False):
+        if (
+            (self.pretty or pretty)
+            or self.get_query_argument("pretty", False)
+            or self.get_body_argument("pretty", False)
+        ):
             return json.dumps(
                 d, sort_keys=True, indent=2, separators=(",", ": "))
 
@@ -290,7 +294,7 @@ class TornadoGraphQLHandler(web.RequestHandler):
                             "Batch requests should receive a list"
                             ", but received {}."
                         ).format(repr(request_json))
-                    if len(request_json <= 0):
+                    if len(request_json) <= 0:
                         raise AssertionError(
                             "Received an empty list in the batch request."
                         )
