@@ -15,8 +15,10 @@
 
 import json
 from textwrap import dedent
+from urllib.parse import urlencode
 
 import pytest
+from tornado.httpclient import HTTPClientError
 
 from cylc.flow.id import Tokens
 
@@ -41,17 +43,20 @@ def gql_query(jp_fetch):
 
     """
 
-    async def _fetch(*endpoint, query=None, headers=None):
+    async def _fetch(*endpoint, query=None, headers=None, **kwargs):
         headers = headers or {}
         headers = {
+            'Content-Type': 'application/json',
             **headers,
-            'Content-Type': 'application/json'
         }
+        if not kwargs.get('method'):
+            kwargs['method'] = 'POST'
+        if 'body' not in kwargs:
+            kwargs['body'] = json.dumps({'query': query}, indent=4)
         return await jp_fetch(
             *endpoint,
-            method='POST',
             headers=headers,
-            body=json.dumps({'query': query}, indent=4),
+            **kwargs
         )
 
     return _fetch
@@ -87,16 +92,17 @@ def gql_subscription(jp_ws_fetch):
     ws.close()
     """
 
-    async def _fetch(*endpoint, sub=None, headers=None):
+    async def _fetch(*endpoint, sub=None, headers=None, **kwargs):
         headers = headers or {}
         headers = {
-            **headers,
             'Content-Type': 'application/json',
             'Sec-Websocket-Protocol': 'graphql-ws',
+            **headers,
         }
         ws = await jp_ws_fetch(
             *endpoint,
             headers=headers,
+            **kwargs
         )
 
         # Using graphql-ws protocol, so send connection_init
@@ -116,23 +122,22 @@ def gql_subscription(jp_ws_fetch):
 
 
 async def test_query(gql_query, dummy_workflow):
-    """Test sending the most basic GraphQL query."""
+    """Test sending the most basic GraphQL query in all it's forms."""
     # configure two dummy workflows so we have something to look at
     await dummy_workflow('foo')
     await dummy_workflow('bar')
 
-    # perform the request
-    response = await gql_query(
-        *('cylc', 'graphql'),
-        query='''
-            query {
-                workflows {
-                    id
-                    status
-                }
+    query = '''
+        query {
+            workflows {
+                id
+                status
             }
-        ''',
-    )
+        }
+    '''
+
+    # perform the request
+    response = await gql_query(*('cylc', 'graphql'), query=query)
     assert response.code == 200
 
     # we should find the two dummy workflows in the response
@@ -149,6 +154,76 @@ async def test_query(gql_query, dummy_workflow):
             },
         ]
     }
+
+    # Test a bad query
+    with pytest.raises(HTTPClientError) as exc:
+        await gql_query(*('cylc', 'graphql'), query='not a query')
+    assert 'Bad Request' in str(exc)
+
+    # Test 'application/graphql'
+    response_gql = await gql_query(
+        *('cylc', 'graphql'),
+        headers={'Content-Type': 'application/graphql'},
+        body=query
+    )
+    assert response_gql.code == 200
+    assert json.loads(response_gql.body) == body
+
+    # Test 'application/x-www-form-urlencoded'
+    response_form = await gql_query(
+        *('cylc', f'graphql'),
+        headers={'Content-Type': 'application/x-www-form-urlencoded'},
+        body=urlencode({'query': query, 'pretty': True}),
+    )
+    assert response_form.code == 200
+    assert json.loads(response_form.body) == body
+    # should be pretty
+    assert response_form.body != response.body
+
+
+async def test_batch_query(gql_query, dummy_workflow):
+    """Test sending a GraphQL batch query."""
+    # configure two dummy workflows so we have something to look at
+    await dummy_workflow('foo')
+    await dummy_workflow('bar')
+
+    query = '''
+        query fooFlow {workflows (ids: ["~me/foo"]) {...shared}}
+        query barFlow {workflows (ids: ["~me/bar"]) {...shared}}
+        fragment shared on Workflow { id status }
+    '''
+
+    # perform the request
+    response = await gql_query(
+        *('cylc', 'graphql', 'batch'),
+        body=json.dumps(
+            [{'id': 1, 'query': query, 'operationName': 'fooFlow'}]
+        )
+    )
+    assert response.code == 200
+
+    # we should find the two dummy workflows in the response
+    body = json.loads(response.body)
+    assert body == [
+        {
+            "id":1,
+            "data": {
+                "workflows": [
+                    {
+                        "id": "~me/foo",
+                        "status": "stopped"
+                    }
+                ]
+            },
+            "status":200
+        }
+    ]
+
+    # Test a empty batch
+    with pytest.raises(HTTPClientError) as exc:
+        await gql_query(
+            *('cylc', 'graphql', 'batch'), body=json.dumps([]))
+    assert 'Bad Request' in str(exc)
 
 
 async def test_multi(gql_query, monkeypatch, cylc_uis, dummy_workflow):
@@ -236,7 +311,7 @@ async def test_multi(gql_query, monkeypatch, cylc_uis, dummy_workflow):
     assert response.code == 200
 
 
-async def test_graphql_subscription(gql_subscription, dummy_workflow):
+async def test_subscription(gql_subscription, dummy_workflow):
     """Test opening a GraphQL subscription and receive a message."""
 
     # Start a workflow for subscription content.
