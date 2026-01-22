@@ -157,8 +157,20 @@ async def test_query(gql_query, dummy_workflow):
 
     # Test a bad query
     with pytest.raises(HTTPClientError) as exc:
-        await gql_query(*('cylc', 'graphql'), query='not a query')
-    assert 'Bad Request' in str(exc)
+        await gql_query(*('cylc', 'graphql'), query='this is not a query')
+    assert r"Syntax Error: Unexpected Name 'this" in str(exc)
+
+    # Test bad graphql query
+    bad_query = '''
+        query {
+            workflows {
+                notAField
+            }
+        }
+    '''
+    result = await gql_query(
+        *('cylc', 'graphql'), query=bad_query, raise_error=False)
+    assert r"Cannot query field 'not" in result.reason
 
     # Test 'application/graphql'
     response_gql = await gql_query(
@@ -202,7 +214,7 @@ async def test_batch_query(gql_query, dummy_workflow):
     )
     assert response.code == 200
 
-    # we should find the two dummy workflows in the response
+    # we should find the 'fooFlow' query result in the response
     body = json.loads(response.body)
     assert body == [
         {
