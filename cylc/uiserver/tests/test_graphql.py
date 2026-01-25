@@ -51,11 +51,16 @@ def gql_query(jp_fetch):
         }
         if not kwargs.get('method'):
             kwargs['method'] = 'POST'
+        params = {}
         if 'body' not in kwargs:
-            kwargs['body'] = json.dumps({'query': query}, indent=4)
+            if kwargs['method'] in ("POST", "PATCH", "PUT"):
+                kwargs['body'] = json.dumps({'query': query}, indent=4)
+            else:
+                params = {'query': query}
         return await jp_fetch(
             *endpoint,
             headers=headers,
+            params=params,
             **kwargs
         )
 
@@ -127,21 +132,27 @@ async def test_query(gql_query, dummy_workflow):
     await dummy_workflow('foo')
     await dummy_workflow('bar')
 
-    query = '''
-        query {
-            workflows {
-                id
-                status
-            }
-        }
-    '''
+    query = '''query {workflows {id status}}'''
 
     # perform the request
-    response = await gql_query(*('cylc', 'graphql'), query=query)
-    assert response.code == 200
+    get_response = await gql_query(
+        *('cylc', 'graphql'),
+        headers={'Content-Type': 'application/x-www-form-urlencoded'},
+        query=query,
+        method='GET'
+    )
+    assert get_response.code == 200
+
+    # test against same query different method
+    post_response = await gql_query(
+        *('cylc', 'graphql'),
+        query=query,
+        method='POST'
+    )
+    assert get_response.body == post_response.body
 
     # we should find the two dummy workflows in the response
-    body = json.loads(response.body)
+    body = json.loads(get_response.body)
     assert body['data'] == {
         'workflows': [
             {
@@ -190,7 +201,7 @@ async def test_query(gql_query, dummy_workflow):
     assert response_form.code == 200
     assert json.loads(response_form.body) == body
     # should be pretty
-    assert response_form.body != response.body
+    assert response_form.body != get_response.body
 
 
 async def test_batch_query(gql_query, dummy_workflow):
