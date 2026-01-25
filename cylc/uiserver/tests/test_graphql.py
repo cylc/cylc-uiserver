@@ -245,6 +245,44 @@ async def test_batch_query(gql_query, dummy_workflow):
     assert 'Bad Request' in str(exc)
 
 
+async def test_mutation(gql_query, dummy_workflow):
+    """Test simple mutation scenarios."""
+
+    # start a workflow
+    await dummy_workflow('foo')
+
+    # make a simple mutation
+    response = await gql_query(
+        *('cylc', 'graphql'),
+        query='''
+            mutation {
+                pause(workflows: ["*"]) {
+                    result
+                }
+            }
+        ''',
+    )
+    assert response.code == 200
+
+    # try a mutation with GET method
+    response = await gql_query(
+        *('cylc', 'graphql'),
+        headers={'Content-Type': 'application/x-www-form-urlencoded'},
+        query='''
+            mutation {
+                stop(workflows: ["*"]) {
+                    result
+                }
+            }
+        ''',
+        method='GET',
+        raise_error=False
+    )
+    # Should be rejected for incorrect method.
+    assert response.code == 405
+    assert response.reason == 'Method Not Allowed'
+
+
 async def test_multi(gql_query, monkeypatch, cylc_uis, dummy_workflow):
     """Ensure multi-mutation requests are properly forwarded.
 
@@ -255,7 +293,7 @@ async def test_multi(gql_query, monkeypatch, cylc_uis, dummy_workflow):
       query must be altered so it only contains the single mutation.
 
     """
-    # need at leat one workflow for the request to be forwarded
+    # need at least one workflow for the request to be forwarded
     await dummy_workflow('foo')
     await dummy_workflow('bar')
 
