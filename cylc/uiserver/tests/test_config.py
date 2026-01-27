@@ -64,9 +64,13 @@ def test_config(clear_env, capload: list, monkeypatch: pytest.MonkeyPatch):
     assert capload == [
         SYS_CONF,
         (SITE_CONF / 'jupyter_config.py'),
+        (SITE_CONF / 'jupyterhub_config.py'),
         (SITE_CONF / '0/jupyter_config.py'),
+        (SITE_CONF / '0/jupyterhub_config.py'),
         (USER_CONF / 'jupyter_config.py'),
-        (USER_CONF / '0/jupyter_config.py')
+        (USER_CONF / 'jupyterhub_config.py'),
+        (USER_CONF / '0/jupyter_config.py'),
+        (USER_CONF / '0/jupyterhub_config.py'),
     ]
 
 
@@ -78,25 +82,49 @@ def test_cylc_site_conf_path(clear_env, capload, monkeypatch):
     assert capload == [
         SYS_CONF,
         Path('elephant/uiserver/jupyter_config.py'),
+        Path('elephant/uiserver/jupyterhub_config.py'),
         Path('elephant/uiserver/0/jupyter_config.py'),
+        Path('elephant/uiserver/0/jupyterhub_config.py'),
         Path(USER_CONF / 'jupyter_config.py'),
-        Path(USER_CONF / '0/jupyter_config.py')
+        Path(USER_CONF / 'jupyterhub_config.py'),
+        Path(USER_CONF / '0/jupyter_config.py'),
+        Path(USER_CONF / '0/jupyterhub_config.py'),
     ]
 
 
 def test_get_conf_dir_hierarchy(monkeypatch: pytest.MonkeyPatch):
     """Tests hierarchy of versioning for config"""
-    config_paths = ['config_path/one', 'config_path/two']
-    expected = [
-        ('config_path/one/jupyter_config.py'),
-        ('config_path/one/0/jupyter_config.py'),
-        ('config_path/one/0.6/jupyter_config.py'),
-        ('config_path/one/0.6.0/jupyter_config.py'),
-        ('config_path/two/jupyter_config.py'),
-        ('config_path/two/0/jupyter_config.py'),
-        ('config_path/two/0.6/jupyter_config.py'),
-        ('config_path/two/0.6.0/jupyter_config.py')
-    ]
     monkeypatch.setattr(config_util, '__version__', '0.6.0')
-    actual = get_conf_dir_hierarchy(config_paths)
-    assert actual == expected
+    assert get_conf_dir_hierarchy(
+        ['config_path/one', 'config_path/two'], 'test'
+    ) == [
+        ('config_path/one/jupyter_config.py'),
+        ('config_path/one/jupytertest_config.py'),
+        ('config_path/one/0/jupyter_config.py'),
+        ('config_path/one/0/jupytertest_config.py'),
+        ('config_path/one/0.6/jupyter_config.py'),
+        ('config_path/one/0.6/jupytertest_config.py'),
+        ('config_path/one/0.6.0/jupyter_config.py'),
+        ('config_path/one/0.6.0/jupytertest_config.py'),
+        ('config_path/two/jupyter_config.py'),
+        ('config_path/two/jupytertest_config.py'),
+        ('config_path/two/0/jupyter_config.py'),
+        ('config_path/two/0/jupytertest_config.py'),
+        ('config_path/two/0.6/jupyter_config.py'),
+        ('config_path/two/0.6/jupytertest_config.py'),
+        ('config_path/two/0.6.0/jupyter_config.py'),
+        ('config_path/two/0.6.0/jupytertest_config.py'),
+    ], 'with filenames'
+
+    assert get_conf_dir_hierarchy(
+        ['config_path/one', 'config_path/two'], 'test', directory_only=True
+    ) == [
+        ('config_path/one'),
+        ('config_path/one/0'),
+        ('config_path/one/0.6'),
+        ('config_path/one/0.6.0'),
+        ('config_path/two'),
+        ('config_path/two/0'),
+        ('config_path/two/0.6'),
+        ('config_path/two/0.6.0'),
+    ], 'directory only'
