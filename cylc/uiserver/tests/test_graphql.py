@@ -248,6 +248,11 @@ async def test_batch_query(gql_query, dummy_workflow):
             *('cylc', 'graphql', 'batch'), body=json.dumps([]))
     assert 'Bad Request' in str(exc)
 
+    # Test a non-list "batch"
+    response = await gql_query(
+        *('cylc', 'graphql', 'batch'), body=json.dumps({}), raise_error=False)
+    assert response.reason == 'Bad Request'
+
 
 async def test_mutation(gql_query, dummy_workflow):
     """Test simple mutation scenarios."""
