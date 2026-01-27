@@ -40,7 +40,6 @@ from typing import (
 from tornado import web
 from tornado.escape import json_encode
 from tornado.escape import to_unicode
-from tornado.httpclient import HTTPClientError
 from tornado.log import app_log
 from tornado.web import HTTPError
 
@@ -146,46 +145,35 @@ class TornadoGraphQLHandler(web.RequestHandler):
             self.handle_error(ex)
 
     async def run(self, *args, **kwargs):
-        try:
-            data = self.parse_body()
+        data = self.parse_body()
 
-            if self.batch:
-                responses = [
-                    await self.get_response(entry)
-                    for entry in data
-                ]
-                result = "[{}]".format(
-                    ",".join([response[0] for response in responses])
-                )
-                status_code = (
-                    responses
-                    and max(responses, key=lambda response: response[1])[1]
-                    or 200
-                )
-            else:
-                result, status_code = await self.get_response(data)
-
-            if status_code == 400:
-                self.set_status(status_code, reason=result)
-            else:
-                self.set_status(status_code)
-
-            self.set_header("Content-Type", "application/json")
-            self.write(result)
-            await self.finish()
-
-        except HTTPClientError as e:
-            response = e.response
-            response["Content-Type"] = "application/json"
-            response.content = self.json_encode(
-                {"errors": [self.format_error(e)]}
+        if self.batch:
+            responses = [
+                await self.get_response(entry)
+                for entry in data
+            ]
+            result = "[{}]".format(
+                ",".join([response[0] for response in responses])
             )
-            return response
+            status_code = (
+                responses
+                and max(responses, key=lambda response: response[1])[1]
+                or 200
+            )
+        else:
+            result, status_code = await self.get_response(data)
+
+        if status_code == 400:
+            self.set_status(status_code, reason=result)
+        else:
+            self.set_status(status_code)
+
+        self.set_header("Content-Type", "application/json")
+        self.write(result)
+        await self.finish()
 
     async def get_response(self, data):
-        query, variables, operation_name, _id = self.get_graphql_params(
-            self.request, data
-        )
+        query, variables, operation_name, _id = self.get_graphql_params(data)
 
         execution_result = await self.execute_graphql_request(
             data, query, variables, operation_name
@@ -253,10 +241,10 @@ class TornadoGraphQLHandler(web.RequestHandler):
                 request_json = json.loads(body)
                 if self.batch:
                     if not isinstance(request_json, list):
-                        raise AssertionError(
+                        raise AssertionError((
                             "Batch requests should receive a list"
                             ", but received {}."
-                        ).format(repr(request_json))
+                        ).format(repr(request_json)))
                     if len(request_json) <= 0:
                         raise AssertionError(
                             "Received an empty list in the batch request."
@@ -354,14 +342,14 @@ class TornadoGraphQLHandler(web.RequestHandler):
     async def execute(self, *args, **kwargs):
         return execute(*args, **kwargs)
 
-    def get_graphql_params(self, request, data):
+    def get_graphql_params(self, data):
         if self.graphql_params:
             return self.graphql_params
 
         single_args = {}
-        for key in request.arguments.keys():
+        for key in self.request.arguments.keys():
             single_args[key] = self.decode_argument(
-                request.arguments.get(key)[0])
+                self.request.arguments.get(key)[0])
 
         query = single_args.get("query") or data.get("query")
         variables = single_args.get("variables") or data.get("variables")
