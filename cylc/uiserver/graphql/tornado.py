@@ -235,7 +235,7 @@ class TornadoGraphQLHandler(web.RequestHandler):
             try:
                 body = self.request.body
             except Exception as e:
-                raise ExecutionError(400, e)
+                raise ExecutionError(400, [e])
 
             try:
                 request_json = json.loads(body)
@@ -337,7 +337,7 @@ class TornadoGraphQLHandler(web.RequestHandler):
 
             return result
         except Exception as e:
-            return ExecutionResult(errors=[e])
+            return ExecutionResult(data=None, errors=[e])
 
     async def execute(self, *args, **kwargs):
         return execute(*args, **kwargs)
