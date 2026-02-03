@@ -26,11 +26,13 @@ from typing import (
     Any,
     Iterable,
     List,
+    Literal,
     Optional,
     Tuple,
 )
 
 import graphene
+from graphene.utils.str_converters import to_snake_case
 from graphene.types.generic import GenericScalar
 from graphene.types.schema import identity_resolve
 
@@ -289,6 +291,26 @@ class Scan(graphene.Mutation):
     result = GenericScalar()
 
 
+def _get_requested_fields(query_type, info):
+    """Extract the GraphQL fields requested for the given node type.
+
+    Args:
+        query_type: The query/node type, i.e, "jobs" or "tasks".
+        info: The GraphQL request info.
+
+    Returns:
+        A 1D set of the requested fields in Python (snake_case) format
+        as opposed to GraphQL (camelCase) format.
+
+    """
+    return {
+        to_snake_case(selection.name.value)
+        for field in info.field_nodes
+        for selection in field.selection_set.selections
+        if field.name.value == query_type
+    }
+
+
 async def get_elements(query_type, root, info, **kwargs):
     if kwargs['live']:
         return await get_nodes_all(root, info, **kwargs)
@@ -312,10 +334,19 @@ async def get_elements(query_type, root, info, **kwargs):
     kwargs['exworkflows'] = [
         Tokens(w_id) for w_id in kwargs['exworkflows']]
 
-    return await list_elements(query_type, **kwargs)
+    return await list_elements(
+        query_type,
+        _get_requested_fields(query_type, info),
+        **kwargs,
+    )
 
 
-async def list_elements(query_type, workflows: 'Iterable[Tokens]', **kwargs):
+async def list_elements(
+    query_type: Literal['tasks', 'jobs'],
+    fields: set[str],
+    workflows: 'Iterable[Tokens]',
+    **kwargs,
+):
     if not workflows:
         raise Exception('At least one workflow must be provided.')
     elements = []
@@ -333,6 +364,7 @@ async def list_elements(query_type, workflows: 'Iterable[Tokens]', **kwargs):
                     run_jobs_query(
                         conn,
                         workflow,
+                        fields,
                         ids=kwargs.get('ids'),
                         exids=kwargs.get('exids'),
                         states=kwargs.get('states'),
@@ -364,25 +396,15 @@ WITH profiler_stats AS (
     tj.platform_name,
     tj.time_submit,
     tj.run_status,
-    CASE
-      WHEN te.event = 'message debug' THEN COALESCE(CAST(SUBSTR(te.message,
-      INSTR(te.message, 'mem_alloc ') + 10) AS INT), 0)
-      ELSE 0
-    END AS mem_alloc,
-    CASE
-      WHEN te.event = 'message debug' THEN COALESCE(
-      CAST(SUBSTR(te.message, INSTR(te.message, 'max_rss ') + 8,
-      INSTR(te.message, ' mem_alloc') -
-      (INSTR(te.message, 'max_rss ') + 8)) AS INT), 0)
-      ELSE 0
-    END AS max_rss,
-    CASE
-      WHEN te.event = 'message debug' THEN COALESCE(
-      CAST(SUBSTR(te.message, INSTR(te.message, 'cpu_time ') + 9,
-      INSTR(te.message, ' max_rss') -
-      (INSTR(te.message, 'cpu_time ') + 8)) AS INT), 0)
-      ELSE 0
-    END AS cpu_time,
+    COALESCE(
+      JSON_EXTRACT(SUBSTR(te.message, 17), '$.memory_allocated'), 0
+    ) AS mem_alloc,
+    COALESCE(
+      JSON_EXTRACT(SUBSTR(te.message, 17), '$.max_rss'), 0
+    ) AS max_rss,
+    COALESCE(
+      JSON_EXTRACT(SUBSTR(te.message, 17), '$.cpu_time'), 0
+    ) AS cpu_time,
     STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit) AS total_time,
     STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run) AS run_time,
     STRFTIME('%s', time_run) - STRFTIME('%s', time_submit) AS queue_time
@@ -394,6 +416,7 @@ WITH profiler_stats AS (
       tj.name = te.name
       AND tj.cycle = te.cycle
       AND tj.submit_num = te.submit_num
+      AND te.message LIKE '_cylc_profiler: %'
   GROUP BY tj.name, tj.cycle, tj.submit_num, tj.platform_name
 ),
 time_stats AS (
@@ -418,12 +441,10 @@ time_stats AS (
     AS run_time_quartile,
     NTILE(4) OVER (PARTITION BY name ORDER BY total_time)
     AS total_time_quartile,
-    NTILE(4) OVER (PARTITION BY name ORDER BY CAST
-    (TRIM(REPLACE(max_rss, 'max_rss ', '')) AS INT)) AS max_rss_quartile,
-    CAST(TRIM(REPLACE(max_rss, 'max_rss ', '')) AS INT) AS max_rss,
-    NTILE(4) OVER (PARTITION BY name ORDER BY CAST
-    (TRIM(REPLACE(cpu_time, 'cpu_time ', '')) AS INT)) AS cpu_time_quartile,
-    CAST(TRIM(REPLACE(cpu_time, 'cpu_time ', '')) AS INT) AS cpu_time
+    NTILE(4) OVER (PARTITION BY name ORDER BY max_rss) AS max_rss_quartile,
+    max_rss,
+    NTILE(4) OVER (PARTITION BY name ORDER BY cpu_time) AS cpu_time_quartile,
+    cpu_time
   FROM profiler_stats
 )
 SELECT
@@ -477,7 +498,7 @@ SELECT
 
   -- Calculate RSS stats
   MIN(max_rss) AS min_max_rss,
-  CAST(AVG(max_rss) AS INT) AS mean_max_rss,
+  AVG(max_rss) AS mean_max_rss,
   MAX(max_rss) AS max_max_rss,
   SQRT(AVG(max_rss * max_rss) - AVG(max_rss) * AVG(max_rss))
   AS stddev_max_rss,
@@ -487,9 +508,9 @@ SELECT
 
   -- Calculate CPU time
   MIN(cpu_time) AS min_cpu_time,
-  CAST(AVG(cpu_time) AS INT) AS mean_cpu_time,
+  AVG(cpu_time) AS mean_cpu_time,
   MAX(cpu_time) AS max_cpu_time,
-  CAST(TOTAL(cpu_time) AS INT) AS total_cpu_time,
+  TOTAL(cpu_time) AS total_cpu_time,
   SQRT(AVG(cpu_time * cpu_time) - AVG(cpu_time) * AVG(cpu_time))
   AS stddev_cpu_time,
   MAX(CASE WHEN cpu_time_quartile = 1 THEN cpu_time END)
@@ -668,6 +689,7 @@ def _state_to_status(
 def run_jobs_query(
     conn: 'sqlite3.Connection',
     workflow: 'Tokens',
+    fields: set[str],
     ids: 'Optional[Iterable[Tokens]]' = None,
     exids: 'Optional[Iterable[Tokens]]' = None,
     states: Optional[Iterable[str]] = None,
@@ -700,9 +722,9 @@ def run_jobs_query(
         for id_ in ids:
             item = []
             for token, column in (
-                ('cycle', 'data.cycle'),
-                ('task', 'data.name'),
-                ('job', 'data.submit_num'),
+                ('cycle', 'tj.cycle'),
+                ('task', 'tj.name'),
+                ('job', 'tj.submit_num'),
             ):
                 value = id_[token]
                 if value:
@@ -725,9 +747,9 @@ def run_jobs_query(
         for id_ in exids:
             items = []
             for token, column in (
-                ('cycle', 'data.cycle'),
-                ('task', 'data.name'),
-                ('job', 'data.submit_num'),
+                ('cycle', 'tj.cycle'),
+                ('task', 'tj.name'),
+                ('job', 'tj.submit_num'),
             ):
                 value = id_[token]
                 if value:
@@ -746,19 +768,19 @@ def run_jobs_query(
             if submit_status is None:
                 # hasn't yet submitted (i.e. there is no job)
                 continue
-            item = [r'IFNULL(data.submit_status,999) = ?']
+            item = [r'IFNULL(tj.submit_status,999) = ?']
             where_args.append(submit_status)
 
             if run_status is None:
-                item.append('run_status IS NULL')
+                item.append('tj.run_status IS NULL')
             else:
-                item.append(r'IFNULL(data.run_status,999) = ?')
+                item.append(r'IFNULL(tj.run_status,999) = ?')
                 where_args.append(run_status)
 
             if time_run is None:
-                item.append(r'data.time_run IS NULL')
+                item.append(r'tj.time_run IS NULL')
             else:
-                item.append(r'data.time_run NOT NULL')
+                item.append(r'tj.time_run NOT NULL')
 
             items.append(r'(' + ' AND '.join(item) + r')')
 
@@ -772,92 +794,109 @@ def run_jobs_query(
             if submit_status is None:
                 # hasn't yet submitted (i.e. there is no job)
                 continue
-            item = [r'IFNULL(data.submit_status,999) = ?']
+            item = [r'IFNULL(tj.submit_status,999) = ?']
             where_args.append(submit_status)
 
             if run_status is None:
-                item.append(r'data.run_status IS NULL')
+                item.append(r'tj.run_status IS NULL')
             else:
-                item.append(r'IFNULL(data.run_status,999) = ?')
+                item.append(r'IFNULL(tj.run_status,999) = ?')
                 where_args.append(run_status)
 
             if time_run is None:
-                item.append(r'data.time_run IS NULL')
+                item.append(r'tj.time_run IS NULL')
             else:
-                item.append(r'data.time_run NOT NULL')
+                item.append(r'tj.time_run NOT NULL')
 
             where_stmts.append(r'NOT (' + ' AND '.join(item) + r')')
 
     # filter by task name (special UIS argument for namespace queries)
     if tasks:
         where_stmts.append(
-            r'(data.name = '
-            + r" OR data.name = ".join('?' for task in tasks)
+            r'(tj.name = '
+            + r" OR tj.name = ".join('?' for _task in tasks)
             + r')'
         )
         where_args.extend(tasks)
 
+    # add mandatory fields to the requested ones
+    fields |= {
+        'name',
+        'cycle_point',
+        'submit_num',
+        'submit_status',
+        'run_status',
+        'started_time',
+    }
+
+    # the SQL statements required to extract each field
+    _fields = {
+        'name': 'tj.name',
+        'cycle_point': 'tj.cycle',
+        'submit_num': 'max(tj.submit_num)' if jobNN else 'tj.submit_num',
+        'submit_status': 'tj.submit_status',
+        'started_time': 'tj.time_run',
+        'finished_time': 'tj.time_run_exit',
+        'job_id': 'tj.job_id',
+        'job_runner_name': 'tj.job_runner_name',
+        'platform': 'tj.platform_name',
+        'submitted_time': 'tj.time_submit',
+        'total_time': '''
+            STRFTIME('%s', tj.time_run_exit) - STRFTIME('%s', tj.time_submit)
+        ''',
+        'run_time': '''
+            STRFTIME('%s', tj.time_run_exit) - STRFTIME('%s', tj.time_run)
+        ''',
+        'queue_time': '''
+            STRFTIME('%s', tj.time_run) - STRFTIME('%s', tj.time_submit)
+        ''',
+        'run_status': 'tj.run_status',
+        'mem_alloc': '''
+            COALESCE(
+                JSON_EXTRACT(SUBSTR(te.message, 17), '$.memory_allocated'), 0
+            )
+        ''',
+        'max_rss': '''
+            COALESCE(
+                JSON_EXTRACT(SUBSTR(te.message, 17), '$.max_rss'), 0
+            )
+        ''',
+        'cpu_time': '''
+            COALESCE(
+                JSON_EXTRACT(SUBSTR(te.message, 17), '$.cpu_time'), 0
+            )
+        ''',
+    }
+
     # build the SQL query
-    submit_num = 'max(data.submit_num)' if jobNN else 'data.submit_num'
+    exprs = (
+        f'{expr.strip()} AS {name}'
+        for name, expr in _fields.items() if name in fields
+    )
     query = rf'''
-WITH data AS (
-    SELECT
-        tj.*,
-        CAST(
-            SUBSTR(
-                te.message,
-                INSTR(te.message, 'mem_alloc ') + 10
-            ) AS INT
-        ) AS mem_alloc,
-        CAST(
-            SUBSTR(
-                te.message,
-                INSTR(te.message, 'max_rss ') + 9,
-                INSTR(te.message, ' mem_alloc') -
-                (INSTR(te.message, 'max_rss ') + 9)
-            ) AS INT
-        ) AS max_rss,
-        CAST(
-            SUBSTR(
-                te.message,
-                INSTR(te.message, 'cpu_time ') + 9,
-                INSTR(te.message, ' max_rss') -
-                (INSTR(te.message, 'cpu_time ') + 9)
-            ) AS INT
-        ) AS cpu_time
-    FROM
-        task_jobs tj
-    LEFT JOIN
-        task_events te ON tj.name = te.name AND tj.cycle = te.cycle AND
-        tj.submit_num = te.submit_num AND te.message LIKE '%cpu_time%'
-)
         SELECT
-            data.name,
-            data.cycle AS cycle_point,
-            {submit_num} AS submit_num,
-            data.submit_status,
-            data.time_run AS started_time,
-            data.time_run_exit AS finished_time,
-            data.job_id,
-            job_runner_name,
-            data.platform_name AS platform,
-            data.time_submit AS submitted_time,
-            STRFTIME('%s', data.time_run_exit) -
-                STRFTIME('%s', data.time_submit) AS total_time,
-            STRFTIME('%s', data.time_run_exit) -
-                STRFTIME('%s', data.time_run) AS run_time,
-            STRFTIME('%s', data.time_run) -
-                STRFTIME('%s', data.time_submit) AS queue_time,
-            data.run_status,
-            data.max_rss,
-            data.cpu_time,
-            data.mem_alloc
-        FROM data
+            {',\n            '.join(exprs)}
+
+        FROM
+            task_jobs tj
+    '''
+    if {'mem_alloc', 'max_rss', 'cpu_time'} & set(fields):
+        query += '''
+        LEFT JOIN
+            task_events te
+
+        ON
+            tj.name = te.name
+            AND tj.cycle = te.cycle
+            AND tj.submit_num = te.submit_num
+            AND te.message LIKE '_cylc_profiler: %'
         '''
+
     if where_stmts:
         query += 'WHERE ' + '            AND '.join(where_stmts)
     if jobNN:
-        query += ' GROUP BY data.name, data.cycle'
+        query += ' GROUP BY tj.name, tj.cycle'
+
     for row in conn.execute(query, where_args):
         row = dict(row)
         # determine job status
@@ -875,7 +914,7 @@ WITH data AS (
             'id': workflow.duplicate(
                 cycle=row['cycle_point'],
                 task=row['name'],
-                job=row['submit_num'],
+                job=f"{row['submit_num']:02d}",
             ),
             'state': status,
             **row,

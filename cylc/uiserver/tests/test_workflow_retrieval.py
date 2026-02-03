@@ -137,7 +137,10 @@ def test_make_task_query_1():
                 1,
                 '2022-12-14T15:10:00Z',
                 'message debug',
-                'cpu_time 994 max_rss 40064 mem_alloc 1048576'
+                (
+                    '_cylc_profiler: {"cpu_time": 994, "max_rss": 40064,'
+                    ' "memory_allocated": 1048576}'
+                )
             )
         ]
     )
@@ -255,7 +258,7 @@ def test_make_task_query_2():
                 1,
                 '2022-12-14T15:10:00Z',
                 'message debug',
-                'cpu_time 994 max_rss 40064'
+                '_cylc_profiler: {"cpu_time": 994, "max_rss": 40064}'
             ),
             (
                 '2',
@@ -287,7 +290,7 @@ def test_make_task_query_2():
                 1,
                 '2022-12-14T16:10:00Z',
                 'message debug',
-                'cpu_time 1994 max_rss 50064'
+                '_cylc_profiler: {"cpu_time": 1994, "max_rss": 50064}'
             ),
         ]
     )
@@ -701,37 +704,55 @@ def test_make_jobs_query_1():
     )
     conn.commit()
     workflow = Tokens('~user/workflow')
-    tasks = []
 
-    ret = run_jobs_query(conn, workflow, tasks)
+    expected = [
+        {
+            'id': Tokens('~user/workflow//1/Task_1/01'),
+            'cycle_point': '1',
+            'finished_time': '2022-12-14T15:10:00Z',
+            'job_id': 'UsersJob',
+            'name': 'Task_1',
+            'platform': 'MyPlatform',
+            'started_time': '2022-12-14T15:01:00Z',
+            'state': 'succeeded',
+            'submit_num': 1,
+            'submitted_time': '2022-12-14T15:00:00Z',
+        },
+        {
+            'id': Tokens('~user/workflow//2/Task_1/01'),
+            'cycle_point': '2',
+            'finished_time': '2022-12-15T15:12:00Z',
+            'job_id': 'UsersJob',
+            'name': 'Task_1',
+            'platform': 'MyPlatform',
+            'started_time': '2022-12-15T15:01:16Z',
+            'state': 'succeeded',
+            'submit_num': 1,
+            'submitted_time': '2022-12-15T15:00:00Z',
+        },
+        {
+            'id': Tokens('~user/workflow//3/Task_1/01'),
+            'cycle_point': '3',
+            'finished_time': '2022-12-16T15:12:00Z',
+            'job_id': 'UsersJob',
+            'name': 'Task_1',
+            'platform': 'MyPlatform',
+            'started_time': '2022-12-16T15:01:16Z',
+            'state': 'succeeded',
+            'submit_num': 1,
+            'submitted_time': '2022-12-16T15:00:00Z',
+        },
+    ]
 
-    assert len(ret) == 3
-    assert ret[0]['cycle_point'] == '1'
-    assert ret[0]['finished_time'] == '2022-12-14T15:10:00Z'
-    assert ret[0]['id'].id == '~user/workflow//1/Task_1/01'
-    assert ret[0]['job_id'] == 'UsersJob'
-    assert ret[0]['name'] == 'Task_1'
-    assert ret[0]['platform'] == 'MyPlatform'
-    assert ret[0]['started_time'] == '2022-12-14T15:01:00Z'
-    assert ret[0]['state'] == 'succeeded'
-    assert ret[0]['submit_num'] == 1
-    assert ret[0]['submitted_time'] == '2022-12-14T15:00:00Z'
-
-    assert ret[1]['cycle_point'] == '2'
-    assert ret[1]['finished_time'] == '2022-12-15T15:12:00Z'
-    assert ret[1]['id'].id == '~user/workflow//2/Task_1/01'
-    assert ret[1]['job_id'] == 'UsersJob'
-    assert ret[1]['name'] == 'Task_1'
-    assert ret[1]['platform'] == 'MyPlatform'
-    assert ret[1]['started_time'] == '2022-12-15T15:01:16Z'
-    assert ret[1]['state'] == 'succeeded'
-    assert ret[1]['submit_num'] == 1
-    assert ret[1]['submitted_time'] == '2022-12-15T15:00:00Z'
+    assert (
+        run_jobs_query(conn, workflow, {*expected[1].keys()}, [])
+        == expected
+    )
 
 
-async def test_list_elements(monkeypatch):
+async def test_list_elements():
     with pytest.raises(Exception) as e_info:
-        await list_elements('tasks', stuff=[1, 2, 3], workflows=[])
+        await list_elements('tasks', set(), stuff=[1, 2, 3], workflows=[])
 
     exception_raised = e_info.value
     assert (
@@ -817,7 +838,7 @@ async def test_get_elements(
     # functions that I'm not testing
     info = None
 
-    async def mock_return_list_elements(_query_type, **kwargs):
+    async def mock_return_list_elements(_query_type, fields, **kwargs):
         return kwargs
 
     def mock_process_resolver_info(*args):
@@ -830,6 +851,10 @@ async def test_get_elements(
     monkeypatch.setattr(
         'cylc.uiserver.schema.process_resolver_info',
         mock_process_resolver_info,
+    )
+    monkeypatch.setattr(
+        'cylc.uiserver.schema._get_requested_fields',
+        lambda _x, _y: {'id', 'max_rss'},
     )
 
     assert await get_elements(
@@ -886,7 +911,7 @@ async def test_job_query_filter():
     # all jobs should appear by default (no filters)
     # Note: The waiting task has no associated job
     assert {
-        item['id']['task'] for item in run_jobs_query(conn, workflow)
+        item['id']['task'] for item in run_jobs_query(conn, workflow, {'id'})
     } == {
         'submitted',
         'submit-failed',
@@ -898,7 +923,9 @@ async def test_job_query_filter():
     # filter by ids
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, ids=[Tokens('//*/s*/01')])
+        for item in run_jobs_query(
+            conn, workflow, {'id'}, ids=[Tokens('//*/s*/01')]
+        )
     } == {
         'submitted',
         'submit-failed',
@@ -908,7 +935,9 @@ async def test_job_query_filter():
     # filter by exids
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, exids=[Tokens('//*/s*/01')])
+        for item in run_jobs_query(
+            conn, workflow, {'id'}, exids=[Tokens('//*/s*/01')]
+        )
     } == {
         'running',
         'failed',
@@ -920,6 +949,7 @@ async def test_job_query_filter():
         for item in run_jobs_query(
             conn,
             workflow,
+            {'id'},
             ids=[Tokens('//*/submitted'), Tokens('//*/succeeded')],
             exids=[Tokens('//*/succeeded'), Tokens('//*/submit-failed')],
         )
@@ -930,7 +960,9 @@ async def test_job_query_filter():
     # filter by states
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, states=['succeeded'])
+        for item in run_jobs_query(
+            conn, workflow, {'id'}, states=['succeeded']
+        )
     } == {
         'succeeded',
     }
@@ -939,7 +971,7 @@ async def test_job_query_filter():
     # ignored
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, states=['waiting'])
+        for item in run_jobs_query(conn, workflow, {'id'}, states=['waiting'])
     } == {
         'submitted',
         'submit-failed',
@@ -951,7 +983,9 @@ async def test_job_query_filter():
     # filter by exstates
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, exstates=['succeeded'])
+        for item in run_jobs_query(
+            conn, workflow, {'id'}, exstates=['succeeded']
+        )
     } == {
         'submitted',
         'submit-failed',
@@ -962,7 +996,9 @@ async def test_job_query_filter():
     # ignored
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, exstates=['waiting'])
+        for item in run_jobs_query(
+            conn, workflow, {'id'}, exstates=['waiting']
+        )
     } == {
         'submitted',
         'submit-failed',
@@ -977,6 +1013,7 @@ async def test_job_query_filter():
         for item in run_jobs_query(
             conn,
             workflow,
+            {'id'},
             states=['submitted', 'succeeded'],
             exstates=['succeeded', 'submit-failed']
         )
@@ -990,6 +1027,7 @@ async def test_job_query_filter():
         for item in run_jobs_query(
             conn,
             workflow,
+            {'id'},
             tasks=['submit-failed', 'failed']
         )
     } == {
@@ -1035,7 +1073,7 @@ async def test_jobNN_query(jobs, query, expected):
     conn = make_db(task_entries=(make_job(*job) for job in jobs))
     workflow = Tokens('~user/workflow')
     result = run_jobs_query(
-        conn, workflow, ids=[Tokens(i, relative=True) for i in query]
+        conn, workflow, {'id'}, ids=[Tokens(i, relative=True) for i in query]
     )
     assert {item['id'].relative_id for item in result} == expected
 
