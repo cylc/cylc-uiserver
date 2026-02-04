@@ -53,17 +53,12 @@ jobs:
             bash
             coreutils
 
-      # - name: install cylc-flow
-      #   uses: cylc/release-actions/install-cylc-components@v1
-      #   with:
-      #     cylc_flow: true
-      #     cylc_flow_opts: ''
-      #     editable_installations: true
-
-      - name: bodge
-        run: |
-          # This is a bodge to make this branch work before companion branches merged:
-          pip install -e git+https://github.com/wxtim/cylc@feat.cylc-review#egg=cylc-flow --no-deps
+      - name: install cylc-flow
+        uses: cylc/release-actions/install-cylc-components@v1
+        with:
+          cylc_flow: true
+          cylc_flow_opts: ''
+          editable_installations: true
 
       - name: install cylc-uiserver
         run: |
