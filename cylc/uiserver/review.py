@@ -29,6 +29,7 @@ from glob import glob
 import jinja2
 from jinja2 import select_autoescape
 import json
+import markupsafe
 import mimetypes
 import os
 import pwd
@@ -517,7 +518,7 @@ class CylcReviewService:
                 continue
             with contextlib.suppress(OSError):
                 data["entries"].append({
-                    "name": str(item),
+                    "name": item.encode().decode('UTF-8', errors='replace'),
                     "info": {},
                     "last_activity_time": (
                         self.get_last_activity_time(user, item))})
@@ -548,8 +549,9 @@ class CylcReviewService:
                 rosie_info = {}
                 with contextlib.suppress(IOError):
                     for line in open(   # noqa: SIM115
-                        rosie_suite_info, 'r'
+                        rosie_suite_info, 'rb'
                     ).readlines():
+                        line = line.decode('utf-8', errors='replace')
                         if not line.strip().startswith('#') and '=' in line:
                             rosie_key, rosie_val = line.strip().split("=", 1)
                             if rosie_key in ("project", "title"):
@@ -576,8 +578,8 @@ class CylcReviewService:
             except KeyError:
                 raise cherrypy.HTTPError(404) from None
             f_size = tar_info.size
-            handle = tar_f.extractfile(path_in_tar)
-            if handle.read(2) == "#!":
+            handle = tar_f.extractfile(path_in_tar, 'rb')
+            if self._is_shebang(handle):
                 mime = self.MIME_TEXT_PLAIN
             else:
                 mime = mimetypes.guess_type(
@@ -601,10 +603,10 @@ class CylcReviewService:
                     return cherrypy.lib.static.serve_file(temp_f.name, mime)
                 finally:
                     temp_f.close()
-            text = handle.read()
+            text = self._get_file_text(handle)
         else:
             f_size = os.stat(f_name).st_size
-            if open(f_name).read(2) == "#!":  # noqa: SIM115
+            if self._is_shebang(f_name):
                 mime = self.MIME_TEXT_PLAIN
             else:
                 mime = mimetypes.guess_type(quote(f_name))[0]
@@ -618,7 +620,7 @@ class CylcReviewService:
             ):
                 cherrypy.response.headers["Content-Type"] = mime
                 return cherrypy.lib.static.serve_file(f_name, mime)
-            text = open(f_name).read()  # noqa: SIM115
+            text = self._get_file_text(f_name)
         try:
             text = str(text)
             if mode in [None, "text"]:
@@ -627,7 +629,7 @@ class CylcReviewService:
                 # escape future modifications to this string. In order to
                 # allow log file syntax highlighting (DEBUG, INFO, etc) we
                 # must cast this back to a str to remove this functionality.
-                text = str(jinja2.escape(text))
+                text = str(markupsafe.escape(text))
             lines = text.splitlines()
         except ValueError:
             if path_in_tar:
@@ -1097,3 +1099,28 @@ class CylcReviewService:
     def _sort_summary_entries(suite1):
         """Sort suites by last_activity_time."""
         return suite1.get("last_activity_time") or suite1["name"]
+
+    @staticmethod
+    def _has_shebang(file):
+        """File (or handle) has shebang"""
+        # It's a filepath
+        if isinstance(file, str):
+            with open(file, 'rb') as handle:
+                return handle.read(2) == b'!#'
+
+        # It's a file handle: Make sure that you close it later!
+        first_chars = file.read(2)
+        return first_chars in [b'!#', '!#']
+
+    @staticmethod
+    def _get_file_text(file):
+        """File (or handle) has shebang"""
+        if isinstance(file, str):
+            with open(file, 'rb') as handle:
+                return handle.read().decode('utf-8', errors='replace')
+
+        # It's a file handle: Make sure that you close it later!
+        filecontent = file.read()
+        if isinstance(filecontent, bytes):
+            return filecontent.decode('utf-8', errors='replace')
+        return filecontent
