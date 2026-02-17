@@ -579,7 +579,7 @@ class CylcReviewService:
                 raise cherrypy.HTTPError(404) from None
             f_size = tar_info.size
             handle = tar_f.extractfile(path_in_tar, 'rb')
-            if self._is_shebang(handle):
+            if self._has_shebang(handle):
                 mime = self.MIME_TEXT_PLAIN
             else:
                 mime = mimetypes.guess_type(
@@ -606,7 +606,7 @@ class CylcReviewService:
             text = self._get_file_text(handle)
         else:
             f_size = os.stat(f_name).st_size
-            if self._is_shebang(f_name):
+            if self._has_shebang(f_name):
                 mime = self.MIME_TEXT_PLAIN
             else:
                 mime = mimetypes.guess_type(quote(f_name))[0]

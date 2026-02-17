@@ -475,8 +475,9 @@ cylc_ws_init() {
     done
 
     TEST_NAME="${TEST_NAME_BASE}-${NS}-${UTIL}"
-    "${NS}" "${UTIL}" 'start' '--port' "${WS_PORT}" >&2 \
-        0<'/dev/null' 1>"${NS}-${UTIL}.stdout" 2>"${NS}-${UTIL}.stderr" &
+    # "${NS}" "${UTIL}" 'start' '--port' "${WS_PORT}" >&2 \
+    #     0<'/dev/null' 1>"${NS}-${UTIL}.stdout" 2>"${NS}-${UTIL}.stderr" &
+    cylc review start --port "${WS_PORT}" >&2 0<'/dev/null' 1>"${NS}-${UTIL}.stdout" & # 2>"${NS}-${UTIL}.stderr" &
     TEST_CYLC_WS_PID="$!"
     T_INIT="$(date '+%s')"
     while ! port_is_busy "${WS_PORT}" && (($(date '+%s') < T_INIT + 30)); do
@@ -494,6 +495,15 @@ cylc_ws_init() {
 
 cylc_ws_kill() {
     if [[ -n "${TEST_CYLC_WS_PID}" ]]; then
+        kill -s SIGINT "${TEST_CYLC_WS_PID}" 2>'/dev/null'
+        for _ in $(seq 1 10); do
+            if ! kill -0 "${TEST_CYLC_WS_PID}"; then
+                break
+            else
+                sleep 1
+            fi
+        done
+        
         kill "${TEST_CYLC_WS_PID}" 2>'/dev/null'
         wait 2>'/dev/null'
     fi
