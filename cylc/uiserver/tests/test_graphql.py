@@ -15,12 +15,14 @@
 
 import json
 from textwrap import dedent
+from time import time
 from urllib.parse import urlencode
 
 import pytest
 from tornado.httpclient import HTTPClientError
 
 from cylc.flow.id import Tokens
+from cylc.uiserver.data_store_mgr import DataStoreMgr, ALL_DELTAS
 
 
 @pytest.fixture
@@ -420,6 +422,151 @@ async def test_subscription(gql_subscription, dummy_workflow):
             }
         }
     }
+
+    # Run the stop/cleanup code
+    await ws.write_message(json.dumps({"id": sub_id, "type": "stop"}))
+
+    ws.close()
+
+
+async def test_subscription_deltas(
+    cylc_uis, gql_subscription, make_all_delta):
+    """Test deltas being processesed and recieved by a GraphQL subscription."""
+
+    data_store_mgr = cylc_uis.data_store_mgr
+
+    # Start subscription
+    sub_id = "1"
+    ws = await gql_subscription(
+        *('cylc', 'subscriptions'),
+        sub={
+            "id": sub_id,
+            "type": "start",
+            "payload": {
+                "query": """
+                    subscription {
+                      deltas (stripNull: true){
+                        id
+                        shutdown
+                        added {
+                          workflow {
+                            status
+                          }
+                          taskProxies {
+                            id
+                            state
+                          }
+                        }
+                        updated {
+                          workflow {
+                            status
+                          }
+                          taskProxies {
+                            id
+                            state
+                          }
+                        }
+                      }
+                    }
+                """
+            }
+        }
+    )
+
+    w_tokens = Tokens(user='user', workflow='this')
+    w_id = w_tokens.id
+
+    # Stop scanning messages
+    cylc_uis.workflows_mgr._stopping = True
+    # Register for data-store entry
+    await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
+
+    # Receive first message
+    response = json.loads(await ws.read_message())
+    assert response == {
+        'id': sub_id,
+        'type': 'data',
+        'payload': {
+            'data': {
+                'deltas': {
+                    'id': w_id,
+                    'shutdown': False,
+                    'added': {
+                        'workflow': {'status': 'stopped'}
+                    },
+                    'updated': {}
+                }
+            }
+        }
+    }
+
+    # Create added delta
+    tp_id = w_tokens.duplicate(cycle='1', task='foo').id
+    all_added_delta = make_all_delta(w_id, 'added', tp_id, 'waiting', time())
+    all_added_delta.workflow.added.status = 'running'
+    all_added_delta.workflow.reloaded = True
+
+    # Process added delta, creating gql subscription delta as a result
+    data_store_mgr._update_workflow_data(ALL_DELTAS, all_added_delta, w_id)
+
+    # Receive next message
+    response = json.loads(await ws.read_message())
+    assert response == {
+        'id': sub_id,
+        'type': 'data',
+        'payload': {
+            'data': {
+                'deltas': {
+                    'id': w_id,
+                    'shutdown': False,
+                    'added': {
+                        'workflow': {'status': 'running'},
+                        'taskProxies': [
+                            {
+                                'id': tp_id,
+                                'state': 'waiting'
+                            }
+                        ]
+                    },
+                    'updated': {}
+                }
+            }
+        }
+    }
+
+    # Create update delta
+    all_updated_delta = make_all_delta(
+        w_id, 'updated', tp_id, 'running', time())
+    all_updated_delta.workflow.updated.status = 'stopping'
+    all_updated_delta.workflow.reloaded = False
+
+    # Process updated delta
+    data_store_mgr._update_workflow_data(ALL_DELTAS, all_updated_delta, w_id)
+
+    # Receive next message
+    response = json.loads(await ws.read_message())
+    assert response['payload']['data']['deltas']['updated'][
+        'workflow'
+    ]['status'] == 'stopping'
+    assert response['payload']['data']['deltas']['updated'][
+        'taskProxies'
+    ][0]['state'] == 'running'
+
+    # Shutdown delta
+    data_store_mgr._update_workflow_data(
+        'shutdown', 'this is the end'.encode('utf-8'), w_id)
+
+    # Receive shutdown message
+    response = json.loads(await ws.read_message())
+    assert response['payload']['data']['deltas']['shutdown']
+
+    # Start scanning messages again
+    cylc_uis.workflows_mgr._stopping = False
+    # Receive scan message
+    response = json.loads(await ws.read_message())
+    assert response['payload']['data']['deltas']['updated'][
+        'workflow'
+    ]['status'] == 'stopped'
 
     # Run the stop/cleanup code
     await ws.write_message(json.dumps({"id": sub_id, "type": "stop"}))
