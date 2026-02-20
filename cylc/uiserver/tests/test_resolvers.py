@@ -174,7 +174,7 @@ async def test_start_services(
             [1],
             ("something", "bad things!!"),
             r"bad things!!.*",
-            ["Command failed \(1\): cylc ", "something", "bad things!!"],
+            [r"Command failed \(1\): cylc ", "something", "bad things!!"],
             id="one"
         ),
         pytest.param(

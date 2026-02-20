@@ -40,6 +40,8 @@ CONTROL_OPS = [
     "pause",
     "play",
     "poll",
+    "reinstall_reload",
+    "reinstall_restart",
     "release",
     "release_hold_point",
     "reload",
@@ -52,7 +54,6 @@ CONTROL_OPS = [
     "set_verbosity",
     "stop",
     "trigger",
-    "validate_reinstall",
 ]
 
 ALL_OPS = [
@@ -136,7 +137,8 @@ FAKE_USER_CONF = {
                 "pause",
                 "set",
                 "release",
-                "validate_reinstall",
+                "reinstall_reload",
+                "reinstall_restart",
             },
             id="user in * and groups, owner in * and groups",
         ),

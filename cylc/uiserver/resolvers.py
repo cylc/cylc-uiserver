@@ -156,6 +156,35 @@ def _build_cmd(cmd: List, args: Dict) -> List:
     return cmd
 
 
+def _rename_keys(
+    dictionary: dict[str, Any], substitutions: Iterable[tuple[str, str]]
+) -> dict[str, Any]:
+    """Rename dictionary keys.
+
+    Args:
+        dictionary: The dictionary to modify.
+        substitutions: `[(before, after)]` pairs of keys to rename.
+
+    Returns:
+        The provided dictionary post-modification.
+
+    Examples:
+        >>> _substitute_keys({'a': 1, 'b': 2}, [('b', 'c')])
+        {'a': 1, 'c': 2}
+
+        >>> _substitute_keys({'a': 1, 'b': 2}, [('b', 'c'), ('c', 'd')])
+        {'a': 1, 'd': 2}
+
+        >>> _substitute_keys({'a': 1, 'b': 2}, [('x', 'y')])
+        {'a': 1, 'b': 2}
+
+    """
+    for before, after in substitutions:
+        if before in dictionary:
+            dictionary[after] = dictionary.pop(before)
+    return dictionary
+
+
 def process_cat_log_stderr(text: bytes) -> str:
     """Tidy up cylc cat-log stderr.
 
@@ -439,7 +468,15 @@ class Services:
         ret = await cls.run_command(
             ('validate-reinstall', '--yes'),
             workflows,
-            args,
+            # map GraphQL fields to CLI args where they differ
+            _rename_keys(args, [
+                # from "cylc reload":
+                ('reload_global', 'global'),
+                # from "cylc reinstall"
+                ('opt_conf_keys', 'opt_conf_key'),
+                ('defines', 'define'),
+                ('rose_template_variables', 'rose_template_variable'),
+            ]),
             log,
             cls.START_TIMEOUT,
             **kwargs,
