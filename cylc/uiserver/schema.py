@@ -510,63 +510,85 @@ GROUP BY name, platform_name;
                 task=row[0],
                 job=row[2]
             ),
-            'name': row[0],
-            'cycle_point': row[1],
-            'submit_num': row[2],
-            'state': _state_to_status(row[3], row[4], row[5]),
-            'started_time': row[5],
-            'finished_time': row[6],
-            'job_id': row[7],
-            'platform': row[8],
-            'submitted_time': row[9],
-            'mem_alloc': row[10],
+            'name': row["name"],
+            'cycle_point': row["cycle"],
+            'submit_num': row["submit_num"],
+            'state': _state_to_status(row["submit_status"],
+                                      row["run_status"],
+                                      row["time_run"]),
+            'started_time': row["time_run"],
+            'finished_time': row["time_run_exit"],
+            'job_id': row["job_id"],
+            'platform': row["platform_name"],
+            'submitted_time': row["time_submit"],
+            'mem_alloc': row["mem_alloc"],
             # Queue time stats
-            'min_queue_time': row[11],
-            'mean_queue_time': row[12],
-            'max_queue_time': row[13],
-            'std_dev_queue_time': row[14],
+            'min_queue_time': row["min_queue_time"],
+            'mean_queue_time': row["mean_queue_time"],
+            'max_queue_time': row["max_queue_time"],
+            'std_dev_queue_time': row["stddev_queue_time"],
             # Prevents null entries when there are too few tasks for quartiles
-            'queue_quartiles': [row[15],
-                                row[15] if row[16] is None else row[16],
-                                row[15] if row[17] is None else row[17]],
+            'queue_quartiles': [row["queue_quartile_1"],
+                                row["queue_quartile_1"]
+                                if row["queue_quartile_2"] is None
+                                else row["queue_quartile_2"],
+                                row["queue_quartile_1"]
+                                if row["queue_quartile_3"] is None
+                                else row["queue_quartile_3"]],
             # Run time stats
-            'min_run_time': row[18],
-            'mean_run_time': row[19],
-            'max_run_time': row[20],
-            'std_dev_run_time': row[21],
+            'min_run_time': row["min_run_time"],
+            'mean_run_time': row["mean_run_time"],
+            'max_run_time': row["max_run_time"],
+            'std_dev_run_time': row["stddev_run_time"],
             # Prevents null entries when there are too few tasks for quartiles
-            'run_quartiles': [row[22],
-                              row[22] if row[23] is None else row[23],
-                              row[22] if row[24] is None else row[24]],
+            'run_quartiles': [row["run_quartile_1"],
+                              row["run_quartile_1"]
+                              if row["run_quartile_2"] is None
+                              else row["run_quartile_2"],
+                              row["run_quartile_1"]
+                              if row["run_quartile_3"] is None
+                              else row["run_quartile_3"]],
             # Total
-            'min_total_time': row[25],
-            'mean_total_time': row[26],
-            'max_total_time': row[27],
-            'std_dev_total_time': row[28],
+            'min_total_time': row["min_total_time"],
+            'mean_total_time': row["mean_total_time"],
+            'max_total_time': row["max_total_time"],
+            'std_dev_total_time': row["stddev_total_time"],
             # Prevents null entries when there are too few tasks for quartiles
-            'total_quartiles': [row[29],
-                                row[29] if row[30] is None else row[30],
-                                row[29] if row[31] is None else row[31]],
+            'total_quartiles': [row["total_quartile_1"],
+                                row["total_quartile_1"]
+                                if row["total_quartile_2"] is None
+                                else row["total_quartile_2"],
+                                row["total_quartile_1"]
+                                if row["total_quartile_3"] is None
+                                else row["total_quartile_3"]],
             # Max RSS stats
-            'min_max_rss': row[32],
-            'mean_max_rss': row[33],
-            'max_max_rss': row[34],
-            'std_dev_max_rss': row[35],
+            'min_max_rss': row["min_max_rss"],
+            'mean_max_rss': row["mean_max_rss"],
+            'max_max_rss': row["max_max_rss"],
+            'std_dev_max_rss': row["stddev_max_rss"],
             # Prevents null entries when there are too few tasks for quartiles
-            'max_rss_quartiles': [row[36],
-                                  row[36] if row[37] is None else row[37],
-                                  row[36] if row[38] is None else row[38]],
+            'max_rss_quartiles': [row["max_rss_quartile_1"],
+                                  row["max_rss_quartile_1"]
+                                  if row["max_rss_quartile_2"] is None
+                                  else row["max_rss_quartile_2"],
+                                  row["max_rss_quartile_1"]
+                                  if row["max_rss_quartile_3"] is None
+                                  else row["max_rss_quartile_3"]],
             # CPU time stats
-            'min_cpu_time': row[39],
-            'mean_cpu_time': row[40],
-            'max_cpu_time': row[41],
-            'total_cpu_time': row[42],
-            'std_dev_cpu_time': row[43],
+            'min_cpu_time': row["min_cpu_time"],
+            'mean_cpu_time': row["mean_cpu_time"],
+            'max_cpu_time': row["max_cpu_time"],
+            'total_cpu_time': row["total_cpu_time"],
+            'std_dev_cpu_time': row["stddev_cpu_time"],
             # Prevents null entries when there are too few tasks for quartiles
-            'cpu_time_quartiles': [row[44],
-                                   row[44] if row[45] is None else row[45],
-                                   row[44] if row[46] is None else row[46]],
-            'count': row[47]
+            'cpu_time_quartiles': [row["cpu_time_quartile_1"],
+                                   row["cpu_time_quartile_1"]
+                                   if row["cpu_time_quartile_2"] is None
+                                   else row["cpu_time_quartile_2"],
+                                   row["cpu_time_quartile_1"]
+                                   if row["cpu_time_quartile_3"] is None
+                                   else row["cpu_time_quartile_3"]],
+            'count': row["n"]
         })
 
     for task in tasks:
