@@ -16,6 +16,10 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 [Updated cylc-ui to 2.13.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
 
+### 🔧 Fixes
+
+[#752](https://github.com/cylc/cylc-uiserver/pull/752) - Improved handling of very long lines in `cat-log` / the UI log view.
+
 ## cylc-uiserver-1.8.3 (Released 2026-01-12)
 
 [Updated cylc-ui to 2.12.2](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
