@@ -1,0 +1,1 @@
+import{_ as t,e as s,o,w as a,x as r,cb as c}from"./index-BxIX773T.js";const n={};function i(m,e){return o(),s(c,{image:"/img/logo.svg"},{headline:a(()=>[...e[0]||(e[0]=[r("div",{class:"text-h4 mt-4"},"You do not have permission to access this server",-1)])]),_:1})}const d=t(n,[["render",i]]);export{d as default};
