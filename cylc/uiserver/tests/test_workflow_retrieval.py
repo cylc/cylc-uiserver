@@ -66,10 +66,10 @@ def make_db(task_entries, task_events=None):
         '''
         CREATE TABLE 
             task_events(
-                cycle TEXT, 
-                name TEXT, 
+                name TEXT,
+                cycle TEXT,
+                time TEXT,
                 submit_num INTEGER,
-                time TEXT, 
                 event TEXT, 
                 message TEXT);''')
 
@@ -108,34 +108,35 @@ def test_make_task_query_1():
         )],
         task_events=[
             (
-                '1',
                 'Task_1',
-                1,
+                '1',
                 '2022-12-14T15:00:00Z',
+                1,
                 'submitted',
                 ''
             ),
             (
-                '1',
+
                 'Task_1',
-                1,
+                '1',
                 '2022-12-14T15:01:00Z',
+                1,
                 'started',
                 ''
             ),
             (
-                '1',
                 'Task_1',
-                1,
+                '1',
                 '2022-12-14T15:10:00Z',
+                1,
                 'succeeded',
                 ''
             ),
             (
-                '1',
                 'Task_1',
-                1,
+                '1',
                 '2022-12-14T15:10:00Z',
+                1,
                 'message debug',
                 (
                     '_cylc_profiler: {"cpu_time": 994, "max_rss": 40064,'
@@ -229,26 +230,26 @@ def test_make_task_query_2():
         ],
         task_events=[
             (
-                '1',
                 'Task_1',
-                1,
+                '1',
                 '2022-12-14T15:00:00Z',
+                1,
                 'submitted',
                 ''
             ),
             (
-                '1',
                 'Task_1',
-                1,
+                '1',
                 '2022-12-14T15:01:00Z',
+                1,
                 'started',
                 ''
             ),
             (
-                '1',
                 'Task_1',
-                1,
+                '1',
                 '2022-12-14T15:10:00Z',
+                1,
                 'succeeded',
                 ''
             ),
@@ -261,34 +262,34 @@ def test_make_task_query_2():
                 '_cylc_profiler: {"cpu_time": 994, "max_rss": 40064}'
             ),
             (
-                '2',
                 'Task_1',
-                1,
+                '2',
                 '2022-12-14T16:00:00Z',
+                1,
                 'submitted',
                 ''
             ),
             (
-                '2',
                 'Task_1',
-                1,
+                '2',
                 '2022-12-14T16:01:00Z',
+                1,
                 'started',
                 ''
             ),
             (
-                '2',
                 'Task_1',
-                1,
+                '2',
                 '2022-12-14T16:10:00Z',
+                1,
                 'succeeded',
                 ''
             ),
             (
-                '2',
                 'Task_1',
-                1,
+                '2',
                 '2022-12-14T16:10:00Z',
+                1,
                 'message debug',
                 '_cylc_profiler: {"cpu_time": 1994, "max_rss": 50064}'
             ),
@@ -387,98 +388,98 @@ def test_make_task_query_3():
         ],
         task_events=[
             (
-                '1',
                 'Task_1',
-                1,
+                '1',
                 '2022-12-14T15:00:00Z',
+                1,
                 'submitted',
                 ''
             ),
             (
-                '1',
                 'Task_1',
-                1,
+                '1',
                 '2022-12-14T15:01:00Z',
+                1,
                 'started',
                 ''
             ),
             (
-                '1',
                 'Task_1',
-                1,
+                '1',
                 '2022-12-14T15:10:00Z',
+                1,
                 'succeeded',
                 ''
             ),
             (
-                '1',
                 'Task_1',
-                1,
+                '1',
                 '2022-12-14T15:10:00Z',
+                1,
                 'message debug',
                 'cpu_time 994 max_rss 40064'
             ),
             (
-                '2',
                 'Task_1',
-                1,
+                '2',
                 '2022-12-14T16:00:00Z',
+                1,
                 'submitted',
                 ''
             ),
             (
-                '2',
                 'Task_1',
-                1,
+                '2',
                 '2022-12-14T16:01:00Z',
+                1,
                 'started',
                 ''
             ),
             (
-                '2',
                 'Task_1',
-                1,
+                '2',
                 '2022-12-14T16:10:00Z',
+                1,
                 'succeeded',
                 ''
             ),
             (
-                '2',
                 'Task_1',
-                1,
+                '2',
                 '2022-12-14T16:10:00Z',
+                1,
                 'message debug',
                 'cpu_time 1994 max_rss 50064'
             ),
             (
-                '3',
                 'Task_1',
-                1,
+                '3',
                 '2022-12-14T17:00:00Z',
+                1,
                 'submitted',
                 ''
             ),
             (
-                '3',
                 'Task_1',
-                1,
+                '3',
                 '2022-12-14T17:01:00Z',
+                1,
                 'started',
                 ''
             ),
             (
-                '3',
                 'Task_1',
-                1,
+                '3',
                 '2022-12-14T17:10:00Z',
+                1,
                 'succeeded',
                 ''
             ),
             (
-                '3',
                 'Task_1',
-                1,
+                '3',
                 '2022-12-14T17:10:00Z',
+                1,
                 'message debug',
                 'cpu_time 2994 max_rss 60064'
             ),
@@ -518,7 +519,7 @@ def test_make_task_query_3():
 
 
 def test_make_task_query_different_platforms():
-    """We should get different entries for tasks that submited to different
+    """We should get different entries for tasks that submitted to different
     platforms on different cycles.
 
     https://github.com/cylc/cylc-uiserver/issues/696
