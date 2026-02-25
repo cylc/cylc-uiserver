@@ -251,7 +251,7 @@ class Reinstall:
             ''')
         )
         # cylc-rose
-        opt_conf_keys = graphene.List(
+        rose_opt_conf_keys = graphene.List(
             graphene.String,
             description=sstrip('''
                 Add Rose optional configurations (if Rose is used).
@@ -263,7 +263,7 @@ class Reinstall:
                 Clear options previous set by cylc-rose.
             ''')
         )
-        defines = graphene.List(
+        rose_suite_defines = graphene.List(
             graphene.String,
             description=sstrip('''
                 Each of these overrides the `[SECTION]KEY` setting in a

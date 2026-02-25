@@ -473,8 +473,8 @@ class Services:
                 # from "cylc reload":
                 ('reload_global', 'global'),
                 # from "cylc reinstall"
-                ('opt_conf_keys', 'opt_conf_key'),
-                ('defines', 'define'),
+                ('rose_opt_conf_keys', 'opt_conf_key'),
+                ('rose_suite_defines', 'define'),
                 ('rose_template_variables', 'rose_template_variable'),
             ]),
             log,
