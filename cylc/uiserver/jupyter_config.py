@@ -66,15 +66,15 @@ c.ConfigurableHTTPProxy.pid_file = f'{USER_CONF_ROOT / "jupyterhub-proxy.pid"}'
 
 # write Cylc logging to the user config directory
 # NOTE: Parallel UIS instances will conflict over this file.
-#       See https://github.com/cylc/cylc-uiserver/issues/240
+#       See https://github.com/cylc/cylc-uiserver/issues/743
 c.CylcUIServer.logging_config = {
     'version': 1,
     'handlers': {
         'file': {
-            'class': 'logging.handlers.RotatingFileHandler',
+            'class': 'cylc.uiserver.logging_util.RotatingUISFileHandler',
             'filename': str(USER_CONF_ROOT / 'log' / 'log'),
             'mode': 'a',
-            'backupCount': 5,
+            'backupCount': 10,
             'maxBytes': 10485760,
             'formatter': 'file_fmt',
         },
