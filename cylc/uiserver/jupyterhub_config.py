@@ -54,7 +54,7 @@ def load() -> None:
         site_conf_path = SITE_CONF_ROOT
     base_config_paths = [site_conf_path, USER_CONF_ROOT]
     # add versioning to paths
-    config_paths = get_conf_dir_hierarchy(base_config_paths)
+    config_paths = get_conf_dir_hierarchy(base_config_paths, 'hub')
     # Default conf path not currently versioned:
     config_paths.insert(0, str(DEFAULT_CONF_PATH))
     for path in config_paths:

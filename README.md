@@ -190,20 +190,22 @@ The Cylc Hub will load the following files in order:
 
    These are the Cylc defaults which are hardcoded within the repository.
 
-   (`<python-installation>/cylc/uiserver/jupyter_config.py`)
+   * `<python-installation>/cylc/uiserver/jupyter_config.py`
 
 2) Site Config
 
    This file configures the Hub/UIS for all users. The default path can be
    changed by the ``CYLC_SITE_CONF_PATH`` environment variable.
 
-   (`/etc/cylc/uiserver/jupyter_config.py`)
+   * `/etc/cylc/uiserver/jupyter_config.py`
+   * `/etc/cylc/uiserver/jupyterhub_config.py`
 
 3) User Config
 
    This file
 
-   (`~/.cylc/uiserver/jupyter_config.py`)
+   * `~/.cylc/uiserver/jupyter_config.py`
+   * `~/.cylc/uiserver/jupyterhub_config.py`
 
 Alternatively a single config file can be provided on the command line.
 
