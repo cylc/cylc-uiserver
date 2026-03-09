@@ -17,6 +17,7 @@
 
 from importlib.resources import files
 from pathlib import Path
+import sys
 
 from cylc.uiserver import (
     __file__ as uis_pkg,
@@ -24,6 +25,13 @@ from cylc.uiserver import (
 )
 from cylc.uiserver.app import USER_CONF_ROOT
 from cylc.uiserver.authorise import CylcAuthorizer
+
+
+LOG_PATH = USER_CONF_ROOT / 'log' / (
+    'log'
+    if (sys.argv[0].endswith('jupyter-cylc') or sys.argv[1] == 'gui')
+    else 'hubapp-log'
+)
 
 
 # the command the hub should spawn (i.e. the cylc uiserver itself)
@@ -72,7 +80,7 @@ c.CylcUIServer.logging_config = {
     'handlers': {
         'file': {
             'class': 'cylc.uiserver.logging_util.RotatingUISFileHandler',
-            'filename': str(USER_CONF_ROOT / 'log' / 'log'),
+            'filename': str(LOG_PATH),
             'mode': 'a',
             'backupCount': 10,
             'maxBytes': 10485760,
