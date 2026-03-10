@@ -35,11 +35,18 @@ from typing import Optional
 import webbrowser
 from getpass import getuser
 
-
+from cylc.flow import LOG
 from cylc.flow.id_cli import parse_id_async
 from cylc.flow.exceptions import (
     InputError,
     WorkflowFilesError
+)
+from cylc.flow.terminal import (
+    DIM,
+    cli_function,
+    handle_sigint,
+    interrupt,
+    is_terminal,
 )
 
 from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
@@ -52,11 +59,14 @@ from cylc.uiserver.app import (
 
 CLI_OPT_NEW = "--new"
 
+_input = input  # to enable testing
+
 
 def main(*argv):
     init_log()
     hub_url = glbl_cfg().get(['hub', 'url'])
     jp_server_opts, new_gui, workflow_id = parse_args_opts()
+
     if '--help' in sys.argv and hub_url:
         print(
             dedent('''
@@ -74,13 +84,51 @@ def main(*argv):
                 and Jupyter Hub documentation for more details.
             '''))
         return
-    if not {'--help', '--help-all'} & set(sys.argv):
-        if hub_url and not new_gui:
-            print(f"Running on {hub_url} as specified in global config.")
-            webbrowser.open(
-                update_url(hub_url, workflow_id), autoraise=True
-            )
-            return
+
+    if '--help-all' not in set(sys.argv):
+        if hub_url:
+            if new_gui and is_terminal():
+                # make sure the user actually wanted to start a new server
+                usr: str = ''
+                with handle_sigint(interrupt):
+                    while usr not in ['open', 'start']:
+                        usr = _input(cparse(
+                            'A central Cylc Hub has been configured for you'
+                            f'at <blue>{hub_url}</blue>'
+                            '\n<bold>Open the central server (open) or start'
+                            ' a new standalone server (start)?' '</bold>'
+                            ' [open] '
+                        )).lower()
+                        if usr == '':
+                            # default to "open"
+                            break
+                if usr != 'start':
+                    new_gui = False
+
+            if not new_gui:
+                if 'SUDO_USER' in os.environ and is_terminal():
+                    # make sure the user actually wants to open the GUI in a
+                    # browser running as a shared user
+                    usr: str = ''
+                    with handle_sigint(interrupt):
+                        while usr not in ['y', 'n']:
+                            usr = _input(cparse(
+                                f'This will open <blue>{hub_url}</blue> in'
+                                ' a web browser running as'
+                                f' <red>{getuser()}</red>.'
+                                '\nYou probably want to open the GUI as'
+                                ' yourself.'
+                                f'\n<bold>Launch as {getuser()} y/n?</bold> '
+                            ))
+                    if usr == 'n':
+                        return
+
+                print(f"Opening {hub_url} as specified in global config.")
+                webbrowser.open(
+                    update_url(hub_url, workflow_id), autoraise=True
+                )
+                return
+
         # get existing jpserver-<pid>-open.html files
         # check if the server is available for use
         # prompt for user whether to clean files for un-usable uiservers
