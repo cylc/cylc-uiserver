@@ -578,7 +578,7 @@ class CylcReviewService:
             except KeyError:
                 raise cherrypy.HTTPError(404) from None
             f_size = tar_info.size
-            handle = tar_f.extractfile(path_in_tar, 'rb')
+            handle = tar_f.extractfile(path_in_tar)
             if self._has_shebang(handle):
                 mime = self.MIME_TEXT_PLAIN
             else:
