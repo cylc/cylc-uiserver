@@ -24,7 +24,6 @@
 
 from asyncio import iscoroutinefunction
 import json
-import re
 import sys
 import traceback
 from typing import (
@@ -41,7 +40,6 @@ from typing import (
 from tornado import web
 from tornado.escape import json_encode
 from tornado.escape import to_unicode
-from tornado.httpclient import HTTPClientError
 from tornado.log import app_log
 from tornado.web import HTTPError
 
@@ -60,11 +58,7 @@ from graphql.execution.middleware import MiddlewareManager
 from graphql.pyutils import is_awaitable
 from graphql.validation import validate
 
-from cylc.flow.network.graphql import (
-    NULL_VALUE,
-    instantiate_middleware,
-    strip_null
-)
+from cylc.flow.network.graphql import instantiate_middleware
 
 if TYPE_CHECKING:
     from graphene import Schema
@@ -74,41 +68,8 @@ MUTATION_ERRORS_FLAG = "graphene_mutation_has_errors"
 MAX_VALIDATION_ERRORS = None
 
 
-def data_search_action(data, action):
-    if isinstance(data, dict):
-        return {
-            key: data_search_action(val, action)
-            for key, val in data.items()
-        }
-    if isinstance(data, list):
-        return [
-            data_search_action(val, action)
-            for val in data
-        ]
-    return action(data)
-
-
 def get_content_type(request: 'HTTPServerRequest') -> str:
     return request.headers.get("Content-Type", "").split(";", 1)[0].lower()
-
-
-def get_accepted_content_types(request: 'HTTPServerRequest') -> list:
-    def qualify(x):
-        parts = x.split(";", 1)
-        if len(parts) == 2:
-            match = re.match(
-                r"(^|;)q=(0(\.\d{,3})?|1(\.0{,3})?)(;|$)", parts[1])
-            if match:
-                return parts[0].strip(), float(match.group(2))
-        return parts[0].strip(), 1
-
-    raw_content_types = request.headers.get("Accept", "*/*").split(",")
-    qualified_content_types = map(qualify, raw_content_types)
-    return [
-        x[0]
-        for x in sorted(
-            qualified_content_types, key=lambda x: x[1], reverse=True)
-    ]
 
 
 class ExecutionError(Exception):
@@ -184,42 +145,35 @@ class TornadoGraphQLHandler(web.RequestHandler):
             self.handle_error(ex)
 
     async def run(self, *args, **kwargs):
-        try:
-            data = self.parse_body()
+        data = self.parse_body()
 
-            if self.batch:
-                responses = [
-                    await self.get_response(entry)
-                    for entry in data
-                ]
-                result = "[{}]".format(
-                    ",".join([response[0] for response in responses])
-                )
-                status_code = (
-                    responses
-                    and max(responses, key=lambda response: response[1])[1]
-                    or 200
-                )
-            else:
-                result, status_code = await self.get_response(data)
-
-            self.set_status(status_code)
-            self.set_header("Content-Type", "application/json")
-            self.write(result)
-            await self.finish()
-
-        except HTTPClientError as e:
-            response = e.response
-            response["Content-Type"] = "application/json"
-            response.content = self.json_encode(
-                self.request, {"errors": [self.format_error(e)]}
+        if self.batch:
+            responses = [
+                await self.get_response(entry)
+                for entry in data
+            ]
+            result = "[{}]".format(
+                ",".join([response[0] for response in responses])
             )
-            return response
+            status_code = (
+                responses
+                and max(responses, key=lambda response: response[1])[1]
+                or 200
+            )
+        else:
+            result, status_code = await self.get_response(data)
+
+        if status_code == 400:
+            self.set_status(status_code, reason=result)
+        else:
+            self.set_status(status_code)
+
+        self.set_header("Content-Type", "application/json")
+        self.write(result)
+        await self.finish()
 
     async def get_response(self, data):
-        query, variables, operation_name, _id = self.get_graphql_params(
-            self.request, data
-        )
+        query, variables, operation_name, _id = self.get_graphql_params(data)
 
         execution_result = await self.execute_graphql_request(
             data, query, variables, operation_name
@@ -252,38 +206,19 @@ class TornadoGraphQLHandler(web.RequestHandler):
             if self.batch:
                 response["id"] = _id
                 response["status"] = status_code
-            try:
-                result = self.json_encode(response)
-            except TypeError:
-                # Catch exceptions in response
-                errors = []
 
-                def exc_to_errors(data):
-                    if isinstance(data, Exception):
-                        errors.append({
-                            'message': (
-                                f'{data.value}'
-                                if hasattr(data, 'value') else f'{data}'
-                            )
-                        })
-                        return NULL_VALUE
-                    return data
-
-                response = data_search_action(
-                    response,
-                    exc_to_errors
-                )
-                response.setdefault("errors", []).extend(errors)
-                response = strip_null(response)
-
-                result = self.json_encode(response)
+            result = self.json_encode(response)
         else:
             result = None
 
         return result, status_code
 
-    def json_encode(self, d, pretty=False):
-        if (self.pretty or pretty) or self.get_query_argument("pretty", False):
+    def json_encode(self, d):
+        if (
+            self.pretty
+            or self.get_query_argument("pretty", False)
+            or self.get_body_argument("pretty", False)
+        ):
             return json.dumps(
                 d, sort_keys=True, indent=2, separators=(",", ": "))
 
@@ -300,17 +235,17 @@ class TornadoGraphQLHandler(web.RequestHandler):
             try:
                 body = self.request.body
             except Exception as e:
-                raise ExecutionError(400, e)
+                raise ExecutionError(400, [e])
 
             try:
                 request_json = json.loads(body)
                 if self.batch:
                     if not isinstance(request_json, list):
-                        raise AssertionError(
+                        raise AssertionError((
                             "Batch requests should receive a list"
                             ", but received {}."
-                        ).format(repr(request_json))
-                    if len(request_json <= 0):
+                        ).format(repr(request_json)))
+                    if len(request_json) <= 0:
                         raise AssertionError(
                             "Received an empty list in the batch request."
                         )
@@ -402,37 +337,19 @@ class TornadoGraphQLHandler(web.RequestHandler):
 
             return result
         except Exception as e:
-            return ExecutionResult(errors=[e])
+            return ExecutionResult(data=None, errors=[e])
 
     async def execute(self, *args, **kwargs):
         return execute(*args, **kwargs)
 
-    def request_wants_html(self):
-        accepted = get_accepted_content_types(self.request)
-        accepted_length = len(accepted)
-        # the list will be ordered in preferred first - so we have to make
-        # sure the most preferred gets the highest number
-        html_priority = (
-            accepted_length - accepted.index("text/html")
-            if "text/html" in accepted
-            else 0
-        )
-        json_priority = (
-            accepted_length - accepted.index("application/json")
-            if "application/json" in accepted
-            else 0
-        )
-
-        return html_priority > json_priority
-
-    def get_graphql_params(self, request, data):
+    def get_graphql_params(self, data):
         if self.graphql_params:
             return self.graphql_params
 
         single_args = {}
-        for key in request.arguments.keys():
+        for key in self.request.arguments.keys():
             single_args[key] = self.decode_argument(
-                request.arguments.get(key)[0])
+                self.request.arguments.get(key)[0])
 
         query = single_args.get("query") or data.get("query")
         variables = single_args.get("variables") or data.get("variables")
