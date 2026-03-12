@@ -17,6 +17,7 @@
 
 from importlib.resources import files
 from pathlib import Path
+import sys
 
 from cylc.uiserver import (
     __file__ as uis_pkg,
@@ -24,6 +25,13 @@ from cylc.uiserver import (
 )
 from cylc.uiserver.app import USER_CONF_ROOT
 from cylc.uiserver.authorise import CylcAuthorizer
+
+
+LOG_PATH = USER_CONF_ROOT / 'log' / (
+    'log'
+    if (sys.argv[0].endswith('jupyter-cylc') or sys.argv[1] == 'gui')
+    else 'hubapp-log'
+)
 
 
 # the command the hub should spawn (i.e. the cylc uiserver itself)
@@ -66,27 +74,24 @@ c.ConfigurableHTTPProxy.pid_file = f'{USER_CONF_ROOT / "jupyterhub-proxy.pid"}'
 
 # write Cylc logging to the user config directory
 # NOTE: Parallel UIS instances will conflict over this file.
-#       See https://github.com/cylc/cylc-uiserver/issues/240
+#       See https://github.com/cylc/cylc-uiserver/issues/743
 c.CylcUIServer.logging_config = {
     'version': 1,
     'handlers': {
         'file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'level': 'INFO',
-            'filename': str(USER_CONF_ROOT / 'log' / 'log'),
+            'class': 'cylc.uiserver.logging_util.RotatingUISFileHandler',
+            'filename': str(LOG_PATH),
             'mode': 'a',
-            'backupCount': 5,
+            'backupCount': 10,
             'maxBytes': 10485760,
             'formatter': 'file_fmt',
         },
     },
     'loggers': {
         'CylcUIServer': {
-            'level': 'INFO',
             'handlers': ['console', 'file'],
         },
         'cylc': {
-            'level': 'INFO',
             'handlers': ['console', 'file'],
         },
     },

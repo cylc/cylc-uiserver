@@ -20,41 +20,38 @@ Launch the Cylc GUI as a standalone web app for local use.
 For a multi-user system see `cylc hub`.
 """
 
-from ansimarkup import parse as cparse
 import argparse
 import asyncio
 from contextlib import suppress
+from getpass import getuser
 from glob import glob
 import os
 import re
-from requests.exceptions import RequestException
-import requests
 import sys
 from textwrap import dedent
 from typing import Optional
 import webbrowser
-from getpass import getuser
 
-
-from cylc.flow.id_cli import parse_id_async
-from cylc.flow.exceptions import (
-    InputError,
-    WorkflowFilesError
-)
+from ansimarkup import parse as cparse
+import requests
+from requests.exceptions import RequestException
 
 from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
-
-from cylc.uiserver import init_log
-from cylc.uiserver.app import (
-    CylcUIServer,
-    INFO_FILES_DIR
+from cylc.flow.exceptions import (
+    InputError,
+    WorkflowFilesError,
 )
+from cylc.flow.id_cli import parse_id_async
+from cylc.uiserver.app import (
+    INFO_FILES_DIR,
+    CylcUIServer,
+)
+
 
 CLI_OPT_NEW = "--new"
 
 
 def main(*argv):
-    init_log()
     hub_url = glbl_cfg().get(['hub', 'url'])
     jp_server_opts, new_gui, workflow_id = parse_args_opts()
     if '--help' in sys.argv and hub_url:

@@ -225,8 +225,8 @@ async def test_disconnect_workflow(
 async def test_workflow_connect_fail(
     data_store_mgr: DataStoreMgr,
     port_range,
-    monkeypatch,
-    caplog,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ):
     """Simulate a failure during workflow connection.
 
@@ -238,6 +238,7 @@ async def test_workflow_connect_fail(
     we aren't providing a client for it to connect to, however, probably the
     best we can achieve without actually running a workflow.
     """
+    caplog.set_level(logging.INFO, data_store_mgr.log.name)
     # patch the zmq logic so that the connection doesn't fail at the first
     # hurdle
     monkeypatch.setattr(
@@ -268,7 +269,7 @@ async def test_workflow_connect_fail(
         }
 
         # try to connect to the workflow
-        caplog.set_level(logging.DEBUG, data_store_mgr.log.name)
+        caplog.clear()
         await data_store_mgr.connect_workflow(w_id, contact_data)
 
         # the connection should fail because our ZMQ socket is not a

@@ -13,60 +13,25 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from contextlib import suppress
-from glob import glob
-import logging
-import os
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from typing import List
 
-from cylc.uiserver.app import USER_CONF_ROOT
+class RotatingUISFileHandler(RotatingFileHandler):
+    """Rotate logs on ui-server restart or when reaching maxBytes."""
 
+    # Class attribute to track whether logging has been started before.
+    # This is needed as Traitlets may reconfigure logging several times
+    # within the lifetime of the application, which creates new instances
+    # of the handler.
+    started = False
 
-class RotatingUISFileHandler(logging.handlers.RotatingFileHandler):
-    """Rotate logs on ui-server restart"""
-
-    LOG_NAME_EXTENSION = "-uiserver.log"
-
-    def __init__(self):
-        self.file_path = Path(USER_CONF_ROOT / "log").expanduser()
-
-    def on_start(self):
-        """Set up logging"""
-        self.file_path.mkdir(parents=True, exist_ok=True)
-        self.delete_symlink()
-        self.update_log_archive()
-        self.setup_new_log()
-
-    def update_log_archive(self):
-        """Ensure log archive retains only 5 logs"""
-        log_files = sorted(glob(os.path.join(
-            self.file_path, f"[0-9]*{self.LOG_NAME_EXTENSION}")), reverse=True)
-        while len(log_files) > 4:
-            os.unlink(log_files.pop(0))
-        # rename logs, logs sent in descending order to prevent conflicts
-        self.rename_logs(log_files)
-
-    def rename_logs(self, log_files: List[str]):
-        """Increment the log number by one for each log"""
-        for file in log_files:
-            log_num = int(Path(file).name.partition('-')[0]) + 1
-            new_file_name = Path(
-                f"{self.file_path}/{log_num:02d}{self.LOG_NAME_EXTENSION}"
-            )
-            Path(file).rename(new_file_name)
-
-    def delete_symlink(self):
-        """Deletes an existing log symlink."""
-        symlink_path = Path(self.file_path / 'log')
-        if symlink_path.exists() and symlink_path.is_symlink():
-            symlink_path.unlink()
-
-    def setup_new_log(self):
-        """Create log"""
-        log = Path(self.file_path / f'01{self.LOG_NAME_EXTENSION}')
-        log.touch()
-        symlink_path = Path(self.file_path / 'log')
-        with suppress(OSError):
-            symlink_path.symlink_to(log)
+    def __init__(self, filename, *args, **kwargs):
+        if RotatingUISFileHandler.started:
+            do_initial_rollover = False
+        else:
+            RotatingUISFileHandler.started = True
+            do_initial_rollover = Path(filename).is_file()
+        super().__init__(filename, *args, **kwargs)
+        if do_initial_rollover:
+            self.doRollover()
