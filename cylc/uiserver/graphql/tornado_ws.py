@@ -29,7 +29,6 @@ from contextlib import suppress
 from inspect import isawaitable
 import json
 from typing import TYPE_CHECKING
-from weakref import WeakSet
 
 from graphql import (
     ExecutionResult,
@@ -82,7 +81,7 @@ class TornadoConnectionContext:
         self.ws: SubscriptionHandler = ws
         self.operations = {}
         self.request_context = request_context
-        self.pending_tasks = WeakSet()
+        self.pending_tasks: set[asyncio.Task] = set()
 
     def has_operation(self, op_id):
         return op_id in self.operations
@@ -106,12 +105,9 @@ class TornadoConnectionContext:
     def closed(self):
         return self.ws.close_code is not None
 
-    def remember_task(self, task):
+    def remember_task(self, task: asyncio.Task) -> None:
         self.pending_tasks.add(task)
-        # Clear completed tasks
-        self.pending_tasks -= WeakSet(
-            task for task in self.pending_tasks if task.done()
-        )
+        task.add_done_callback(self.pending_tasks.discard)
 
     async def unsubscribe(self, op_id):
         async_iterator = self._unsubscribe(op_id)
