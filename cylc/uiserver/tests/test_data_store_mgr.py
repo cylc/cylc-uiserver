@@ -29,8 +29,9 @@ from cylc.flow.workflow_files import ContactFileFields as CFF
 from cylc.uiserver.data_store_mgr import (
     DataStoreMgr,
     ALL_DELTAS,
-    WORKFLOW,
-    SUBSCRIPTION_CATALOGUE
+    SUBSCRIPTION_CATALOGUE,
+    TASK_PROXIES,
+    WORKFLOW
 )
 
 from .conftest import AsyncClientFixture
@@ -349,6 +350,7 @@ async def test_update_workflow_data(
     # Pretend data store is populated for this workflow:
     w_id_data['workflow'].last_updated = time()
     # Call the _update_workflow_data function.
+    data_store_mgr.workflow_sync_level[w_id].add(TASK_PROXIES)
     data_store_mgr._update_workflow_data(ALL_DELTAS, all_updated_delta, w_id)
 
     # The data-store sould now contain info from the delta
