@@ -129,12 +129,16 @@ SUBSCRIPTION_CATALOGUE = {
         'request': 'pb_data_elements',
     },
     ALL_DELTAS: {
+        # Tie proxies together, otherwise they can arrive out of order
+        # at the UI, causing pruning issue at the UI (because UI
+        # regenerates/keeps family after it's pruned to anchor).
+        # Otherwise, we could include all fields...
         'criteria': {
-            EDGES,
-            FAMILIES,
+            # EDGES,
+            # FAMILIES,
             FAMILY_PROXIES,
-            JOBS,
-            TASKS,
+            # JOBS,
+            # TASKS,
             TASK_PROXIES,
             WORKFLOW,
         },
@@ -148,9 +152,8 @@ QUERY_SYNC_EXPIRY = 60
 def generate_level_topics(level) -> set:
     """Produce the subscription topics from the workflow sync level."""
     selection = set()
-    all_criteria = SUBSCRIPTION_CATALOGUE[ALL_DELTAS]['criteria']
-    if all_criteria.issubset(level):
-        selection.update(level.difference(all_criteria))
+    if SUBSCRIPTION_CATALOGUE[ALL_DELTAS]['criteria'].issubset(level):
+        selection.update(level.difference(DATA_TEMPLATE))
         selection.add(ALL_DELTAS)
     else:
         selection = level
@@ -391,7 +394,7 @@ class DataStoreMgr:
             del self.data[w_id]
         if w_id in self.delta_queues:
             del self.delta_queues[w_id]
-        if w_id in self.workflow_sync_level_graphql_subs:
+        if w_id in self.workflow_sync_graphql_subs:
             del self.workflow_sync_graphql_subs[w_id]
         if w_id in self.workflow_query_sync_timers:
             del self.workflow_query_sync_timers[w_id]
@@ -465,8 +468,10 @@ class DataStoreMgr:
 
     def _apply_all_delta(self, w_id, delta):
         """Apply the AllDeltas delta."""
+        level = self.workflow_sync_level.get(w_id, None)
         for field, sub_delta in delta.ListFields():
-            self._apply_delta(w_id, field.name, sub_delta)
+            if not level or field.name in level:
+                self._apply_delta(w_id, field.name, sub_delta)
 
     def _apply_delta(self, w_id, name, delta):
         """Apply delta."""
