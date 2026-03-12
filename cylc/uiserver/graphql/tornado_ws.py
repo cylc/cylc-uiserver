@@ -52,18 +52,14 @@ if TYPE_CHECKING:
 
 NO_MSG_DELAY = 1.0
 
-GRAPHQL_WS = "graphql-ws"
-WS_PROTOCOL = GRAPHQL_WS
-GQL_CONNECTION_INIT = "connection_init"  # Client -> Server
-GQL_CONNECTION_ACK = "connection_ack"  # Server -> Client
-GQL_CONNECTION_ERROR = "connection_error"  # Server -> Client
-GQL_CONNECTION_TERMINATE = "connection_terminate"  # Client -> Server
-GQL_CONNECTION_KEEP_ALIVE = "ka"  # Server -> Client
-GQL_START = "start"  # Client -> Server
-GQL_DATA = "data"  # Server -> Client
-GQL_ERROR = "error"  # Server -> Client
-GQL_COMPLETE = "complete"  # Server -> Client
-GQL_STOP = "stop"  # Client -> Server
+# See https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md
+WS_PROTOCOL = 'graphql-transport-ws'
+GQL_CONNECTION_INIT = 'connection_init'  # Client -> Server
+GQL_CONNECTION_ACK = 'connection_ack'  # Server -> Client
+GQL_SUBSCRIBE = 'subscribe'  # Client -> Server
+GQL_NEXT = 'next'  # Server -> Client
+GQL_ERROR = 'error'  # Server -> Client
+GQL_COMPLETE = 'complete'  # Bidrectional
 
 REQ_HEADER_INFO = {
     'Host',
@@ -189,40 +185,32 @@ class TornadoSubscriptionServer:
                 connection_context, op_id, payload
             )
 
-        elif op_type == GQL_CONNECTION_TERMINATE:
-            return self.on_connection_terminate(connection_context, op_id)
-
-        elif op_type == GQL_START:
+        elif op_type == GQL_SUBSCRIBE:
             if not isinstance(payload, dict):
                 raise AssertionError("The payload must be a dict")
             params = self.get_graphql_params(connection_context, payload)
             return await self.on_start(connection_context, op_id, params)
 
-        elif op_type == GQL_STOP:
+        elif op_type == GQL_COMPLETE:
             return await self.on_stop(connection_context, op_id)
 
         else:
-            return await self.send_error(
-                connection_context,
-                op_id,
-                Exception("Invalid message type: {}.".format(op_type)),
+            connection_context.ws.close(
+                4400, f"Invalid message type: {op_type}"
             )
 
     async def on_connection_init(self, connection_context, op_id, payload):
         try:
             await self.on_connect(connection_context, payload)
             await self.send_message(
-                connection_context, op_type=GQL_CONNECTION_ACK)
+                connection_context, op_type=GQL_CONNECTION_ACK
+            )
         except Exception as e:
-            await self.send_error(
-                connection_context, op_id, e, GQL_CONNECTION_ERROR)
+            await self.send_error(connection_context, op_id, e, GQL_ERROR)
             await connection_context.ws.close(1011)
 
     async def on_connect(self, connection_context, payload):
         pass
-
-    def on_connection_terminate(self, connection_context, op_id):
-        return connection_context.ws.close(1011)
 
     def get_graphql_params(self, connection_context, payload):
         # Create a new context object for each subscription,
@@ -262,6 +250,7 @@ class TornadoSubscriptionServer:
 
     async def on_stop(self, connection_context, op_id):
         return await connection_context.unsubscribe(op_id)
+        connection_context.request_context['sub_statuses'][op_id] = 'stop'
 
     async def on_close(self, connection_context):
         return await connection_context.unsubscribe_all()
@@ -286,6 +275,8 @@ class TornadoSubscriptionServer:
         # Attempt to unsubscribe first in case we already have a subscription
         # with this id.
         await connection_context.unsubscribe(op_id)
+
+        connection_context.request_context['sub_statuses'][op_id] = 'start'
 
         params['kwargs']['root_value'] = op_id
         execution_result = await self.execute(params)
@@ -370,7 +361,7 @@ class TornadoSubscriptionServer:
 
         result = execution_result.formatted
         return await self.send_message(
-            connection_context, op_id, GQL_DATA, result
+            connection_context, op_id, GQL_NEXT, result
         )
 
     async def on_operation_complete(self, connection_context, op_id):
@@ -384,13 +375,9 @@ class TornadoSubscriptionServer:
         if error_type is None:
             error_type = GQL_ERROR
 
-        if error_type not in {GQL_CONNECTION_ERROR, GQL_ERROR}:
-            raise AssertionError(
-                "error_type should be one of the allowed error messages"
-                " GQL_CONNECTION_ERROR or GQL_ERROR"
-            )
+        assert error_type == GQL_ERROR, "error_type should be GQL_ERROR"
 
-        error_payload = {"message": str(error)}
+        error_payload = [{"message": str(error)}]
 
         with suppress(WebSocketClosedError):
             return await self.send_message(
@@ -405,6 +392,7 @@ class TornadoSubscriptionServer:
             else:
                 parsed_message = message
         except Exception as e:
-            return await self.send_error(connection_context, None, e)
+            connection_context.ws.close(4400, str(e))
+            return None
 
         return self.process_message(connection_context, parsed_message)

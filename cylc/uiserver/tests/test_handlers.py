@@ -23,7 +23,6 @@ from tornado.httputil import HTTPServerRequest
 from tornado.testing import AsyncHTTPTestCase, get_async_test_timeout
 from tornado.web import Application
 
-from cylc.uiserver.graphql.tornado_ws import GRAPHQL_WS
 from cylc.uiserver.handlers import SubscriptionHandler
 
 
@@ -64,7 +63,7 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
     @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_websockets_subprotocol(self):
         handler = self._create_handler()
-        assert handler.select_subprotocol(subprotocols=[]) == GRAPHQL_WS
+        assert handler.select_subprotocol([]) == 'graphql-transport-ws'
 
     @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_websockets_check_origin_accepts_same_origin(self):
