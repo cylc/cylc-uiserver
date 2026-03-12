@@ -29,8 +29,8 @@ from cylc.flow.workflow_files import ContactFileFields as CFF
 from cylc.uiserver.data_store_mgr import (
     DataStoreMgr,
     ALL_DELTAS,
-    MAX_LEVEL,
-    SUBSCRIPTION_LEVELS
+    WORKFLOW,
+    SUBSCRIPTION_CATALOGUE
 )
 
 from .conftest import AsyncClientFixture
@@ -56,7 +56,8 @@ async def test_workflow_update(
     # calling ``workflow_request``.
     await data_store_mgr._workflow_update(
         [w_id],
-        SUBSCRIPTION_LEVELS[MAX_LEVEL]["request"]
+        SUBSCRIPTION_CATALOGUE[WORKFLOW]["request"],
+        elements=[WORKFLOW]
     )
 
     # The ``DataStoreMgr`` sets the workflow data retrieved in its
@@ -91,7 +92,8 @@ async def test_workflow_update_ignores_timeout_message(
     # calling ``workflow_request``.
     await data_store_mgr._workflow_update(
         [w_id],
-        SUBSCRIPTION_LEVELS[MAX_LEVEL]["request"]
+        SUBSCRIPTION_CATALOGUE[WORKFLOW]["request"],
+        elements=[WORKFLOW]
     )
 
     # When a ClientTimeout happens, the ``DataStoreMgr`` object ignores
@@ -127,7 +129,8 @@ async def test_workflow_update_gather_error(
     # calling ``workflow_request``.
     await data_store_mgr._workflow_update(
         ['workflow_id'],
-        SUBSCRIPTION_LEVELS[MAX_LEVEL]["request"]
+        SUBSCRIPTION_CATALOGUE[WORKFLOW]["request"],
+        elements=[WORKFLOW]
     )
     assert caplog.record_tuples == [
         ('cylc', 40, 'Error communicating with myflow'),
@@ -153,7 +156,8 @@ async def test_workflow_update__stopped_workflow(
     }
     await data_store_mgr._workflow_update(
         ['workflow_id'],
-        SUBSCRIPTION_LEVELS[MAX_LEVEL]["request"]
+        SUBSCRIPTION_CATALOGUE[WORKFLOW]["request"],
+        elements=[WORKFLOW]
     )
     assert caplog.record_tuples == [
         ('cylc', 40, f'WorkflowStopped: {exc}'),
@@ -292,7 +296,7 @@ async def test_workflow_connect_fail(
         # WorkflowRuntimeServer with the correct endpoints and auth
         assert [record.message for record in caplog.records] == [
             "[data-store] connect_workflow('~user/workflow_id', <dict>)",
-            "[data-store] workflow_data_update('~user/workflow_id', 'min')",
+            "[data-store] workflow_data_update('~user/workflow_id', <set>)",
             'failed to connect to ~user/workflow_id',
             "[data-store] disconnect_workflow('~user/workflow_id')",
         ]
