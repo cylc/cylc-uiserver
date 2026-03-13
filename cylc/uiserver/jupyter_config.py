@@ -24,6 +24,7 @@ from cylc.uiserver import (
 )
 from cylc.uiserver.app import USER_CONF_ROOT
 from cylc.uiserver.authorise import CylcAuthorizer
+from cylc.uiserver.ws import get_review_service_config
 
 
 # the command the hub should spawn (i.e. the cylc uiserver itself)
@@ -104,3 +105,8 @@ c.CylcUIServer.logging_config = {
 # Lab as a result of being granted the ``access:servers`` permission in Jupyter
 # Hub.
 c.ServerApp.authorizer_class = CylcAuthorizer
+
+
+# Setup Cylc Review - uncomment to start Cylc review with Cylc Hub
+# n.b. if installed with pip optional dependence [review] must be specified.
+# c.JupyterHub.services = [get_review_service_config()]
