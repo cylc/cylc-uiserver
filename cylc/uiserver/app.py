@@ -25,18 +25,32 @@ at the bottom) would be:
 
 * ``cylc/uiserver/jupyter_config.py`` (pre-packaged default)
 * ``/etc/cylc/uiserver/jupyter_config.py``
+* ``/etc/cylc/uiserver/jupyter_cylc_config.py``
 * ``/etc/cylc/uiserver/0/jupyter_config.py``
+* ``/etc/cylc/uiserver/0/jupyter_cylc_config.py``
 * ``/etc/cylc/uiserver/0.6/jupyter_config.py``
+* ``/etc/cylc/uiserver/0.6/jupyter_cylc_config.py``
 * ``/etc/cylc/uiserver/0.6.0/jupyter_config.py``
+* ``/etc/cylc/uiserver/0.6.0/jupyter_cylc_config.py``
 * ``~/.cylc/uiserver/jupyter_config.py``
+* ``~/.cylc/uiserver/jupyter_cylc_config.py``
 * ``~/.cylc/uiserver/0/jupyter_config.py``
+* ``~/.cylc/uiserver/0/jupyter_cylc_config.py``
 * ``~/.cylc/uiserver/0.6/jupyter_config.py``
+* ``~/.cylc/uiserver/0.6/jupyter_cylc_config.py``
 * ``~/.cylc/uiserver/0.6.0/jupyter_config.py``
+* ``~/.cylc/uiserver/0.6.0/jupyter_cylc_config.py``
 
+.. note::
+
+   ``jupyter_config.py`` may be loaded by other Jupyter components, e.g.
+   Jupyter Hub, whereas ``jupyter_cylc_config.py`` is loaded only by the
+   Cylc UI Server itself.
 
 An example configuration might look like this:
 
 .. code-block:: python
+   :caption: ~/.cylc/uiserver/jupyter_config.py
 
    # scan for workflows every 10 seconds
    c.CylcUIServer.scan_interval = 10
@@ -44,13 +58,8 @@ An example configuration might look like this:
 The Cylc UI Server is a `Jupyter Server`_ extension. For generic configuration
 options see the Jupyter Servers documentation:
 :external+jupyter_server:ref:`other-full-config`.
-Cylc specific configurations are documented here.
 
-.. note::
-
-   ``c.CylcUIServer.site_authorization`` should be defined in
-   ``/etc/cylc/uiserver/jupyter_config.py``, or, alternatively, via
-   the environment variable ``CYLC_SITE_CONF_PATH``.
+Cylc specific configurations are documented here:
 """
 
 from concurrent.futures import ProcessPoolExecutor
@@ -224,6 +233,11 @@ class CylcUIServer(ExtensionApp):
                    },
                }
 
+            .. note::
+
+               ``c.CylcUIServer.site_authorization`` should be defined in the
+               site configuration (e.g
+               ``/etc/cylc/uiserver/jupyter_config.py``)
         ''')
 
     user_authorization = Dict(
@@ -465,7 +479,9 @@ class CylcUIServer(ExtensionApp):
                 [
                     SITE_CONF_ROOT,  # site configuration
                     USER_CONF_ROOT,  # user configuration
-                ], filename=False
+                ],
+                'cylc',
+                directory_only=True,
             )
             # Next include currently needed for directory making
             ret.insert(0, str(Path(uis_pkg).parent))  # packaged config
