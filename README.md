@@ -44,6 +44,12 @@ This repository provides the following components of the Cylc system.
   server and handles authentication. It is a
   [JupyterHub](https://github.com/jupyterhub/jupyterhub) server.
 
+* Cylc Review
+
+  A Hub "service" which runs a public web server for viewing user's workflows.
+  It is a Jupyter Hub [JupyterHub](https://github.com/jupyterhub/jupyterhub)
+  service.
+
 
 ## Installation
 
@@ -239,6 +245,23 @@ By default the Cylc part of the UI Server log is written to
 <!--
 TODO: Link to Jupyter Server logging_config docs when published
 -->
+
+### Review
+
+To enable the Cylc Review web service, register the service using
+`JupyterHub.services` and provide users access to it using
+`JupyterHub.load_roles`:
+
+```python
+from cylc.uiserver.ws import get_review_service_config
+c.JupyterHub.services = [get_review_service_config()]
+c.JupyterHub.load_roles = [
+    {
+        "name": "user",
+        "scopes": ["self", "access:services!service=cylc-review"],
+    },
+]
+```
 
 ### UI
 
