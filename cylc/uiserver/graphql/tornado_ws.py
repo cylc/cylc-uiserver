@@ -26,6 +26,10 @@
 import asyncio
 from asyncio.queues import QueueEmpty
 from contextlib import suppress
+from enum import (
+    StrEnum,
+    auto,
+)
 from inspect import isawaitable
 import json
 from typing import (
@@ -62,26 +66,35 @@ if TYPE_CHECKING:
     from cylc.uiserver.authorise import Authorization
     from cylc.uiserver.handlers import SubscriptionHandler
 
-    SendOperationType = Literal[
-        "connection_ack", "ping", "pong", "next", "error", "complete"
-    ]
 
 NO_MSG_DELAY = 1.0
 
-# See https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md
 WS_PROTOCOL = 'graphql-transport-ws'
-GQL_CONNECTION_INIT: Literal["connection_init"] = (
-    'connection_init'  # Client -> Server
-)
-GQL_CONNECTION_ACK: Literal["connection_ack"] = (
-    'connection_ack'  # Server -> Client
-)
-GQL_PING: Literal["ping"] = 'ping'  # Bidirectional
-GQL_PONG: Literal["pong"] = 'pong'  # Bidirectional
-GQL_SUBSCRIBE: Literal["subscribe"] = 'subscribe'  # Client -> Server
-GQL_NEXT: Literal["next"] = 'next'  # Server -> Client
-GQL_ERROR: Literal["error"] = 'error'  # Server -> Client
-GQL_COMPLETE: Literal["complete"] = 'complete'  # Bidrectional
+
+
+class OperationType(StrEnum):
+    """graphql-transport-ws message types.
+
+    See https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md
+    """
+    CONNECTION_INIT = auto()  # Client -> Server
+    CONNECTION_ACK = auto()  # Server -> Client
+    PING = auto()  # Bidirectional
+    PONG = auto()  # Bidirectional
+    SUBSCRIBE = auto()  # Client -> Server
+    NEXT = auto()  # Server -> Client
+    ERROR = auto()  # Server -> Client
+    COMPLETE = auto()  # Bidrectional
+
+
+SendOperationType = Literal[
+    OperationType.CONNECTION_ACK,
+    OperationType.PING,
+    OperationType.PONG,
+    OperationType.NEXT,
+    OperationType.ERROR,
+    OperationType.COMPLETE,
+]
 
 REQ_HEADER_INFO = {
     'Host',
@@ -201,39 +214,41 @@ class TornadoSubscriptionServer:
         op_type = parsed_message.get("type")
         payload = parsed_message.get("payload")
 
-        if op_type == GQL_CONNECTION_INIT:
-            return await self.on_connection_init(connection_context)
+        match op_type:
+            case OperationType.CONNECTION_INIT.value:
+                await self.on_connection_init(connection_context)
 
-        elif op_type == GQL_SUBSCRIBE:
-            if not isinstance(payload, dict):
-                raise AssertionError("The payload must be a dict")
-            assert op_id, "The message must have an operation ID"
-            params = self.get_graphql_params(connection_context, payload)
-            return await self.on_subscribe(connection_context, op_id, params)
+            case OperationType.SUBSCRIBE.value:
+                if not isinstance(payload, dict):
+                    raise AssertionError("The payload must be a dict")
+                assert op_id, "The message must have an operation ID"
+                params = self.get_graphql_params(connection_context, payload)
+                await self.on_subscribe(connection_context, op_id, params)
 
-        elif op_type == GQL_COMPLETE:
-            assert op_id, "The message must have an operation ID"
-            await connection_context.unsubscribe(op_id)
-            connection_context.request_context['sub_statuses'][op_id] = 'stop'
-            return
+            case OperationType.COMPLETE.value:
+                assert op_id, "The message must have an operation ID"
+                await connection_context.unsubscribe(op_id)
+                connection_context.request_context['sub_statuses'][op_id] = (
+                    'stop'
+                )
 
-        elif op_type == GQL_PING:
-            return await self.send_message(connection_context, GQL_PONG)
+            case OperationType.PING.value:
+                await self.send_message(connection_context, OperationType.PONG)
 
-        elif op_type == GQL_PONG:
-            return
+            case OperationType.PONG.value:
+                pass
 
-        else:
-            connection_context.ws.close(
-                4400, f"Invalid message type: {op_type}"
-            )
+            case _:
+                connection_context.ws.close(
+                    4400, f"Invalid message type: {op_type}"
+                )
 
     async def on_connection_init(
         self, connection_context: TornadoConnectionContext
     ) -> None:
         try:
             await self.send_message(
-                connection_context, op_type=GQL_CONNECTION_ACK
+                connection_context, op_type=OperationType.CONNECTION_ACK
             )
         except Exception as e:
             connection_context.ws.close(1011, str(e))
@@ -329,7 +344,7 @@ class TornadoSubscriptionServer:
             with suppress(WebSocketClosedError):
                 await self.send_message(
                     connection_context,
-                    GQL_ERROR,
+                    OperationType.ERROR,
                     op_id,
                     payload=[{"message": str(e)}],
                 )
@@ -339,14 +354,16 @@ class TornadoSubscriptionServer:
 
         # Complete the subscription from the server side:
         with suppress(WebSocketClosedError):
-            await self.send_message(connection_context, GQL_COMPLETE, op_id)
+            await self.send_message(
+                connection_context, OperationType.COMPLETE, op_id
+            )
         await connection_context.unsubscribe(op_id)
         connection_context.request_context['sub_statuses'].pop(op_id, None)
 
     async def send_message(
         self,
         connection_context: TornadoConnectionContext,
-        op_type: 'SendOperationType',
+        op_type: SendOperationType,
         op_id: str | None = None,
         payload=None,
     ) -> None:
@@ -381,10 +398,10 @@ class TornadoSubscriptionServer:
 
     @staticmethod
     def build_message(
-        op_type: 'SendOperationType', op_id: str | None, payload
+        op_type: SendOperationType, op_id: str | None, payload
     ):
         assert op_type, "Message must have a type"
-        message: dict[str, Any] = {"type": op_type}
+        message: dict[str, Any] = {"type": str(op_type)}
         if op_id is not None:
             message["id"] = op_id
         if payload is not None:
@@ -408,7 +425,7 @@ class TornadoSubscriptionServer:
 
         result = execution_result.formatted
         return await self.send_message(
-            connection_context, GQL_NEXT, op_id, result
+            connection_context, OperationType.NEXT, op_id, result
         )
 
     def on_message(
