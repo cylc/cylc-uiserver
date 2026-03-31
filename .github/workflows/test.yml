@@ -42,7 +42,7 @@ jobs:
         uses: cylc/release-actions/patch-dns@v1
 
       - name: Install System Dependencies
-        uses: mamba-org/setup-micromamba@v2
+        uses: mamba-org/setup-micromamba@v3
         with:
           cache-environment: true
           post-cleanup: 'all'
