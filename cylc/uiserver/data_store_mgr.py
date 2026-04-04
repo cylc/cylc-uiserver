@@ -36,16 +36,18 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
 import time
-from typing import TYPE_CHECKING, Dict, Optional, Set, cast
+from typing import Dict, Iterable, List, Optional, Set, cast, TYPE_CHECKING
 
-from cylc.flow.exceptions import WorkflowStopped
-from cylc.flow.id import Tokens
-from cylc.flow.network.server import PB_METHOD_MAP
-from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
 from cylc.flow.data_store_mgr import (
+    FAMILIES, FAMILY_PROXIES, JOBS, TASKS, TASK_PROXIES,
     EDGES, DATA_TEMPLATE, ALL_DELTAS, DELTAS_MAP, WORKFLOW,
     apply_delta, generate_checksum, create_delta_store
 )
+from cylc.flow.exceptions import WorkflowStopped
+from cylc.flow.id import Tokens
+from cylc.flow.network.graphql import extract_ast_fields
+from cylc.flow.network.server import PB_METHOD_MAP
+from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
 from cylc.flow.workflow_files import (
     ContactFileFields as CFF,
     WorkflowFiles,
@@ -56,8 +58,106 @@ from cylc.flow.workflow_status import WorkflowStatus
 from .utils import fmt_call
 from .workflows_mgr import workflow_request
 
+
 if TYPE_CHECKING:
     from cylc.flow.data_messages_pb2 import PbWorkflow
+
+
+SUBSCRIPTION_CATALOGUE = {
+    EDGES: {
+        'criteria': {
+            'edges',
+            'nodesEdges',
+        },
+        'request': 'pb_data_elements',
+    },
+    FAMILIES: {
+        'criteria': {
+            'ancestors',
+            'childFamilies',
+            'family',
+            'families',
+            'firstParent',
+            'parents',
+        },
+        'request': 'pb_data_elements',
+    },
+    FAMILY_PROXIES: {
+        'criteria': {
+            'ancestors',
+            'childFamilies',
+            'familyProxy',
+            'familyProxies',
+            'firstParent',
+            'nodes',
+            'parents',
+        },
+        'request': 'pb_data_elements',
+    },
+    JOBS: {
+        'criteria': {
+            'job',
+            'jobs',
+        },
+        'request': 'pb_data_elements',
+    },
+    TASKS: {
+        'criteria': {
+            'childTasks',
+            'task',
+            'tasks',
+        },
+        'request': 'pb_data_elements',
+    },
+    TASK_PROXIES: {
+        'criteria': {
+            'childTasks',
+            'nodes',
+            'sourceNode',
+            'targetNode',
+            'taskProxy',
+            'taskProxies',
+        },
+        'request': 'pb_data_elements',
+    },
+    WORKFLOW: {
+        'criteria': {
+            'workflow',
+            'workflows',
+            'deltas',
+        },
+        'request': 'pb_data_elements',
+    },
+    ALL_DELTAS: {
+        # Tie proxies together, otherwise they can arrive out of order
+        # at the UI, causing pruning issue at the UI (because UI
+        # regenerates/keeps family after it's pruned to anchor).
+        # Otherwise, we could include all fields...
+        'criteria': {
+            # EDGES,
+            # FAMILIES,
+            FAMILY_PROXIES,
+            # JOBS,
+            # TASKS,
+            TASK_PROXIES,
+            WORKFLOW,
+        },
+        'request': 'pb_entire_workflow',
+    },
+}
+# expiry interval post query
+QUERY_SYNC_EXPIRY = 60
+
+
+def generate_level_topics(level) -> set:
+    """Produce the subscription topics from the workflow sync level."""
+    selection = set()
+    if SUBSCRIPTION_CATALOGUE[ALL_DELTAS]['criteria'].issubset(level):
+        selection.update(level.difference(DATA_TEMPLATE))
+        selection.add(ALL_DELTAS)
+    else:
+        selection = level
+    return {item.encode('utf-8') for item in selection}
 
 
 def log_call(fcn):
@@ -97,13 +197,23 @@ class DataStoreMgr:
     INIT_DATA_RETRY_DELAY = 0.5  # seconds
     RECONCILE_TIMEOUT = 5.  # seconds
     PENDING_DELTA_CHECK_INTERVAL = 0.5
+    SYNC_LEVEL_TIMER_INTERVAL = 30
 
     def __init__(self, workflows_mgr, log, max_threads=10):
         self.workflows_mgr = workflows_mgr
         self.log = log
         self.data = {}
         self.w_subs: Dict[str, WorkflowSubscriber] = {}
-        self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown'}
+        # graphql subscription level
+        self.sync_level_graphql_subs = {
+            'minimal': {WORKFLOW, 'shutdown'},
+        }
+        # workflow graphql subscriptions
+        self.workflow_sync_graphql_subs = {}
+        # workflow graphql query timers
+        self.workflow_query_sync_timers = {}
+        # resultant workflow sync level
+        self.workflow_sync_level = {}
         self.loop = None
         self.executor = ThreadPoolExecutor(max_threads)
         self.delta_queues = {}
@@ -127,6 +237,18 @@ class DataStoreMgr:
             status=WorkflowStatus.STOPPED.value,
             status_msg=self._get_status_msg(w_id, is_active),
         )
+
+        # setup sync subscriber level sets
+        self.workflow_sync_graphql_subs[w_id] = {'minimal'}
+
+        # set query sync timer
+        self.workflow_query_sync_timers[w_id] = {
+            'expiry': 0.0,
+            'level': set(),
+        }
+
+        # set workflow sync level
+        self.workflow_sync_level[w_id] = self._get_sync_level(w_id)
 
     @log_call
     async def unregister_workflow(self, w_id):
@@ -163,6 +285,8 @@ class DataStoreMgr:
 
         self.delta_queues[w_id] = {}
 
+        level = self.workflow_sync_level[w_id]
+
         # Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.
         self.executor.submit(
@@ -170,9 +294,43 @@ class DataStoreMgr:
             w_id,
             contact_data['name'],
             contact_data[CFF.HOST],
-            contact_data[CFF.PUBLISH_PORT]
+            contact_data[CFF.PUBLISH_PORT],
+            generate_level_topics(level)
         )
-        successful_updates = await self._entire_workflow_update(ids=[w_id])
+
+        result = await self.workflow_data_update(w_id, level)
+
+        if result:
+            # don't update the contact data until we have successfully updated
+            self._update_contact(w_id, contact_data)
+
+    @log_call
+    async def workflow_data_update(
+        self,
+        w_id: str,
+        level: Set[str],
+    ):
+        requests = set()
+        if ALL_DELTAS in level:
+            requests.add(SUBSCRIPTION_CATALOGUE[ALL_DELTAS]["request"])
+        else:
+            requests.update(
+                {
+                    SUBSCRIPTION_CATALOGUE[topic]["request"]
+                    for topic in level
+                    if topic in SUBSCRIPTION_CATALOGUE
+                }
+            )
+        for request in requests:
+            successful_updates = await self._workflow_update(
+                [w_id],
+                request,
+                elements=[
+                    element
+                    for element in level
+                    if element in DATA_TEMPLATE
+                ]
+            )
 
         if w_id not in successful_updates:
             # something went wrong, undo any changes to allow for subsequent
@@ -180,6 +338,7 @@ class DataStoreMgr:
             self.log.info(f'failed to connect to {w_id}')
             self.disconnect_workflow(w_id)
             return False
+        return True
 
     @log_call
     def disconnect_workflow(self, w_id, update_contact=True):
@@ -235,8 +394,14 @@ class DataStoreMgr:
             del self.data[w_id]
         if w_id in self.delta_queues:
             del self.delta_queues[w_id]
+        if w_id in self.workflow_sync_graphql_subs:
+            del self.workflow_sync_graphql_subs[w_id]
+        if w_id in self.workflow_query_sync_timers:
+            del self.workflow_query_sync_timers[w_id]
+        if w_id in self.workflow_sync_level:
+            del self.workflow_sync_level[w_id]
 
-    def _start_subscription(self, w_id, reg, host, port):
+    def _start_subscription(self, w_id, reg, host, port, topics):
         """Instantiate and run subscriber data-store sync.
 
         Args:
@@ -244,6 +409,7 @@ class DataStoreMgr:
             reg (str): Registered workflow name.
             host (str): Hostname of target workflow.
             port (int): Port of target workflow.
+            topics set(str): set of topics to subscribe to.
 
         """
         self.w_subs[w_id] = WorkflowSubscriber(
@@ -251,7 +417,7 @@ class DataStoreMgr:
             host=host,
             port=port,
             context=self.workflows_mgr.context,
-            topics=self.topics
+            topics=topics
         )
         self.w_subs[w_id].loop.run_until_complete(
             self.w_subs[w_id].subscribe(
@@ -283,8 +449,16 @@ class DataStoreMgr:
             # close connections
             self.disconnect_workflow(w_id)
             return
-        self._apply_all_delta(w_id, delta)
-        self._delta_store_to_queues(w_id, topic, delta)
+        elif topic == ALL_DELTAS:
+            self._apply_all_delta(w_id, delta)
+            self._delta_store_to_queues(w_id, topic, delta)
+        else:
+            self._apply_delta(w_id, topic, delta)
+            # might seem clunky, but as with contact update, making it look
+            # like an ALL_DELTA avoids changing the resolver in cylc-flow
+            all_deltas = DELTAS_MAP[ALL_DELTAS]()
+            getattr(all_deltas, topic).CopyFrom(delta)
+            self._delta_store_to_queues(w_id, ALL_DELTAS, all_deltas)
 
     def _clear_data_field(self, w_id, field_name):
         if field_name == WORKFLOW:
@@ -294,24 +468,30 @@ class DataStoreMgr:
 
     def _apply_all_delta(self, w_id, delta):
         """Apply the AllDeltas delta."""
-        delta_times = self.data[w_id]['delta_times']
+        level = self.workflow_sync_level.get(w_id, None)
         for field, sub_delta in delta.ListFields():
-            delta_time = getattr(sub_delta, 'time', 0.0)
-            # If the workflow has reloaded clear the data before
-            # delta application.
-            if sub_delta.reloaded:
-                self._clear_data_field(w_id, field.name)
-                delta_times[field.name] = 0.0
-            # hard to catch errors in a threaded async app, so use try-except.
-            try:
-                # Apply the delta if newer than the previously applied.
-                if delta_time >= delta_times.get(field.name, 0.0):
-                    apply_delta(field.name, sub_delta, self.data[w_id])
-                    delta_times[field.name] = delta_time
-                    if not sub_delta.reloaded:
-                        self._reconcile_update(field.name, sub_delta, w_id)
-            except Exception as exc:
-                self.log.exception(exc)
+            if not level or field.name in level:
+                self._apply_delta(w_id, field.name, sub_delta)
+
+    def _apply_delta(self, w_id, name, delta):
+        """Apply delta."""
+        delta_times = self.data[w_id]['delta_times']
+        delta_time = getattr(delta, 'time', 0.0)
+        # If the workflow has reloaded clear the data before
+        # delta application.
+        if delta.reloaded:
+            self._clear_data_field(w_id, name)
+            delta_times[name] = 0.0
+        # hard to catch errors in a threaded async app, so use try-except.
+        try:
+            # Apply the delta if newer than the previously applied.
+            if delta_time >= delta_times.get(name, 0.0):
+                apply_delta(name, delta, self.data[w_id])
+                delta_times[name] = delta_time
+                if not delta.reloaded:
+                    self._reconcile_update(name, delta, w_id)
+        except Exception as exc:
+            self.log.exception(exc)
 
     def _delta_store_to_queues(self, w_id, topic, delta):
         # Queue delta for graphql subscription resolving
@@ -349,7 +529,7 @@ class DataStoreMgr:
                 future = asyncio.run_coroutine_threadsafe(
                     workflow_request(
                         self.workflows_mgr.workflows[w_id]['req_client'],
-                        'pb_data_elements',
+                        'pb_delta_elements',
                         args={'element_type': topic}
                     ),
                     self.loop
@@ -369,8 +549,8 @@ class DataStoreMgr:
             except Exception as exc:
                 self.log.exception(exc)
 
-    async def _entire_workflow_update(
-        self, ids: Optional[list] = None
+    async def _workflow_update(
+        self, ids: List[str], req_method: str, **kwargs
     ) -> Set[str]:
         """Update entire local data-store of workflow(s).
 
@@ -378,16 +558,15 @@ class DataStoreMgr:
             ids: List of workflow external IDs.
 
         """
-        if ids is None:
-            ids = []
-
         # Request new data
         req_time = time.time()
-        req_method = 'pb_entire_workflow'
 
         requests = {
             w_id: workflow_request(
-                client=info['req_client'], command=req_method, log=self.log
+                client=info['req_client'],
+                command=req_method,
+                log=self.log,
+                args=kwargs
             )
             for w_id, info in self.workflows_mgr.workflows.items()
             if info.get('req_client')  # skip stopped workflows
@@ -507,3 +686,94 @@ class DataStoreMgr:
         else:
             # the workflow has not yet run
             return 'not yet run'
+
+    def _get_sync_level(self, w_id) -> set:
+        """Return the sync level in the form of a set of catalogue items."""
+        level = set()
+        if (
+            w_id in self.workflow_query_sync_timers
+            and self.workflow_query_sync_timers[w_id]['expiry'] > 0
+        ):
+            level.update(self.workflow_query_sync_timers[w_id]['level'])
+        for sub_id in self.workflow_sync_graphql_subs[w_id]:
+            level.update(self.sync_level_graphql_subs.get(sub_id, ()))
+        return level
+
+    async def _update_subscription_level(self, w_id):
+        """Update level of data subscribed to."""
+        new_level = self._get_sync_level(w_id)
+        if new_level == self.workflow_sync_level[w_id]:
+            return
+        self.workflow_sync_level[w_id] = new_level
+        sub = self.w_subs.get(w_id)
+        if sub:
+            new_topics = generate_level_topics(new_level)
+            stop_topics = sub.topics.difference(new_topics)
+            start_topics = new_topics.difference(sub.topics)
+            for stop_topic in stop_topics:
+                sub.unsubscribe_topic(stop_topic)
+            # Doing this after unsubscribe and before subscribe
+            # to make sure old topics stop and new data is in place.
+            await self.workflow_data_update(w_id, new_level)
+            for start_topic in start_topics:
+                sub.subscribe_topic(start_topic)
+
+    def graphql_sub_interrogate(self, sub_id, info):
+        """Scope data requirements."""
+        fields = set()
+        extract_ast_fields(info.operation, fields)
+        for frag in getattr(info, 'fragments', {}).values():
+            extract_ast_fields(frag, fields)
+        self.sync_level_graphql_subs[sub_id] = {'shutdown'}
+        sync_level_subs = self.sync_level_graphql_subs[sub_id]
+        for category in DATA_TEMPLATE:
+            if fields.intersection(
+                SUBSCRIPTION_CATALOGUE[category]['criteria']
+            ):
+                sync_level_subs.add(category)
+
+    async def graphql_sub_data_match(self, w_id, sub_id):
+        """Match store data level to requested graphql subscription."""
+        sync_level_wsubs = self.workflow_sync_graphql_subs[w_id]
+        sync_level_wsubs.add(sub_id)
+
+        # set new sync level
+        await self._update_subscription_level(w_id)
+
+    async def graphql_sub_discard(self, sub_id):
+        """Discard graphql subscription references."""
+        if sub_id in self.sync_level_graphql_subs:
+            del self.sync_level_graphql_subs[sub_id]
+        for w_id in self.workflow_sync_graphql_subs:
+            if sub_id not in self.workflow_sync_graphql_subs[w_id]:
+                continue
+            self.workflow_sync_graphql_subs[w_id].discard(sub_id)
+            await self._update_subscription_level(w_id)
+
+    async def set_query_sync_levels(
+        self,
+        w_ids: Iterable[str],
+        level: Optional[Iterable[str]] = None,
+        expire_delay: Optional[float] = None,
+    ):
+        """Set a workflow sync level."""
+        if level is None:
+            level = set(DATA_TEMPLATE.keys())
+        if expire_delay is None:
+            expire_delay = QUERY_SYNC_EXPIRY
+        expire_time = time.time() + expire_delay
+        for w_id in w_ids:
+            if self.workflow_sync_level[w_id] == level:
+                # Already required level
+                continue
+            self.workflow_query_sync_timers[w_id]['expiry'] = expire_time
+            self.workflow_query_sync_timers[w_id]['level'].update(level)
+            await self._update_subscription_level(w_id)
+
+    async def check_query_sync_level_expiries(self):
+        """Check for and downgrade expired sub levels."""
+        for w_id, items in self.workflow_query_sync_timers.items():
+            if items['expiry'] < time.time():
+                items['expiry'] = 0.0
+                items['level'].clear()
+                await self._update_subscription_level(w_id)
