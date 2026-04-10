@@ -22,14 +22,10 @@ With no arguments, the status of the ad-hoc web service server is printed.
 
 For 'cylc review start', if 'PORT' is not specified, port 8080 is used."""
 
-import cherrypy
 import contextlib
 from fnmatch import fnmatch
 from glob import glob
-import jinja2
-from jinja2 import select_autoescape
 import json
-import markupsafe
 import mimetypes
 import os
 import pwd
@@ -38,16 +34,27 @@ import shlex
 from sqlite3 import OperationalError
 import tarfile
 from tempfile import NamedTemporaryFile
-from time import gmtime, strftime
+from time import (
+    gmtime,
+    strftime,
+)
 import traceback
 from urllib.parse import quote
+
+import cherrypy
+import jinja2
+from jinja2 import select_autoescape
+import markupsafe
 
 from cylc.flow import __version__ as CYLC_VERSION
 from cylc.flow.hostuserutil import get_host
 from cylc.flow.task_state import TASK_STATUSES_ORDERED
 from cylc.flow.workflow_files import WorkflowFiles
-from cylc.uiserver.review_dao import TASK_STATUS_GROUPS, CylcReviewDAO
-from cylc.uiserver.ws import get_util_home
+from cylc.review.review_dao import (
+    TASK_STATUS_GROUPS,
+    CylcReviewDAO,
+)
+from cylc.review.ws import get_util_home
 
 
 # Cylc 7 Task states.
@@ -108,7 +115,7 @@ class CylcReviewService:
         # Autoescape markup to prevent code injection from user inputs.
         template_env = jinja2.Environment(
             loader=jinja2.PackageLoader(
-                'cylc', package_path='uiserver/cylc_review/template'),
+                'cylc', package_path='review/template'),
             autoescape=select_autoescape(
                 enabled_extensions=('html', 'xml'), default_for_string=True),
         )

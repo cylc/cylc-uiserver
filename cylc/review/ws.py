@@ -20,12 +20,14 @@ wsgi_app - Return a WSGI application for a web service.
 ws_cli - Parse CLI. Start/Stop ad-hoc server.
 """
 
-from annotated_types import Ge
-import cherrypy
 from glob import glob
 import os
 from pathlib import Path
 from typing import Annotated
+
+from annotated_types import Ge
+import cherrypy
+
 
 LOG_ROOT_TMPL = "~/.cylc/%(ns)s-%(util)s-%(host)s-%(port)s"
 
@@ -113,7 +115,7 @@ def _configure(service_cls):
     config = {}
     from pathlib import Path
 
-    static_lib = Path(__file__).parent / 'cylc_review/static'
+    static_lib = Path(__file__).parent / 'static'
     for name in os.listdir(static_lib):
         path = os.path.join(static_lib, name)
         if os.path.isdir(path):
