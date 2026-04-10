@@ -30,14 +30,12 @@ omit =
     cylc/uiserver/tests/*
     cylc/uiserver/jupyter*_config.py
 parallel = True
-plugins=
-include=
-    cylc/uiserver/*
 timid = False
+source = ./cylc
+relative_files=True
 
 
 [report]
-
 exclude_lines =
     pragma: no cover
     def __repr__
@@ -66,14 +64,13 @@ show_missing=False
 skip_covered=False
 sort=Name
 
-[html]
 
+[html]
 directory=htmlcov
 extra_css=
 title=
 
 
 [xml]
-
 output=coverage.xml
 package_depth=99
