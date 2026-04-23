@@ -57,7 +57,7 @@ Cylc Review Service
 
 Cylc hub can be configured to automatically serve the Cylc Review static
 log-file viewer. To enable Cylc Review, add the following to your
-`jupyterhub_config.py`:
+``jupyterhub_config.py``:
 
 .. code-block:: python
 
