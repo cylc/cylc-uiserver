@@ -20,12 +20,16 @@ wsgi_app - Return a WSGI application for a web service.
 ws_cli - Parse CLI. Start/Stop ad-hoc server.
 """
 
-from annotated_types import Ge
-import cherrypy
-from glob import glob
 import os
+from glob import glob
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
+
+import cherrypy
+
+if TYPE_CHECKING:
+    from annotated_types import Ge
+
 
 LOG_ROOT_TMPL = "~/.cylc/%(ns)s-%(util)s-%(host)s-%(port)s"
 
@@ -113,7 +117,7 @@ def _configure(service_cls):
     config = {}
     from pathlib import Path
 
-    static_lib = Path(__file__).parent / 'cylc_review/static'
+    static_lib = Path(__file__).parent / 'static'
     for name in os.listdir(static_lib):
         path = os.path.join(static_lib, name)
         if os.path.isdir(path):
@@ -161,7 +165,7 @@ def get_util_home(*args):
 
 
 def get_review_service_config(
-    port: Annotated[int, Ge(0)] = 8042,
+    port: 'Annotated[int, Ge(0)]' = 8042,
     service_root: str = 'services/cylc'
 ) -> dict:
     """Get a configuration for Cylc Review as a service.

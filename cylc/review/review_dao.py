@@ -33,6 +33,7 @@ from cylc.flow.task_state import (
 )
 from cylc.flow.workflow_files import WorkflowFiles
 
+
 TASK_STATUS_GROUPS = {
     # Cylc review's Cylc 7 based view of what is "active" is not the same
     # As Cylc 8's:
@@ -194,7 +195,7 @@ class CylcReviewDAO:
 
     @staticmethod
     def set_is_cylc8(user_name, suite_name):
-        from cylc.uiserver.review import CylcReviewService
+        from cylc.review.review import CylcReviewService
 
         suite_dir = os.path.join(
             CylcReviewService._get_user_home(user_name),

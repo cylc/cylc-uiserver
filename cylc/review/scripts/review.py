@@ -26,9 +26,14 @@ import os
 import signal
 
 from cylc.flow.option_parsers import CylcOptionParser as COP
-from cylc.uiserver.review import CylcReviewService
 from cylc.flow.terminal import cli_function
-from cylc.uiserver.ws import _ws_init, _get_server_status
+
+from cylc.review.review import CylcReviewService
+from cylc.review.ws import (
+    _get_server_status,
+    _ws_init,
+)
+
 
 START = 'start'
 STOP = 'stop'
