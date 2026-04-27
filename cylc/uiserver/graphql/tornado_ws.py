@@ -141,7 +141,6 @@ class TornadoSubscriptionServer:
     def __init__(
         self,
         schema,
-        keep_alive=True,
         loop=None,
         middleware=None,
         execution_context_class=None,
