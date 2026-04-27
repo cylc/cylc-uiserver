@@ -40,14 +40,15 @@ from cylc.flow.data_store_mgr import (
 )
 from cylc.flow.id import Tokens
 from cylc.flow.network.schema import (
-    NODE_MAP,
-    STRIP_NULL_DEFAULT,
-    SUB_RESOLVER_MAPPING,
     CyclePoint,
     GenericResponse,
     Job,
     Mutations,
+    NODE_MAP,
     Queries,
+    Reload,
+    STRIP_NULL_DEFAULT,
+    SUB_RESOLVER_MAPPING,
     SortArgs,
     Subscriptions,
     Task,
@@ -237,6 +238,87 @@ class Play(graphene.Mutation):
                 on the `cylc play` command line if they need to be overridden.
             ''')
         )
+
+    result = GenericScalar()
+
+
+class Reinstall:
+    class Arguments:
+        workflows = graphene.List(WorkflowID, required=True)
+        cylc_version = CylcVersion(
+            description=sstrip('''
+                Set the Cylc version that the workflow starts with.
+            ''')
+        )
+        # cylc-rose
+        rose_opt_conf_keys = graphene.List(
+            graphene.String,
+            description=sstrip('''
+                Add Rose optional configurations (if Rose is used).
+            ''')
+        )
+        clear_rose_install_options = graphene.Boolean(
+            default_value=False,
+            description=sstrip('''
+                Clear options previous set by cylc-rose.
+            ''')
+        )
+        rose_suite_defines = graphene.List(
+            graphene.String,
+            description=sstrip('''
+                Each of these overrides the `[SECTION]KEY` setting in a
+                `rose-suite.conf` file.
+
+                Can be used to disable a setting using the syntax
+                `[SECTION]!KEY` or even `[!SECTION]`.
+            ''')
+        )
+        rose_template_variables = graphene.List(
+            graphene.String,
+            description=sstrip('''
+                Define a Rose `[template variable]`s e.g, `FOO=1`.
+
+                Note: Specifying `FOO=1` to this argument is equivalent to
+                specifying `[template variables]FOO=1` to the `define`
+                argument.
+            ''')
+        )
+
+
+class ReinstallReload(graphene.Mutation):
+    class Meta:
+        description = sstrip('''
+            Validate, reinstall, then reload workflows.
+
+            This command updates a workflow to reflect any new changes made in
+            the workflow source directory since it was installed.
+
+            Valid for: paused, running workflows.
+        ''')
+        resolver = partial(mutator, command='validate_reinstall')
+
+    class Arguments(Reinstall.Arguments, Reload.Arguments):
+        """Compound command inherits arguments from the subcommands it proxies.
+        """
+
+    result = GenericScalar()
+
+
+class ReinstallRestart(graphene.Mutation):
+    class Meta:
+        description = sstrip('''
+            Validate, reinstall, then restart workflows.
+
+            This command updates a workflow to reflect any new changes made in
+            the workflow source directory since it was installed.
+
+            Valid for: stopped workflows.
+        ''')
+        resolver = partial(mutator, command='validate_reinstall')
+
+    class Arguments(Reinstall.Arguments, Play.Arguments):
+        """Compound command inherits arguments from the subcommands it proxies.
+        """
 
     result = GenericScalar()
 
@@ -894,6 +976,8 @@ class UISSubscriptions(Subscriptions):
 
 class UISMutations(Mutations):
     play = _mut_field(Play)
+    reinstall_reload = _mut_field(ReinstallReload)
+    reinstall_restart = _mut_field(ReinstallRestart)
     clean = _mut_field(Clean)
     scan = _mut_field(Scan)
 
