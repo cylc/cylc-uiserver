@@ -64,13 +64,13 @@ def make_db(task_entries, task_events=None):
 
     conn.execute(
         '''
-        CREATE TABLE 
+        CREATE TABLE
             task_events(
                 name TEXT,
                 cycle TEXT,
                 time TEXT,
                 submit_num INTEGER,
-                event TEXT, 
+                event TEXT,
                 message TEXT);''')
 
     conn.executemany(
@@ -88,50 +88,30 @@ def make_db(task_entries, task_events=None):
 
 def test_make_task_query_1():
     conn = make_db(
-        task_entries=[(
-            '1',
-            'Task_1',
-            1,
-            '[1]',
-            0,
-            1,
-            '2022-12-14T15:00:00Z',
-            '2022-12-14T15:01:00Z',
-            0,
-            '2022-12-14T15:01:00Z',
-            '2022-12-14T15:10:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        )],
-        task_events=[
+        task_entries=[
             (
-                'Task_1',
                 '1',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
                 '2022-12-14T15:00:00Z',
-                1,
-                'submitted',
-                ''
-            ),
-            (
-
-                'Task_1',
-                '1',
                 '2022-12-14T15:01:00Z',
-                1,
-                'started',
-                ''
-            ),
-            (
-                'Task_1',
-                '1',
+                0,
+                '2022-12-14T15:01:00Z',
                 '2022-12-14T15:10:00Z',
-                1,
-                'succeeded',
-                ''
-            ),
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            )
+        ],
+        task_events=[
+            ('Task_1', '1', '2022-12-14T15:00:00Z', 1, 'submitted', ''),
+            ('Task_1', '1', '2022-12-14T15:01:00Z', 1, 'started', ''),
+            ('Task_1', '1', '2022-12-14T15:10:00Z', 1, 'succeeded', ''),
             (
                 'Task_1',
                 '1',
@@ -141,9 +121,9 @@ def test_make_task_query_1():
                 (
                     '_cylc_profiler: {"cpu_time": 994, "max_rss": 40064,'
                     ' "memory_allocated": 1048576}'
-                )
-            )
-        ]
+                ),
+            ),
+        ],
     )
     workflow = Tokens('~user/workflow')
 
@@ -226,74 +206,32 @@ def test_make_task_query_2():
                 'MyPlatform',
                 'User',
                 'UsersJob',
-            )
+            ),
         ],
         task_events=[
-            (
-                'Task_1',
-                '1',
-                '2022-12-14T15:00:00Z',
-                1,
-                'submitted',
-                ''
-            ),
-            (
-                'Task_1',
-                '1',
-                '2022-12-14T15:01:00Z',
-                1,
-                'started',
-                ''
-            ),
-            (
-                'Task_1',
-                '1',
-                '2022-12-14T15:10:00Z',
-                1,
-                'succeeded',
-                ''
-            ),
+            ('Task_1', '1', '2022-12-14T15:00:00Z', 1, 'submitted', ''),
+            ('Task_1', '1', '2022-12-14T15:01:00Z', 1, 'started', ''),
+            ('Task_1', '1', '2022-12-14T15:10:00Z', 1, 'succeeded', ''),
             (
                 '1',
                 'Task_1',
                 1,
                 '2022-12-14T15:10:00Z',
                 'message debug',
-                '_cylc_profiler: {"cpu_time": 994, "max_rss": 40064}'
+                '_cylc_profiler: {"cpu_time": 994, "max_rss": 40064}',
             ),
-            (
-                'Task_1',
-                '2',
-                '2022-12-14T16:00:00Z',
-                1,
-                'submitted',
-                ''
-            ),
-            (
-                'Task_1',
-                '2',
-                '2022-12-14T16:01:00Z',
-                1,
-                'started',
-                ''
-            ),
-            (
-                'Task_1',
-                '2',
-                '2022-12-14T16:10:00Z',
-                1,
-                'succeeded',
-                ''
-            ),
+            ('Task_1', '2', '2022-12-14T16:00:00Z', 1, 'submitted', ''),
+            ('Task_1', '2', '2022-12-14T16:01:00Z', 1, 'started', ''),
+            ('Task_1', '2', '2022-12-14T16:10:00Z', 1, 'succeeded', ''),
             (
                 'Task_1',
                 '2',
                 '2022-12-14T16:10:00Z',
                 1,
                 'message debug',
-                '_cylc_profiler: {"cpu_time": 1994, "max_rss": 50064}'
+                '_cylc_profiler: {"cpu_time": 1994, "max_rss": 50064}',
             ),
-        ]
+        ],
     )
     conn.commit()
     workflow = Tokens('~user/workflow')
@@ -384,106 +322,43 @@ def test_make_task_query_3():
                 'MyPlatform',
                 'User',
                 'UsersJob',
-            )
+            ),
         ],
         task_events=[
-            (
-                'Task_1',
-                '1',
-                '2022-12-14T15:00:00Z',
-                1,
-                'submitted',
-                ''
-            ),
-            (
-                'Task_1',
-                '1',
-                '2022-12-14T15:01:00Z',
-                1,
-                'started',
-                ''
-            ),
-            (
-                'Task_1',
-                '1',
-                '2022-12-14T15:10:00Z',
-                1,
-                'succeeded',
-                ''
-            ),
+            ('Task_1', '1', '2022-12-14T15:00:00Z', 1, 'submitted', ''),
+            ('Task_1', '1', '2022-12-14T15:01:00Z', 1, 'started', ''),
+            ('Task_1', '1', '2022-12-14T15:10:00Z', 1, 'succeeded', ''),
             (
                 'Task_1',
                 '1',
                 '2022-12-14T15:10:00Z',
                 1,
                 'message debug',
-                'cpu_time 994 max_rss 40064'
+                'cpu_time 994 max_rss 40064',
             ),
-            (
-                'Task_1',
-                '2',
-                '2022-12-14T16:00:00Z',
-                1,
-                'submitted',
-                ''
-            ),
-            (
-                'Task_1',
-                '2',
-                '2022-12-14T16:01:00Z',
-                1,
-                'started',
-                ''
-            ),
-            (
-                'Task_1',
-                '2',
-                '2022-12-14T16:10:00Z',
-                1,
-                'succeeded',
-                ''
-            ),
+            ('Task_1', '2', '2022-12-14T16:00:00Z', 1, 'submitted', ''),
+            ('Task_1', '2', '2022-12-14T16:01:00Z', 1, 'started', ''),
+            ('Task_1', '2', '2022-12-14T16:10:00Z', 1, 'succeeded', ''),
             (
                 'Task_1',
                 '2',
                 '2022-12-14T16:10:00Z',
                 1,
                 'message debug',
-                'cpu_time 1994 max_rss 50064'
+                'cpu_time 1994 max_rss 50064',
             ),
-            (
-                'Task_1',
-                '3',
-                '2022-12-14T17:00:00Z',
-                1,
-                'submitted',
-                ''
-            ),
-            (
-                'Task_1',
-                '3',
-                '2022-12-14T17:01:00Z',
-                1,
-                'started',
-                ''
-            ),
-            (
-                'Task_1',
-                '3',
-                '2022-12-14T17:10:00Z',
-                1,
-                'succeeded',
-                ''
-            ),
+            ('Task_1', '3', '2022-12-14T17:00:00Z', 1, 'submitted', ''),
+            ('Task_1', '3', '2022-12-14T17:01:00Z', 1, 'started', ''),
+            ('Task_1', '3', '2022-12-14T17:10:00Z', 1, 'succeeded', ''),
             (
                 'Task_1',
                 '3',
                 '2022-12-14T17:10:00Z',
                 1,
                 'message debug',
-                'cpu_time 2994 max_rss 60064'
+                'cpu_time 2994 max_rss 60064',
             ),
-        ]
+        ],
     )
     conn.commit()
     workflow = Tokens('~user/workflow')
@@ -602,106 +477,43 @@ def test_make_jobs_query_1():
                 'MyPlatform',
                 'User',
                 'UsersJob',
-            )
+            ),
         ],
         task_events=[
-            (
-                '1',
-                'Task_1',
-                1,
-                '2022-12-14T15:00:00Z',
-                'submitted',
-                ''
-            ),
-            (
-                '1',
-                'Task_1',
-                1,
-                '2022-12-14T15:01:00Z',
-                'started',
-                ''
-            ),
-            (
-                '1',
-                'Task_1',
-                1,
-                '2022-12-14T15:10:00Z',
-                'succeeded',
-                ''
-            ),
+            ('1', 'Task_1', 1, '2022-12-14T15:00:00Z', 'submitted', ''),
+            ('1', 'Task_1', 1, '2022-12-14T15:01:00Z', 'started', ''),
+            ('1', 'Task_1', 1, '2022-12-14T15:10:00Z', 'succeeded', ''),
             (
                 '1',
                 'Task_1',
                 1,
                 '2022-12-14T15:10:00Z',
                 'message debug',
-                '{    "max_rss": 40064,    "cpu_time": 994}'
+                '{    "max_rss": 40064,    "cpu_time": 994}',
             ),
-            (
-                '2',
-                'Task_1',
-                1,
-                '2022-12-14T16:00:00Z',
-                'submitted',
-                ''
-            ),
-            (
-                '2',
-                'Task_1',
-                1,
-                '2022-12-14T16:01:00Z',
-                'started',
-                ''
-            ),
-            (
-                '2',
-                'Task_1',
-                1,
-                '2022-12-14T16:10:00Z',
-                'succeeded',
-                ''
-            ),
+            ('2', 'Task_1', 1, '2022-12-14T16:00:00Z', 'submitted', ''),
+            ('2', 'Task_1', 1, '2022-12-14T16:01:00Z', 'started', ''),
+            ('2', 'Task_1', 1, '2022-12-14T16:10:00Z', 'succeeded', ''),
             (
                 '2',
                 'Task_1',
                 1,
                 '2022-12-14T16:10:00Z',
                 'message debug',
-                '{    "max_rss": 50064,    "cpu_time": 1994}'
+                '{    "max_rss": 50064,    "cpu_time": 1994}',
             ),
-            (
-                '3',
-                'Task_1',
-                1,
-                '2022-12-14T17:00:00Z',
-                'submitted',
-                ''
-            ),
-            (
-                '3',
-                'Task_1',
-                1,
-                '2022-12-14T17:01:00Z',
-                'started',
-                ''
-            ),
-            (
-                '3',
-                'Task_1',
-                1,
-                '2022-12-14T17:10:00Z',
-                'succeeded',
-                ''
-            ),
+            ('3', 'Task_1', 1, '2022-12-14T17:00:00Z', 'submitted', ''),
+            ('3', 'Task_1', 1, '2022-12-14T17:01:00Z', 'started', ''),
+            ('3', 'Task_1', 1, '2022-12-14T17:10:00Z', 'succeeded', ''),
             (
                 '3',
                 'Task_1',
                 1,
                 '2022-12-14T17:10:00Z',
                 'message_debug',
-                '{    "max_rss": 60064,    "cpu_time": 2994}'
+                '{    "max_rss": 60064,    "cpu_time": 2994}',
             ),
-        ]
+        ],
     )
     conn.commit()
     workflow = Tokens('~user/workflow')
