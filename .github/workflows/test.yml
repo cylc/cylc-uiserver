@@ -117,7 +117,7 @@ jobs:
 
       - name: Coverage report
         run: |
-          coverage combine .
+          coverage combine --append
           coverage xml --ignore-errors
           coverage report
 

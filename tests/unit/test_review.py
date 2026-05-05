@@ -17,7 +17,7 @@
 from io import BytesIO, StringIO
 import pytest
 
-from cylc.uiserver.review import CylcReviewService
+from cylc.review.review import CylcReviewService
 
 
 param = pytest.param

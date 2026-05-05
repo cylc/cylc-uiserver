@@ -24,8 +24,8 @@ from time import sleep
 
 from cylc.flow import __version__ as CYLC_VERSION
 
-from cylc.uiserver.review import CylcReviewService
-from cylc.uiserver.ws import _ws_init
+from cylc.review.review import CylcReviewService
+from cylc.review.ws import _ws_init
 
 
 @pytest.fixture(scope='module')
