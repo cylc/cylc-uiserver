@@ -180,9 +180,6 @@ class DataStoreMgr:
             self.log.info(f'failed to connect to {w_id}')
             self.disconnect_workflow(w_id)
             return False
-        else:
-            # don't update the contact data until we have successfully updated
-            self._update_contact(w_id, contact_data)
 
     @log_call
     def disconnect_workflow(self, w_id, update_contact=True):
@@ -385,6 +382,7 @@ class DataStoreMgr:
             ids = []
 
         # Request new data
+        req_time = time.time()
         req_method = 'pb_entire_workflow'
 
         requests = {
@@ -412,6 +410,9 @@ class DataStoreMgr:
             new_data = deepcopy(DATA_TEMPLATE)
             for field, value in pb_data.ListFields():
                 if field.name == WORKFLOW:
+                    # If the workflow is still loading this initial dump will
+                    # be empty, so use time immediately before request.
+                    value.last_updated = value.last_updated or req_time
                     cast('PbWorkflow', new_data[field.name]).CopyFrom(value)
                     new_data['delta_times'] = {
                         key: value.last_updated

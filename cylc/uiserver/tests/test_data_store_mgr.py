@@ -324,6 +324,8 @@ async def test_update_workflow_data(
 
     # loop used in the reconcile request.
     data_store_mgr.loop = threadsafe_loop
+    # Pretend data store is populated for this workflow:
+    w_id_data['workflow'].last_updated = time()
     # Call the _update_workflow_data function.
     data_store_mgr._update_workflow_data(ALL_DELTAS, all_updated_delta, w_id)
 
