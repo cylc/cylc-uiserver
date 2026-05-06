@@ -524,12 +524,12 @@ SELECT
 FROM time_stats
 GROUP BY name, platform_name;
 '''):
-        total_of_totals += row[40]
+        total_of_totals += row['n']
         tasks.append({
             'id': workflow.duplicate(
-                cycle=row[1],
-                task=row[0],
-                job=row[2]
+                cycle=row['cycle'],
+                task=row['name'],
+                job=f"{row['submit_num']:02d}"
             ),
             'name': row[0],
             'cycle_point': row[1],
@@ -830,7 +830,7 @@ def run_jobs_query(
     }
 
     # the SQL statements required to extract each field
-    _fields = {
+    fields_map = {
         'name': 'tj.name',
         'cycle_point': 'tj.cycle',
         'submit_num': 'max(tj.submit_num)' if jobNN else 'tj.submit_num',
@@ -871,7 +871,7 @@ def run_jobs_query(
     # build the SQL query
     exprs = (
         f'{expr.strip()} AS {name}'
-        for name, expr in _fields.items() if name in fields
+        for name, expr in fields_map.items() if name in fields
     )
     query = rf'''
         SELECT
