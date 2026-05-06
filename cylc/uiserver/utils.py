@@ -14,15 +14,32 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import TYPE_CHECKING
+from typing import (
+    TYPE_CHECKING,
+    TypeVar,
+    cast,
+)
 
 from jupyter_server.auth.identity import PasswordIdentityProvider
 
+
 if TYPE_CHECKING:
-    from cylc.uiserver.handlers import CylcAppHandler
     from jupyter_server.auth.identity import (
         IdentityProvider as JPSIdentityProvider,
     )
+
+    from cylc.uiserver.handlers import CylcAppHandler
+
+
+_T = TypeVar('_T')
+
+
+def cast_non_null(var: _T | None) -> _T:
+    """Type cast an "Optional" variable to its non-None type.
+
+    Does not perform any runtime checks.
+    """
+    return cast('_T', var)
 
 
 def is_bearer_token_authenticated(handler: 'CylcAppHandler') -> bool:

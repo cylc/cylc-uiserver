@@ -51,6 +51,25 @@ Cylc specific configurations are documented here.
    ``c.CylcUIServer.site_authorization`` should be defined in
    ``/etc/cylc/uiserver/jupyter_config.py``, or, alternatively, via
    the environment variable ``CYLC_SITE_CONF_PATH``.
+
+Cylc Review Service
+^^^^^^^^^^^^^^^^^^^
+
+Cylc hub can be configured to automatically serve the Cylc Review static
+log-file viewer. To enable Cylc Review, add the following to your
+``jupyterhub_config.py``:
+
+.. code-block:: python
+
+   from cylc.uiserver.ws import get_review_service_config
+   c.JupyterHub.services = [get_review_service_config()]
+   c.JupyterHub.load_roles = [
+       {
+           "name": "user",
+           "scopes": ["self", "access:services!service=cylc-review"],
+       },
+   ]
+
 """
 
 from concurrent.futures import ProcessPoolExecutor
@@ -62,7 +81,6 @@ from pathlib import (
 )
 import sys
 from textwrap import dedent
-from types import SimpleNamespace
 from typing import (
     List,
     Optional,
@@ -74,14 +92,13 @@ from packaging.version import Version
 from tornado import ioloop
 from tornado.web import RedirectHandler
 from traitlets import (
-    Bool,
     Dict,
     Float,
     Int,
+    Unicode,
     TraitError,
     TraitType,
     Undefined,
-    Unicode,
     default,
     validate,
 )
@@ -90,7 +107,6 @@ from traitlets.config.loader import LazyConfigValue
 from cylc.flow.network.graphql import (
     CylcExecutionContext, IgnoreFieldMiddleware
 )
-from cylc.flow.profiler import Profiler
 from cylc.uiserver import __file__ as uis_pkg
 from cylc.uiserver.authorise import (
     Authorization,
@@ -109,6 +125,7 @@ from cylc.uiserver.handlers import (
     UIServerGraphQLHandler,
     UserProfileHandler,
 )
+from cylc.uiserver.profilers import get_profiler
 from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
 from cylc.uiserver.graphql.tornado_ws import TornadoSubscriptionServer
@@ -336,15 +353,33 @@ class CylcUIServer(ExtensionApp):
         ''',
         default_value=100,
     )
-    profile = Bool(
+    profile = Unicode(
         config=True,
         help='''
-            Turn on Python profiling.
+            Developer extension: Turn on the specified profiler.
 
-            The profile results will be saved to ~/.cylc/uiserver/profile.prof
-            in cprofile format.
+            The default (empty string) does not invoke a profiler.
+
+            Only one profiler may be run at a time.
+
+            Options:
+                cprofile:
+                    Profile Python code execution time with cprofile.
+
+                    Results will be saved to ~/.cylc/uiserver/profile.prof
+                    in cprofile format.
+                track_objects:
+                    Track attributes of the CylcUIServer class.
+
+                    Results will be saved to
+                    ~/.cylc/uiserver/cylc.flow.main_loop.log_memory.pdf.
+                track_data_store
+                    Track attributes of the DataStoreMgr class.
+
+                    Results will be saved to
+                    ~/.cylc/uiserver/cylc.flow.main_loop.log_memory.pdf.
         ''',
-        default_value=False,
+        default_value='',
     )
 
     log_timeout = Float(
@@ -477,14 +512,13 @@ class CylcUIServer(ExtensionApp):
             )
         )
 
-        # start profiling
-        self.profiler = Profiler(
-            # the profiler is designed to attach to a Cylc scheduler
-            schd=SimpleNamespace(workflow_log_dir=USER_CONF_ROOT),
-            # profiling is turned on via the "profile" traitlet
-            enabled=self.profile,
-        )
-        self.profiler.start()
+        profiler_cls = get_profiler(self.profile)
+        if profiler_cls:
+            self.profiler = profiler_cls(self)
+            ioloop.PeriodicCallback(
+                self.profiler.periodic,
+                1000,  # PT1S
+            ).start()
 
         # start the async scan task running (do this on server start not init)
         ioloop.IOLoop.current().add_callback(
@@ -633,4 +667,7 @@ class CylcUIServer(ExtensionApp):
 
         # Destroy ZeroMQ context of all sockets
         self.workflows_mgr.context.destroy()
-        self.profiler.stop()
+
+        # stop the profiler
+        if getattr(self, 'profiler', None):
+            self.profiler.shutdown()

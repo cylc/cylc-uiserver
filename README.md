@@ -44,6 +44,12 @@ This repository provides the following components of the Cylc system.
   server and handles authentication. It is a
   [JupyterHub](https://github.com/jupyterhub/jupyterhub) server.
 
+* Cylc Review
+
+  A Hub "service" which runs a public web server for viewing user's workflows.
+  It is a Jupyter Hub [JupyterHub](https://github.com/jupyterhub/jupyterhub)
+  service.
+
 
 ## Installation
 
@@ -240,6 +246,23 @@ By default the Cylc part of the UI Server log is written to
 TODO: Link to Jupyter Server logging_config docs when published
 -->
 
+### Review
+
+To enable the Cylc Review web service, register the service using
+`JupyterHub.services` and provide users access to it using
+`JupyterHub.load_roles`:
+
+```python
+from cylc.uiserver.ws import get_review_service_config
+c.JupyterHub.services = [get_review_service_config()]
+c.JupyterHub.load_roles = [
+    {
+        "name": "user",
+        "scopes": ["self", "access:services!service=cylc-review"],
+    },
+]
+```
+
 ### UI
 
 The UI can be configured via the "Settings" option in the Dashboard.
@@ -285,15 +308,31 @@ Contributions welcome:
    c.CylcUIServer.ui_build_dir = os.path.expanduser('~/cylc-ui/dist')
    ```
 
-Note about testing: unlike cylc-flow, cylc-uiserver uses the
+**Note about testing:**
+
+Unlike cylc-flow, cylc-uiserver uses the
 [pytest-tornasync](https://github.com/eukaryote/pytest-tornasync/) plugin
 instead of [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio).
 This means you should not decorate async test functions with
 `@pytest.mark.asyncio`.
 
+**Profiling:**
+
+There are some built-in profilers in the server, activate them using the
+`profile` trait, e.g:
+
+```
+cylc gui --CylcUIServer.profile=track_data_store
+```
+
+
+See the
+[config docs](https://cylc.github.io/cylc-doc/stable/html/reference/config/ui-server.html#cylc.uiserver.app.CylcUIServer.profile)
+for more details.
+
 ## Copyright and Terms of Use
 
-Copyright (C) 2019-<span actions:bind='current-year'>2025</span> NIWA & British Crown (Met Office) & Contributors.
+Copyright (C) 2019-<span actions:bind='current-year'>2026</span> NIWA & British Crown (Met Office) & Contributors.
 
 Cylc is free software: you can redistribute it and/or modify it under the terms
 of the GNU General Public License as published by the Free Software Foundation,
