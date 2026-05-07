@@ -1,0 +1,9 @@
+import{_ as f,b2 as b,bK as h,q as a,bF as m,x as s,bL as k,g as l,A as u,t as c,v as x,F as J,r as v,o}from"./index-PqzDRcKR.js";const g={name:"GraphNode",components:{SVGTask:h,Job:b},props:{task:{type:Object,required:!0},jobs:{type:Array,required:!0},maxJobs:{default:6,required:!1},mostRecentJobScale:{default:1.2,required:!1}},computed:{nodeID(){return`graph-node-${this.task.id}`},startTime(){return this.jobs?.[0]?.node?.startedTime},jobsForDisplay(){return this.jobs.slice(0,this.maxJobs)},numOverflowJobs(){return this.jobs.length>this.maxJobs?this.jobs.length-this.maxJobs:0},labelTransform(){return this.jobs.length?"":"translate(0, 20)"},previousJobOffset(){return this.mostRecentJobScale*100-100}}},y={class:"c-graph-node"},T=["transform"],j={x:"130",y:"25","font-size":"45"},p={x:"130",y:"65","font-size":"30"},S={transform:`
+        translate(130, 75)
+        scale(0.3, 0.3)
+      `},w=["transform"],D=["transform"],G={x:"25",y:"75","font-size":"80"};function O(V,q,e,B,F,t){const _=u("SVGTask"),d=u("Job"),i=k("command-menu");return o(),a("g",y,[m(l(_,{task:e.task.node,modifierSize:.5,startTime:t.startTime,viewBox:"-40 -40 140 140",x:"0",y:"0"},null,8,["task","startTime"]),[[i,e.task]]),s("g",{transform:t.labelTransform},[s("text",j,c(e.task.name),1),s("text",p,c(e.task.tokens.cycle),1)],8,T),s("g",S,[(o(!0),a(J,null,v(t.jobsForDisplay,(r,n)=>(o(),a("g",{class:"jobs",key:r.id,transform:`
+          translate(${n*100+(n===0?0:t.previousJobOffset)}, 0)
+          scale(${n===0?e.mostRecentJobScale:"1"})
+        `},[m(l(d,{svg:!0,status:r.node.state,viewBox:"0 0 100 100"},null,8,["status"]),[[i,r]])],8,w))),128)),t.numOverflowJobs?(o(),a("g",{key:0,class:"job-overflow",transform:`
+          translate(${e.maxJobs*100+20}, 0)
+        `},[s("text",G," +"+c(t.numOverflowJobs),1)],8,D)):x("",!0)])])}const z=f(g,[["render",O]]);export{z as G};
