@@ -26,9 +26,19 @@
 import asyncio
 from asyncio.queues import QueueEmpty
 from contextlib import suppress
+from enum import (
+    StrEnum,
+    auto,
+)
 from inspect import isawaitable
 import json
-from typing import TYPE_CHECKING
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    Literal,
+    Type,
+)
 
 from graphql import (
     ExecutionResult,
@@ -47,23 +57,44 @@ from cylc.uiserver.schema import SUB_RESOLVER_MAPPING
 
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from graphene import Schema
+    from graphql import ExecutionContext
+    from tornado.httputil import HTTPServerRequest
+
+    from cylc.uiserver.authorise import Authorization
     from cylc.uiserver.handlers import SubscriptionHandler
 
 
 NO_MSG_DELAY = 1.0
 
-GRAPHQL_WS = "graphql-ws"
-WS_PROTOCOL = GRAPHQL_WS
-GQL_CONNECTION_INIT = "connection_init"  # Client -> Server
-GQL_CONNECTION_ACK = "connection_ack"  # Server -> Client
-GQL_CONNECTION_ERROR = "connection_error"  # Server -> Client
-GQL_CONNECTION_TERMINATE = "connection_terminate"  # Client -> Server
-GQL_CONNECTION_KEEP_ALIVE = "ka"  # Server -> Client
-GQL_START = "start"  # Client -> Server
-GQL_DATA = "data"  # Server -> Client
-GQL_ERROR = "error"  # Server -> Client
-GQL_COMPLETE = "complete"  # Server -> Client
-GQL_STOP = "stop"  # Client -> Server
+WS_PROTOCOL = 'graphql-transport-ws'
+
+
+class OperationType(StrEnum):
+    """graphql-transport-ws message types.
+
+    See https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md
+    """
+    CONNECTION_INIT = auto()  # Client -> Server
+    CONNECTION_ACK = auto()  # Server -> Client
+    PING = auto()  # Bidirectional
+    PONG = auto()  # Bidirectional
+    SUBSCRIBE = auto()  # Client -> Server
+    NEXT = auto()  # Server -> Client
+    ERROR = auto()  # Server -> Client
+    COMPLETE = auto()  # Bidrectional
+
+
+SendOperationType = Literal[
+    OperationType.CONNECTION_ACK,
+    OperationType.PING,
+    OperationType.PONG,
+    OperationType.NEXT,
+    OperationType.ERROR,
+    OperationType.COMPLETE,
+]
 
 REQ_HEADER_INFO = {
     'Host',
@@ -76,40 +107,33 @@ REQ_HEADER_INFO = {
 
 
 class TornadoConnectionContext:
-
-    def __init__(self, ws, request_context=None):
-        self.ws: SubscriptionHandler = ws
-        self.operations = {}
+    def __init__(self, ws: 'SubscriptionHandler', request_context: dict):
+        self.ws = ws
+        self.operations: dict[str, 'AsyncIterator'] = {}
         self.request_context = request_context
         self.pending_tasks: set[asyncio.Task] = set()
 
-    def has_operation(self, op_id):
+    def has_operation(self, op_id: str):
         return op_id in self.operations
 
-    def register_operation(self, op_id, async_iterator):
+    def register_operation(self, op_id: str, async_iterator: 'AsyncIterator'):
         self.operations[op_id] = async_iterator
 
-    def get_operation(self, op_id):
+    def get_operation(self, op_id: str):
         return self.operations[op_id]
 
-    def remove_operation(self, op_id):
-        try:
-            return self.operations.pop(op_id)
-        except KeyError:
-            return
-
-    async def receive(self):
-        return self.ws.recv_nowait()
+    def remove_operation(self, op_id: str):
+        return self.operations.pop(op_id, None)
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         return self.ws.close_code is not None
 
     def remember_task(self, task: asyncio.Task) -> None:
         self.pending_tasks.add(task)
         task.add_done_callback(self.pending_tasks.discard)
 
-    async def unsubscribe(self, op_id):
+    async def unsubscribe(self, op_id: str) -> None:
         async_iterator = self._unsubscribe(op_id)
         if (
             getattr(async_iterator, "future", None)
@@ -117,7 +141,7 @@ class TornadoConnectionContext:
         ):
             await async_iterator.future
 
-    def _unsubscribe(self, op_id):
+    def _unsubscribe(self, op_id: str):
         async_iterator = self.remove_operation(op_id)
         if hasattr(async_iterator, "dispose"):
             async_iterator.dispose()
@@ -140,14 +164,12 @@ class TornadoSubscriptionServer:
 
     def __init__(
         self,
-        schema,
-        loop=None,
-        middleware=None,
-        execution_context_class=None,
-        auth=None
+        schema: 'Schema',
+        middleware: Iterable[Type],
+        execution_context_class: 'Type[ExecutionContext]',
+        auth: 'Authorization',
     ):
         self.schema = schema
-        self.loop = loop
         self.middleware = middleware
         self.execution_context_class = execution_context_class
         self.auth = auth
@@ -171,60 +193,69 @@ class TornadoSubscriptionServer:
             **params['kwargs']
         )
 
-    def process_message(self, connection_context, parsed_message):
-        task = asyncio.ensure_future(
-            self._process_message(connection_context, parsed_message),
-            loop=self.loop
+    def process_message(
+        self,
+        connection_context: TornadoConnectionContext,
+        parsed_message: dict,
+    ) -> asyncio.Task[None]:
+        """Process a message from the client"""
+        task = asyncio.create_task(
+            self._process_message(connection_context, parsed_message)
         )
         connection_context.remember_task(task)
         return task
 
-    async def _process_message(self, connection_context, parsed_message):
+    async def _process_message(
+        self,
+        connection_context: TornadoConnectionContext,
+        parsed_message: dict,
+    ) -> None:
         op_id = parsed_message.get("id")
         op_type = parsed_message.get("type")
         payload = parsed_message.get("payload")
 
-        if op_type == GQL_CONNECTION_INIT:
-            return await self.on_connection_init(
-                connection_context, op_id, payload
-            )
+        match op_type:
+            case OperationType.CONNECTION_INIT.value:
+                await self.on_connection_init(connection_context)
 
-        elif op_type == GQL_CONNECTION_TERMINATE:
-            return self.on_connection_terminate(connection_context, op_id)
+            case OperationType.SUBSCRIBE.value:
+                if not isinstance(payload, dict):
+                    raise AssertionError("The payload must be a dict")
+                assert op_id, "The message must have an operation ID"
+                params = self.get_graphql_params(connection_context, payload)
+                await self.on_subscribe(connection_context, op_id, params)
 
-        elif op_type == GQL_START:
-            if not isinstance(payload, dict):
-                raise AssertionError("The payload must be a dict")
-            params = self.get_graphql_params(connection_context, payload)
-            return await self.on_start(connection_context, op_id, params)
+            case OperationType.COMPLETE.value:
+                assert op_id, "The message must have an operation ID"
+                await connection_context.unsubscribe(op_id)
+                connection_context.request_context['sub_statuses'][op_id] = (
+                    'stop'
+                )
 
-        elif op_type == GQL_STOP:
-            return await self.on_stop(connection_context, op_id)
+            case OperationType.PING.value:
+                await self.send_message(connection_context, OperationType.PONG)
 
-        else:
-            return await self.send_error(
-                connection_context,
-                op_id,
-                Exception("Invalid message type: {}.".format(op_type)),
-            )
+            case OperationType.PONG.value:
+                pass
 
-    async def on_connection_init(self, connection_context, op_id, payload):
+            case _:
+                connection_context.ws.close(
+                    4400, f"Invalid message type: {op_type}"
+                )
+
+    async def on_connection_init(
+        self, connection_context: TornadoConnectionContext
+    ) -> None:
         try:
-            await self.on_connect(connection_context, payload)
             await self.send_message(
-                connection_context, op_type=GQL_CONNECTION_ACK)
+                connection_context, op_type=OperationType.CONNECTION_ACK
+            )
         except Exception as e:
-            await self.send_error(
-                connection_context, op_id, e, GQL_CONNECTION_ERROR)
-            await connection_context.ws.close(1011)
+            connection_context.ws.close(1011, str(e))
 
-    async def on_connect(self, connection_context, payload):
-        pass
-
-    def on_connection_terminate(self, connection_context, op_id):
-        return connection_context.ws.close(1011)
-
-    def get_graphql_params(self, connection_context, payload):
+    def get_graphql_params(
+        self, connection_context: TornadoConnectionContext, payload: dict
+    ):
         # Create a new context object for each subscription,
         # which allows it to carry a unique subscription id.
         params = {
@@ -237,14 +268,11 @@ class TornadoSubscriptionServer:
         }
         # If middleware get instantiated here (optional), they will
         # be local/private to each subscription.
-        if self.middleware is not None:
-            middleware = list(
-                instantiate_middleware(self.middleware)
-            )
-        else:
-            middleware = self.middleware
-        for mw in self.middleware:
-            if mw == AuthorizationMiddleware:
+        middleware = list(
+            instantiate_middleware(self.middleware)
+        )
+        for mw in middleware:
+            if isinstance(mw, AuthorizationMiddleware):
                 mw.auth = self.auth
         return {
             'query': payload.get("query"),
@@ -257,35 +285,41 @@ class TornadoSubscriptionServer:
             )
         }
 
-    async def on_open(self, connection_context):
-        pass
-
-    async def on_stop(self, connection_context, op_id):
-        return await connection_context.unsubscribe(op_id)
-
-    async def on_close(self, connection_context):
-        return await connection_context.unsubscribe_all()
-
-    async def handle(self, ws, request_context=None):
+    async def handle(self, ws: 'SubscriptionHandler', request_context: dict):
         await asyncio.shield(self._handle(ws, request_context))
 
-    async def _handle(self, ws, request_context=None):
+    async def _handle(self, ws: 'SubscriptionHandler', request_context: dict):
         connection_context = TornadoConnectionContext(ws, request_context)
-        await self.on_open(connection_context)
         while not connection_context.closed:
             try:
-                message = await connection_context.receive()
+                message = connection_context.ws.recv_nowait()
             except QueueEmpty:
                 await asyncio.sleep(NO_MSG_DELAY)
             else:
-                await self.on_message(connection_context, message)
+                self.on_message(connection_context, message)
 
-        await self.on_close(connection_context)
+        await connection_context.unsubscribe_all()
 
-    async def on_start(self, connection_context, op_id, params):
+    async def on_subscribe(
+        self,
+        connection_context: TornadoConnectionContext,
+        op_id: str,
+        params: dict,
+    ) -> None:
+        """Run when the client starts a subscription.
+
+        Execute the GraphQL subscription and send to the client each resulting
+        delta in turn.
+
+        This will not return until the subscription ends (e.g. workflow stops),
+        at which point it will send a complete message to the client and
+        clean up.
+        """
         # Attempt to unsubscribe first in case we already have a subscription
         # with this id.
         await connection_context.unsubscribe(op_id)
+
+        connection_context.request_context['sub_statuses'][op_id] = 'start'
 
         params['kwargs']['root_value'] = op_id
         execution_result = await self.execute(params)
@@ -307,26 +341,42 @@ class TornadoSubscriptionServer:
         except (GeneratorExit, asyncio.CancelledError):
             raise
         except Exception as e:
-            await self.send_error(connection_context, op_id, e)
+            with suppress(WebSocketClosedError):
+                await self.send_message(
+                    connection_context,
+                    OperationType.ERROR,
+                    op_id,
+                    payload=[{"message": str(e)}],
+                )
         finally:
             if iterator:
                 await iterator.aclose()
+
+        # Complete the subscription from the server side:
         with suppress(WebSocketClosedError):
-            await self.send_message(connection_context, op_id, GQL_COMPLETE)
+            await self.send_message(
+                connection_context, OperationType.COMPLETE, op_id
+            )
         await connection_context.unsubscribe(op_id)
-        await self.on_operation_complete(connection_context, op_id)
+        connection_context.request_context['sub_statuses'].pop(op_id, None)
 
     async def send_message(
-        self, connection_context, op_id=None, op_type=None, payload=None
-    ):
-        message = self.build_message(op_id, op_type, payload)
+        self,
+        connection_context: TornadoConnectionContext,
+        op_type: SendOperationType,
+        op_id: str | None = None,
+        payload=None,
+    ) -> None:
+        message = self.build_message(op_type, op_id, payload)
         try:
             return await connection_context.ws.write_message(message)
         except WebSocketClosedError:
             resolvers = connection_context.request_context.get('resolvers')
             if resolvers is not None:
-                request = connection_context.request_context.get('request')
-                headers = {}
+                request: HTTPServerRequest = (
+                    connection_context.request_context['request']
+                )
+                headers: dict[str, Any] = {}
                 headers.update(getattr(request, 'headers', {}))
                 resolvers.log.warning(
                     '[GraphQL WS] Websocket closed on send'
@@ -346,23 +396,28 @@ class TornadoSubscriptionServer:
             # Raise exception, in order to exit the on_start subscription loop.
             raise
 
-    def build_message(self, _id, op_type, payload):
-        message = {}
-        if _id is not None:
-            message["id"] = _id
-        if op_type is not None:
-            message["type"] = op_type
+    @staticmethod
+    def build_message(
+        op_type: SendOperationType, op_id: str | None, payload
+    ):
+        assert op_type, "Message must have a type"
+        message: dict[str, Any] = {"type": str(op_type)}
+        if op_id is not None:
+            message["id"] = op_id
         if payload is not None:
             message["payload"] = payload
-        if not message:
-            raise AssertionError("You need to send at least one thing")
         return message
 
     async def send_execution_result(
-            self, connection_context, op_id, execution_result):
+        self,
+        connection_context: TornadoConnectionContext,
+        op_id: str,
+        execution_result: ExecutionResult,
+    ):
         # Resolve any pending promises
         if is_awaitable(execution_result.data):
-            await execution_result.data
+            # TODO: never hit?
+            await execution_result.data  # type: ignore[misc]
         if execution_result.data and 'logs' not in execution_result.data:
             request_context = connection_context.request_context
             await request_context['resolvers'].flow_delta_processed(
@@ -370,41 +425,18 @@ class TornadoSubscriptionServer:
 
         result = execution_result.formatted
         return await self.send_message(
-            connection_context, op_id, GQL_DATA, result
+            connection_context, OperationType.NEXT, op_id, result
         )
 
-    async def on_operation_complete(self, connection_context, op_id):
-        # remove the subscription from the sub_statuses dict
-        with suppress(KeyError):
-            connection_context.request_context['sub_statuses'].pop(op_id)
-
-    async def send_error(
-        self, connection_context, op_id, error, error_type=None
-    ):
-        if error_type is None:
-            error_type = GQL_ERROR
-
-        if error_type not in {GQL_CONNECTION_ERROR, GQL_ERROR}:
-            raise AssertionError(
-                "error_type should be one of the allowed error messages"
-                " GQL_CONNECTION_ERROR or GQL_ERROR"
-            )
-
-        error_payload = {"message": str(error)}
-
-        with suppress(WebSocketClosedError):
-            return await self.send_message(
-                connection_context, op_id, error_type, error_payload)
-
-    async def on_message(self, connection_context, message):
+    def on_message(
+        self, connection_context: TornadoConnectionContext, message
+    ) -> None:
         try:
-            if not isinstance(message, dict):
-                parsed_message = json.loads(message)
-                if not isinstance(parsed_message, dict):
-                    raise AssertionError("Payload must be an object.")
-            else:
-                parsed_message = message
+            parsed_message = json.loads(message)
+            if not isinstance(parsed_message, dict):
+                raise AssertionError("Message must be an object")
         except Exception as e:
-            return await self.send_error(connection_context, None, e)
+            connection_context.ws.close(4400, str(e))
+            return None
 
-        return self.process_message(connection_context, parsed_message)
+        self.process_message(connection_context, parsed_message)
