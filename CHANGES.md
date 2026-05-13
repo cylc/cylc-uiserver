@@ -12,6 +12,14 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.9.0 (Released 2026-05-13)
+
+[Updated cylc-ui to 2.14.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🚀 Enhancements
+
+[#755](https://github.com/cylc/cylc-uiserver/pull/755) - Cylc Review converted to Python 3 and added to Cylc UIServer bundle.
+
 ## cylc-uiserver-1.8.4 (Released 2026-02-24)
 
 [Updated cylc-ui to 2.13.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
