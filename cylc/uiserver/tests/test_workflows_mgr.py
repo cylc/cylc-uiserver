@@ -48,7 +48,7 @@ LOG = logging.getLogger('cylc')
 )
 async def test_workflow_request_client_error(
     exc: Type[Exception],
-    async_client: AsyncClientFixture,
+    async_client: "AsyncClientFixture",
     caplog: pytest.LogCaptureFixture
 ):
     caplog.set_level(logging.ERROR, logger='cylc')
@@ -59,7 +59,7 @@ async def test_workflow_request_client_error(
     assert exc.__name__ in caplog.text
 
 
-async def test_workflow_request(async_client: AsyncClientFixture):
+async def test_workflow_request(async_client: "AsyncClientFixture"):
     """Test normal response of workflow_request matches async_request"""
     async_client.will_return(42)
     res = await workflow_request(client=async_client, command='')
@@ -208,7 +208,7 @@ async def test_workflow_state_change_uuid(
 
 async def test_multi_request(
     workflows_manager: WorkflowsManager,
-    async_client: AsyncClientFixture
+    async_client: "AsyncClientFixture"
 ):
     workflow_id = 'multi-request-workflow'
     # The response for a workflow multi-request.
@@ -237,7 +237,7 @@ async def test_multi_request(
 
 async def test_multi_request_gather_errors(
     workflows_manager,
-    async_client: AsyncClientFixture,
+    async_client: "AsyncClientFixture",
     caplog: pytest.LogCaptureFixture
 ):
     workflow_id = 'gather-error-workflow'
