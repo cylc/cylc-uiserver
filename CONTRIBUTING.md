@@ -62,7 +62,7 @@ below.
  - Min RK
  - James Frost
  - Samuel Denton
- - Scott Owen James
+ - Scott-Owen-James
  <!-- end-shortlog -->
 
 (All contributors are identifiable with email addresses in the git version
