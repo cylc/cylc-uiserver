@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 
 async def test_entire_workflow_update(
-    async_client: AsyncClientFixture,
+    async_client: 'AsyncClientFixture',
     data_store_mgr: DataStoreMgr,
     make_entire_workflow
 ):
@@ -66,7 +66,7 @@ async def test_entire_workflow_update(
 
 
 async def test_entire_workflow_update_ignores_timeout_message(
-    async_client: AsyncClientFixture,
+    async_client: 'AsyncClientFixture',
     data_store_mgr: DataStoreMgr
 ):
     """
@@ -93,7 +93,7 @@ async def test_entire_workflow_update_ignores_timeout_message(
 
 
 async def test_entire_workflow_update_gather_error(
-    async_client: AsyncClientFixture,
+    async_client: 'AsyncClientFixture',
     data_store_mgr: DataStoreMgr,
     caplog: pytest.LogCaptureFixture,
 ):
