@@ -46,7 +46,7 @@ def test_ui_version_specified(mock_config, ui_build_dir):
     mock_config(CylcUIServer={
         'ui_build_dir': ui_build_dir,
         'ui_version': '1.0'
-        })
+    })
     uis = CylcUIServer()
     uis.initialize_settings()
     assert uis.ui_path == ui_build_dir / '1.0'
@@ -55,7 +55,7 @@ def test_ui_version_specified(mock_config, ui_build_dir):
     mock_config(CylcUIServer={
         'ui_build_dir': ui_build_dir,
         'ui_version': '5.0'
-        })
+    })
     uis = CylcUIServer()
     with pytest.raises(Exception):
         uis.initialize_settings()
@@ -68,7 +68,7 @@ def test_ui_build_dir(mock_config, ui_build_dir):
         'ui_build_dir': ui_build_dir / '2.0',
         # the ui_version should do nothing here
         'ui_version': '99'
-        })
+    })
     uis = CylcUIServer()
     uis.initialize_settings()
     assert uis.ui_path == ui_build_dir / '2.0'
