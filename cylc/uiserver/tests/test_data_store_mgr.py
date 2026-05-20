@@ -125,8 +125,7 @@ async def test_entire_workflow_update_gather_error(
          'Failed to update entire local data-store of a workflow: x'),
     ]
     exc_info = caplog.records[1].exc_info
-    assert exc_info is ValueError
-    assert exc_info[0] is ValueError
+    assert exc_info and exc_info[0] is ValueError
 
 
 async def test_entire_workflow_update__stopped_workflow(

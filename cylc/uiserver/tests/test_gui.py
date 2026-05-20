@@ -17,6 +17,7 @@ import builtins
 from glob import glob
 import os
 from pathlib import Path
+from getpass import getuser
 import pytest
 from random import randint
 import requests
@@ -54,9 +55,9 @@ from cylc.uiserver.scripts.gui import (
             'http://localhost:8892/cylc/?token=1234567890'
             'some_big_long_token1234567890#',
             'some/hub/workflow',
-            'http://localhost:8892/cylc/?token=1234567890'
-            'some_big_long_token1234567890#/user/{getuser()}'
-            '/cylc/#/workspace/some/hub/workflow',
+            f'http://localhost:8892/cylc/?token=1234567890'
+            f'some_big_long_token1234567890#/user/'
+            f'{getuser()}/cylc/#/workspace/some/hub/workflow',
             'localhost:8000',
             id='existing_no_workflow_new_workflow_hub'
         ),
@@ -95,7 +96,9 @@ def test_update_html_file_updates_gui_file(
         mock_glbl_cfg):
     """Tests url is updated correctly"""
     mock_glbl_cfg('cylc.uiserver.scripts.gui.glbl_cfg',
-                  f'''[hub]url = {hub_url}''')
+                  f'''[hub]
+                  url = {hub_url}
+                  ''')
     updated_file_content = update_url(existing_content, workflow_id)
     assert updated_file_content == expected_updated_content
 
@@ -139,17 +142,17 @@ def test_gui_selection_and_clean_process(tmp_path, monkeypatch):
         json_file = (info_files_dir / f"jpserver-{pid}.json")
         json_file.touch()
         html_file.touch()
-        html_file.write_text(f"""content=\"1;url=http://localhost:8892/cylc/?
-                             token=1234567890some_big_long_token{pid}#/
-                             workspace/some/workflow\" more content""")
+        html_file.write_text(f"content=\"1;url=http://localhost:8892/cylc/"
+                             f"?token=1234567890some_big_long_token{pid}#/"
+                             f"workspace/some/workflow\" more content")
         # Sleep ensure different modification time for sort
         sleep(0.1)
     mock_existing_guis = glob(os.path.join(info_files_dir, "*open.html"))
     monkeypatch.setattr(requests, 'get', mock_get)
     url = select_info_file(mock_existing_guis)
     # Test that the most recent ui-server is selected:
-    assert url == f"""http://localhost:8892/cylc/?token=1234567890
-                  some_big_long_token{pid}#/workspace/some/workflow"""
+    assert url == (f"http://localhost:8892/cylc/?token=1234567890"
+                   f"some_big_long_token{pid}#/workspace/some/workflow")
 
 
 def test_cleaning_of_info_files(tmp_path, monkeypatch):
