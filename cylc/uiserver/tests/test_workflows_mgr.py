@@ -34,7 +34,9 @@ from cylc.uiserver.workflows_mgr import (
     WorkflowsManager,
 )
 
-from .conftest import AsyncClientFixture
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .conftest import AsyncClientFixture
 
 LOG = logging.getLogger('cylc')
 

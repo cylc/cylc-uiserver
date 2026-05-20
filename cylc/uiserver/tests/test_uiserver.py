@@ -35,7 +35,9 @@ def test_ui_version_unset(mock_config, ui_build_dir):
     # test with an invalid ui_build_path
     mock_config(CylcUIServer={'ui_build_dir': 'beef'})
     uis = CylcUIServer()
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match=(
+        r'.*does not exist:.*'
+    )):
         uis.initialize_settings()
         uis.ui_path  # forces computation of the ui_path
 
@@ -57,7 +59,9 @@ def test_ui_version_specified(mock_config, ui_build_dir):
         'ui_version': '5.0'
     })
     uis = CylcUIServer()
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match=(
+        r'Could not find UI build in.*'
+    )):
         uis.initialize_settings()
         uis.ui_path  # forces computation of the ui_path
 
