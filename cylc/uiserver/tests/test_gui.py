@@ -89,16 +89,19 @@ from cylc.uiserver.scripts.gui import (
     ]
 )
 def test_update_html_file_updates_gui_file(
-        existing_content,
-        workflow_id,
-        expected_updated_content,
-        hub_url,
-        mock_glbl_cfg):
+    existing_content,
+    workflow_id,
+    expected_updated_content,
+    hub_url,
+    mock_glbl_cfg
+):
     """Tests url is updated correctly"""
-    mock_glbl_cfg('cylc.uiserver.scripts.gui.glbl_cfg',
-                  f'''[hub]
-                  url = {hub_url}
-                  ''')
+    mock_glbl_cfg(
+        'cylc.uiserver.scripts.gui.glbl_cfg',
+        f'''[hub]
+        url = {hub_url}
+        '''
+    )
     updated_file_content = update_url(existing_content, workflow_id)
     assert updated_file_content == expected_updated_content
 

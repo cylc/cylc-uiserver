@@ -446,10 +446,10 @@ class CylcUIServer(ExtensionApp):
             # pick the highest installed version by default
             try:
                 version = self._list_ui_versions(build_dir)[-1]
-            except IndexError as exc:
+            except IndexError:
                 raise Exception(
                     f'Could not find any UI builds in {build_dir}.'
-                ) from exc
+                ) from None
 
         ui_path = build_dir / version
         if (ui_path / 'index.html').exists():
