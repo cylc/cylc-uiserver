@@ -12,6 +12,12 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.9.1 (Released 2026-05-22)
+
+### 🔧 Fixes
+
+[#824](https://github.com/cylc/cylc-uiserver/pull/824) - Fixed files missing from the package, needed for Cylc Review.
+
 ## cylc-uiserver-1.9.0 (Released 2026-05-13)
 
 [Updated cylc-ui to 2.14.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
