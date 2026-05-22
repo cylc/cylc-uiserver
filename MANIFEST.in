@@ -1,3 +1,4 @@
 include cylc/uiserver/logo.svg
 include cylc/uiserver/py.typed
 recursive-include cylc/uiserver/ui/ *
+recursive-include cylc/review/static/ *
