@@ -59,3 +59,4 @@ jobs:
           grep 'cylc/uiserver/py.typed' files
           grep 'cylc/uiserver/ui' files
           grep 'cylc/review/static/css/bootstrap.min.css' files
+          grep 'cylc/review/template/index.html' files
