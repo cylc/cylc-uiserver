@@ -53,7 +53,6 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
                                       sub_server=None, resolvers=None)
 
         if logged_in:
-            handler.get
 
             def _current_user():
                 return {'name': getuser()}
