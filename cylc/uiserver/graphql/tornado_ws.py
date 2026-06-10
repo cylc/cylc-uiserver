@@ -103,7 +103,7 @@ class TornadoConnectionContext:
         try:
             return self.ws.recv_nowait()
         except WebSocketClosedError:
-            raise ConnectionClosedException()
+            raise ConnectionClosedException() from None
 
     async def send(self, data):
         if self.ws.ws_connection and not self.ws.ws_connection.is_closing():
