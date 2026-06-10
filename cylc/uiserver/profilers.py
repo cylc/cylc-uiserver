@@ -122,7 +122,7 @@ def get_profiler(profiler: str):
         return None
     try:
         return PROFILERS[profiler]
-    except KeyError as exc:
+    except KeyError:
         raise Exception(
             f'Unknown profiler: {profiler}'
             f'\nValid options: {", ".join(PROFILERS)}'
