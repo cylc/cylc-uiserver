@@ -151,7 +151,6 @@ FAKE_USER_CONF = {
                 "release_hold_point",
                 "ext_trigger",
                 "pause",
-                "pause",
                 "set",
                 "release",
             },

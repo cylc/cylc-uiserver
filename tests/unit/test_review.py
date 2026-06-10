@@ -104,6 +104,7 @@ def test_sort_workflows(workflows, sorted_names):
         w['name'] for w in CylcReviewService.sort_workflows(workflows)
     ] == sorted_names
 
+
 def test_sort_workflows_plausible():
     """Case based on tests/function/cylc-review/08-suite-page.t
     Which was failing in CI

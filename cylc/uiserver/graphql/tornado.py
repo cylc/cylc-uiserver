@@ -300,7 +300,7 @@ class TornadoGraphQLHandler(web.RequestHandler):
             try:
                 body = self.request.body
             except Exception as e:
-                raise ExecutionError(400, e)
+                raise ExecutionError(400, e) from e
 
             try:
                 request_json = json.loads(body)
@@ -322,11 +322,11 @@ class TornadoGraphQLHandler(web.RequestHandler):
                 self.parsed_body = request_json
                 return self.parsed_body
             except AssertionError as e:
-                raise HTTPError(status_code=400, log_message=str(e))
-            except (TypeError, ValueError):
+                raise HTTPError(status_code=400, log_message=str(e)) from e
+            except (TypeError, ValueError) as e:
                 raise HTTPError(
                     status_code=400, log_message="POST body sent invalid JSON."
-                )
+                ) from e
 
         elif content_type in [
             "application/x-www-form-urlencoded",
@@ -441,11 +441,11 @@ class TornadoGraphQLHandler(web.RequestHandler):
         if variables and isinstance(variables, str):
             try:
                 variables = json.loads(variables)
-            except Exception:
+            except Exception as e:
                 raise HTTPError(
                     status_code=400,
                     log_message="Variables are invalid JSON."
-                )
+                ) from e
 
         operation_name = (
             single_args.get("operationName") or data.get("operationName")

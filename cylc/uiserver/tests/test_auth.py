@@ -113,7 +113,6 @@ def authorisation_middleware_instances(monkeypatch):
     instances = []
 
     def _init(self):
-        nonlocal instances
         instances.append(self)
 
     monkeypatch.setattr(

@@ -25,7 +25,6 @@ from cylc.uiserver import (
 from cylc.uiserver.app import USER_CONF_ROOT
 from cylc.uiserver.authorise import CylcAuthorizer
 
-
 # the command the hub should spawn (i.e. the cylc uiserver itself)
 c.Spawner.cmd = ['cylc', 'hubapp']
 
