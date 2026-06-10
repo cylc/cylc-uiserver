@@ -16,7 +16,6 @@
 from functools import partial
 from getpass import getuser
 import json
-from unittest import mock
 from unittest.mock import MagicMock
 import pytest
 
@@ -54,8 +53,10 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
                                       sub_server=None, resolvers=None)
 
         if logged_in:
-            handler.get
-            _current_user = lambda: {'name': getuser()}
+
+            def _current_user():
+                return {'name': getuser()}
+            handler.get_current_user = _current_user
         else:
             handler.current_user = None
         return handler
