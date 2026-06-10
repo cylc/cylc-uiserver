@@ -300,7 +300,7 @@ class TornadoGraphQLHandler(web.RequestHandler):
             try:
                 body = self.request.body
             except Exception as e:
-                raise ExecutionError(400, e) from None
+                raise ExecutionError(400, e) from e
 
             try:
                 request_json = json.loads(body)
