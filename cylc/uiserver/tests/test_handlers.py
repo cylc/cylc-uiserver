@@ -98,8 +98,7 @@ class GraphQLHandlersTest(AsyncHTTPTestCase):
         )
 
         if logged_in:
-            handler.get
-            _current_user = lambda: {'name': getuser()}
+            handler.get_current_user = lambda: {'name': getuser()}
         else:
             handler.current_user = None
         return handler
