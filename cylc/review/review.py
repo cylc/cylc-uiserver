@@ -20,7 +20,15 @@ logs via an HTTP interface.
 
 With no arguments, the status of the ad-hoc web service server is printed.
 
-For 'cylc review start', if 'PORT' is not specified, port 8080 is used."""
+For 'cylc review start', if 'PORT' is not specified, port 8080 is used.
+
+If $CYLC_REVIEW_HOME is defined look there for user run directories instead
+of in home directories. This can be used to view symlinked run directories
+directly when home directories are private. For example with symlinking as:
+   /home/USER/cylc-run/WORKFLOW -> /project/PROJECT/USER/cylc-run/WORKFLOW
+set the environment variable as:
+   CYLC_REVIEW_HOME=/project/PROJECT
+"""
 
 import contextlib
 from fnmatch import fnmatch
@@ -940,7 +948,7 @@ class CylcReviewService:
 
     @staticmethod
     def _get_user_home(user):
-        """Return, e.g. ~/cylc-run/ for a cylc suite.
+        """Return user home dir or $CYLC_REVIEW_HOME if defined.
 
         N.B. os.path.expanduser does not fail if ~user is invalid.
 
@@ -948,6 +956,11 @@ class CylcReviewService:
             cherrypy.HTTPError(404)
 
         """
+        if os.environ.get('CYLC_REVIEW_HOME', False):
+            return os.path.join(
+                os.environ['CYLC_REVIEW_HOME'],
+                str(user)
+            )
         try:
             return pwd.getpwnam(user).pw_dir
         except KeyError:
