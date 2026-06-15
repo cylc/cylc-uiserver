@@ -20,6 +20,15 @@ Start/stop ad-hoc Cylc Review web service server for browsing users' suite
 logs via an HTTP interface.
 
 With no arguments, the status of the ad-hoc web service server is printed.
+
+For 'cylc review start', if 'PORT' is not specified, port 8080 is used.
+
+If $CYLC_REVIEW_HOME is defined look there for user run directories instead
+of in home directories. This can be used to view symlinked run directories
+directly when home directories are private. For example with symlinking as:
+   /home/USER/cylc-run/WORKFLOW -> /project/PROJECT/USER/cylc-run/WORKFLOW
+set the environment variable as:
+   CYLC_REVIEW_HOME=/project/PROJECT
 """
 
 import os
