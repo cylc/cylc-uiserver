@@ -12,6 +12,12 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.9.2 (Released 2026-06-17)
+
+### 🔧 Fixes
+
+[#832](https://github.com/cylc/cylc-uiserver/pull/832) - Fix a traceback in Cylc Review which could occur on the "task jobs" page.
+
 ## cylc-uiserver-1.9.1 (Released 2026-05-22)
 
 ### 🔧 Fixes
