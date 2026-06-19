@@ -311,7 +311,10 @@ class DataStoreMgr:
         level: Set[str],
     ):
         requests = set()
-        if ALL_DELTAS in level:
+        # If level has all fields, just use one request.
+        # As BACK COMPAT workflows automatically contain all fields they will
+        # use this request.
+        if DATA_TEMPLATE.keys() <= level:
             requests.add(SUBSCRIPTION_CATALOGUE[ALL_DELTAS]["request"])
         else:
             requests.update(
@@ -522,14 +525,19 @@ class DataStoreMgr:
             [getattr(e, s_att)
              for e in self.data[w_id][topic].values()])
         if local_checksum != delta.checksum:
-            self.log.debug(
+            self.log.warn(
                 f'Out of sync with {topic} of {w_id}... Reconciling.')
             try:
+                # BACK COMPAT: see cylc/cylc-flow/pull/6113 for API changes.
+                if self.data[w_id]['workflow'].cylc_version < '8.7':
+                    end_point = 'pb_data_elements'
+                else:
+                    end_point = 'pb_delta_elements'
                 # use threadsafe as client socket is in main loop thread.
                 future = asyncio.run_coroutine_threadsafe(
                     workflow_request(
                         self.workflows_mgr.workflows[w_id]['req_client'],
-                        'pb_delta_elements',
+                        end_point,
                         args={'element_type': topic}
                     ),
                     self.loop
@@ -641,6 +649,7 @@ class DataStoreMgr:
             flow.host = contact_data[CFF.HOST]
             flow.port = int(contact_data[CFF.PORT])
             flow.api_version = int(contact_data[CFF.API])
+            flow.cylc_version = contact_data[CFF.VERSION]
         else:
             # wipe pre-existing contact-file data
             w_tokens = Tokens(w_id)
@@ -649,6 +658,7 @@ class DataStoreMgr:
             flow.host = ''
             flow.port = 0
             flow.api_version = 0
+            flow.cylc_version = '0'
 
         if status is not None:
             flow.status = status
@@ -690,6 +700,9 @@ class DataStoreMgr:
     def _get_sync_level(self, w_id) -> set:
         """Return the sync level in the form of a set of catalogue items."""
         level = set()
+        # BACK COMPAT: see cylc/cylc-flow/pull/6113 for API changes.
+        if self.data[w_id]['workflow'].cylc_version < '8.7':
+            level.update(DATA_TEMPLATE)
         if (
             w_id in self.workflow_query_sync_timers
             and self.workflow_query_sync_timers[w_id]['expiry'] > 0
