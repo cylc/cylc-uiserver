@@ -117,8 +117,7 @@ jobs:
 
       - name: Coverage report
         run: |
-          coverage combine --append
-          coverage xml --ignore-errors
+          coverage xml
           coverage report
 
       - name: Upload coverage artifact

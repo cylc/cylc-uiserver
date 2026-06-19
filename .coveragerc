@@ -32,7 +32,6 @@ omit =
 parallel = True
 timid = False
 source = ./cylc
-relative_files=True
 
 
 [report]
