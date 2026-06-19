@@ -216,7 +216,8 @@ async def test_update_contact_with_contact_data(
         'owner': 'cylc',
         CFF.HOST: 'localhost',
         CFF.PORT: 40000,
-        CFF.API: api_version
+        CFF.API: api_version,
+        CFF.VERSION: '0',
     }
     data_store_mgr._update_contact(w_id=w_id, contact_data=contact_data)
     assert api_version == data_store_mgr.data[w_id]['workflow'].api_version
@@ -235,7 +236,8 @@ async def test_disconnect_workflow(
         'owner': 'cylc',
         CFF.HOST: 'localhost',
         CFF.PORT: 40000,
-        CFF.API: api_version
+        CFF.API: api_version,
+        CFF.VERSION: '0',
     }
     data_store_mgr._update_contact(
         w_id=w_id,
