@@ -123,7 +123,13 @@ class CylcReviewDAO:
         self.daos = {}
 
     def _db_init(self, user_name, suite_name):
-        """Initialise a named CylcWorkflowDAO database connection."""
+        """Initialise a named CylcWorkflowDAO database connection.
+
+        Returns:
+            CylcWorkflowDAO for the "log/db" or "cylc-suite.db" file as
+            appropriate, or "None" if there is no DB.
+
+        """
         key = (user_name, suite_name)
         if key not in self.daos:
             prefix = "~"
@@ -133,11 +139,11 @@ class CylcReviewDAO:
                 db_f_name = os.path.expanduser(
                     os.path.join(
                         prefix, os.path.join("cylc-run", suite_name, name)))
-                self.daos[key] = CylcWorkflowDAO(db_f_name, is_public=True)
                 if os.path.exists(db_f_name):
+                    self.daos[key] = CylcWorkflowDAO(db_f_name, is_public=True)
                     break
         self.is_cylc8 = self.set_is_cylc8(user_name, suite_name)
-        return self.daos[key]
+        return self.daos.get(key, None)
 
     def _db_close(self, user_name, suite_name):
         """Close a named CylcWorkflowDAO database connection."""
@@ -147,15 +153,16 @@ class CylcReviewDAO:
 
     def _db_exec(self, user_name, suite_name, stmt, stmt_args=None):
         """Execute a query on a named CylcWorkflowDAO database connection."""
-        daos = self._db_init(user_name, suite_name)
-        if stmt_args is None:
-            stmt_args = []
+        dao = self._db_init(user_name, suite_name)
+
         # only connect if db exists to avoid creating db if none there
-        if not os.path.exists(daos.db_file_name):
+        if dao is None or not os.path.exists(dao.db_file_name):
             return []
         else:
+            if stmt_args is None:
+                stmt_args = []
             try:
-                return daos.connect().execute(stmt, stmt_args)
+                return dao.connect().execute(stmt, stmt_args)
             except sqlite3.OperationalError as exc:
                 # At Cylc 8.0.1+ Workflows installed but not run will not yet
                 # have a database.
@@ -501,7 +508,7 @@ class CylcReviewDAO:
                 if seq_key not in entry["seq_logs_indexes"]:
                     entry["seq_logs_indexes"][seq_key] = {}
                 entry["seq_logs_indexes"][seq_key][index_str] = filename
-            for seq_key, indexes in entry["seq_logs_indexes"].items():
+            for seq_key, indexes in list(entry["seq_logs_indexes"].items()):
                 # Only one item, not a sequence
                 if len(indexes) <= 1:
                     entry["seq_logs_indexes"].pop(seq_key)
@@ -691,7 +698,7 @@ class CylcReviewDAO:
             "is_failed": False,
             "server": None}
         dao = self._db_init(user_name, suite_name)
-        if not os.access(dao.db_file_name, os.F_OK | os.R_OK):
+        if dao is None or not os.access(dao.db_file_name, os.F_OK | os.R_OK):
             self._db_close(user_name, suite_name)
             return ret
 
