@@ -126,4 +126,4 @@ def get_profiler(profiler: str):
         raise Exception(
             f'Unknown profiler: {profiler}'
             f'\nValid options: {", ".join(PROFILERS)}'
-        )
+        ) from None
