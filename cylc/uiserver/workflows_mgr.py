@@ -200,6 +200,19 @@ class WorkflowsManager:
         """
         active_before, inactive_before = self.get_workflows()
 
+        # workflows stopped between scans
+        w_stops = {
+            w_id
+            for w_id in inactive_before
+            if (
+                w_id in self.workflows
+                and self.workflows[w_id].get('req_client')
+            )
+        }
+        # ensure workflows get properly dealt with by the workflow manger
+        active_before |= w_stops
+        inactive_before -= w_stops
+
         active = set()
         inactive = set()
 
@@ -300,7 +313,7 @@ class WorkflowsManager:
         Marks the workflow as stopped.
         """
         self.uiserver.data_store_mgr.disconnect_workflow(wid)
-        with suppress(KeyError, IOError):
+        with suppress(KeyError, IOError, AttributeError):
             self.workflows[wid]['req_client'].stop(stop_loop=False)
         with suppress(KeyError):
             self.workflows[wid]['req_client'] = None
