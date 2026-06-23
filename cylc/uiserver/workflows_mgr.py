@@ -26,6 +26,7 @@ import asyncio
 from contextlib import suppress
 from getpass import getuser
 from pathlib import Path
+import socket
 import sys
 from typing import (
     TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Union
@@ -34,7 +35,7 @@ from typing import (
 import zmq.asyncio
 
 from cylc.flow.id import Tokens
-from cylc.flow.exceptions import ClientError, ClientTimeout
+from cylc.flow.exceptions import ClientError, ClientTimeout, SchedulerAlive
 from cylc.flow.network import API
 from cylc.flow.network.client import WorkflowRuntimeClient
 from cylc.flow.network.scan import (
@@ -45,6 +46,7 @@ from cylc.flow.network.scan import (
     validate_contact_info
 )
 from cylc.flow.workflow_files import (
+    detect_old_contact_file,
     ContactFileFields as CFF,
     WorkflowFiles,
 )
@@ -111,6 +113,15 @@ def db_file_exists(flow) -> bool:
         WorkflowFiles.Service.DIRNAME,
         WorkflowFiles.Service.DB
     ).exists()
+
+
+def listener_exists(host, port) -> bool:
+    """Return True if listener exists on given host and port."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex((host, port)) == 0
+    except Exception:
+        return False
 
 
 class WorkflowsManager:  # noqa: SIM119
@@ -188,7 +199,8 @@ class WorkflowsManager:  # noqa: SIM119
 
             # append fields to scan results
             flow['owner'] = self.owner
-            wid = Tokens(user=flow['owner'], workflow=flow['name']).id
+            w_tokens = Tokens(user=flow['owner'], workflow=flow['name'])
+            wid = w_tokens.id
             flow['id'] = wid
 
             if not flow.get('contact'):
@@ -236,6 +248,39 @@ class WorkflowsManager:  # noqa: SIM119
                 else:
                     yield (wid, '/inactive', 'active', flow)
 
+            elif (
+                wid in self.workflows
+                and not listener_exists(
+                    self.workflows[wid]['req_client'].host,
+                    self.workflows[wid]['req_client'].port
+                )
+            ):
+                # Contact file exists, but flow server is irresponsive,
+                # perhaps workflow is no longer running and is leaving behind
+                # a contact file?
+                # Either way, purge current registration/connections by
+                # setting to inactive and allow next scan to reestablish if
+                # the workflow was restarted between scans.
+                try:
+                    # Will delete contact file if no workflow process
+                    detect_old_contact_file(
+                        w_tokens['workflow'],
+                        contact_data=flow
+                    )
+                    inactive.add(wid)
+                    if wid in active_before:
+                        yield (wid, '/active', 'inactive', flow)
+                    else:
+                        yield (wid, '/inactive', 'inactive', flow)
+                except SchedulerAlive:
+                    # old contact file exists and the workflow process still
+                    # exists.. purge and reestablish anyway.
+                    active.add(wid)
+                    if wid in active_before:
+                        yield (wid, '/active', 'active', flow)
+                    else:
+                        yield (wid, '/inactive', 'active', flow)
+
             else:
                 # this flow is running
                 active.add(wid)
@@ -276,7 +321,7 @@ class WorkflowsManager:  # noqa: SIM119
         Marks the workflow as stopped.
         """
         self.uiserver.data_store_mgr.disconnect_workflow(wid)
-        with suppress(KeyError, IOError):
+        with suppress(KeyError, IOError, AttributeError):
             self.workflows[wid]['req_client'].stop(stop_loop=False)
         with suppress(KeyError):
             self.workflows[wid]['req_client'] = None
