@@ -276,7 +276,6 @@ async def test_workflow_connect_fail(
         assert [record.message for record in caplog.records] == [
             "[data-store] connect_workflow('~user/workflow_id', <dict>)",
             'failed to connect to ~user/workflow_id',
-            "[data-store] disconnect_workflow('~user/workflow_id')",
         ]
     finally:
         # tidy up
