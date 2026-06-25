@@ -178,11 +178,19 @@ class DataStoreMgr:
             # something went wrong, undo any changes to allow for subsequent
             # connection attempts
             self.log.info(f'failed to connect to {w_id}')
-            self.disconnect_workflow(w_id)
+            self._disconnect_workflow(w_id)
             return False
 
     @log_call
     def disconnect_workflow(self, w_id, update_contact=True):
+        """Terminate workflow subscriptions.
+
+        This is called externally i.e. by the workflow manager when the
+        workflow has stopped or changed state.
+        """
+        self._disconnect_workflow(w_id, update_contact)
+
+    def _disconnect_workflow(self, w_id, update_contact=True):
         """Terminate workflow subscriptions.
 
         Call this when a workflow has stopped.
@@ -230,7 +238,7 @@ class DataStoreMgr:
         """Purge the manager of a workflow's subscription and data."""
         # Ensure no old/new subscriptions exist on purge,
         # this shouldn't happen if disconnect is run before unregister.
-        self.disconnect_workflow(w_id, update_contact=False)
+        self._disconnect_workflow(w_id, update_contact=False)
         if w_id in self.data:
             del self.data[w_id]
         if w_id in self.delta_queues:
@@ -281,7 +289,7 @@ class DataStoreMgr:
         if topic == 'shutdown':
             self._delta_store_to_queues(w_id, topic, delta)
             # close connections
-            self.disconnect_workflow(w_id)
+            self._disconnect_workflow(w_id)
             return
         self._apply_all_delta(w_id, delta)
         self._delta_store_to_queues(w_id, topic, delta)
