@@ -336,6 +336,20 @@ class CylcUIServer(ExtensionApp):
         ''',
         default_value=5.0  # default values as kwargs correctly display in docs
     )
+    connections_check_interval = Float(
+        config=False,
+        help='''
+            Set the interval between REQ/RES/PUB/SUB connnection checks in
+            seconds.
+
+            This allows connections that may have broken for whatever reason
+            to be reset.
+
+            This involves sending workflows a REQ/RES request which prompts
+            a PUB response captured by our SUB.
+        ''',
+        default_value=180.0
+    )
     max_workers = Int(
         config=True,
         help='''
@@ -528,6 +542,11 @@ class CylcUIServer(ExtensionApp):
         ioloop.PeriodicCallback(
             self.workflows_mgr.scan,
             self.scan_interval * 1000
+        ).start()
+        # configure the connections checking
+        ioloop.PeriodicCallback(
+            self.data_store_mgr.connections_checker,
+            self.connections_check_interval * 1000
         ).start()
 
     def initialize_handlers(self):
