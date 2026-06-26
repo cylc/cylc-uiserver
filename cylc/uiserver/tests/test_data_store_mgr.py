@@ -143,6 +143,33 @@ async def test_entire_workflow_update__stopped_workflow(
     ]
 
 
+async def test_connections_checker(
+    async_client: AsyncClientFixture,
+    data_store_mgr: DataStoreMgr,
+):
+    """Test that ``connections_checker`` is executed successfully."""
+    w_id = 'workflow_id'
+    async_client.will_return('ping')
+
+    # mark as active sub
+    data_store_mgr.w_subs[w_id] = {}
+
+    # Set the client used by our test workflow.
+    data_store_mgr.workflows_mgr.workflows[w_id] = {
+        'req_client': async_client,
+        CFF.VERSION: '8.6.6',
+    }
+
+    # Call the connections checker method.
+    # This should use the client defined above (``async_client``) when
+    # calling ``workflow_request``.
+    data_store_mgr.workflows_mgr.workflows[w_id]['reqres_time'] = 0.0
+    await data_store_mgr.connections_checker()
+
+    # Test the req/res connection check update
+    assert data_store_mgr.workflows_mgr.workflows[w_id]['reqres_time'] > 0.0
+
+
 async def test_register_workflow(
     data_store_mgr: DataStoreMgr
 ):
@@ -284,6 +311,28 @@ async def test_workflow_connect_fail(
         context.destroy()
 
 
+async def test_unregister_workflow(data_store_mgr: DataStoreMgr):
+    """Test that ``unregister_workflow`` is executed successfully.
+
+    Along with ``_purge_workflow``, as a consequence.
+    """
+
+    w_tokens = Tokens(user='user', workflow='workflow_id')
+    w_id = w_tokens.id
+
+    # Register data-store entry
+    await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
+
+    assert w_id in data_store_mgr.data
+    assert w_id in data_store_mgr.delta_queues
+
+    # Unregister data-store entry
+    await data_store_mgr.unregister_workflow(w_id)
+
+    assert w_id not in data_store_mgr.data
+    assert w_id not in data_store_mgr.delta_queues
+
+
 async def test_update_workflow_data(
     async_client: AsyncClientFixture,
     data_store_mgr: DataStoreMgr,
@@ -332,3 +381,16 @@ async def test_update_workflow_data(
     # The data-store sould now contain info from the delta
     assert w_id_data['workflow'].status == 'running'
     assert w_id_data['task_proxies'][tp_id].state == 'running'
+
+    # Test the pub/sub connection check update
+    data_store_mgr.workflows_mgr.workflows[w_id]['pubsub_time'] = 0.0
+    data_store_mgr._update_workflow_data('ping', b'pong', w_id)
+    assert data_store_mgr.workflows_mgr.workflows[w_id]['pubsub_time'] > 0.0
+
+    # Test shutdown delta
+    class w_sub:
+        def stop(self):
+            pass
+    data_store_mgr.w_subs[w_id] = w_sub()
+    data_store_mgr._update_workflow_data('shutdown', b'stopped', w_id)
+    assert w_id not in data_store_mgr.w_subs
