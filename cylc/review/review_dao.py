@@ -21,7 +21,6 @@ import os
 from pathlib import Path
 import re
 import sqlite3
-from sqlite3 import OperationalError
 import tarfile
 
 from cylc.flow.rundb import CylcWorkflowDAO
@@ -110,10 +109,6 @@ class CylcReviewDAO:
 
     REC_CYCLE_QUERY_OP = re.compile(r"\A(before |after |[<>]=?)(.+)\Z")
     REC_SEQ_LOG = re.compile(r"\A(.+\.)([^\.]+)(\.[^\.]+)\Z")
-    CANNOT_JOIN_FLOW_NUMS = (
-        'cannot join using column flow_nums - '
-        'column not present in both tables'
-    )
     # Required when using
     # CylcWorkflowDAO.pre_select_broadcast_states(self, order)
     # Because that method needs self.TABLE_BROADCAST_STATES
@@ -221,7 +216,6 @@ class CylcReviewDAO:
         order,
         limit,
         offset,
-        flow_nums='flow_nums',
     ):
         """Query suite runtime database to return a listing of task jobs.
         user -- A string containing a valid user ID
@@ -242,7 +236,6 @@ class CylcReviewDAO:
                  the keys in CylcReviewDAO.ORDERS.
         limit -- Limit number of returned entries
         offset -- Offset entry number
-        flow_nums -- whether to use flow_nums
 
         Return (entries, of_n_entries) where:
         entries -- A list of matching entries
@@ -256,8 +249,6 @@ class CylcReviewDAO:
                       "out": {...},
                       "err": {...},
                       ...}}
-        eight_zero_warning - boolean flag indicating that the database is
-            a Cylc 8.0 database and we can only get the latest task job.
         """
         where_expr, where_args = self._get_suite_job_entries_where(
             cycles, tasks, task_status, job_status)
@@ -275,9 +266,9 @@ class CylcReviewDAO:
                 break
             else:
                 self._db_close(user_name, suite_name)
-                return ([], 0, self.is_cylc8)
+                return ([], 0)
         except sqlite3.Error:
-            return ([], 0, self.is_cylc8)
+            return ([], 0)
         if self.is_cylc8:
             stmt = (   # nosec B608
                 "SELECT" +
@@ -290,7 +281,7 @@ class CylcReviewDAO:
                 " time_run, time_run_exit, run_signal, run_status," +
                 " platform_name, job_runner_name, job_id" +
                 " FROM task_states LEFT JOIN task_jobs USING " +
-                "(cycle, name, " + flow_nums + ") " +
+                "(cycle, name, flow_nums) " +
                 where_expr +
                 " ORDER BY " +
                 self.JOB_ORDERS.get(order, self.JOB_ORDERS["time_desc"])
@@ -320,26 +311,9 @@ class CylcReviewDAO:
             stmt += " LIMIT ? OFFSET ?"
             limit_args = [limit, offset]
 
-        # Try except loop deals with case (Cylc 8.0) where the database
-        # doesn't contain enough information to identify multiple jobs
-        # belonging to the same task:
-        # https://github.com/cylc/cylc-flow/issues/5247
-        eight_zero_warning = False
-        try:
-            db_data = self._db_exec(
-                user_name, suite_name, stmt, where_args + limit_args
-            )
-        except OperationalError as exc:
-            if exc.message == self.CANNOT_JOIN_FLOW_NUMS:
-                stmt = stmt.replace('flow_nums', 'submit_num')
-                db_data = self._db_exec(
-                    user_name, suite_name, stmt, where_args + limit_args
-                )
-                eight_zero_warning = True
-            else:
-                raise exc
-
-        for row in db_data:
+        for row in self._db_exec(
+            user_name, suite_name, stmt, where_args + limit_args
+        ):
             (
                 cycle,
                 name,
@@ -376,7 +350,7 @@ class CylcReviewDAO:
         self._db_close(user_name, suite_name)
         if entries:
             self._get_job_logs(user_name, suite_name, entries, entry_of)
-        return (entries, of_n_entries, eight_zero_warning)
+        return (entries, of_n_entries)
 
     def _get_suite_job_entries_where(
             self, cycles, tasks, task_status, job_status):
