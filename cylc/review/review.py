@@ -537,11 +537,11 @@ class CylcReviewService:
             data["entries"].sort(key=lambda entry: entry["name"], reverse=True)
         elif order == "time_asc":
             data['entries'] = self.sort_workflows(
-                data['entries'], reverse=True
+                data['entries']
             )
         else:  # order == "time_desc"
             data['entries'] = self.sort_workflows(
-                data['entries']
+                data['entries'], reverse=True
             )
 
         data["of_n_entries"] = len(data["entries"])
@@ -1134,39 +1134,43 @@ class CylcReviewService:
             ...     i['name'] for i in
             ...     CylcReviewService.sort_workflows(workflows)
             ... ]
-            ['last', 'first', 'AAA', 'zzz']
+            ['zzz', 'AAA', 'first', 'last']
+
 
             >>> [
             ...     i['name'] for i in
             ...     CylcReviewService.sort_workflows(workflows, reverse=True)
             ... ]
-            ['zzz', 'AAA', 'first', 'last']
+            ['last', 'first', 'AAA', 'zzz']
+
         """
-        class Workflow(dict):
+        class Workflow:
+
+            __slots__ = ('name', 'last_activity_time')
+
+            def __init__(self, item):
+                self.name = item['name']
+                self.last_activity_time = item['last_activity_time'] or '0'
+
             def __lt__(self, other):
-                if self['last_activity_time'] and other['last_activity_time']:
-                    return (
-                        self['last_activity_time']
-                        > other['last_activity_time']
-                    )
-                elif other['last_activity_time'] or self['last_activity_time']:
-                    return (
-                        self['last_activity_time'] or '0'
-                        > other['last_activity_time'] or '0'
-                    )
-                else:
-                    return self['name'] < other['name']
+                if self.last_activity_time == other.last_activity_time:
+                    return self.name > other.name
+                return self.last_activity_time < other.last_activity_time
+
+            def __gt__(self, other):
+                if self.last_activity_time == other.last_activity_time:
+                    return self.name < other.name
+                return self.last_activity_time > other.last_activity_time
 
             def __eq__(self, other):
                 return (
-                    self['last_activity_time'] == other['last_activity_time']
-                    and self['name'] == other['name']
+                    self.name == other.name
+                    and self.last_activity_time == other.last_activity_time
                 )
 
-        ret = sorted([Workflow(workflow) for workflow in workflows])
-        if reverse:
-            return list(reversed(ret))
-        return list(ret)
+        ret = list(workflows)
+        ret.sort(key=Workflow, reverse=reverse)
+        return ret
 
     @staticmethod
     def _has_shebang(file):

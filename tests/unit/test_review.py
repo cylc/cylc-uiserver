@@ -101,7 +101,8 @@ def test_get_file_text_nasty(get_garbage_file):
 def test_sort_workflows(workflows, sorted_names):
     """Workflow object sorting"""
     assert [
-        w['name'] for w in CylcReviewService.sort_workflows(workflows)
+        w['name']
+        for w in CylcReviewService.sort_workflows(workflows, reverse=True)
     ] == sorted_names
 
 def test_sort_workflows_plausible():
@@ -123,7 +124,8 @@ def test_sort_workflows_plausible():
         },
     ]
     assert [
-        i['name'] for i in CylcReviewService.sort_workflows(workflows)
+        i['name']
+        for i in CylcReviewService.sort_workflows(workflows, reverse=True)
     ] == [
         '08-suites-page-2-3',
         '08-suites-page-2-2',
