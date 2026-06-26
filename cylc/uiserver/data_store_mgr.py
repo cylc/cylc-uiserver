@@ -103,7 +103,7 @@ class DataStoreMgr:
         self.log = log
         self.data = {}
         self.w_subs: Dict[str, WorkflowSubscriber] = {}
-        self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown'}
+        self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown', b'ping'}
         self.loop = None
         self.executor = ThreadPoolExecutor(max_threads)
         self.delta_queues = {}
@@ -162,6 +162,10 @@ class DataStoreMgr:
             return
 
         self.delta_queues[w_id] = {}
+
+        # Setup connection checker points
+        self.workflows_mgr.workflows[w_id]['reqres_time'] = time.time()
+        self.workflows_mgr.workflows[w_id]['pubsub_time'] = time.time()
 
         # Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.
@@ -290,6 +294,13 @@ class DataStoreMgr:
             self._delta_store_to_queues(w_id, topic, delta)
             # close connections
             self._disconnect_workflow(w_id)
+            return
+        elif (
+            topic == 'ping'
+            and delta == b'pong'
+            and w_id in self.workflows_mgr.workflows
+        ):
+            self.workflows_mgr.workflows[w_id]['pubsub_time'] = time.time()
             return
         self._apply_all_delta(w_id, delta)
         self._delta_store_to_queues(w_id, topic, delta)
@@ -515,3 +526,31 @@ class DataStoreMgr:
         else:
             # the workflow has not yet run
             return 'not yet run'
+
+    async def connections_checker(self):
+        """Check REQ/RES by requesting a PUB/SUB check."""
+        topic = 'ping'
+        requests = {
+            w_id: workflow_request(
+                client=info['req_client'],
+                command='reqpub',
+                log=self.log,
+                args={'topic': topic, 'payload': 'pong'},
+            )
+            for w_id, info in self.workflows_mgr.workflows.items()
+            if (
+                # skip stopped workflows
+                info.get('req_client')
+                and w_id in self.w_subs
+                # BACK COMPAT
+                and info.get(CFF.VERSION) > '8.6.5'
+            )
+        }
+        results = await asyncio.gather(
+            *requests.values(), return_exceptions=True
+        )
+        for w_id, result in zip(requests, results):
+            if isinstance(result, Exception):
+                continue
+            if result == topic:
+                self.workflows_mgr.workflows[w_id]['reqres_time'] = time.time()

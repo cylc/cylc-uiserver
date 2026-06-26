@@ -28,6 +28,7 @@ from getpass import getuser
 from pathlib import Path
 import socket
 import sys
+from time import time
 from typing import (
     TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Union
 )
@@ -168,6 +169,10 @@ class WorkflowsManager:  # noqa: SIM119
         # will be ignored
         self._stopping = False
 
+        # Connection checker threshold, twice the check interval and buffer
+        # to allow for two check attempts.
+        self.conn_threshold = uiserver.connections_check_interval * 2 + 60
+
     def get_workflows(self):
         return self.uiserver.data_store_mgr.get_workflows()
 
@@ -215,13 +220,16 @@ class WorkflowsManager:  # noqa: SIM119
             w_tokens = Tokens(user=flow['owner'], workflow=flow['name'])
             wid = w_tokens.id
             flow['id'] = wid
+            workflow = self.workflows.get(wid, {})
+
+            now = time()
 
             if not flow.get('contact'):
                 # this flow isn't running
                 inactive.add(wid)
                 if (
                     # if the workflow has previously started...
-                    self.workflows.get(wid, {}).get(CFF.UUID)
+                    workflow.get(CFF.UUID)
                     # ...but the database has since been removed...
                     and not db_file_exists(flow)
                 ):
@@ -241,20 +249,34 @@ class WorkflowsManager:  # noqa: SIM119
                     yield (wid, None, 'inactive', flow)
 
             elif (
-                # detect workflows which have restarted since the last scan
-                wid in self.workflows
+                workflow
                 and (
                     # UUID is unique to each workflow run, it is preserved
                     # across reload/restart
-                    flow[CFF.UUID] != self.workflows[wid].get(CFF.UUID)
+                    flow[CFF.UUID] != workflow.get(CFF.UUID)
                     # PID and HOST are (almost) unique to each scheduler
                     # invocation
-                    or flow[CFF.PID] != self.workflows[wid].get(CFF.PID)
-                    or flow[CFF.HOST] != self.workflows[wid].get(CFF.HOST)
+                    or flow[CFF.PID] != workflow.get(CFF.PID)
+                    or flow[CFF.HOST] != workflow.get(CFF.HOST)
+                    or (
+                        # BACK COMPAT
+                        workflow.get(CFF.VERSION) > '8.6.5'
+                        and (
+                            (
+                                now - workflow['reqres_time']
+                            ) > self.conn_threshold
+                            or (
+                                now - workflow['pubsub_time']
+                            ) > self.conn_threshold
+                        )
+                    )
                 )
             ):
-                # this workflow has been restarted or cleaned & cold-started
-                # since the last scan, we must disconnect/reconnect
+                # This tests the following:
+                # - The workflow has been restarted or cleaned & cold-started.
+                # - The REQ/RES or PUB/SUB connections are irresponsive.
+                #
+                # we must disconnect/reconnect
                 active.add(wid)
                 if wid in active_before:
                     yield (wid, '/active', 'active', flow)
@@ -262,10 +284,10 @@ class WorkflowsManager:  # noqa: SIM119
                     yield (wid, '/inactive', 'active', flow)
 
             elif (
-                wid in self.workflows
+                workflow
                 and not listener_exists(
-                    self.workflows[wid]['req_client'].host,
-                    self.workflows[wid]['req_client'].port
+                    workflow['req_client'].host,
+                    workflow['req_client'].port
                 )
             ):
                 # Contact file exists, but flow server is irresponsive,

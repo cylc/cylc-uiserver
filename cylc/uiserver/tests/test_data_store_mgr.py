@@ -258,6 +258,7 @@ async def test_workflow_connect_fail(
 
         # register the workflow with the data store
         await data_store_mgr.register_workflow(w_id=w_id, is_active=False)
+        data_store_mgr.workflows_mgr.workflows.setdefault(w_id, {})
         contact_data = {
             'name': 'workflow_id',
             'owner': 'cylc',

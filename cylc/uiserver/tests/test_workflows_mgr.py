@@ -107,13 +107,13 @@ def mk_flow(path, reg, active=True, database=True):
     'active_before,active_after',
     product(['active', 'inactive', None], repeat=2)
 )
-async def test_workflow_state_changes(tmp_path, active_before, active_after):
+async def test_workflow_state_changes(tmp_path, cylc_uis, active_before, active_after):
     """It correctly identifies workflow state changes from the filesystem."""
     tmp_path /= str(random())
     tmp_path.mkdir()
 
     # mock the results of the previous scan
-    wfm = WorkflowsManager(None, LOG, context=None, run_dir=tmp_path)
+    wfm = WorkflowsManager(cylc_uis, LOG, context=None, run_dir=tmp_path)
     wid = Tokens(user=wfm.owner, workflow='a').id
 
     ret = (
@@ -147,6 +147,7 @@ async def test_workflow_state_changes(tmp_path, active_before, active_after):
 )
 async def test_workflow_state_change_uuid(
     tmp_path,
+    cylc_uis,
     active_before,
     active_after
 ):
@@ -163,7 +164,7 @@ async def test_workflow_state_change_uuid(
 
     """
     # mock the result of the previous scan
-    wfm = WorkflowsManager(None, LOG, context=None, run_dir=tmp_path)
+    wfm = WorkflowsManager(cylc_uis, LOG, context=None, run_dir=tmp_path)
     wid = Tokens(user=wfm.owner, workflow='a').id
 
     wfm.workflows[wid] = {
