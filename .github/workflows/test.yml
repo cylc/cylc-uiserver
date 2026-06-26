@@ -14,6 +14,7 @@ concurrency:
 
 env:
   FORCE_COLOR: 2
+  PIP_PROGRESS_BAR: 'off'
 
 defaults:
   run:
@@ -74,6 +75,7 @@ jobs:
         run: mypy
 
       - name: Check changelog
+        if: startsWith(matrix.os, 'ubuntu')
         uses: cylc/release-actions/towncrier-draft@v1
 
       - name: Test
@@ -117,8 +119,7 @@ jobs:
 
       - name: Coverage report
         run: |
-          coverage combine --append
-          coverage xml --ignore-errors
+          coverage xml
           coverage report
 
       - name: Upload coverage artifact
