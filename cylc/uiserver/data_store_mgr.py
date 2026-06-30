@@ -161,8 +161,6 @@ class DataStoreMgr:
         if w_id in self.w_subs:
             return
 
-        self.delta_queues[w_id] = {}
-
         # Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.
         self.executor.submit(
@@ -173,6 +171,8 @@ class DataStoreMgr:
             contact_data[CFF.PUBLISH_PORT]
         )
         successful_updates = await self._entire_workflow_update(ids=[w_id])
+
+        self.delta_queues[w_id] = {}
 
         if w_id not in successful_updates:
             # something went wrong, undo any changes to allow for subsequent
