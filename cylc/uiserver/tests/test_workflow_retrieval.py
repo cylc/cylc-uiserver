@@ -33,7 +33,7 @@ from cylc.uiserver.schema import (
 )
 
 
-def make_db(*task_entries):
+def make_db(task_entries, task_events=None):
     """Create a DB and populate the task_jobs table."""
     conn = sqlite3.connect(':memory:')
     conn.row_factory = sqlite3.Row
@@ -62,21 +62,37 @@ def make_db(*task_entries):
     '''
     )
 
+    conn.execute(
+        '''
+        CREATE TABLE 
+            task_events(
+                name TEXT,
+                cycle TEXT,
+                time TEXT,
+                submit_num INTEGER,
+                event TEXT, 
+                message TEXT);''')
+
     conn.executemany(
         'INSERT into task_jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-        task_entries,
+        task_entries
     )
+    if task_events:
+        conn.executemany(
+            'INSERT into task_events VALUES (?,?,?,?,?,?)',
+            task_events
+        )
     conn.commit()
     return conn
 
 
 def test_make_task_query_1():
     conn = make_db(
-        (
+        task_entries=[(
             '1',
             'Task_1',
-            '01',
-            '{1}',
+            1,
+            '[1]',
             0,
             1,
             '2022-12-14T15:00:00Z',
@@ -89,7 +105,45 @@ def test_make_task_query_1():
             'MyPlatform',
             'User',
             'UsersJob',
-        )
+        )],
+        task_events=[
+            (
+                'Task_1',
+                '1',
+                '2022-12-14T15:00:00Z',
+                1,
+                'submitted',
+                ''
+            ),
+            (
+
+                'Task_1',
+                '1',
+                '2022-12-14T15:01:00Z',
+                1,
+                'started',
+                ''
+            ),
+            (
+                'Task_1',
+                '1',
+                '2022-12-14T15:10:00Z',
+                1,
+                'succeeded',
+                ''
+            ),
+            (
+                'Task_1',
+                '1',
+                '2022-12-14T15:10:00Z',
+                1,
+                'message debug',
+                (
+                    '_cylc_profiler: {"cpu_time": 994, "max_rss": 40064,'
+                    ' "memory_allocated": 1048576}'
+                )
+            )
+        ]
     )
     workflow = Tokens('~user/workflow')
 
@@ -101,17 +155,25 @@ def test_make_task_query_1():
     assert ret['queue_quartiles'] == [60, 60, 60]
     assert ret['run_quartiles'] == [540, 540, 540]
     assert ret['total_quartiles'] == [600, 600, 600]
+    assert ret['max_rss_quartiles'] == [40064, 40064, 40064]
+    assert ret['cpu_time_quartiles'] == [994, 994, 994]
     assert ret['id'].id == '~user/workflow//1/Task_1/01'
     assert ret['job_id'] == 'UsersJob'
     assert ret['max_queue_time'] == 60
     assert ret['max_run_time'] == 540
     assert ret['max_total_time'] == 600
+    assert ret['max_max_rss'] == 40064
+    assert ret['max_cpu_time'] == 994
     assert ret['mean_queue_time'] == pytest.approx(60.0, 0.01)
     assert ret['mean_run_time'] == pytest.approx(540.0, 0.01)
     assert ret['mean_total_time'] == pytest.approx(600.0, 0.01)
+    assert ret['mean_max_rss'] == pytest.approx(40064.0, 0.01)
+    assert ret['mean_cpu_time'] == pytest.approx(994.0, 0.01)
     assert ret['min_queue_time'] == 60
     assert ret['min_run_time'] == 540
     assert ret['min_total_time'] == 600
+    assert ret['min_max_rss'] == 40064
+    assert ret['min_cpu_time'] == 994
     assert ret['name'] == 'Task_1'
     assert ret['platform'] == 'MyPlatform'
     assert ret['started_time'] == '2022-12-14T15:01:00Z'
@@ -119,48 +181,119 @@ def test_make_task_query_1():
     assert ret['std_dev_queue_time'] == pytest.approx(0.0, 0.01)
     assert ret['std_dev_run_time'] == pytest.approx(0.0, 0.01)
     assert ret['std_dev_total_time'] == pytest.approx(0.0, 0.01)
+    assert ret['std_dev_max_rss'] == pytest.approx(0.0, 0.01)
+    assert ret['std_dev_cpu_time'] == pytest.approx(0.0, 0.01)
     assert ret['submit_num'] == 1
     assert ret['submitted_time'] == '2022-12-14T15:00:00Z'
+    assert ret['mem_alloc'] == 1048576
 
 
 def test_make_task_query_2():
     conn = make_db(
-        (
-            '1',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-14T15:00:00Z',
-            '2022-12-14T15:01:00Z',
-            0,
-            '2022-12-14T15:01:00Z',
-            '2022-12-14T15:10:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
-        (
-            '2',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-15T15:00:00Z',
-            '2022-12-15T15:01:15Z',
-            0,
-            '2022-12-15T15:01:16Z',
-            '2022-12-15T15:12:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
+        task_entries=[
+            (
+                '1',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-14T15:00:00Z',
+                '2022-12-14T15:01:00Z',
+                0,
+                '2022-12-14T15:01:00Z',
+                '2022-12-14T15:10:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-15T15:00:00Z',
+                '2022-12-15T15:01:15Z',
+                0,
+                '2022-12-15T15:01:16Z',
+                '2022-12-15T15:12:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            )
+        ],
+        task_events=[
+            (
+                'Task_1',
+                '1',
+                '2022-12-14T15:00:00Z',
+                1,
+                'submitted',
+                ''
+            ),
+            (
+                'Task_1',
+                '1',
+                '2022-12-14T15:01:00Z',
+                1,
+                'started',
+                ''
+            ),
+            (
+                'Task_1',
+                '1',
+                '2022-12-14T15:10:00Z',
+                1,
+                'succeeded',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:10:00Z',
+                'message debug',
+                '_cylc_profiler: {"cpu_time": 994, "max_rss": 40064}'
+            ),
+            (
+                'Task_1',
+                '2',
+                '2022-12-14T16:00:00Z',
+                1,
+                'submitted',
+                ''
+            ),
+            (
+                'Task_1',
+                '2',
+                '2022-12-14T16:01:00Z',
+                1,
+                'started',
+                ''
+            ),
+            (
+                'Task_1',
+                '2',
+                '2022-12-14T16:10:00Z',
+                1,
+                'succeeded',
+                ''
+            ),
+            (
+                'Task_1',
+                '2',
+                '2022-12-14T16:10:00Z',
+                1,
+                'message debug',
+                '_cylc_profiler: {"cpu_time": 1994, "max_rss": 50064}'
+            ),
+        ]
     )
     conn.commit()
     workflow = Tokens('~user/workflow')
@@ -197,68 +330,166 @@ def test_make_task_query_2():
 
 def test_make_task_query_3():
     conn = make_db(
-        (
-            '1',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-14T15:00:00Z',
-            '2022-12-14T15:01:00Z',
-            0,
-            '2022-12-14T15:01:00Z',
-            '2022-12-14T15:10:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
-        (
-            '2',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-15T15:00:00Z',
-            '2022-12-15T15:01:15Z',
-            0,
-            '2022-12-15T15:01:16Z',
-            '2022-12-15T15:12:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
-        (
-            '3',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-16T15:00:00Z',
-            '2022-12-16T15:01:15Z',
-            0,
-            '2022-12-16T15:01:16Z',
-            '2022-12-16T15:12:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
+        task_entries=[
+            (
+                '1',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-14T15:00:00Z',
+                '2022-12-14T15:01:00Z',
+                0,
+                '2022-12-14T15:01:00Z',
+                '2022-12-14T15:10:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-15T15:00:00Z',
+                '2022-12-15T15:01:15Z',
+                0,
+                '2022-12-15T15:01:16Z',
+                '2022-12-15T15:12:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-16T15:00:00Z',
+                '2022-12-16T15:01:15Z',
+                0,
+                '2022-12-16T15:01:16Z',
+                '2022-12-16T15:12:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            )
+        ],
+        task_events=[
+            (
+                'Task_1',
+                '1',
+                '2022-12-14T15:00:00Z',
+                1,
+                'submitted',
+                ''
+            ),
+            (
+                'Task_1',
+                '1',
+                '2022-12-14T15:01:00Z',
+                1,
+                'started',
+                ''
+            ),
+            (
+                'Task_1',
+                '1',
+                '2022-12-14T15:10:00Z',
+                1,
+                'succeeded',
+                ''
+            ),
+            (
+                'Task_1',
+                '1',
+                '2022-12-14T15:10:00Z',
+                1,
+                'message debug',
+                'cpu_time 994 max_rss 40064'
+            ),
+            (
+                'Task_1',
+                '2',
+                '2022-12-14T16:00:00Z',
+                1,
+                'submitted',
+                ''
+            ),
+            (
+                'Task_1',
+                '2',
+                '2022-12-14T16:01:00Z',
+                1,
+                'started',
+                ''
+            ),
+            (
+                'Task_1',
+                '2',
+                '2022-12-14T16:10:00Z',
+                1,
+                'succeeded',
+                ''
+            ),
+            (
+                'Task_1',
+                '2',
+                '2022-12-14T16:10:00Z',
+                1,
+                'message debug',
+                'cpu_time 1994 max_rss 50064'
+            ),
+            (
+                'Task_1',
+                '3',
+                '2022-12-14T17:00:00Z',
+                1,
+                'submitted',
+                ''
+            ),
+            (
+                'Task_1',
+                '3',
+                '2022-12-14T17:01:00Z',
+                1,
+                'started',
+                ''
+            ),
+            (
+                'Task_1',
+                '3',
+                '2022-12-14T17:10:00Z',
+                1,
+                'succeeded',
+                ''
+            ),
+            (
+                'Task_1',
+                '3',
+                '2022-12-14T17:10:00Z',
+                1,
+                'message debug',
+                'cpu_time 2994 max_rss 60064'
+            ),
+        ]
     )
     conn.commit()
     workflow = Tokens('~user/workflow')
 
-    ret = run_task_query(conn, workflow)
+    ret = run_task_query(conn, workflow)[0]
 
-    assert len(ret) == 1
-    ret = ret[0]
     assert ret['count'] == 3
     assert ret['cycle_point'] == '3'
     assert ret['finished_time'] == '2022-12-16T15:12:00Z'
@@ -288,33 +519,23 @@ def test_make_task_query_3():
 
 
 def test_make_task_query_different_platforms():
-    """We should get different entries for tasks that submited to different
+    """We should get different entries for tasks that submitted to different
     platforms on different cycles.
 
     https://github.com/cylc/cylc-uiserver/issues/696
     """
-    conn = sqlite3.connect(':memory:')
-    conn.execute('''CREATE TABLE task_jobs(cycle TEXT, name TEXT,
-    submit_num INTEGER, flow_nums TEXT, is_manual_submit INTEGER,
-    try_num INTEGER, time_submit TEXT, time_submit_exit TEXT,
-    submit_status INTEGER, time_run TEXT, time_run_exit TEXT,
-    run_signal TEXT, run_status INTEGER, platform_name TEXT,
-    job_runner_name TEXT, job_id TEXT,
-    PRIMARY KEY(cycle, name, submit_num));''')
 
     middle_values = (
         'Task_1', '01', '[1]', 0, 1, '2022-12-14T15:00:00Z',
         '2022-12-14T15:01:00Z', 0, '2022-12-14T15:01:00Z',
         '2022-12-14T15:10:00Z', None, 0,
     )
-    conn.executemany(
-        'INSERT into task_jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-        [
-            ('1', *middle_values, 'MyPlatform', 'User', 'UsersJob'),
-            ('2', *middle_values, 'MyPlatform2', 'User', 'UsersJob'),
-            ('3', *middle_values, 'MyPlatform3', 'User', 'UsersJob'),
-        ],
-    )
+    conn = make_db(task_entries=[
+        ('1', *middle_values, 'MyPlatform', 'User', 'UsersJob'),
+        ('2', *middle_values, 'MyPlatform2', 'User', 'UsersJob'),
+        ('3', *middle_values, 'MyPlatform3', 'User', 'UsersJob'),
+    ])
+
     conn.commit()
     workflow = Tokens('~user/workflow')
 
@@ -327,96 +548,212 @@ def test_make_task_query_different_platforms():
 
 def test_make_jobs_query_1():
     conn = make_db(
-        (
-            '1',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-14T15:00:00Z',
-            '2022-12-14T15:01:00Z',
-            0,
-            '2022-12-14T15:01:00Z',
-            '2022-12-14T15:10:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
-        (
-            '2',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-15T15:00:00Z',
-            '2022-12-15T15:01:15Z',
-            0,
-            '2022-12-15T15:01:16Z',
-            '2022-12-15T15:12:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
-        (
-            '3',
-            'Task_1',
-            '01',
-            '{1}',
-            0,
-            1,
-            '2022-12-16T15:00:00Z',
-            '2022-12-16T15:01:15Z',
-            0,
-            '2022-12-16T15:01:16Z',
-            '2022-12-16T15:12:00Z',
-            None,
-            0,
-            'MyPlatform',
-            'User',
-            'UsersJob',
-        ),
+        task_entries=[
+            (
+                '1',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-14T15:00:00Z',
+                '2022-12-14T15:01:00Z',
+                0,
+                '2022-12-14T15:01:00Z',
+                '2022-12-14T15:10:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-15T15:00:00Z',
+                '2022-12-15T15:01:15Z',
+                0,
+                '2022-12-15T15:01:16Z',
+                '2022-12-15T15:12:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '[1]',
+                0,
+                1,
+                '2022-12-16T15:00:00Z',
+                '2022-12-16T15:01:15Z',
+                0,
+                '2022-12-16T15:01:16Z',
+                '2022-12-16T15:12:00Z',
+                None,
+                0,
+                'MyPlatform',
+                'User',
+                'UsersJob',
+            )
+        ],
+        task_events=[
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '1',
+                'Task_1',
+                1,
+                '2022-12-14T15:10:00Z',
+                'message debug',
+                '{    "max_rss": 40064,    "cpu_time": 994}'
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '2',
+                'Task_1',
+                1,
+                '2022-12-14T16:10:00Z',
+                'message debug',
+                '{    "max_rss": 50064,    "cpu_time": 1994}'
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:00:00Z',
+                'submitted',
+                ''
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:01:00Z',
+                'started',
+                ''
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:10:00Z',
+                'succeeded',
+                ''
+            ),
+            (
+                '3',
+                'Task_1',
+                1,
+                '2022-12-14T17:10:00Z',
+                'message_debug',
+                '{    "max_rss": 60064,    "cpu_time": 2994}'
+            ),
+        ]
     )
     conn.commit()
     workflow = Tokens('~user/workflow')
-    tasks = []
 
-    ret = run_jobs_query(conn, workflow, tasks)
+    expected = [
+        {
+            'id': Tokens('~user/workflow//1/Task_1/01'),
+            'cycle_point': '1',
+            'finished_time': '2022-12-14T15:10:00Z',
+            'job_id': 'UsersJob',
+            'name': 'Task_1',
+            'platform': 'MyPlatform',
+            'started_time': '2022-12-14T15:01:00Z',
+            'state': 'succeeded',
+            'submit_num': 1,
+            'submitted_time': '2022-12-14T15:00:00Z',
+        },
+        {
+            'id': Tokens('~user/workflow//2/Task_1/01'),
+            'cycle_point': '2',
+            'finished_time': '2022-12-15T15:12:00Z',
+            'job_id': 'UsersJob',
+            'name': 'Task_1',
+            'platform': 'MyPlatform',
+            'started_time': '2022-12-15T15:01:16Z',
+            'state': 'succeeded',
+            'submit_num': 1,
+            'submitted_time': '2022-12-15T15:00:00Z',
+        },
+        {
+            'id': Tokens('~user/workflow//3/Task_1/01'),
+            'cycle_point': '3',
+            'finished_time': '2022-12-16T15:12:00Z',
+            'job_id': 'UsersJob',
+            'name': 'Task_1',
+            'platform': 'MyPlatform',
+            'started_time': '2022-12-16T15:01:16Z',
+            'state': 'succeeded',
+            'submit_num': 1,
+            'submitted_time': '2022-12-16T15:00:00Z',
+        },
+    ]
 
-    assert len(ret) == 3
-
-    assert ret[0]['cycle_point'] == '1'
-    assert ret[0]['finished_time'] == '2022-12-14T15:10:00Z'
-    assert ret[0]['id'].id == '~user/workflow//1/Task_1/01'
-    assert ret[0]['job_id'] == 'UsersJob'
-    assert ret[0]['name'] == 'Task_1'
-    assert ret[0]['platform'] == 'MyPlatform'
-    assert ret[0]['started_time'] == '2022-12-14T15:01:00Z'
-    assert ret[0]['state'] == 'succeeded'
-    assert ret[0]['submit_num'] == 1
-    assert ret[0]['submitted_time'] == '2022-12-14T15:00:00Z'
-
-    assert ret[1]['cycle_point'] == '2'
-    assert ret[1]['finished_time'] == '2022-12-15T15:12:00Z'
-    assert ret[1]['id'].id == '~user/workflow//2/Task_1/01'
-    assert ret[1]['job_id'] == 'UsersJob'
-    assert ret[1]['name'] == 'Task_1'
-    assert ret[1]['platform'] == 'MyPlatform'
-    assert ret[1]['started_time'] == '2022-12-15T15:01:16Z'
-    assert ret[1]['state'] == 'succeeded'
-    assert ret[1]['submit_num'] == 1
-    assert ret[1]['submitted_time'] == '2022-12-15T15:00:00Z'
+    assert (
+        run_jobs_query(conn, workflow, {*expected[1].keys()}, [])
+        == expected
+    )
 
 
-async def test_list_elements(monkeypatch):
-
+async def test_list_elements():
     with pytest.raises(Exception) as e_info:
-        await list_elements('tasks', stuff=[1, 2, 3], workflows=[])
+        await list_elements('tasks', set(), stuff=[1, 2, 3], workflows=[])
 
     exception_raised = e_info.value
     assert (
@@ -502,7 +839,7 @@ async def test_get_elements(
     # functions that I'm not testing
     info = None
 
-    async def mock_return_list_elements(_query_type, **kwargs):
+    async def mock_return_list_elements(_query_type, fields, **kwargs):
         return kwargs
 
     def mock_process_resolver_info(*args):
@@ -515,6 +852,10 @@ async def test_get_elements(
     monkeypatch.setattr(
         'cylc.uiserver.schema.process_resolver_info',
         mock_process_resolver_info,
+    )
+    monkeypatch.setattr(
+        'cylc.uiserver.schema._get_requested_fields',
+        lambda _x, _y: {'id', 'max_rss'},
     )
 
     assert await get_elements(
@@ -540,10 +881,10 @@ async def test_job_query_filter():
         return (
             '1',
             task_name,
-            '01',
-            '{1}',
-            0,
             1,
+            '[1]',
+            0,
+            0,
             submit_start,
             submit_end,
             submit_status,
@@ -558,19 +899,20 @@ async def test_job_query_filter():
 
     # define a workflow with one job in each state
     conn = make_db(
-        make_job('waiting', None, None, None),
-        make_job('submitted', 0, None, False),
-        make_job('submit-failed', 1, None, False),
-        make_job('running', 0, None, True),
-        make_job('succeeded', 0, 0, True),
-        make_job('failed', 0, 1, True),
+        task_entries=[
+            make_job('waiting', None, None, None),
+            make_job('submitted', 0, None, False),
+            make_job('submit-failed', 1, None, False),
+            make_job('running', 0, None, True),
+            make_job('succeeded', 0, 0, True),
+            make_job('failed', 0, 1, True)],
     )
     workflow = Tokens('~user/workflow')
 
     # all jobs should appear by default (no filters)
     # Note: The waiting task has no associated job
     assert {
-        item['id']['task'] for item in run_jobs_query(conn, workflow)
+        item['id']['task'] for item in run_jobs_query(conn, workflow, {'id'})
     } == {
         'submitted',
         'submit-failed',
@@ -582,7 +924,9 @@ async def test_job_query_filter():
     # filter by ids
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, ids=[Tokens('//*/s*/01')])
+        for item in run_jobs_query(
+            conn, workflow, {'id'}, ids=[Tokens('//*/s*/01')]
+        )
     } == {
         'submitted',
         'submit-failed',
@@ -592,7 +936,9 @@ async def test_job_query_filter():
     # filter by exids
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, exids=[Tokens('//*/s*/01')])
+        for item in run_jobs_query(
+            conn, workflow, {'id'}, exids=[Tokens('//*/s*/01')]
+        )
     } == {
         'running',
         'failed',
@@ -604,6 +950,7 @@ async def test_job_query_filter():
         for item in run_jobs_query(
             conn,
             workflow,
+            {'id'},
             ids=[Tokens('//*/submitted'), Tokens('//*/succeeded')],
             exids=[Tokens('//*/succeeded'), Tokens('//*/submit-failed')],
         )
@@ -614,7 +961,9 @@ async def test_job_query_filter():
     # filter by states
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, states=['succeeded'])
+        for item in run_jobs_query(
+            conn, workflow, {'id'}, states=['succeeded']
+        )
     } == {
         'succeeded',
     }
@@ -623,7 +972,7 @@ async def test_job_query_filter():
     # ignored
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, states=['waiting'])
+        for item in run_jobs_query(conn, workflow, {'id'}, states=['waiting'])
     } == {
         'submitted',
         'submit-failed',
@@ -635,7 +984,9 @@ async def test_job_query_filter():
     # filter by exstates
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, exstates=['succeeded'])
+        for item in run_jobs_query(
+            conn, workflow, {'id'}, exstates=['succeeded']
+        )
     } == {
         'submitted',
         'submit-failed',
@@ -646,7 +997,9 @@ async def test_job_query_filter():
     # ignored
     assert {
         item['id']['task']
-        for item in run_jobs_query(conn, workflow, exstates=['waiting'])
+        for item in run_jobs_query(
+            conn, workflow, {'id'}, exstates=['waiting']
+        )
     } == {
         'submitted',
         'submit-failed',
@@ -661,6 +1014,7 @@ async def test_job_query_filter():
         for item in run_jobs_query(
             conn,
             workflow,
+            {'id'},
             states=['submitted', 'succeeded'],
             exstates=['succeeded', 'submit-failed']
         )
@@ -674,6 +1028,7 @@ async def test_job_query_filter():
         for item in run_jobs_query(
             conn,
             workflow,
+            {'id'},
             tasks=['submit-failed', 'failed']
         )
     } == {
@@ -716,13 +1071,10 @@ async def test_jobNN_query(jobs, query, expected):
             'background',
             '1701',
         )
-
-    conn = make_db(
-        *(make_job(*job) for job in jobs)
-    )
+    conn = make_db(task_entries=(make_job(*job) for job in jobs))
     workflow = Tokens('~user/workflow')
     result = run_jobs_query(
-        conn, workflow, ids=[Tokens(i, relative=True) for i in query]
+        conn, workflow, {'id'}, ids=[Tokens(i, relative=True) for i in query]
     )
     assert {item['id'].relative_id for item in result} == expected
 
@@ -745,24 +1097,25 @@ async def test_e2e_jobs_query(monkeypatch: pytest.MonkeyPatch):
         'queueTime': 2,
         'runTime': 98,
     }
-    conn = make_db((
-        entry['cyclePoint'],
-        entry['name'],
-        entry['submitNum'],
-        '[1]',
-        0,
-        1,
-        entry['submittedTime'],
-        '2022-12-14T15:00:01Z',
-        0,
-        entry['startedTime'],
-        entry['finishedTime'],
-        None,
-        0,
-        entry['platform'],
-        entry['jobRunnerName'],
-        entry['jobId'],
-    ))
+    conn = make_db(
+        task_entries=[(
+            entry['cyclePoint'],
+            entry['name'],
+            entry['submitNum'],
+            '[1]',
+            0,
+            1,
+            entry['submittedTime'],
+            '2022-12-14T15:00:01Z',
+            0,
+            entry['startedTime'],
+            entry['finishedTime'],
+            None,
+            0,
+            entry['platform'],
+            entry['jobRunnerName'],
+            entry['jobId'],
+        )])
     mock_dao = Mock(
         return_value=Mock(
             __enter__=Mock(return_value=Mock(connect=lambda: conn)),
