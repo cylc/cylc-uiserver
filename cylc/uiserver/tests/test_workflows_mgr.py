@@ -142,7 +142,7 @@ async def test_workflow_state_changes(tmp_path, active_before, active_after):
 
 
 @pytest.mark.parametrize(
-    'active_before,active_after',
+    'active_before, active_after',
     product([True, False], repeat=2)
 )
 async def test_workflow_state_change_uuid(
@@ -167,8 +167,11 @@ async def test_workflow_state_change_uuid(
     wid = Tokens(user=wfm.owner, workflow='a').id
 
     wfm.workflows[wid] = {
+        # NOTE: the mocked scan will return "42" for each of these fields
         CFF.API: API,
-        CFF.UUID: '41'
+        CFF.UUID: '41',
+        CFF.PID: '41',
+        CFF.HOST: '41',
     }
 
     if active_before:

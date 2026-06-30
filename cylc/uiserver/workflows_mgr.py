@@ -216,10 +216,20 @@ class WorkflowsManager:  # noqa: SIM119
                     yield (wid, None, 'inactive', flow)
 
             elif (
+                # detect workflows which have restarted since the last scan
                 wid in self.workflows
-                and flow[CFF.UUID] != self.workflows[wid].get(CFF.UUID)
+                and (
+                    # UUID is unique to each workflow run, it is preserved
+                    # across reload/restart
+                    flow[CFF.UUID] != self.workflows[wid].get(CFF.UUID)
+                    # PID and HOST are (almost) unique to each scheduler
+                    # invocation
+                    or flow[CFF.PID] != self.workflows[wid].get(CFF.PID)
+                    or flow[CFF.HOST] != self.workflows[wid].get(CFF.HOST)
+                )
             ):
-                # this flow is running but it's a different run
+                # this workflow has been restarted or cleaned & cold-started
+                # since the last scan, we must disconnect/reconnect
                 active.add(wid)
                 if wid in active_before:
                     yield (wid, '/active', 'active', flow)
