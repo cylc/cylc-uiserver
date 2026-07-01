@@ -15,12 +15,14 @@
 """Test code and fixtures."""
 
 import asyncio
+from functools import partial
 import inspect
 import logging
 from pathlib import Path
 from shutil import rmtree
 from tempfile import TemporaryDirectory
 import threading
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -99,8 +101,38 @@ def async_client():
 
 
 @pytest.fixture
-def workflows_manager() -> WorkflowsManager:
-    return WorkflowsManager(None, logging.getLogger('cylc'))
+def dummy_uis():
+    calls = []
+
+    async def async_capture(func, *_):
+        nonlocal calls
+        calls.append(func)
+
+    def sync_capture(func, *_):
+        nonlocal calls
+        calls.append(func)
+
+    data_store_mgr = SimpleNamespace(
+        register_workflow=partial(async_capture, 'register'),
+        unregister_workflow=partial(async_capture, 'unregister'),
+        connect_workflow=partial(async_capture, 'connect'),
+        disconnect_workflow=partial(sync_capture, 'disconnect'),
+        calls=calls,
+    )
+
+    uis = SimpleNamespace(
+        data_store_mgr=data_store_mgr,
+        connections_check_interval=120.0,
+    )
+    wfm = WorkflowsManager(uis, logging.getLogger())
+    uis.workflows_mgr = wfm
+
+    return uis
+
+
+@pytest.fixture
+def workflows_manager(dummy_uis) -> WorkflowsManager:
+    return WorkflowsManager(dummy_uis, logging.getLogger('cylc'))
 
 
 @pytest.fixture
