@@ -19,7 +19,13 @@ import getpass
 import json
 import os
 import re
-from typing import TYPE_CHECKING, Callable, Dict, Awaitable, Optional
+from typing import (
+    TYPE_CHECKING,
+    Awaitable,
+    Callable,
+    Literal,
+    Optional,
+)
 
 from cylc.flow import __version__ as cylc_flow_version
 from jupyter_server.base.handlers import JupyterHandler
@@ -30,17 +36,21 @@ from tornado import (
 from tornado.ioloop import IOLoop
 
 from cylc.uiserver import __version__
-from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
+from cylc.uiserver.authorise import (
+    Authorization,
+    AuthorizationMiddleware,
+)
 from cylc.uiserver.graphql import authenticated as websockets_authenticated
 from cylc.uiserver.graphql.tornado import TornadoGraphQLHandler
-from cylc.uiserver.graphql.tornado_ws import GRAPHQL_WS
+from cylc.uiserver.graphql.tornado_ws import WS_PROTOCOL
 from cylc.uiserver.utils import is_bearer_token_authenticated
 
 
 if TYPE_CHECKING:
-    from cylc.uiserver.resolvers import Resolvers
-    from cylc.uiserver.graphql.tornado_ws import TornadoSubscriptionServer
     from jupyter_server.auth.identity import User as JPSUser
+
+    from cylc.uiserver.graphql.tornado_ws import TornadoSubscriptionServer
+    from cylc.uiserver.resolvers import Resolvers
 
 
 ME = getpass.getuser()
@@ -369,14 +379,15 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
 class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
     """Endpoint for performing GraphQL subscriptions."""
     # No authorization decorators here, auth handled in AuthorizationMiddleware
-    def initialize(self, sub_server, resolvers, sub_statuses=None):
+    def initialize(self, sub_server, resolvers):
         self.queue: Queue = Queue(100)
         self.subscription_server: TornadoSubscriptionServer = sub_server
         self.resolvers: Resolvers = resolvers
-        self.sub_statuses: Dict = sub_statuses
+        # sub_status dictionary storing status of subscriptions
+        self.sub_statuses: dict[str, Literal["start", "stop"]] = {}
 
     def select_subprotocol(self, subprotocols):
-        return GRAPHQL_WS
+        return WS_PROTOCOL
 
     @websockets_authenticated
     def get(self, *args, **kwargs):
@@ -392,15 +403,6 @@ class SubscriptionHandler(CylcAppHandler, websocket.WebSocketHandler):
         )
 
     async def on_message(self, message):
-        try:
-            message_dict = json.loads(message)
-            op_id = message_dict.get("id", None)
-            if (message_dict['type'] == 'start'):
-                self.sub_statuses[op_id] = 'start'
-            if (message_dict['type'] == 'stop'):
-                self.sub_statuses[op_id] = 'stop'
-        except (KeyError, ValueError):
-            pass
         await self.queue.put(message)
 
     async def recv(self):

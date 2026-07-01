@@ -504,7 +504,7 @@ class AuthorizationMiddleware:
 
     """
 
-    auth = None
+    auth: Authorization
 
     def resolve(self, next_, root, info, **args):
         current_user = info.context["current_user"]
