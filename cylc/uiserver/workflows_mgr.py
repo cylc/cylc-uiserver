@@ -192,7 +192,6 @@ class WorkflowsManager:  # noqa: SIM119
             flow['id'] = wid
 
             if not flow.get('contact'):
-                # this flow isn't running
                 inactive.add(wid)
                 if (
                     # if the workflow has previously started...
@@ -215,36 +214,36 @@ class WorkflowsManager:  # noqa: SIM119
                 else:
                     yield (wid, None, 'inactive', flow)
 
-            elif (
-                # detect workflows which have restarted since the last scan
-                wid in self.workflows
-                and (
-                    # UUID is unique to each workflow run, it is preserved
-                    # across reload/restart
-                    flow[CFF.UUID] != self.workflows[wid].get(CFF.UUID)
-                    # PID and HOST are (almost) unique to each scheduler
-                    # invocation
-                    or flow[CFF.PID] != self.workflows[wid].get(CFF.PID)
-                    or flow[CFF.HOST] != self.workflows[wid].get(CFF.HOST)
-                )
-            ):
-                # this workflow has been restarted or cleaned & cold-started
-                # since the last scan, we must disconnect/reconnect
-                active.add(wid)
-                if wid in active_before:
-                    yield (wid, '/active', 'active', flow)
-                else:
-                    yield (wid, '/inactive', 'active', flow)
+                continue
 
+            active.add(wid)
+
+            if wid in self.workflows:
+                if flow[CFF.UUID] != self.workflows[wid].get(CFF.UUID):
+                    # UUID is unique to each workflow run, it is preserved
+                    # across reload/restart.
+                    # This workflow has been cleaned & started since last scan
+                    if wid in active_before:
+                        yield (wid, '/active', 'active', flow)
+                    else:
+                        yield (wid, '/inactive', 'active', flow)
+                    continue
+                if wid in active_before and (
+                    flow[CFF.PID] != self.workflows[wid].get(CFF.PID)
+                    or flow[CFF.HOST] != self.workflows[wid].get(CFF.HOST)
+                ):
+                    # Process ID or host changes means workflow must have
+                    # restarted (contact file was left behind so we didn't
+                    # detect it as inactive earlier)
+                    yield (wid, 'active', 'active', flow)
+                    continue
+
+            if wid in active_before:
+                pass
+            elif wid in inactive_before:
+                yield (wid, 'inactive', 'active', flow)
             else:
-                # this flow is running
-                active.add(wid)
-                if wid in active_before:
-                    pass
-                elif wid in inactive_before:
-                    yield (wid, 'inactive', 'active', flow)
-                else:
-                    yield (wid, None, 'active', flow)
+                yield (wid, None, 'active', flow)
 
         for wid in active_before - (active | inactive):
             yield (wid, 'active', None, None)
@@ -323,6 +322,13 @@ class WorkflowsManager:  # noqa: SIM119
                     run(
                         self._disconnect(wid),
                         self._unregister(wid),
+                    )
+
+                elif after == 'active':
+                    # workflow has restarted without earlier being disconnected
+                    run(
+                        self._disconnect(wid),
+                        self._connect(wid, flow),
                     )
 
             elif before is None:
