@@ -36,15 +36,29 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
 import time
-from typing import TYPE_CHECKING, Dict, Optional, Set, cast
+from typing import (
+    TYPE_CHECKING,
+    Container,
+    Dict,
+    cast,
+)
 
+from cylc.flow.data_store_mgr import (
+    ALL_DELTAS,
+    DATA_TEMPLATE,
+    DELTAS_MAP,
+    EDGES,
+    WORKFLOW,
+    apply_delta,
+    create_delta_store,
+    generate_checksum,
+)
 from cylc.flow.exceptions import WorkflowStopped
 from cylc.flow.id import Tokens
 from cylc.flow.network.server import PB_METHOD_MAP
-from cylc.flow.network.subscriber import WorkflowSubscriber, process_delta_msg
-from cylc.flow.data_store_mgr import (
-    EDGES, DATA_TEMPLATE, ALL_DELTAS, DELTAS_MAP, WORKFLOW,
-    apply_delta, generate_checksum, create_delta_store
+from cylc.flow.network.subscriber import (
+    WorkflowSubscriber,
+    process_delta_msg,
 )
 from cylc.flow.workflow_files import (
     ContactFileFields as CFF,
@@ -55,6 +69,7 @@ from cylc.flow.workflow_status import WorkflowStatus
 
 from .utils import fmt_call
 from .workflows_mgr import workflow_request
+
 
 if TYPE_CHECKING:
     from cylc.flow.data_messages_pb2 import PbWorkflow
@@ -144,7 +159,7 @@ class DataStoreMgr:
         self._purge_workflow(w_id)
 
     @log_call
-    async def connect_workflow(self, w_id, contact_data):
+    async def connect_workflow(self, w_id: str, contact_data: dict) -> None:
         """Initiate workflow subscriptions.
 
         Call this when a workflow has started.
@@ -179,7 +194,6 @@ class DataStoreMgr:
             # connection attempts
             self.log.info(f'failed to connect to {w_id}')
             self.disconnect_workflow(w_id)
-            return False
 
     @log_call
     def disconnect_workflow(self, w_id, update_contact=True):
@@ -370,13 +384,15 @@ class DataStoreMgr:
                 self.log.exception(exc)
 
     async def _entire_workflow_update(
-        self, ids: Optional[list] = None
-    ) -> Set[str]:
+        self, ids: Container[str] | None = None
+    ) -> set[str]:
         """Update entire local data-store of workflow(s).
 
         Args:
             ids: List of workflow external IDs.
 
+        Returns:
+            Set of IDs for workflows that were successfully updated.
         """
         if ids is None:
             ids = []
@@ -396,7 +412,7 @@ class DataStoreMgr:
         results = await asyncio.gather(
             *requests.values(), return_exceptions=True
         )
-        successes: Set[str] = set()
+        successes: set[str] = set()
         for w_id, result in zip(requests, results):
             if isinstance(result, Exception):
                 if not isinstance(result, WorkflowStopped):

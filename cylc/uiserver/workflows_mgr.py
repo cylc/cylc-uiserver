@@ -25,16 +25,23 @@ Includes:
 import asyncio
 from contextlib import suppress
 from getpass import getuser
+import logging
 from pathlib import Path
 import sys
 from typing import (
-    TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Union
+    TYPE_CHECKING,
+    Any,
+    Iterable,
 )
 
 import zmq.asyncio
 
+from cylc.flow.exceptions import (
+    ClientError,
+    ClientTimeout,
+    WorkflowStopped,
+)
 from cylc.flow.id import Tokens
-from cylc.flow.exceptions import ClientError, ClientTimeout
 from cylc.flow.network import API
 from cylc.flow.network.client import WorkflowRuntimeClient
 from cylc.flow.network.scan import (
@@ -42,15 +49,18 @@ from cylc.flow.network.scan import (
     contact_info,
     is_active,
     scan,
-    validate_contact_info
+    validate_contact_info,
 )
 from cylc.flow.workflow_files import (
     ContactFileFields as CFF,
     WorkflowFiles,
 )
 
+
 if TYPE_CHECKING:
     from logging import Logger
+
+    from cylc.uiserver.app import CylcUIServer
 
 
 CLIENT_TIMEOUT = 2.0
@@ -59,12 +69,12 @@ CLIENT_TIMEOUT = 2.0
 async def workflow_request(
     client: WorkflowRuntimeClient,
     command: str,
-    args: Optional[Dict[str, Any]] = None,
-    timeout: Optional[float] = None,
+    args: dict[str, Any] | None = None,
+    timeout: float | None = None,
     *,
-    log: Optional['Logger'] = None,
-    req_meta: Optional[Dict[str, Any]] = None
-) -> Union[bytes, object]:
+    log: 'Logger | None' = None,
+    req_meta: dict[str, Any] | None = None
+) -> bytes | object:
     """Workflow request command.
 
     Args:
@@ -113,7 +123,7 @@ def db_file_exists(flow) -> bool:
     ).exists()
 
 
-class WorkflowsManager:  # noqa: SIM119
+class WorkflowsManager:
     """Object for tracking workflows by performing filesystem scans.
 
     * Detects stopped & running workflows in the run dir.
@@ -121,7 +131,13 @@ class WorkflowsManager:  # noqa: SIM119
 
     """
 
-    def __init__(self, uiserver, log, context=None, run_dir=None) -> None:
+    def __init__(
+        self,
+        uiserver: 'CylcUIServer',
+        log: 'Logger',
+        context: 'zmq.asyncio.Context | None' = None,
+        run_dir: 'Path | None' = None,
+    ) -> None:
         self.uiserver = uiserver
         self.log = log
         if context is None:
@@ -130,8 +146,14 @@ class WorkflowsManager:  # noqa: SIM119
             self.context = context
         self.owner = getuser()
 
-        # all workflows currently tracked
-        self.workflows: 'Dict[str, Dict]' = {}
+        self.workflows: dict[str, dict] = {}
+        """Mapping of workflow ID to workflow scan data
+        (including the contact data and the WorkflowRuntimeClient if active).
+
+        We add a workflow to this dict when we connect to it for the first
+        time (i.e. it first becomes active), and remove it when we unregister
+        it (i.e. workflow was cleaned).
+        """
 
         # the "workflow pipe" used to detect workflows on the filesystem
         self._scan_pipe = (
@@ -151,7 +173,7 @@ class WorkflowsManager:  # noqa: SIM119
         # * True  - (stop=True)  The stop signal (stops the scanner)
         # * False - (stop=False) Request a new scan
         # * None  - The "stopped" signal, sent after the scan task has stopped
-        self._queue: 'asyncio.Queue[Union[bool, None]]' = asyncio.Queue()
+        self._queue: asyncio.Queue[bool | None] = asyncio.Queue()
 
         # signal that the scanner is stopping, subsequent scan requests
         # will be ignored
@@ -192,7 +214,6 @@ class WorkflowsManager:  # noqa: SIM119
             flow['id'] = wid
 
             if not flow.get('contact'):
-                # this flow isn't running
                 inactive.add(wid)
                 if (
                     # if the workflow has previously started...
@@ -215,36 +236,36 @@ class WorkflowsManager:  # noqa: SIM119
                 else:
                     yield (wid, None, 'inactive', flow)
 
-            elif (
-                # detect workflows which have restarted since the last scan
-                wid in self.workflows
-                and (
-                    # UUID is unique to each workflow run, it is preserved
-                    # across reload/restart
-                    flow[CFF.UUID] != self.workflows[wid].get(CFF.UUID)
-                    # PID and HOST are (almost) unique to each scheduler
-                    # invocation
-                    or flow[CFF.PID] != self.workflows[wid].get(CFF.PID)
-                    or flow[CFF.HOST] != self.workflows[wid].get(CFF.HOST)
-                )
-            ):
-                # this workflow has been restarted or cleaned & cold-started
-                # since the last scan, we must disconnect/reconnect
-                active.add(wid)
-                if wid in active_before:
-                    yield (wid, '/active', 'active', flow)
-                else:
-                    yield (wid, '/inactive', 'active', flow)
+                continue
 
+            active.add(wid)
+
+            if wid in self.workflows:
+                if flow[CFF.UUID] != self.workflows[wid].get(CFF.UUID):
+                    # UUID is unique to each workflow run, it is preserved
+                    # across reload/restart.
+                    # This workflow has been cleaned & started since last scan
+                    if wid in active_before:
+                        yield (wid, '/active', 'active', flow)
+                    else:
+                        yield (wid, '/inactive', 'active', flow)
+                    continue
+                if wid in active_before and (
+                    flow[CFF.PID] != self.workflows[wid].get(CFF.PID)
+                    or flow[CFF.HOST] != self.workflows[wid].get(CFF.HOST)
+                ):
+                    # Process ID or host changes means workflow must have
+                    # restarted (contact file was left behind so we didn't
+                    # detect it as inactive earlier)
+                    yield (wid, 'active', 'active', flow)
+                    continue
+
+            if wid in active_before:
+                pass
+            elif wid in inactive_before:
+                yield (wid, 'inactive', 'active', flow)
             else:
-                # this flow is running
-                active.add(wid)
-                if wid in active_before:
-                    pass
-                elif wid in inactive_before:
-                    yield (wid, 'inactive', 'active', flow)
-                else:
-                    yield (wid, None, 'active', flow)
+                yield (wid, None, 'active', flow)
 
         for wid in active_before - (active | inactive):
             yield (wid, 'active', None, None)
@@ -252,25 +273,28 @@ class WorkflowsManager:  # noqa: SIM119
         for wid in inactive_before - (active | inactive):
             yield (wid, 'inactive', None, None)
 
-    async def _register(self, wid, flow, is_active):
+    async def _register(self, wid: str, is_active: bool) -> None:
         """Register a new workflow with the data store."""
         await self.uiserver.data_store_mgr.register_workflow(wid, is_active)
 
-    async def _connect(self, wid, flow):
+    async def _connect(self, wid: str, flow: dict) -> None:
         """Open a connection to a running workflow."""
         try:
             flow['req_client'] = WorkflowRuntimeClient(flow['name'])
         except ClientError as exc:
-            self.log.debug(f'Could not connect to {wid}: {exc}')
-            return False
+            self.log.log(
+                (
+                    logging.DEBUG
+                    if isinstance(exc, WorkflowStopped)
+                    else logging.WARNING  # Something has gone very wrong
+                ),
+                f'Could not connect to {wid}: {exc}',
+            )
+            return
         self.workflows[wid] = flow
-        await self.uiserver.data_store_mgr.connect_workflow(
-            wid,
-            flow
-        )
-        return True
+        await self.uiserver.data_store_mgr.connect_workflow(wid, flow)
 
-    async def _disconnect(self, wid):
+    async def _disconnect(self, wid: str) -> None:
         """Disconnect from a running workflow.
 
         Marks the workflow as stopped.
@@ -281,7 +305,7 @@ class WorkflowsManager:  # noqa: SIM119
         with suppress(KeyError):
             self.workflows[wid]['req_client'] = None
 
-    async def _unregister(self, wid):
+    async def _unregister(self, wid: str) -> None:
         """Unregister a workflow from the data store."""
         await self.uiserver.data_store_mgr.unregister_workflow(wid)
         if wid in self.workflows:
@@ -303,7 +327,7 @@ class WorkflowsManager:  # noqa: SIM119
         Between scans workflows can jump from any state to any other state.
 
         """
-        tasks: List[asyncio.Task] = []
+        tasks: list[asyncio.Task] = []
 
         def run(*coros):
             # start tasks running as soon as possible
@@ -325,17 +349,24 @@ class WorkflowsManager:  # noqa: SIM119
                         self._unregister(wid),
                     )
 
+                elif after == 'active':
+                    # workflow has restarted without earlier being disconnected
+                    run(
+                        self._disconnect(wid),
+                        self._connect(wid, flow),
+                    )
+
             elif before is None:
                 if after == 'active':
                     # workflow has been created and started
                     run(
-                        self._register(wid, flow, is_active=True),
+                        self._register(wid, is_active=True),
                         self._connect(wid, flow),
                     )
 
                 elif after == 'inactive':
                     # workflow has been created
-                    run(self._register(wid, flow, is_active=False))
+                    run(self._register(wid, is_active=False))
 
             elif before == 'inactive':
                 if after == 'active':
@@ -357,7 +388,7 @@ class WorkflowsManager:  # noqa: SIM119
                 # re-register the workflow
                 cmds.extend([
                     self._unregister(wid),
-                    self._register(wid, flow, is_active=(after == 'active')),
+                    self._register(wid, is_active=(after == 'active')),
                 ])
                 if after == 'active':
                     # connect to the new workflow
@@ -371,11 +402,11 @@ class WorkflowsManager:  # noqa: SIM119
         self,
         command: str,
         workflows: Iterable[str],
-        args: Optional[Dict[str, Any]] = None,
-        multi_args: Optional[Dict[str, Any]] = None,
-        timeout=None,
-        req_meta: Optional[Dict[str, Any]] = None
-    ) -> List[Union[bytes, object, Exception]]:
+        args: dict[str, Any] | None = None,
+        multi_args: dict[str, Any] | None = None,
+        timeout: float | None = None,
+        req_meta: dict[str, Any] | None = None
+    ) -> list[bytes | object | Exception]:
         """Send requests to multiple workflows."""
         if args is None:
             args = {}

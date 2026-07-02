@@ -17,6 +17,7 @@ from itertools import product
 import logging
 from random import random
 from typing import Type
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -97,7 +98,8 @@ def mk_flow(path, reg, active=True, database=True):
                     f'{CFF.HOST}=42',
                     f'{CFF.PORT}=42',
                     f'{CFF.NAME}=42',
-                    f'{CFF.UUID}=42'
+                    f'{CFF.UUID}=42',
+                    f'{CFF.PID}=42',
                 ])
             )
 
@@ -170,8 +172,8 @@ async def test_workflow_state_change_uuid(
         # NOTE: the mocked scan will return "42" for each of these fields
         CFF.API: API,
         CFF.UUID: '41',
-        CFF.PID: '41',
-        CFF.HOST: '41',
+        CFF.PID: '42',
+        CFF.HOST: '42',
     }
 
     if active_before:
@@ -205,6 +207,56 @@ async def test_workflow_state_change_uuid(
     # it should have picked up the new uuid too
     if active_after:
         assert changes[0][3][CFF.UUID] == '42'
+
+
+@pytest.mark.parametrize(
+    'pid, host, change_expected',
+    [
+        pytest.param('42', '42', False, id='no-change'),
+        pytest.param('1', '42', True, id='pid-change'),
+        pytest.param('42', '1', True, id='host-change'),
+    ],
+)
+async def test_workflow_state_change__killed(
+    pid, host, change_expected, tmp_path
+):
+    """It identifies workflow restarts when the contact file is left behind.
+
+    This can happen when the workflow is killed or the host dies.
+    """
+    wfm = WorkflowsManager(None, LOG, context=None, run_dir=tmp_path)
+    wid = Tokens(user=wfm.owner, workflow='a').id
+    wfm.workflows[wid] = {
+        CFF.API: API,
+        CFF.UUID: '42',
+        CFF.PID: pid,
+        CFF.HOST: host,
+    }
+    wfm.get_workflows = lambda: ({wid}, set())  # workflow active before...
+    mk_flow(tmp_path, 'a', active=True)  # ...and active after
+
+    # Check that the state change is detected correctly
+    changes = [i async for i in wfm._workflow_state_changes()]
+    if change_expected:
+        assert len(changes) == 1
+        assert changes[0][1:3] == ('active', 'active')
+        for field in (CFF.PID, CFF.HOST):
+            assert changes[0][3][field] == '42'
+    else:
+        assert not changes
+
+    # Check that the update calls the appropriate methods
+    for method in ('_register', '_unregister', '_connect', '_disconnect'):
+        setattr(wfm, method, AsyncMock())
+    await wfm.update()
+    assert wfm._register.call_count == 0
+    assert wfm._unregister.call_count == 0
+    if change_expected:
+        assert wfm._disconnect.call_count == 1
+        assert wfm._connect.call_count == 1
+    else:
+        assert wfm._disconnect.call_count == 0
+        assert wfm._connect.call_count == 0
 
 
 async def test_multi_request(
@@ -280,7 +332,6 @@ async def test_crashed_workflow(one_workflow_aiter, caplog, uis_caplog):
     # ... connection will fail, the UIS should catch the ClientError
     await uiserver.workflows_mgr.update()
 
-    # we should have two log messages
     assert len(caplog.records) == 2
     # one when it attempted to register the workflow
     assert 'register_workflow' in caplog.records[0].message
