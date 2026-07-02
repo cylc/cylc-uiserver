@@ -40,7 +40,6 @@ from cylc.flow.data_messages_pb2 import (  # type: ignore
 )
 from cylc.flow.data_store_mgr import generate_checksum
 from cylc.flow.network.client import WorkflowRuntimeClient
-from cylc.flow.workflow_files import ContactFileFields as CFF
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.workflows_mgr import WorkflowsManager
@@ -349,15 +348,7 @@ def dummy_workflow(
 
     async def _register(name):
         await cylc_workflows_mgr._register(
-            Tokens(user='me', workflow=name).id,
-            {
-                'name': name,
-                'owner': 'me',
-                CFF.HOST: 'localhost',
-                CFF.PORT: 1234,
-                CFF.API: 1,
-            },
-            True,
+            Tokens(user='me', workflow=name).id, is_active=True
         )
 
     return _register

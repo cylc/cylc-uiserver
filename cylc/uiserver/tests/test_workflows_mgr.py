@@ -332,7 +332,6 @@ async def test_crashed_workflow(one_workflow_aiter, caplog, uis_caplog):
     # ... connection will fail, the UIS should catch the ClientError
     await uiserver.workflows_mgr.update()
 
-    # we should have two log messages
     assert len(caplog.records) == 2
     # one when it attempted to register the workflow
     assert 'register_workflow' in caplog.records[0].message
