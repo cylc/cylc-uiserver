@@ -32,6 +32,7 @@ from time import time
 from typing import (
     TYPE_CHECKING,
     Any,
+    Set,
 )
 
 import zmq.asyncio
@@ -182,7 +183,9 @@ class WorkflowsManager:
 
         # Connection checker threshold, twice the check interval and buffer
         # to allow for two check attempts.
-        self.conn_threshold = uiserver.connections_check_interval * 2 + 60
+        self.conn_threshold = uiserver.connections_check_interval * 2 + 30
+        # Naughty bin of irresponsive workflows
+        self.irresponsive: Set[str] = set()
 
     def get_workflows(self):
         return self.uiserver.data_store_mgr.get_workflows()
@@ -283,7 +286,10 @@ class WorkflowsManager:
                 if (
                     wid in active_before
                     # BACK COMPAT
-                    and workflow.get(CFF.VERSION) > '8.6.5'
+                    and workflow.get(CFF.VERSION) >= '8.6.6'
+                    # Ping/Pong test for socket/network state and workflow
+                    # responsiveness.
+                    and wid not in self.irresponsive
                     and (
                         (
                             now - workflow['reqres_time']
@@ -295,6 +301,15 @@ class WorkflowsManager:
                 ):
                     # This tests if the REQ/RES or PUB/SUB connections
                     # are irresponsive. If so, we must disconnect/reconnect.
+                    self.irresponsive.add(wid)
+                    # Apply/Send new workflow status
+                    self.uiserver.data_store_mgr.create_status_delta(
+                        wid,
+                        status='irresponsive',
+                        status_msg=(
+                            'Workflow is not responding to the UI Server.'
+                        ),
+                    )
                     yield (wid, 'active', 'active', flow)
                     continue
 
@@ -389,6 +404,9 @@ class WorkflowsManager:
 
                 elif after == 'active':
                     # workflow has restarted without earlier being disconnected
+                    # or is irresponsive for some reason:
+                    # * Some internal scheduler issue/load/exception
+                    # * Some unrecoverable state of the network/socket
                     run(
                         self._disconnect(wid),
                         self._connect(wid, flow),

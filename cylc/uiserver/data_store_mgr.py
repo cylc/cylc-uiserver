@@ -34,6 +34,7 @@ Subscriptions are currently run in a different thread (via ThreadPoolExecutor).
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+import json
 from pathlib import Path
 import time
 from typing import (
@@ -312,10 +313,19 @@ class DataStoreMgr:
             return
         elif (
             topic == 'ping'
-            and delta == b'pong'
             and w_id in self.workflows_mgr.workflows
         ):
             self.workflows_mgr.workflows[w_id]['pubsub_time'] = time.time()
+            # workflow is now clearly responsive
+            if w_id in self.workflows_mgr.irresponsive:
+                # Bring status up to date
+                status_data = json.loads(delta.decode('utf-8'))
+                self.create_status_delta(
+                    w_id,
+                    status=status_data['status'],
+                    status_msg=status_data['status_msg'],
+                )
+                self.workflows_mgr.irresponsive.remove(w_id)
             return
         self._apply_all_delta(w_id, delta)
         self._delta_store_to_queues(w_id, topic, delta)
@@ -486,11 +496,16 @@ class DataStoreMgr:
             # workflow has been removed - do nothing
             return False
 
-        delta = DELTAS_MAP[ALL_DELTAS]()
-        delta.workflow.time = time.time()
+        delta = self.create_status_delta(
+            w_id,
+            status=status,
+            status_msg=status_msg,
+            apply=False,
+            send=False,
+        )
+
         flow = delta.workflow.updated
-        flow.id = w_id
-        flow.stamp = f'{w_id}@{delta.workflow.time}'
+
         if contact_data:
             # update with contact file data
             flow.name = contact_data['name']
@@ -507,10 +522,6 @@ class DataStoreMgr:
             flow.port = 0
             flow.api_version = 0
 
-        if status is not None:
-            flow.status = status
-        if status_msg is not None:
-            flow.status_msg = status_msg
         if pruned:
             flow.pruned = True
             delta.workflow.pruned = w_id
@@ -523,6 +534,48 @@ class DataStoreMgr:
         self._delta_store_to_queues(w_id, ALL_DELTAS, delta)
 
         return True
+
+    def create_status_delta(
+        self,
+        w_id,
+        status=None,
+        status_msg=None,
+        apply=True,
+        send=True,
+    ):
+        """Create status delta for application and/or distribution.
+
+        Args:
+            w_id: Workflow ID.
+            status: Workflow status (e.g. "running").
+            status_msg: Workflow status message (e.g. "will stop at 2000").
+            apply: Apply delta to data-store.
+            send: Add delta to subscription queue.
+
+        Returns:
+            An ALL_DELTAS with updated.workflow fields status and/or msg.
+
+        """
+
+        delta = DELTAS_MAP[ALL_DELTAS]()
+        delta.workflow.time = time.time()
+        flow = delta.workflow.updated
+        flow.id = w_id
+        flow.stamp = f'{w_id}@{delta.workflow.time}'
+
+        if status is not None:
+            flow.status = status
+        if status_msg is not None:
+            flow.status_msg = status_msg
+
+        # apply delta to data-store
+        if apply:
+            self._apply_all_delta(w_id, delta)
+        # Queue delta for subscription push
+        if send:
+            self._delta_store_to_queues(w_id, ALL_DELTAS, delta)
+
+        return delta
 
     def _get_status_msg(self, w_id: str, is_active: bool) -> str:
         """Derive a status message for the workflow.
@@ -552,7 +605,7 @@ class DataStoreMgr:
                 client=info['req_client'],
                 command='reqpub',
                 log=self.log,
-                args={'topic': topic, 'payload': 'pong'},
+                args={'topic': topic, 'payload': 'status'},
             )
             for w_id, info in self.workflows_mgr.workflows.items()
             if (
@@ -560,7 +613,7 @@ class DataStoreMgr:
                 info.get('req_client')
                 and w_id in self.w_subs
                 # BACK COMPAT
-                and info.get(CFF.VERSION) > '8.6.5'
+                and info.get(CFF.VERSION) >= '8.6.6'
             )
         }
         results = await asyncio.gather(
