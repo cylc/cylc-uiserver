@@ -12,6 +12,16 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.9.3 (Released 2026-06-30)
+
+### 🔧 Fixes
+
+[#847](https://github.com/cylc/cylc-uiserver/pull/847) - Cylc Review: fixed a bug where a newly-installed workflow would be stuck with an error banner incorrectly mentioning Cylc 8.0.x.
+
+[#853](https://github.com/cylc/cylc-uiserver/pull/853) - Fix workflow sort order in Cylc Review.
+
+[#856](https://github.com/cylc/cylc-uiserver/pull/856) - Fixed detection of workflows that were restarted after having crashed.
+
 ## cylc-uiserver-1.9.2 (Released 2026-06-18)
 
 ### 🔧 Fixes
