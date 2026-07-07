@@ -449,7 +449,7 @@ class CylcUIServer(ExtensionApp):
             except IndexError:
                 raise Exception(
                     f'Could not find any UI builds in {build_dir}.'
-                )
+                ) from None
 
         ui_path = build_dir / version
         if (ui_path / 'index.html').exists():

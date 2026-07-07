@@ -32,11 +32,9 @@ def dummy_uis():
     calls = []
 
     async def async_capture(func, *_):
-        nonlocal calls
         calls.append(func)
 
     def sync_capture(func, *_):
-        nonlocal calls
         calls.append(func)
 
     data_store_mgr = SimpleNamespace(

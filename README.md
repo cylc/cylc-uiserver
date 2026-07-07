@@ -253,7 +253,7 @@ To enable the Cylc Review web service, register the service using
 `JupyterHub.load_roles`:
 
 ```python
-from cylc.uiserver.ws import get_review_service_config
+from cylc.review.ws import get_review_service_config
 c.JupyterHub.services = [get_review_service_config()]
 c.JupyterHub.load_roles = [
     {
