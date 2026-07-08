@@ -382,7 +382,6 @@ class Services:
             'cylc',
             'cat-log',
             '--mode=tail',
-            '--force-remote',
             '--prepend-path',
             id_.id,
         ]
