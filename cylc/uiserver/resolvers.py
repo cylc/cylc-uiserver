@@ -508,7 +508,7 @@ class Services:
         This uses the Cylc cat-log interface, list dir mode, forcing remote
         file checking.
         """
-        cmd: List[str] = ['cylc', 'cat-log', '-m', 'l', '-o', id_.id]
+        cmd: List[str] = ['cylc', 'cat-log', '-m', 'l', id_.id]
         log.debug(f"$ {' '.join(cmd)}")
         proc_job = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
