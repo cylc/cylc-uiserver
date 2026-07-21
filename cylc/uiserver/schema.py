@@ -976,13 +976,13 @@ class UISTask(Task):
         description=sstrip('''
                 List containing the first, second,
                 third and forth quartile run times.'''))
-    max_rss = graphene.Int()
-    min_max_rss = graphene.Int()
-    mean_max_rss = graphene.Int()
-    max_max_rss = graphene.Int()
+    max_rss = graphene.BigInt()
+    min_max_rss = graphene.BigInt()
+    mean_max_rss = graphene.BigInt()
+    max_max_rss = graphene.BigInt()
     std_dev_max_rss = graphene.Int()
     max_rss_quartiles = graphene.List(
-        graphene.Int,
+        graphene.BigInt,
         description=sstrip('''
                 List containing the first, second,
                 third and forth quartile for Max RSS.'''))
@@ -997,7 +997,7 @@ class UISTask(Task):
                 List containing the first, second,
                 third and forth quartile for CPU time.'''))
     total_of_totals = graphene.Int()
-    mem_alloc = graphene.Int()
+    mem_alloc = graphene.BigInt()
     count = graphene.Int()
 
 
