@@ -524,7 +524,7 @@ SELECT
 FROM time_stats
 GROUP BY name, platform_name;
 '''):
-        total_of_totals += row['n']
+        total_of_totals += row['total_cpu_time']
         tasks.append({
             'id': workflow.duplicate(
                 cycle=row['cycle'],
