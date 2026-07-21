@@ -64,13 +64,13 @@ def make_db(task_entries, task_events=None):
 
     conn.execute(
         '''
-        CREATE TABLE 
+        CREATE TABLE
             task_events(
                 name TEXT,
                 cycle TEXT,
                 time TEXT,
                 submit_num INTEGER,
-                event TEXT, 
+                event TEXT,
                 message TEXT);''')
 
     conn.executemany(
