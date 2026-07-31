@@ -20,9 +20,12 @@ import getpass
 import json
 import os
 import re
-from typing import TYPE_CHECKING, Callable, Dict, Awaitable, Optional
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+)
 
-from cylc.flow import __version__ as cylc_flow_version
 from jupyter_server.base.handlers import JupyterHandler
 from tornado import (
     web,
@@ -30,8 +33,12 @@ from tornado import (
 )
 from tornado.ioloop import IOLoop
 
+from cylc.flow import __version__ as cylc_flow_version
 from cylc.uiserver import __version__
-from cylc.uiserver.authorise import Authorization, AuthorizationMiddleware
+from cylc.uiserver.authorise import (
+    Authorization,
+    AuthorizationMiddleware,
+)
 from cylc.uiserver.graphql import authenticated as websockets_authenticated
 from cylc.uiserver.graphql.tornado import TornadoGraphQLHandler
 from cylc.uiserver.graphql.tornado_ws import GRAPHQL_WS
@@ -39,9 +46,10 @@ from cylc.uiserver.utils import is_bearer_token_authenticated
 
 
 if TYPE_CHECKING:
-    from cylc.uiserver.resolvers import Resolvers
-    from cylc.uiserver.graphql.tornado_ws import TornadoSubscriptionServer
     from jupyter_server.auth.identity import User as JPSUser
+
+    from cylc.uiserver.graphql.tornado_ws import TornadoSubscriptionServer
+    from cylc.uiserver.resolvers import Resolvers
 
 
 ME = getpass.getuser()
@@ -356,10 +364,8 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
             'current_user': get_user_info(self)['username'],
         }
 
-    @web.authenticated  # type: ignore[arg-type]
-    async def execute(
-        self, *args, **kwargs
-    ) -> Optional[Awaitable[None]]:
+    @web.authenticated
+    async def execute(self, *args, **kwargs):
         return await TornadoGraphQLHandler.execute(self, *args, **kwargs)
 
     @web.authenticated

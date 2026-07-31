@@ -436,6 +436,12 @@ requires_cherrypy() {
     fi
 }
 
+requires_jq() {
+    if ! which jq 1>'/dev/null'; then
+        skip_all '"jq" not installed'
+    fi
+}
+
 
 get_hostname() {
     if [[ "${OSTYPE}" == "darwin"* ]]; then
@@ -504,7 +510,7 @@ cylc_ws_kill() {
                 sleep 1
             fi
         done
-        
+
         kill "${TEST_CYLC_WS_PID}" 2>'/dev/null'
         wait 2>'/dev/null'
     fi
@@ -536,16 +542,15 @@ for item in sys.argv[2:]:
                         datum = datum_item
                         break
                 else:
-                    raise KeyError
+                    raise KeyError(item)
             else:
                 datum = datum[key]
-        if datum != value:
-            raise ValueError((item, datum))
-    except IndexError:
+        assert datum == value, f"assert {datum!r} == {value!r}, in {item=}"
+    except IndexError as exc:
         print(data)
-        raise IndexError(item)
-    except KeyError:
-        raise KeyError(item)
+        raise IndexError(item) from exc
+    except KeyError as exc:
+        raise KeyError(item) from exc
 __PYTHON__
     if [[ -s "${TEST_NAME}.stderr" ]]; then
         # Only print the final exception line - change to cat for details
