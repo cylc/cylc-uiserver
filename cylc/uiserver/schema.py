@@ -443,15 +443,7 @@ time_stats AS (
 )
 SELECT
   name,
-  cycle,
-  submit_num,
-  submit_status,
-  run_status,
-  time_run,
-  time_run_exit,
-  job_id,
   platform_name,
-  time_submit,
   mem_alloc,
 
   -- Calculate Queue time stats
@@ -526,16 +518,7 @@ GROUP BY name, platform_name;
                 job=f"{row['submit_num']:02d}"
             ),
             'name': row["name"],
-            'cycle_point': row["cycle"],
-            'submit_num': row["submit_num"],
-            'state': _state_to_status(row["submit_status"],
-                                      row["run_status"],
-                                      row["time_run"]),
-            'started_time': row["time_run"],
-            'finished_time': row["time_run_exit"],
-            'job_id': row["job_id"],
             'platform': row["platform_name"],
-            'submitted_time': row["time_submit"],
             'mem_alloc': row["mem_alloc"],
             # Queue time stats
             'min_queue_time': row["min_queue_time"],
