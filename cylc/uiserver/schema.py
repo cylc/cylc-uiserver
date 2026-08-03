@@ -396,15 +396,9 @@ WITH profiler_stats AS (
     tj.platform_name,
     tj.time_submit,
     tj.run_status,
-    COALESCE(
-      JSON_EXTRACT(SUBSTR(te.message, 17), '$.memory_allocated'), 0
-    ) AS mem_alloc,
-    COALESCE(
-      JSON_EXTRACT(SUBSTR(te.message, 17), '$.max_rss'), 0
-    ) AS max_rss,
-    COALESCE(
-      JSON_EXTRACT(SUBSTR(te.message, 17), '$.cpu_time'), 0
-    ) AS cpu_time,
+    JSON_EXTRACT(SUBSTR(te.message, 17), '$.memory_allocated') AS mem_alloc,
+    JSON_EXTRACT(SUBSTR(te.message, 17), '$.max_rss') AS max_rss,
+    JSON_EXTRACT(SUBSTR(te.message, 17), '$.cpu_time') AS cpu_time,
     STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_submit) AS total_time,
     STRFTIME('%s', time_run_exit) - STRFTIME('%s', time_run) AS run_time,
     STRFTIME('%s', time_run) - STRFTIME('%s', time_submit) AS queue_time
@@ -950,7 +944,7 @@ class UISTask(Task):
     platform = graphene.String()
 
     min_total_time = graphene.Int()
-    mean_total_time = graphene.Int()
+    mean_total_time = graphene.Float()
     max_total_time = graphene.Int()
     std_dev_total_time = graphene.Float()
     total_quartiles = graphene.List(
@@ -959,7 +953,7 @@ class UISTask(Task):
                 List containing the first, second,
                 third and forth quartile total times.'''))
     min_queue_time = graphene.Int()
-    mean_queue_time = graphene.Int()
+    mean_queue_time = graphene.Float()
     max_queue_time = graphene.Int()
     std_dev_queue_time = graphene.Float()
     queue_quartiles = graphene.List(
@@ -968,7 +962,7 @@ class UISTask(Task):
             List containing the first, second,
             third and forth quartile queue times.'''))
     min_run_time = graphene.Int()
-    mean_run_time = graphene.Int()
+    mean_run_time = graphene.Float()
     max_run_time = graphene.Int()
     std_dev_run_time = graphene.Float()
     run_quartiles = graphene.List(
@@ -978,16 +972,16 @@ class UISTask(Task):
                 third and forth quartile run times.'''))
     max_rss = graphene.BigInt()
     min_max_rss = graphene.BigInt()
-    mean_max_rss = graphene.BigInt()
+    mean_max_rss = graphene.Float()
     max_max_rss = graphene.BigInt()
-    std_dev_max_rss = graphene.Int()
+    std_dev_max_rss = graphene.Float()
     max_rss_quartiles = graphene.List(
         graphene.BigInt,
         description=sstrip('''
                 List containing the first, second,
                 third and forth quartile for Max RSS.'''))
     min_cpu_time = graphene.Int()
-    mean_cpu_time = graphene.Int()
+    mean_cpu_time = graphene.Float()
     max_cpu_time = graphene.Int()
     total_cpu_time = graphene.Int()
     std_dev_cpu_time = graphene.Float()
