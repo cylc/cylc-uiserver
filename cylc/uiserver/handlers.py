@@ -355,10 +355,8 @@ class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
             'current_user': get_user_info(self)['username'],
         }
 
-    @web.authenticated  # type: ignore[arg-type]
-    async def execute(
-        self, *args, **kwargs
-    ) -> Optional[Awaitable[None]]:
+    @web.authenticated
+    async def execute(self, *args, **kwargs):
         return await TornadoGraphQLHandler.execute(self, *args, **kwargs)
 
     @web.authenticated
