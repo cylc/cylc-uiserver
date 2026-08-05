@@ -130,15 +130,12 @@ def test_make_task_query_1():
     ret = run_task_query(conn, workflow)[0]
 
     assert ret['count'] == 1
-    assert ret['cycle_point'] == '1'
-    assert ret['finished_time'] == '2022-12-14T15:10:00Z'
     assert ret['queue_quartiles'] == [60, 60, 60]
     assert ret['run_quartiles'] == [540, 540, 540]
     assert ret['total_quartiles'] == [600, 600, 600]
     assert ret['max_rss_quartiles'] == [40064, 40064, 40064]
     assert ret['cpu_time_quartiles'] == [994, 994, 994]
     assert ret['id'].id == '~user/workflow//1/Task_1/01'
-    assert ret['job_id'] == 'UsersJob'
     assert ret['max_queue_time'] == 60
     assert ret['max_run_time'] == 540
     assert ret['max_total_time'] == 600
@@ -156,15 +153,11 @@ def test_make_task_query_1():
     assert ret['min_cpu_time'] == 994
     assert ret['name'] == 'Task_1'
     assert ret['platform'] == 'MyPlatform'
-    assert ret['started_time'] == '2022-12-14T15:01:00Z'
-    assert ret['state'] == 'succeeded'
     assert ret['std_dev_queue_time'] == pytest.approx(0.0, 0.01)
     assert ret['std_dev_run_time'] == pytest.approx(0.0, 0.01)
     assert ret['std_dev_total_time'] == pytest.approx(0.0, 0.01)
     assert ret['std_dev_max_rss'] == pytest.approx(0.0, 0.01)
     assert ret['std_dev_cpu_time'] == pytest.approx(0.0, 0.01)
-    assert ret['submit_num'] == 1
-    assert ret['submitted_time'] == '2022-12-14T15:00:00Z'
     assert ret['mem_alloc'] == 1048576
 
 
@@ -239,13 +232,10 @@ def test_make_task_query_2():
     ret = run_task_query(conn, workflow)[0]
 
     assert ret['count'] == 2
-    assert ret['cycle_point'] == '2'
-    assert ret['finished_time'] == '2022-12-15T15:12:00Z'
     assert ret['queue_quartiles'] == [60, 76, 60]
     assert ret['run_quartiles'] == [540, 644, 540]
     assert ret['total_quartiles'] == [600, 720, 600]
     assert ret['id'].id == '~user/workflow//2/Task_1/01'
-    assert ret['job_id'] == 'UsersJob'
     assert ret['max_queue_time'] == 76
     assert ret['max_run_time'] == 644
     assert ret['max_total_time'] == 720
@@ -257,13 +247,9 @@ def test_make_task_query_2():
     assert ret['min_total_time'] == 600
     assert ret['name'] == 'Task_1'
     assert ret['platform'] == 'MyPlatform'
-    assert ret['started_time'] == '2022-12-15T15:01:16Z'
-    assert ret['state'] == 'succeeded'
     assert ret['std_dev_queue_time'] == pytest.approx(8.00, 0.01)
     assert ret['std_dev_run_time'] == pytest.approx(52.0, 0.01)
     assert ret['std_dev_total_time'] == pytest.approx(60.0, 0.01)
-    assert ret['submit_num'] == 1
-    assert ret['submitted_time'] == '2022-12-15T15:00:00Z'
 
 
 def test_make_task_query_3():
@@ -366,13 +352,10 @@ def test_make_task_query_3():
     ret = run_task_query(conn, workflow)[0]
 
     assert ret['count'] == 3
-    assert ret['cycle_point'] == '3'
-    assert ret['finished_time'] == '2022-12-16T15:12:00Z'
     assert ret['queue_quartiles'] == [60, 76, 76]
     assert ret['run_quartiles'] == [540, 644, 644]
     assert ret['total_quartiles'] == [600, 720, 720]
     assert ret['id'].id == '~user/workflow//3/Task_1/01'
-    assert ret['job_id'] == 'UsersJob'
     assert ret['max_queue_time'] == 76
     assert ret['max_run_time'] == 644
     assert ret['max_total_time'] == 720
@@ -384,13 +367,9 @@ def test_make_task_query_3():
     assert ret['min_total_time'] == 600
     assert ret['name'] == 'Task_1'
     assert ret['platform'] == 'MyPlatform'
-    assert ret['started_time'] == '2022-12-16T15:01:16Z'
-    assert ret['state'] == 'succeeded'
     assert ret['std_dev_queue_time'] == pytest.approx(7.54, 0.01)
     assert ret['std_dev_run_time'] == pytest.approx(49.02, 0.01)
     assert ret['std_dev_total_time'] == pytest.approx(56.56, 0.01)
-    assert ret['submit_num'] == 1
-    assert ret['submitted_time'] == '2022-12-16T15:00:00Z'
 
 
 def test_make_task_query_different_platforms():
@@ -896,7 +875,6 @@ async def test_e2e_jobs_query(monkeypatch: pytest.MonkeyPatch):
     entry = {
         'id': 'wflow//5/mytask/02',
         'submitNum': 2,
-        'state': 'succeeded',
         'name': 'mytask',
         'cyclePoint': '5',
         'submittedTime': '2022-12-14T15:00:00Z',

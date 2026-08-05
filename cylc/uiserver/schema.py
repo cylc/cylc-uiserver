@@ -443,6 +443,8 @@ time_stats AS (
 )
 SELECT
   name,
+  cycle,
+  submit_num,
   platform_name,
   mem_alloc,
 
