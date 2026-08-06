@@ -42,6 +42,7 @@ from time import (
 )
 import traceback
 from urllib.parse import quote
+from pathlib import Path
 
 import cherrypy
 import jinja2
@@ -51,6 +52,7 @@ import markupsafe
 from cylc.flow import __version__ as CYLC_VERSION
 from cylc.flow.task_state import TASK_STATUSES_ORDERED
 from cylc.flow.workflow_files import WorkflowFiles
+from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
 from cylc.review.review_dao import (
     TASK_STATUS_GROUPS,
     CylcReviewDAO,
@@ -444,6 +446,22 @@ class CylcReviewService:
         except jinja2.TemplateError:
             traceback.print_exc()
 
+    # Filters out any os.walk results longer than max_scan_depth
+    @staticmethod
+    def safe_walking(user_suite_dir_root):
+        max_scan_depth = glbl_cfg().get(['install', 'max depth'])
+        for dirpath, dnames, fnames in os.walk(
+            user_suite_dir_root, followlinks=True
+        ):
+            relpath = Path(dirpath).relative_to(Path(user_suite_dir_root
+                                                     )).parts
+            if (len(relpath) > max_scan_depth):
+                continue
+            if any((relpath[x] == "_cylc_install" and relpath[x + 1] ==
+                    "source") for x in range(0, len(relpath) - 1)):
+                continue
+            yield (dirpath, dnames, fnames)
+
     @cherrypy.expose
     def suites(
         self,
@@ -505,8 +523,8 @@ class CylcReviewService:
             "share",
             "work"
         ]
-        for dirpath, dnames, fnames in os.walk(
-            user_suite_dir_root, followlinks=True
+        for dirpath, dnames, fnames in self.safe_walking(
+            user_suite_dir_root
         ):
             if dirpath != user_suite_dir_root and (
                 any(name in dnames or name in fnames for name in sub_names)
