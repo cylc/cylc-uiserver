@@ -14,6 +14,7 @@ concurrency:
 
 env:
   FORCE_COLOR: 2
+  PIP_PROGRESS_BAR: 'off'
 
 defaults:
   run:
@@ -36,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Patch DNS
         uses: cylc/release-actions/patch-dns@v1
@@ -74,6 +75,7 @@ jobs:
         run: mypy
 
       - name: Check changelog
+        if: startsWith(matrix.os, 'ubuntu')
         uses: cylc/release-actions/towncrier-draft@v1
 
       - name: Test
@@ -117,8 +119,7 @@ jobs:
 
       - name: Coverage report
         run: |
-          coverage combine --append
-          coverage xml --ignore-errors
+          coverage xml
           coverage report
 
       - name: Upload coverage artifact
@@ -134,7 +135,7 @@ jobs:
     timeout-minutes: 2
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download coverage artifacts
         uses: actions/download-artifact@v8

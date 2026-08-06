@@ -1,5 +1,6 @@
 # THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +22,6 @@ import os
 from pathlib import Path
 import re
 import sqlite3
-from sqlite3 import OperationalError
 import tarfile
 
 from cylc.flow.rundb import CylcWorkflowDAO
@@ -110,10 +110,6 @@ class CylcReviewDAO:
 
     REC_CYCLE_QUERY_OP = re.compile(r"\A(before |after |[<>]=?)(.+)\Z")
     REC_SEQ_LOG = re.compile(r"\A(.+\.)([^\.]+)(\.[^\.]+)\Z")
-    CANNOT_JOIN_FLOW_NUMS = (
-        'cannot join using column flow_nums - '
-        'column not present in both tables'
-    )
     # Required when using
     # CylcWorkflowDAO.pre_select_broadcast_states(self, order)
     # Because that method needs self.TABLE_BROADCAST_STATES
@@ -123,7 +119,13 @@ class CylcReviewDAO:
         self.daos = {}
 
     def _db_init(self, user_name, suite_name):
-        """Initialise a named CylcWorkflowDAO database connection."""
+        """Initialise a named CylcWorkflowDAO database connection.
+
+        Returns:
+            CylcWorkflowDAO for the "log/db" or "cylc-suite.db" file as
+            appropriate, or "None" if there is no DB.
+
+        """
         key = (user_name, suite_name)
         if key not in self.daos:
             prefix = "~"
@@ -133,11 +135,11 @@ class CylcReviewDAO:
                 db_f_name = os.path.expanduser(
                     os.path.join(
                         prefix, os.path.join("cylc-run", suite_name, name)))
-                self.daos[key] = CylcWorkflowDAO(db_f_name, is_public=True)
                 if os.path.exists(db_f_name):
+                    self.daos[key] = CylcWorkflowDAO(db_f_name, is_public=True)
                     break
         self.is_cylc8 = self.set_is_cylc8(user_name, suite_name)
-        return self.daos[key]
+        return self.daos.get(key, None)
 
     def _db_close(self, user_name, suite_name):
         """Close a named CylcWorkflowDAO database connection."""
@@ -147,15 +149,16 @@ class CylcReviewDAO:
 
     def _db_exec(self, user_name, suite_name, stmt, stmt_args=None):
         """Execute a query on a named CylcWorkflowDAO database connection."""
-        daos = self._db_init(user_name, suite_name)
-        if stmt_args is None:
-            stmt_args = []
+        dao = self._db_init(user_name, suite_name)
+
         # only connect if db exists to avoid creating db if none there
-        if not os.path.exists(daos.db_file_name):
+        if dao is None or not os.path.exists(dao.db_file_name):
             return []
         else:
+            if stmt_args is None:
+                stmt_args = []
             try:
-                return daos.connect().execute(stmt, stmt_args)
+                return dao.connect().execute(stmt, stmt_args)
             except sqlite3.OperationalError as exc:
                 # At Cylc 8.0.1+ Workflows installed but not run will not yet
                 # have a database.
@@ -214,7 +217,6 @@ class CylcReviewDAO:
         order,
         limit,
         offset,
-        flow_nums='flow_nums',
     ):
         """Query suite runtime database to return a listing of task jobs.
         user -- A string containing a valid user ID
@@ -235,7 +237,6 @@ class CylcReviewDAO:
                  the keys in CylcReviewDAO.ORDERS.
         limit -- Limit number of returned entries
         offset -- Offset entry number
-        flow_nums -- whether to use flow_nums
 
         Return (entries, of_n_entries) where:
         entries -- A list of matching entries
@@ -249,8 +250,6 @@ class CylcReviewDAO:
                       "out": {...},
                       "err": {...},
                       ...}}
-        eight_zero_warning - boolean flag indicating that the database is
-            a Cylc 8.0 database and we can only get the latest task job.
         """
         where_expr, where_args = self._get_suite_job_entries_where(
             cycles, tasks, task_status, job_status)
@@ -268,9 +267,9 @@ class CylcReviewDAO:
                 break
             else:
                 self._db_close(user_name, suite_name)
-                return ([], 0, self.is_cylc8)
+                return ([], 0)
         except sqlite3.Error:
-            return ([], 0, self.is_cylc8)
+            return ([], 0)
         if self.is_cylc8:
             stmt = (   # nosec B608
                 "SELECT" +
@@ -283,7 +282,7 @@ class CylcReviewDAO:
                 " time_run, time_run_exit, run_signal, run_status," +
                 " platform_name, job_runner_name, job_id" +
                 " FROM task_states LEFT JOIN task_jobs USING " +
-                "(cycle, name, " + flow_nums + ") " +
+                "(cycle, name, flow_nums) " +
                 where_expr +
                 " ORDER BY " +
                 self.JOB_ORDERS.get(order, self.JOB_ORDERS["time_desc"])
@@ -313,26 +312,9 @@ class CylcReviewDAO:
             stmt += " LIMIT ? OFFSET ?"
             limit_args = [limit, offset]
 
-        # Try except loop deals with case (Cylc 8.0) where the database
-        # doesn't contain enough information to identify multiple jobs
-        # belonging to the same task:
-        # https://github.com/cylc/cylc-flow/issues/5247
-        eight_zero_warning = False
-        try:
-            db_data = self._db_exec(
-                user_name, suite_name, stmt, where_args + limit_args
-            )
-        except OperationalError as exc:
-            if exc.message == self.CANNOT_JOIN_FLOW_NUMS:
-                stmt = stmt.replace('flow_nums', 'submit_num')
-                db_data = self._db_exec(
-                    user_name, suite_name, stmt, where_args + limit_args
-                )
-                eight_zero_warning = True
-            else:
-                raise exc
-
-        for row in db_data:
+        for row in self._db_exec(
+            user_name, suite_name, stmt, where_args + limit_args
+        ):
             (
                 cycle,
                 name,
@@ -369,7 +351,7 @@ class CylcReviewDAO:
         self._db_close(user_name, suite_name)
         if entries:
             self._get_job_logs(user_name, suite_name, entries, entry_of)
-        return (entries, of_n_entries, eight_zero_warning)
+        return (entries, of_n_entries)
 
     def _get_suite_job_entries_where(
             self, cycles, tasks, task_status, job_status):
@@ -501,7 +483,7 @@ class CylcReviewDAO:
                 if seq_key not in entry["seq_logs_indexes"]:
                     entry["seq_logs_indexes"][seq_key] = {}
                 entry["seq_logs_indexes"][seq_key][index_str] = filename
-            for seq_key, indexes in entry["seq_logs_indexes"].items():
+            for seq_key, indexes in list(entry["seq_logs_indexes"].items()):
                 # Only one item, not a sequence
                 if len(indexes) <= 1:
                     entry["seq_logs_indexes"].pop(seq_key)
@@ -691,7 +673,7 @@ class CylcReviewDAO:
             "is_failed": False,
             "server": None}
         dao = self._db_init(user_name, suite_name)
-        if not os.access(dao.db_file_name, os.F_OK | os.R_OK):
+        if dao is None or not os.access(dao.db_file_name, os.F_OK | os.R_OK):
             self._db_close(user_name, suite_name)
             return ret
 
