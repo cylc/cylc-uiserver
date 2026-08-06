@@ -21,15 +21,18 @@
 . "$(dirname "$0")/test_header"
 requires_cherrypy
 
-set_test_number 14
+set_test_number 13
 #-------------------------------------------------------------------------------
-# Initialise, validate and run a suite for testing with
+# Install a (effectively empty) workflow for testing with.
+# Rather than actually running the workflow (slow, and job timings vary between
+# runs) we load a pre-generated database with hard-coded job timings. This keeps
+# the sort-order assertions deterministic and makes the test fast.
 install_workflow "${TEST_NAME_BASE}" "${TEST_NAME_BASE}"
 
-TEST_NAME=$TEST_NAME_BASE-validate
-run_ok "${TEST_NAME}" cylc validate "${WORKFLOW_NAME}"
-
-cylc play --no-detach --debug "${WORKFLOW_NAME}" 2>'/dev/null'
+# Populate the workflow's database from the SQL dump.
+mkdir -p "${WORKFLOW_RUN_DIR}/log"
+sqlite3 "${WORKFLOW_RUN_DIR}/log/db" \
+    <"${TEST_SOURCE_DIR}/${TEST_NAME_BASE}/db.sqlite3"
 #-------------------------------------------------------------------------------
 # Initialise WSGI application for the cylc review web service
 cylc_ws_init 'cylc' 'review'
