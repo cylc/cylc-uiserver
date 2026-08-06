@@ -60,6 +60,7 @@ from cylc.flow.network.schema import (
 )
 from cylc.flow.pathutil import get_workflow_run_dir
 from cylc.flow.rundb import CylcWorkflowDAO
+from cylc.flow.scripts.cat_log import TAIL, TAIL_FROM_START
 from cylc.flow.task_state import (
     TASK_STATUS_FAILED,
     TASK_STATUS_RUNNING,
@@ -888,6 +889,16 @@ class UISSubscriptions(Subscriptions):
             graphene.String,
             required=False,
             description='File name of job log to fetch, e.g. job.out'
+        ),
+        mode=graphene.Argument(
+            graphene.String,
+            required=False,
+            default_value=TAIL,
+            description=(
+                'Log view mode: '
+                f'"{TAIL}" (follow the last lines from the end of the file) '
+                f'or "{TAIL_FROM_START}" (follow from the start of the file).'
+            ),
         ),
         resolver=identity_resolve
     )
