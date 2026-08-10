@@ -54,19 +54,16 @@ jobs:
             bash
             coreutils
 
-      - name: install cylc-flow
+      - name: Install Cylc components
         uses: cylc/release-actions/install-cylc-components@v1
         with:
           cylc_flow: true
           cylc_flow_opts: ''
+local_source: '.[all]'
           # Required for coverage collection
           editable_installations: true
 
-      - name: install cylc-uiserver
-        run: |
-          pip install -e .[all]
-
-      - name: Style test
+            - name: Style test
         if: startsWith(matrix.os, 'ubuntu')
         run: flake8
 
