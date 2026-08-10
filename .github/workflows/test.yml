@@ -59,11 +59,11 @@ jobs:
         with:
           cylc_flow: true
           cylc_flow_opts: ''
-local_source: '.[all]'
+          local_source: '.[all]'
           # Required for coverage collection
           editable_installations: true
 
-            - name: Style test
+      - name: Style test
         if: startsWith(matrix.os, 'ubuntu')
         run: flake8
 
@@ -78,7 +78,7 @@ local_source: '.[all]'
       - name: Test
         run: pytest
 
-      - name: Cylc Review tests
+      - name: Cylc Review functional tests
         id: review_tests
         run: |
           CONF_PATH="$HOME/.cylc/flow/8"

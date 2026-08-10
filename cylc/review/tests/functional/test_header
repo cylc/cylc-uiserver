@@ -19,9 +19,6 @@
 # NAME
 #     test_header
 #
-# SYNOPSIS
-#     . $CYLC_REPO_DIR/tests/lib/bash/test_header
-#
 # DESCRIPTION
 #     Interface for constructing tests under a TAP harness (the "prove"
 #     command).
@@ -376,15 +373,7 @@ cmp_json() {
     local FILE_TEST="$2"
     local FILE_CONTROL="${3:--}"
 
-    if python3 "$CYLC_REPO_DIR/tests/f/lib/python/diffr.py" \
-        "$(cat "$FILE_CONTROL")" "$(cat "$FILE_TEST")" \
-        >"${TEST_NAME}.stdout" 2>"${TEST_NAME}.stderr"
-    then
-        ok "${TEST_NAME}"
-        return
-    else
-        cat "${TEST_NAME}.stderr" >&2
-    fi
+    cat "${TEST_NAME}.stderr" >&2
     dump_std "$TEST_NAME"
     fail "${TEST_NAME}"
 }
