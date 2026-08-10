@@ -60,9 +60,6 @@
 #     contains_ok FILE_TEST [FILE_CONTROL]
 #         Make sure that each line in FILE_TEST is present in FILE_CONTROL
 #         (stdin if FILE_CONTROL is "-" or missing).
-#     get_hostname
-#         Wraps logic to deal with differences between Darwin and Gnu Linux
-#         $(hostname) on Github actions runners.
 #     grep_ok PATTERN FILE [$OPTS]
 #         Run "grep [$OPTS] -q -e PATTERN FILE".
 #     grep_workflow_log_ok TEST_NAME PATTERN [$OPTS]
@@ -429,17 +426,6 @@ requires_jq() {
         skip_all '"jq" not installed'
     fi
 }
-
-
-get_hostname() {
-    if [[ "${OSTYPE}" == "darwin"* ]]; then
-        HOSTNAME="$(hostname -f | sed 's@.local@@')"
-    else
-        HOSTNAME=$(hostname)
-    fi
-    export HOSTNAME
-}
-
 
 port_is_busy() {
     local WS_PORT="${1}"

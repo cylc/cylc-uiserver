@@ -1,7 +1,7 @@
 #!/bin/bash
 # THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
 # Copyright (C) NIWA & British Crown (Met Office) & Contributors.
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -42,21 +42,19 @@ ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
 # Basic data transfer output check
 
-get_hostname
-
 TEST_NAME="${TEST_NAME_BASE}-200-curl-root-json"
 run_ok "${TEST_NAME}" curl "${TEST_CYLC_WS_URL}/?form=json"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('logo',), 'cylc-logo.png']" \
     "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']"
+    "[('host',), '$(hostname)']"
 
 TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-json"
 run_ok "${TEST_NAME}" curl "${TEST_CYLC_WS_URL}/suites/${USER}?form=json"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('logo',), 'cylc-logo.png']" \
     "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']"
+    "[('host',), '$(hostname)']"
 
 TEST_NAME="${TEST_NAME_BASE}-200-curl-cycles-json"
 run_ok "${TEST_NAME}" \
@@ -64,7 +62,7 @@ run_ok "${TEST_NAME}" \
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('logo',), 'cylc-logo.png']" \
     "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']"
+    "[('host',), '$(hostname)']"
 
 TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs-json"
 run_ok "${TEST_NAME}" \
@@ -72,7 +70,7 @@ run_ok "${TEST_NAME}" \
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('logo',), 'cylc-logo.png']" \
     "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']"
+    "[('host',), '$(hostname)']"
 #-------------------------------------------------------------------------------
 # Tidy up - note suite trivial so stops early on by itself
 purge "${WORKFLOW_NAME}"
