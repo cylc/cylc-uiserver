@@ -43,13 +43,10 @@ TASK_STATUS_GROUPS = {
 }
 
 
-def get_prefix(user_name):
-    """Return user "home" dir under $CYLC_REVIEW_HOME, or else ~user_name."""
-    if os.environ.get('CYLC_REVIEW_HOME', False) and user_name:
-        prefix = os.path.join(
-            os.environ['CYLC_REVIEW_HOME'],
-            str(user_name)
-        )
+def get_prefix(user_name, alt_home_dir=None):
+    """Return user home dir under alt_home_dir or else ~user_name."""
+    if alt_home_dir is not None and user_name:
+        prefix = os.path.join(alt_home_dir, str(user_name))
     else:
         prefix = "~"
         if user_name:
@@ -129,7 +126,8 @@ class CylcReviewDAO:
     # Because that method needs self.TABLE_BROADCAST_STATES
     TABLE_BROADCAST_STATES = CylcWorkflowDAO.TABLE_BROADCAST_STATES
 
-    def __init__(self):
+    def __init__(self, alt_home_dir=None):
+        self.alt_home_dir = alt_home_dir
         self.daos = {}
 
     def _db_init(self, user_name, suite_name):
@@ -148,7 +146,7 @@ class CylcReviewDAO:
             for name in [os.path.join("log", "db"), "cylc-suite.db"]:
                 db_f_name = os.path.expanduser(
                     os.path.join(
-                        get_prefix(user_name),
+                        get_prefix(user_name, self.alt_home_dir),
                         os.path.join("cylc-run", suite_name, name)
                     )
                 )
@@ -156,7 +154,8 @@ class CylcReviewDAO:
                 if os.path.exists(db_f_name):
                     self.daos[key] = CylcWorkflowDAO(db_f_name, is_public=True)
                     break
-        self.is_cylc8 = self.set_is_cylc8(user_name, suite_name)
+        self.is_cylc8 = self.set_is_cylc8(
+            user_name, suite_name, self.alt_home_dir)
         return self.daos.get(key, None)
 
     def _db_close(self, user_name, suite_name):
@@ -215,11 +214,11 @@ class CylcReviewDAO:
         return broadcast_events
 
     @staticmethod
-    def set_is_cylc8(user_name, suite_name):
+    def set_is_cylc8(user_name, suite_name, alt_home_dir=None):
         from cylc.review.review import CylcReviewService
 
         suite_dir = os.path.join(
-            CylcReviewService._get_user_home(user_name),
+            CylcReviewService._get_user_home(user_name, alt_home_dir),
             "cylc-run",
             suite_name)
         return CylcReviewService.is_cylc8(suite_dir)
@@ -425,8 +424,15 @@ class CylcReviewDAO:
         relevant entries of that cycle.
         Modify each entry in entries.
         """
-        user_suite_dir = os.path.expanduser(os.path.join(
-            get_prefix(user_name), os.path.join("cylc-run", suite_name)))
+        user_suite_dir = os.path.expanduser(
+            os.path.join(
+                get_prefix(
+                    user_name,
+                    self.alt_home_dir
+                ),
+                os.path.join("cylc-run", suite_name)
+            )
+        )
         try:
             fs_log_cycles = os.listdir(
                 os.path.join(user_suite_dir, "log", "job"))
@@ -561,8 +567,15 @@ class CylcReviewDAO:
             integer_mode = row[0].isdigit()
             break
 
-        user_suite_dir = os.path.expanduser(os.path.join(
-            get_prefix(user_name), os.path.join("cylc-run", suite_name)))
+        user_suite_dir = os.path.expanduser(
+            os.path.join(
+                get_prefix(
+                    user_name,
+                    self.alt_home_dir
+                ),
+                os.path.join("cylc-run", suite_name)
+            )
+        )
         targzip_log_cycles = []
         with contextlib.suppress(OSError):
             for item in os.listdir(os.path.join(user_suite_dir, "log")):

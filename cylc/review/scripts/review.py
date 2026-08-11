@@ -24,12 +24,13 @@ With no arguments, the status of the ad-hoc web service server is printed.
 
 For 'cylc review start', if 'PORT' is not specified, port 8080 is used.
 
-If $CYLC_REVIEW_HOME is defined look there for user run directories instead
-of in home directories. This can be used to view symlinked run directories
-directly when home directories are private. For example with symlinking as:
-   /home/USER/cylc-run/WORKFLOW -> /project/PROJECT/USER/cylc-run/WORKFLOW
-set the environment variable as:
-   CYLC_REVIEW_HOME=/project/PROJECT
+With --alt-home-dir=DIR look under DIR for user run directories instead
+of in $HOME. This can be used to view symlinked run directories directly
+when home directories are private. For example with symlinking as:
+   /home/$USER/cylc-run/<workflow> -> /project/test/$USER/cylc-run/<workflow>
+start Review like this:
+   cylc review start --alt-home-dir=/project/test
+
 """
 
 import os
@@ -80,6 +81,15 @@ def get_option_parser():
         type=int,
     )
     parser.add_option(
+        '--alt-home-dir',
+        '-d',
+        help="Look here for user run directories, instead of under $HOME.",
+        default=None,
+        action='store',
+        dest="alt_home_dir"
+    )
+
+    parser.add_option(
         "--non-interactive",
         "--yes",
         "-y",
@@ -114,6 +124,7 @@ def main(_, opts, *args):
             service_cls=CylcReviewService,
             port=opts.port,
             service_root=opts.service_root,
+            alt_home_dir=opts.alt_home_dir,
         )
     # User has asked to stop or get info on server, server _not_ running:
     elif not status:

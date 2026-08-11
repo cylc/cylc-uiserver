@@ -263,6 +263,30 @@ c.JupyterHub.load_roles = [
 ]
 ```
 
+#### Alternate Home Directories
+
+The Review service can be configured to look for user run directories under
+a location other than $HOME, primarily to view symlinked run directories directly
+when home directories are private.
+
+For example with symlinking like this:
+
+```bash
+/home/$USER/cylc-run/<workflow>/run3 -> /project/test/$USER/cylc-run/<workflow>/run3
+```
+
+Start Review like this:
+```bash
+```
+$ cylc review start --alt-home-dir=/project/test
+
+As a hub service, provide the argument to `get_review_service_config` (above) as:
+
+```python
+c.JupyterHub.services = [get_review_service_config(alt_home_dir="/project/test")]
+```
+
+
 ### UI
 
 The UI can be configured via the "Settings" option in the Dashboard.
