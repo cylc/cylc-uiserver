@@ -876,6 +876,14 @@ class UISSubscriptions(Subscriptions):
         connected = graphene.Boolean()
         path = graphene.String()
         error = graphene.String()
+        truncated = graphene.String(
+            description=(
+                'Set at the point in the stream where the file has been'
+                ' truncated: "start" (earlier lines omitted), "middle"'
+                ' (lines omitted between the head and tail blocks in "mixed"'
+                ' mode) or "end" (later lines omitted).'
+            ),
+        )
 
     logs = graphene.Field(
         Logs,
@@ -896,8 +904,17 @@ class UISSubscriptions(Subscriptions):
             default_value=TAIL,
             description=(
                 'Log view mode: '
-                f'"{TAIL}" (follow the last lines from the end of the file) '
-                f'or "{TAIL_FROM_START}" (follow from the start of the file).'
+                f'"{TAIL}" (follow the last lines from the end of the file), '
+                f'"{TAIL_FROM_START}" (follow from the start of the file) '
+                'or "mixed" (show the start and follow the end of the file).'
+            ),
+        ),
+        maxLines=graphene.Argument(
+            graphene.Int,
+            required=False,
+            description=(
+                'The maximum number of log lines to display before'
+                ' truncating the file.'
             ),
         ),
         resolver=identity_resolve
