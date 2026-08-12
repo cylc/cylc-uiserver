@@ -909,7 +909,7 @@ class UISSubscriptions(Subscriptions):
                 'or "mixed" (show the start and follow the end of the file).'
             ),
         ),
-        maxLines=graphene.Argument(
+        max_lines=graphene.Argument(
             graphene.Int,
             required=False,
             description=(
