@@ -1,7 +1,7 @@
 #!/bin/bash
 # THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
 # Copyright (C) NIWA & British Crown (Met Office) & Contributors.
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -50,12 +50,10 @@ grep_ok 'HTTP/.* 200 OK' "${TEST_NAME}.stdout"
 TEST_NAME="${TEST_NAME_BASE}-200-curl-root-json"
 run_ok "${TEST_NAME}" curl "${TEST_CYLC_WS_URL}/?form=json"
 
-get_hostname
-
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('cylc_version',), '$(cylc version | cut -d' ' -f 2)']" \
     "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']"
+    "[('host',), '$(hostname)']"
 
 #-------------------------------------------------------------------------------
 # Data transfer output check for a specific user's page including non-existent
@@ -67,7 +65,7 @@ run_ok "${TEST_NAME}" curl "${TEST_CYLC_WS_URL}/suites/${USER}?form=json"
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('cylc_version',), '$(cylc version | cut -d' ' -f 2)']" \
     "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']" \
+    "[('host',), '$(hostname)']" \
     "[('user',), '${USER}']"
 
 TEST_NAME="${TEST_NAME_BASE}-404-curl-suites"
@@ -99,7 +97,7 @@ run_ok "${TEST_NAME}" \
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('cylc_version',), '$(cylc version | cut -d' ' -f 2)']" \
     "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']" \
+    "[('host',), '$(hostname)']" \
     "[('user',), '${USER}']" \
     "[('suite',), '${WORKFLOW_NAME}']" \
     "[('page',), 1]" \
@@ -122,7 +120,7 @@ FOO1_JOB='log/job/20000101T0000Z/foo1/01/job'
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
     "[('cylc_version',), '$(cylc version | cut -d' ' -f 2)']" \
     "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']" \
+    "[('host',), '$(hostname)']" \
     "[('user',), '${USER}']" \
     "[('suite',), '${WORKFLOW_NAME}']" \
     "[('is_option_on',), False]" \

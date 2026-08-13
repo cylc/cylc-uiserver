@@ -31,6 +31,7 @@ import os
 import pwd
 import re
 import shlex
+from socket import gethostname
 from sqlite3 import OperationalError
 import tarfile
 from tempfile import NamedTemporaryFile
@@ -47,7 +48,6 @@ from jinja2 import select_autoescape
 import markupsafe
 
 from cylc.flow import __version__ as CYLC_VERSION
-from cylc.flow.hostuserutil import get_host
 from cylc.flow.task_state import TASK_STATUSES_ORDERED
 from cylc.flow.workflow_files import WorkflowFiles
 from cylc.review.review_dao import (
@@ -108,9 +108,7 @@ class CylcReviewService:
         self.logo = os.path.basename(
             get_util_home("doc", "src", "cylc-logo.png"))
         self.title = self.TITLE
-        self.host_name = get_host()
-        if self.host_name and "." in self.host_name:
-            self.host_name = self.host_name.split(".", 1)[0]
+        self.host_name = gethostname()
         self.cylc_version = CYLC_VERSION
         # Autoescape markup to prevent code injection from user inputs.
         template_env = jinja2.Environment(
