@@ -110,7 +110,7 @@ def mk_flow(path, reg, active=True, database=True):
 @pytest.mark.parametrize(
     # generate all possible normal state changes
     'active_before,active_after',
-    product(['active', 'inactive', None], repeat=2)
+    list(product(['active', 'inactive', None], repeat=2))
 )
 async def test_workflow_state_changes(tmp_path, active_before, active_after):
     """It correctly identifies workflow state changes from the filesystem."""
@@ -148,7 +148,7 @@ async def test_workflow_state_changes(tmp_path, active_before, active_after):
 
 @pytest.mark.parametrize(
     'active_before, active_after',
-    product([True, False], repeat=2)
+    list(product([True, False], repeat=2))
 )
 async def test_workflow_state_change_uuid(
     tmp_path,
