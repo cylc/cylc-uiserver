@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,9 +19,6 @@
 #
 # NAME
 #     test_header
-#
-# SYNOPSIS
-#     . $CYLC_REPO_DIR/tests/lib/bash/test_header
 #
 # DESCRIPTION
 #     Interface for constructing tests under a TAP harness (the "prove"
@@ -63,9 +61,6 @@
 #     contains_ok FILE_TEST [FILE_CONTROL]
 #         Make sure that each line in FILE_TEST is present in FILE_CONTROL
 #         (stdin if FILE_CONTROL is "-" or missing).
-#     get_hostname
-#         Wraps logic to deal with differences between Darwin and Gnu Linux
-#         $(hostname) on Github actions runners.
 #     grep_ok PATTERN FILE [$OPTS]
 #         Run "grep [$OPTS] -q -e PATTERN FILE".
 #     grep_workflow_log_ok TEST_NAME PATTERN [$OPTS]
@@ -376,15 +371,7 @@ cmp_json() {
     local FILE_TEST="$2"
     local FILE_CONTROL="${3:--}"
 
-    if python3 "$CYLC_REPO_DIR/tests/f/lib/python/diffr.py" \
-        "$(cat "$FILE_CONTROL")" "$(cat "$FILE_TEST")" \
-        >"${TEST_NAME}.stdout" 2>"${TEST_NAME}.stderr"
-    then
-        ok "${TEST_NAME}"
-        return
-    else
-        cat "${TEST_NAME}.stderr" >&2
-    fi
+    cat "${TEST_NAME}.stderr" >&2
     dump_std "$TEST_NAME"
     fail "${TEST_NAME}"
 }
@@ -435,16 +422,11 @@ requires_cherrypy() {
     fi
 }
 
-
-get_hostname() {
-    if [[ "${OSTYPE}" == "darwin"* ]]; then
-        HOSTNAME="$(hostname -f | sed 's@.local@@')"
-    else
-        HOSTNAME=$(hostname)
+requires_jq() {
+    if ! which jq 1>'/dev/null'; then
+        skip_all '"jq" not installed'
     fi
-    export HOSTNAME
 }
-
 
 port_is_busy() {
     local WS_PORT="${1}"
@@ -503,7 +485,7 @@ cylc_ws_kill() {
                 sleep 1
             fi
         done
-        
+
         kill "${TEST_CYLC_WS_PID}" 2>'/dev/null'
         wait 2>'/dev/null'
     fi
@@ -535,16 +517,15 @@ for item in sys.argv[2:]:
                         datum = datum_item
                         break
                 else:
-                    raise KeyError
+                    raise KeyError(item)
             else:
                 datum = datum[key]
-        if datum != value:
-            raise ValueError((item, datum))
-    except IndexError:
+        assert datum == value, f"assert {datum!r} == {value!r}, in {item=}"
+    except IndexError as exc:
         print(data)
-        raise IndexError(item)
-    except KeyError:
-        raise KeyError(item)
+        raise IndexError(item) from exc
+    except KeyError as exc:
+        raise KeyError(item) from exc
 __PYTHON__
     if [[ -s "${TEST_NAME}.stderr" ]]; then
         # Only print the final exception line - change to cat for details

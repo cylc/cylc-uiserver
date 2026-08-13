@@ -1,4 +1,5 @@
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -382,7 +383,6 @@ class Services:
             'cylc',
             'cat-log',
             '--mode=tail',
-            '--force-remote',
             '--prepend-path',
             id_.id,
         ]
@@ -509,7 +509,7 @@ class Services:
         This uses the Cylc cat-log interface, list dir mode, forcing remote
         file checking.
         """
-        cmd: List[str] = ['cylc', 'cat-log', '-m', 'l', '-o', id_.id]
+        cmd: List[str] = ['cylc', 'cat-log', '-m', 'l', id_.id]
         log.debug(f"$ {' '.join(cmd)}")
         proc_job = await asyncio.subprocess.create_subprocess_exec(
             *cmd,

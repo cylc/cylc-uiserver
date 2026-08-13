@@ -1,5 +1,6 @@
 # THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,7 +31,6 @@ from cylc.review.ws import _ws_init
 
 @pytest.fixture(scope='module')
 def run_cylc_review(request):
-    port, timeout, service_root = request.param
     """Start a Cylc Review server.
 
     (Clean it up after too)
@@ -38,6 +38,7 @@ def run_cylc_review(request):
     Yields:
         Server process, request to home page as json
     """
+    port, timeout, service_root = request.param
     proc = Process(target=_ws_init, kwargs={
         'service_cls': CylcReviewService,
         'port': port,
@@ -71,7 +72,7 @@ def run_cylc_review(request):
 )
 def test_basic_path(run_cylc_review):
     """The CLI --service-root option changes the path to Cylc Review."""
-    expect = {
+    assert json.loads(run_cylc_review[1].text) == {
         'logo': 'cylc-logo.png',
         'title': 'Cylc Review',
         'host': socket.gethostname(),
@@ -79,5 +80,3 @@ def test_basic_path(run_cylc_review):
         'script': '/foo/cylc-review',
         'jupythub_base': None,
     }
-    data = json.loads(run_cylc_review[1].text)
-    assert data == expect

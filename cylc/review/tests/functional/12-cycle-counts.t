@@ -1,6 +1,7 @@
 #!/bin/bash
 # THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,23 +16,34 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #-------------------------------------------------------------------------------
-# Test for "cylc review", behaviour of job entry with no "job.out".
+# Test for "cylc review", cycles list, paging.
 #-------------------------------------------------------------------------------
 . "$(dirname "$0")/test_header"
 requires_cherrypy
 
-set_test_number 5
+set_test_number 4
 #-------------------------------------------------------------------------------
 # Initialise, validate and run a suite for testing with
-install_workflow "${TEST_NAME_BASE}" "${TEST_NAME_BASE}"
+init_workflow "${TEST_NAME_BASE}" <<'__SUITE_RC__'
+[scheduler]
+    UTC mode = True
+[scheduling]
+    initial cycle point = 20100101T0000Z
+    final cycle point = 20100101T0000Z
+    [[dependencies]]
+        T00 = foo => bar
+        T06 = bar[-PT6H] => baz
+[runtime]
+    [[foo]]
+        script = cylc stop "${CYLC_WORKFLOW_ID}//20100101T0000Z/bar"; sleep 5
+    [[bar, baz]]
+        script = true
+__SUITE_RC__
 
-run_ok "${TEST_NAME_BASE}-validate" cylc validate "${WORKFLOW_NAME}"
+TEST_NAME=$TEST_NAME_BASE-validate
+run_ok "${TEST_NAME}" cylc validate "${WORKFLOW_NAME}"
 
-run_ok "${TEST_NAME_BASE}-play" cylc play --no-detach --debug "${WORKFLOW_NAME}" 2>'/dev/null'
-
-# Remove the "job.out" entry from the suite's public database.
-sqlite3 "${TEST_DIR}/log/db" \
-    'DELETE FROM task_job_logs WHERE filename=="job.out";' 2>'/dev/null' || true
+cylc play --no-detach --debug "${WORKFLOW_NAME}" 2>'/dev/null'
 #-------------------------------------------------------------------------------
 # Initialise WSGI application for the cylc review web service
 cylc_ws_init 'cylc' 'review'
@@ -43,23 +55,21 @@ fi
 # shellcheck disable=SC2001
 ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
-# Data transfer output check for case with no job output publicly viewable
-TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs"
-run_ok "${TEST_NAME}" \
-    curl "${TEST_CYLC_WS_URL}/taskjobs/${USER}?suite=${ESC_WORKFLOW_NAME}&form=json"
+# Data transfer output check for a suite's cycles page, sorted by time_desc
+TEST_NAME_PREFIX="${TEST_NAME_BASE}-200-curl-cycles-page-"
+TEST_NAME="${TEST_NAME_PREFIX}1"
+PAGE_OPT="&page=1&per_page=3"
+run_ok "${TEST_NAME}" curl \
+    "${TEST_CYLC_WS_URL}/cycles/${USER}/${ESC_WORKFLOW_NAME}?form=json${PAGE_OPT}"
 
-FOO0="{'cycle': '20000101T0000Z', 'name': 'foo0', 'submit_num': 1}"
-FOO0_OUT='log/job/20000101T0000Z/foo0/01/job.out'
-FOO0_OUT_MTIME=$(stat -c'%Y' "${WORKFLOW_RUN_DIR}/${FOO0_OUT}")
-FOO0_OUT_SIZE=$(stat -c'%s' "${WORKFLOW_RUN_DIR}/${FOO0_OUT}")
-
-cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
-    "[('entries', ${FOO0}, 'logs', 'job.out', 'path'), '${FOO0_OUT}']" \
-    "[('entries', ${FOO0}, 'logs', 'job.out', 'size'), ${FOO0_OUT_SIZE}]" \
-    "[('entries', ${FOO0}, 'logs', 'job.out', 'mtime'), ${FOO0_OUT_MTIME}]" \
-    "[('entries', ${FOO0}, 'logs', 'job.out', 'exists'), True]"
+# N.B. Extra cycle at the end, due to spawn-held task beyond final cycle point
+cylc_ws_json_greps "${TEST_NAME_PREFIX}1.stdout" "${TEST_NAME_PREFIX}1.stdout" \
+    "[('page',), 1]" \
+    "[('per_page',), 3]" \
+    "[('of_n_entries',), 1]" \
+    "[('entries', 0, 'cycle'), '20100101T0000Z']"
 #-------------------------------------------------------------------------------
-# Tidy up - note suite trivial so stops early on by itself
+# Tidy up - note suite terminates by itself with 'stop' task
 purge "${WORKFLOW_NAME}"
 cylc_ws_kill
 exit

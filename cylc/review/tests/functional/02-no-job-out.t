@@ -1,6 +1,7 @@
 #!/bin/bash
 # THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,20 +16,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #-------------------------------------------------------------------------------
-# Tests for "cylc review", "logo", "title" and "host" settings.
+# Test for "cylc review", behaviour of job entry with no "job.out".
 #-------------------------------------------------------------------------------
 . "$(dirname "$0")/test_header"
 requires_cherrypy
 
-set_test_number 10
+set_test_number 5
 #-------------------------------------------------------------------------------
 # Initialise, validate and run a suite for testing with
 install_workflow "${TEST_NAME_BASE}" "${TEST_NAME_BASE}"
 
-TEST_NAME=$TEST_NAME_BASE-validate
-run_ok "${TEST_NAME}" cylc validate "${WORKFLOW_NAME}"
+run_ok "${TEST_NAME_BASE}-validate" cylc validate "${WORKFLOW_NAME}"
 
-cylc play --no-detach --debug "${WORKFLOW_NAME}" 2>'/dev/null'
+run_ok "${TEST_NAME_BASE}-play" cylc play --no-detach --debug "${WORKFLOW_NAME}" 2>'/dev/null'
+
+# Remove the "job.out" entry from the suite's public database.
+sqlite3 "${TEST_DIR}/log/db" \
+    'DELETE FROM task_job_logs WHERE filename=="job.out";' 2>'/dev/null' || true
 #-------------------------------------------------------------------------------
 # Initialise WSGI application for the cylc review web service
 cylc_ws_init 'cylc' 'review'
@@ -40,39 +44,21 @@ fi
 # shellcheck disable=SC2001
 ESC_WORKFLOW_NAME="$(echo "${WORKFLOW_NAME}" | sed 's|/|%2F|g')"
 #-------------------------------------------------------------------------------
-# Basic data transfer output check
-
-get_hostname
-
-TEST_NAME="${TEST_NAME_BASE}-200-curl-root-json"
-run_ok "${TEST_NAME}" curl "${TEST_CYLC_WS_URL}/?form=json"
-cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
-    "[('logo',), 'cylc-logo.png']" \
-    "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']"
-
-TEST_NAME="${TEST_NAME_BASE}-200-curl-suites-json"
-run_ok "${TEST_NAME}" curl "${TEST_CYLC_WS_URL}/suites/${USER}?form=json"
-cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
-    "[('logo',), 'cylc-logo.png']" \
-    "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']"
-
-TEST_NAME="${TEST_NAME_BASE}-200-curl-cycles-json"
+# Data transfer output check for case with no job output publicly viewable
+TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs"
 run_ok "${TEST_NAME}" \
-    curl "${TEST_CYLC_WS_URL}/cycles/${USER}/${ESC_WORKFLOW_NAME}?form=json"
-cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
-    "[('logo',), 'cylc-logo.png']" \
-    "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']"
+    curl "${TEST_CYLC_WS_URL}/taskjobs/${USER}?suite=${ESC_WORKFLOW_NAME}&form=json"
 
-TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs-json"
-run_ok "${TEST_NAME}" \
-    curl "${TEST_CYLC_WS_URL}/taskjobs/${USER}/${ESC_WORKFLOW_NAME}?form=json"
+FOO0="{'cycle': '20000101T0000Z', 'name': 'foo0', 'submit_num': 1}"
+FOO0_OUT='log/job/20000101T0000Z/foo0/01/job.out'
+FOO0_OUT_MTIME=$(stat -c'%Y' "${WORKFLOW_RUN_DIR}/${FOO0_OUT}")
+FOO0_OUT_SIZE=$(stat -c'%s' "${WORKFLOW_RUN_DIR}/${FOO0_OUT}")
+
 cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
-    "[('logo',), 'cylc-logo.png']" \
-    "[('title',), 'Cylc Review']" \
-    "[('host',), '${HOSTNAME}']"
+    "[('entries', ${FOO0}, 'logs', 'job.out', 'path'), '${FOO0_OUT}']" \
+    "[('entries', ${FOO0}, 'logs', 'job.out', 'size'), ${FOO0_OUT_SIZE}]" \
+    "[('entries', ${FOO0}, 'logs', 'job.out', 'mtime'), ${FOO0_OUT_MTIME}]" \
+    "[('entries', ${FOO0}, 'logs', 'job.out', 'exists'), True]"
 #-------------------------------------------------------------------------------
 # Tidy up - note suite trivial so stops early on by itself
 purge "${WORKFLOW_NAME}"

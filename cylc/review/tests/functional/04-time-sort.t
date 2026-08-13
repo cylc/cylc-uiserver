@@ -1,7 +1,7 @@
 #!/bin/bash
 # THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
-# 
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -20,6 +20,7 @@
 #-------------------------------------------------------------------------------
 . "$(dirname "$0")/test_header"
 requires_cherrypy
+requires_jq
 
 set_test_number 13
 #-------------------------------------------------------------------------------
@@ -51,65 +52,71 @@ run_ok "${TEST_NAME}" curl \
     "${TEST_CYLC_WS_URL}/taskjobs/${USER}?suite=${ESC_WORKFLOW_NAME}&form=json&order=${ORDER}"
 # Note: only qux submit time order is reliable, the others are submitted at the
 # same time, in any order.
-cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
-    "[('order',), '${ORDER}']" \
-    "[('entries', 0, 'name'), 'qux']"
+cmp_ok <(jq -r '.order, .entries[0] .name' "${TEST_NAME}.stdout") << __EOF__
+$ORDER
+qux
+__EOF__
 
 ORDER='time_run_desc'
 TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs-${ORDER}"
 run_ok "${TEST_NAME}" curl \
     "${TEST_CYLC_WS_URL}/taskjobs/${USER}?suite=${ESC_WORKFLOW_NAME}&form=json&order=${ORDER}"
-
-cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
-    "[('order',), '${ORDER}']" \
-    "[('entries', 0, 'name'), 'qux']" \
-    "[('entries', 1, 'name'), 'bar']" \
-    "[('entries', 2, 'name'), 'baz']" \
-    "[('entries', 3, 'name'), 'foo']"
+cmp_ok <(jq -r '.order, .entries[] .name' "${TEST_NAME}.stdout") << __EOF__
+$ORDER
+qux
+bar
+baz
+foo
+__EOF__
 
 ORDER='time_run_exit_desc'
 TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs-${ORDER}"
 run_ok "${TEST_NAME}" curl \
     "${TEST_CYLC_WS_URL}/taskjobs/${USER}?suite=${ESC_WORKFLOW_NAME}&form=json&order=${ORDER}"
-cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
-    "[('order',), '${ORDER}']" \
-    "[('entries', 0, 'name'), 'qux']" \
-    "[('entries', 1, 'name'), 'baz']" \
-    "[('entries', 2, 'name'), 'bar']" \
-    "[('entries', 3, 'name'), 'foo']"
+cmp_ok <(jq -r '.order, .entries[] .name' "${TEST_NAME}.stdout") << __EOF__
+$ORDER
+qux
+baz
+bar
+foo
+__EOF__
 
 ORDER='duration_queue_desc'
 TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs-${ORDER}"
 run_ok "${TEST_NAME}" curl \
     "${TEST_CYLC_WS_URL}/taskjobs/${USER}?suite=${ESC_WORKFLOW_NAME}&form=json&order=${ORDER}"
-cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
-    "[('order',), '${ORDER}']" \
-    "[('entries', 0, 'name'), 'bar']" \
-    "[('entries', 1, 'name'), 'baz']" \
-    "[('entries', 2, 'name'), 'foo']" \
-    "[('entries', 3, 'name'), 'qux']"
+cmp_ok <(jq -r '.order, .entries[] .name' "${TEST_NAME}.stdout") << __EOF__
+$ORDER
+bar
+baz
+foo
+qux
+__EOF__
 
 ORDER='duration_run_desc'
 TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs-${ORDER}"
 run_ok "${TEST_NAME}" curl \
     "${TEST_CYLC_WS_URL}/taskjobs/${USER}?suite=${ESC_WORKFLOW_NAME}&form=json&order=${ORDER}"
-cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
-    "[('order',), '${ORDER}']" \
-    "[('entries', 0, 'name'), 'baz']" \
-    "[('entries', 1, 'name'), 'foo']" \
-    "[('entries', 2, 'name'), 'qux']" \
-    "[('entries', 3, 'name'), 'bar']"
+cmp_ok <(jq -r '.order, .entries[] .name' "${TEST_NAME}.stdout") << __EOF__
+$ORDER
+baz
+foo
+qux
+bar
+__EOF__
 
 ORDER='duration_queue_run_desc'
 TEST_NAME="${TEST_NAME_BASE}-200-curl-jobs-${ORDER}"
 run_ok "${TEST_NAME}" curl \
     "${TEST_CYLC_WS_URL}/taskjobs/${USER}?suite=${ESC_WORKFLOW_NAME}&form=json&order=${ORDER}"
-cylc_ws_json_greps "${TEST_NAME}.stdout" "${TEST_NAME}.stdout" \
-    "[('order',), '${ORDER}']" \
-    "[('entries', 0, 'name'), 'baz']" \
-    "[('entries', 1, 'name'), 'bar']" \
-    "[('entries', 2, 'name'), 'foo']" \
-    "[('entries', 3, 'name'), 'qux']"
+cmp_ok <(jq -r '.order, .entries[] .name' "${TEST_NAME}.stdout") << __EOF__
+$ORDER
+baz
+bar
+foo
+qux
+__EOF__
+
 #-------------------------------------------------------------------------------
 # Tidy up - note suite trivial so stops early on by itself
 purge "${WORKFLOW_NAME}"
