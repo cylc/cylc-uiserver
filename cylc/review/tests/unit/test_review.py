@@ -1,5 +1,6 @@
 # THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -104,6 +105,7 @@ def test_sort_workflows(workflows, sorted_names):
         w['name']
         for w in CylcReviewService.sort_workflows(workflows, reverse=True)
     ] == sorted_names
+
 
 def test_sort_workflows_plausible():
     """Case based on tests/function/cylc-review/08-suite-page.t

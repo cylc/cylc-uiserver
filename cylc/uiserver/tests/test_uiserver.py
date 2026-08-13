@@ -1,4 +1,5 @@
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,7 +36,9 @@ def test_ui_version_unset(mock_config, ui_build_dir):
     # test with an invalid ui_build_path
     mock_config(CylcUIServer={'ui_build_dir': 'beef'})
     uis = CylcUIServer()
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match=(
+        r'.*does not exist:.*'
+    )):
         uis.initialize_settings()
         uis.ui_path  # forces computation of the ui_path
 
@@ -46,7 +49,7 @@ def test_ui_version_specified(mock_config, ui_build_dir):
     mock_config(CylcUIServer={
         'ui_build_dir': ui_build_dir,
         'ui_version': '1.0'
-        })
+    })
     uis = CylcUIServer()
     uis.initialize_settings()
     assert uis.ui_path == ui_build_dir / '1.0'
@@ -55,9 +58,11 @@ def test_ui_version_specified(mock_config, ui_build_dir):
     mock_config(CylcUIServer={
         'ui_build_dir': ui_build_dir,
         'ui_version': '5.0'
-        })
+    })
     uis = CylcUIServer()
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match=(
+        r'Could not find UI build in.*'
+    )):
         uis.initialize_settings()
         uis.ui_path  # forces computation of the ui_path
 
@@ -68,7 +73,7 @@ def test_ui_build_dir(mock_config, ui_build_dir):
         'ui_build_dir': ui_build_dir / '2.0',
         # the ui_version should do nothing here
         'ui_version': '99'
-        })
+    })
     uis = CylcUIServer()
     uis.initialize_settings()
     assert uis.ui_path == ui_build_dir / '2.0'
