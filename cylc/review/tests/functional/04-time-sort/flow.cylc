@@ -22,4 +22,4 @@
         script = sleep 30
     [[qux]]
         init-script = true
-        script = sleep 2
+        script = sleep 5
