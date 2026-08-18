@@ -79,7 +79,6 @@ from cylc.uiserver.resolvers import (
     stream_log,
 )
 
-
 if TYPE_CHECKING:
     from graphql import GraphQLResolveInfo
 
@@ -90,7 +89,7 @@ async def mutator(
     *,
     command: str,
     workflows: Optional[List[str]] = None,
-    **kwargs: Any
+    **kwargs: Any,
 ):
     """Call the resolver method that act on the workflow service
     via the internal command queue."""
@@ -101,9 +100,9 @@ async def mutator(
         kwargs.update(kwargs.get('args', {}))
         kwargs.pop('args')
 
-    resolvers: 'Resolvers' = (
-        info.context.get('resolvers')  # type: ignore[union-attr]
-    )
+    resolvers: 'Resolvers' = info.context.get(
+        'resolvers'
+    )  # type: ignore[union-attr]
     try:
         res = await resolvers.service(info, command, parsed_workflows, kwargs)
     except Exception as exc:
@@ -128,20 +127,15 @@ class Play(graphene.Mutation):
 
     class Arguments:
         workflows = graphene.List(WorkflowID, required=True)
-        cylc_version = CylcVersion(
-            description=sstrip('''
+        cylc_version = CylcVersion(description=sstrip('''
                 Set the Cylc version that the workflow starts with.
-            ''')
-        )
-        initial_cycle_point = CyclePoint(
-            description=sstrip('''
+            '''))
+        initial_cycle_point = CyclePoint(description=sstrip('''
                 Set the initial cycle point.
 
                 Required if not defined in flow.cylc.
-            ''')
-        )
-        start_cycle_point = CyclePoint(
-            description=sstrip('''
+            '''))
+        start_cycle_point = CyclePoint(description=sstrip('''
                 Set the start cycle point, which may be after the initial
                 cycle point.
 
@@ -151,72 +145,61 @@ class Play(graphene.Mutation):
                 (Not to be confused with the initial cycle point).
 
                 This replaces the Cylc 7 --warm option.
-            ''')
-        )
-        final_cycle_point = CyclePoint(
-            description=sstrip('''
+            '''))
+        final_cycle_point = CyclePoint(description=sstrip('''
                 Set the final cycle point. This command line option overrides
                 the workflow config option `[scheduling]final cycle point`.
-            ''')
-        )
-        stop_cycle_point = CyclePoint(
-            description=sstrip('''
+            '''))
+        stop_cycle_point = CyclePoint(description=sstrip('''
                 Set the stop cycle point. Shut down after all tasks have PASSED
                 this cycle point. (Not to be confused with the final cycle
                 point.) This command line option overrides the workflow config
                 option `[scheduling]stop after cycle point`.
-            ''')
-        )
-        pause = graphene.Boolean(
-            description=sstrip('''
+            '''))
+        pause = graphene.Boolean(description=sstrip('''
                 Pause workflow immediately on starting.
-            ''')
-        )
-        hold_cycle_point = CyclePoint(
-            description=sstrip('''
+            '''))
+        hold_cycle_point = CyclePoint(description=sstrip('''
                 Hold all tasks after this cycle point.
-            ''')
-        )
+            '''))
         mode = WorkflowRunMode(default_value=WorkflowRunMode.Live)
-        host = graphene.String(
-            description=sstrip('''
+        host = graphene.String(description=sstrip('''
                 Specify the host on which to start-up the workflow. If not
                 specified, a host will be selected using the
                 `[scheduler]run hosts` global config.
-            ''')
-        )
+            '''))
         main_loop = graphene.List(
             graphene.String,
             description=sstrip('''
                 Specify an additional plugin to run in the main loop. These
                 are used in combination with those specified in
                 `[scheduler][main loop]plugins`. Can be used multiple times.
-            ''')
+            '''),
         )
         upgrade = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 Allow the workflow to be restarted with a newer
                 version of Cylc.
-            ''')
+            '''),
         )
         abort_if_any_task_fails = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 If set workflow will abort with status 1 if any task fails.
-            ''')
+            '''),
         )
         debug = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 Output developer information and show exception tracebacks.
-            ''')
+            '''),
         )
         no_timestamp = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 Don't timestamp logged messages.
-            ''')
+            '''),
         )
         set = graphene.List(  # noqa: A003 (graphql field name)
             graphene.String,
@@ -228,18 +211,16 @@ class Play(graphene.Mutation):
                 NOTE: these settings persist across workflow restarts, but can
                 be set again on the `cylc play` command line if they need to be
                 overridden.
-            ''')
+            '''),
         )
-        set_file = graphene.String(
-            description=sstrip('''
+        set_file = graphene.String(description=sstrip('''
                 Set the value of Jinja2 template variables in the workflow
                 definition from a file containing NAME=VALUE pairs (one per
                 line). As with "set" values should be valid Python literals so
                 strings must be quoted e.g.  `STR='string'`. NOTE: these
                 settings persist across workflow restarts, but can be set again
                 on the `cylc play` command line if they need to be overridden.
-            ''')
-        )
+            '''))
 
     result = GenericScalar()
 
@@ -263,19 +244,19 @@ class Clean(graphene.Mutation):
 
                 A colon separated list that accepts globs,
                 e.g. ``.service/db:log:share:work/2020*``.
-            ''')
+            '''),
         )
         local_only = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 Only clean on the local filesystem (not remote hosts).
-            ''')
+            '''),
         )
         remote_only = graphene.Boolean(
             default_value=False,
             description=sstrip('''
                 Only clean on remote hosts (not the local filesystem).
-            ''')
+            '''),
         )
 
     result = GenericScalar()
@@ -289,6 +270,7 @@ class Scan(graphene.Mutation):
             Valid for: stopped workflows.
         ''')
         resolver = partial(mutator, command='scan')
+
     result = GenericScalar()
 
 
@@ -330,10 +312,8 @@ async def get_elements(query_type, root, info, **kwargs):
     for arg in ('ids', 'exids'):
         # live objects can be represented by a universal ID
         kwargs[arg] = [Tokens(n_id, relative=True) for n_id in kwargs[arg]]
-    kwargs['workflows'] = [
-        Tokens(w_id) for w_id in kwargs['workflows']]
-    kwargs['exworkflows'] = [
-        Tokens(w_id) for w_id in kwargs['exworkflows']]
+    kwargs['workflows'] = [Tokens(w_id) for w_id in kwargs['workflows']]
+    kwargs['exworkflows'] = [Tokens(w_id) for w_id in kwargs['exworkflows']]
 
     return await list_elements(
         query_type,
@@ -353,9 +333,7 @@ async def list_elements(
     elements = []
     for workflow in workflows:
         db_file = get_workflow_run_dir(
-            workflow['workflow'],
-            WorkflowFiles.LogDir.DIRNAME,
-            "db"
+            workflow['workflow'], WorkflowFiles.LogDir.DIRNAME, "db"
         )
         with CylcWorkflowDAO(db_file, is_public=True) as dao:
             conn = dao.connect()
@@ -514,83 +492,115 @@ FROM time_stats
 GROUP BY name, platform_name;
 '''):
         total_of_totals += row['total_cpu_time']
-        tasks.append({
-            'id': workflow.duplicate(
-                cycle=row['cycle'],
-                task=row['name'],
-                job=f"{row['submit_num']:02d}"
-            ),
-            'name': row["name"],
-            'platform': row["platform_name"],
-            'mem_alloc': row["mem_alloc"],
-            # Queue time stats
-            'min_queue_time': row["min_queue_time"],
-            'mean_queue_time': row["mean_queue_time"],
-            'max_queue_time': row["max_queue_time"],
-            'std_dev_queue_time': row["stddev_queue_time"],
-            # Prevents null entries when there are too few tasks for quartiles
-            'queue_quartiles': [row["queue_quartile_1"],
-                                row["queue_quartile_1"]
-                                if row["queue_quartile_2"] is None
-                                else row["queue_quartile_2"],
-                                row["queue_quartile_1"]
-                                if row["queue_quartile_3"] is None
-                                else row["queue_quartile_3"]],
-            # Run time stats
-            'min_run_time': row["min_run_time"],
-            'mean_run_time': row["mean_run_time"],
-            'max_run_time': row["max_run_time"],
-            'std_dev_run_time': row["stddev_run_time"],
-            # Prevents null entries when there are too few tasks for quartiles
-            'run_quartiles': [row["run_quartile_1"],
-                              row["run_quartile_1"]
-                              if row["run_quartile_2"] is None
-                              else row["run_quartile_2"],
-                              row["run_quartile_1"]
-                              if row["run_quartile_3"] is None
-                              else row["run_quartile_3"]],
-            # Total
-            'min_total_time': row["min_total_time"],
-            'mean_total_time': row["mean_total_time"],
-            'max_total_time': row["max_total_time"],
-            'std_dev_total_time': row["stddev_total_time"],
-            # Prevents null entries when there are too few tasks for quartiles
-            'total_quartiles': [row["total_quartile_1"],
-                                row["total_quartile_1"]
-                                if row["total_quartile_2"] is None
-                                else row["total_quartile_2"],
-                                row["total_quartile_1"]
-                                if row["total_quartile_3"] is None
-                                else row["total_quartile_3"]],
-            # Max RSS stats
-            'min_max_rss': row["min_max_rss"],
-            'mean_max_rss': row["mean_max_rss"],
-            'max_max_rss': row["max_max_rss"],
-            'std_dev_max_rss': row["stddev_max_rss"],
-            # Prevents null entries when there are too few tasks for quartiles
-            'max_rss_quartiles': [row["max_rss_quartile_1"],
-                                  row["max_rss_quartile_1"]
-                                  if row["max_rss_quartile_2"] is None
-                                  else row["max_rss_quartile_2"],
-                                  row["max_rss_quartile_1"]
-                                  if row["max_rss_quartile_3"] is None
-                                  else row["max_rss_quartile_3"]],
-            # CPU time stats
-            'min_cpu_time': row["min_cpu_time"],
-            'mean_cpu_time': row["mean_cpu_time"],
-            'max_cpu_time': row["max_cpu_time"],
-            'total_cpu_time': row["total_cpu_time"],
-            'std_dev_cpu_time': row["stddev_cpu_time"],
-            # Prevents null entries when there are too few tasks for quartiles
-            'cpu_time_quartiles': [row["cpu_time_quartile_1"],
-                                   row["cpu_time_quartile_1"]
-                                   if row["cpu_time_quartile_2"] is None
-                                   else row["cpu_time_quartile_2"],
-                                   row["cpu_time_quartile_1"]
-                                   if row["cpu_time_quartile_3"] is None
-                                   else row["cpu_time_quartile_3"]],
-            'count': row["n"]
-        })
+        tasks.append(
+            {
+                'id': workflow.duplicate(
+                    cycle=row['cycle'],
+                    task=row['name'],
+                    job=f"{row['submit_num']:02d}",
+                ),
+                'name': row["name"],
+                'platform': row["platform_name"],
+                'mem_alloc': row["mem_alloc"],
+                # Queue time stats
+                'min_queue_time': row["min_queue_time"],
+                'mean_queue_time': row["mean_queue_time"],
+                'max_queue_time': row["max_queue_time"],
+                'std_dev_queue_time': row["stddev_queue_time"],
+                # Prevents null entries when there are too few tasks for quartiles
+                'queue_quartiles': [
+                    row["queue_quartile_1"],
+                    (
+                        row["queue_quartile_1"]
+                        if row["queue_quartile_2"] is None
+                        else row["queue_quartile_2"]
+                    ),
+                    (
+                        row["queue_quartile_1"]
+                        if row["queue_quartile_3"] is None
+                        else row["queue_quartile_3"]
+                    ),
+                ],
+                # Run time stats
+                'min_run_time': row["min_run_time"],
+                'mean_run_time': row["mean_run_time"],
+                'max_run_time': row["max_run_time"],
+                'std_dev_run_time': row["stddev_run_time"],
+                # Prevents null entries when there are too few tasks for quartiles
+                'run_quartiles': [
+                    row["run_quartile_1"],
+                    (
+                        row["run_quartile_1"]
+                        if row["run_quartile_2"] is None
+                        else row["run_quartile_2"]
+                    ),
+                    (
+                        row["run_quartile_1"]
+                        if row["run_quartile_3"] is None
+                        else row["run_quartile_3"]
+                    ),
+                ],
+                # Total
+                'min_total_time': row["min_total_time"],
+                'mean_total_time': row["mean_total_time"],
+                'max_total_time': row["max_total_time"],
+                'std_dev_total_time': row["stddev_total_time"],
+                # Prevents null entries when there are too few tasks for quartiles
+                'total_quartiles': [
+                    row["total_quartile_1"],
+                    (
+                        row["total_quartile_1"]
+                        if row["total_quartile_2"] is None
+                        else row["total_quartile_2"]
+                    ),
+                    (
+                        row["total_quartile_1"]
+                        if row["total_quartile_3"] is None
+                        else row["total_quartile_3"]
+                    ),
+                ],
+                # Max RSS stats
+                'min_max_rss': row["min_max_rss"],
+                'mean_max_rss': row["mean_max_rss"],
+                'max_max_rss': row["max_max_rss"],
+                'std_dev_max_rss': row["stddev_max_rss"],
+                # Prevents null entries when there are too few tasks for quartiles
+                'max_rss_quartiles': [
+                    row["max_rss_quartile_1"],
+                    (
+                        row["max_rss_quartile_1"]
+                        if row["max_rss_quartile_2"] is None
+                        else row["max_rss_quartile_2"]
+                    ),
+                    (
+                        row["max_rss_quartile_1"]
+                        if row["max_rss_quartile_3"] is None
+                        else row["max_rss_quartile_3"]
+                    ),
+                ],
+                # CPU time stats
+                'min_cpu_time': row["min_cpu_time"],
+                'mean_cpu_time': row["mean_cpu_time"],
+                'max_cpu_time': row["max_cpu_time"],
+                'total_cpu_time': row["total_cpu_time"],
+                'std_dev_cpu_time': row["stddev_cpu_time"],
+                # Prevents null entries when there are too few tasks for quartiles
+                'cpu_time_quartiles': [
+                    row["cpu_time_quartile_1"],
+                    (
+                        row["cpu_time_quartile_1"]
+                        if row["cpu_time_quartile_2"] is None
+                        else row["cpu_time_quartile_2"]
+                    ),
+                    (
+                        row["cpu_time_quartile_1"]
+                        if row["cpu_time_quartile_3"] is None
+                        else row["cpu_time_quartile_3"]
+                    ),
+                ],
+                'count': row["n"],
+            }
+        )
 
     for task in tasks:
         task['total_of_totals'] = total_of_totals
@@ -608,7 +618,7 @@ _JOB_STATUS_TO_STATE = {
 
 
 def _status_to_state(
-    status: str
+    status: str,
 ) -> Tuple[Optional[int], Optional[int], Optional[bool]]:
     """Derive job state attributes from job status.
 
@@ -740,9 +750,7 @@ def run_jobs_query(
             items.append(rf'({" AND ".join(item)})')
 
         if items:
-            where_stmts.append(
-                r'(' + ' OR '.join(items) + ')'
-            )
+            where_stmts.append(r'(' + ' OR '.join(items) + ')')
 
     # filter out cycle/task/job IDs
     if exids:
@@ -873,7 +881,8 @@ def run_jobs_query(
     # build the SQL query
     exprs = (
         f'{expr.strip()} AS {name}'
-        for name, expr in fields_map.items() if name in fields
+        for name, expr in fields_map.items()
+        if name in fields
     )
     query = rf'''
         SELECT
@@ -912,15 +921,17 @@ def run_jobs_query(
         if status == TASK_STATUS_WAITING:
             continue
 
-        jobs.append({
-            'id': workflow.duplicate(
-                cycle=row['cycle_point'],
-                task=row['name'],
-                job=f"{row['submit_num']:02d}",
-            ),
-            'state': status,
-            **row,
-        })
+        jobs.append(
+            {
+                'id': workflow.duplicate(
+                    cycle=row['cycle_point'],
+                    task=row['name'],
+                    job=f"{row['submit_num']:02d}",
+                ),
+                'state': status,
+                **row,
+            }
+        )
 
     return jobs
 
@@ -937,7 +948,8 @@ class UISTask(Task):
         graphene.Int,
         description=sstrip('''
                 List containing the first, second,
-                third and forth quartile total times.'''))
+                third and forth quartile total times.'''),
+    )
     min_queue_time = graphene.Int()
     mean_queue_time = graphene.Float()
     max_queue_time = graphene.Int()
@@ -946,7 +958,8 @@ class UISTask(Task):
         graphene.Int,
         description=sstrip('''
             List containing the first, second,
-            third and forth quartile queue times.'''))
+            third and forth quartile queue times.'''),
+    )
     min_run_time = graphene.Int()
     mean_run_time = graphene.Float()
     max_run_time = graphene.Int()
@@ -955,7 +968,8 @@ class UISTask(Task):
         graphene.Int,
         description=sstrip('''
                 List containing the first, second,
-                third and forth quartile run times.'''))
+                third and forth quartile run times.'''),
+    )
     max_rss = graphene.BigInt()
     min_max_rss = graphene.BigInt()
     mean_max_rss = graphene.Float()
@@ -965,7 +979,8 @@ class UISTask(Task):
         graphene.BigInt,
         description=sstrip('''
                 List containing the first, second,
-                third and forth quartile for Max RSS.'''))
+                third and forth quartile for Max RSS.'''),
+    )
     min_cpu_time = graphene.Int()
     mean_cpu_time = graphene.Float()
     max_cpu_time = graphene.Int()
@@ -975,7 +990,8 @@ class UISTask(Task):
         graphene.Int,
         description=sstrip('''
                 List containing the first, second,
-                third and forth quartile for CPU time.'''))
+                third and forth quartile for CPU time.'''),
+    )
     total_of_totals = graphene.Int()
     mem_alloc = graphene.BigInt()
     count = graphene.Int()
@@ -1009,7 +1025,7 @@ class UISQueries(Queries):
             description='workflow//[cycle/task]',
             required=True,
         ),
-        resolver=list_log_files
+        resolver=list_log_files,
     )
 
     tasks = graphene.List(
@@ -1025,7 +1041,6 @@ class UISQueries(Queries):
         mindepth=graphene.Int(default_value=-1),
         maxdepth=graphene.Int(default_value=-1),
         sort=SortArgs(default_value=None),
-
     )
 
     jobs = graphene.List(
@@ -1056,9 +1071,11 @@ class UISQueries(Queries):
 # graphql-core has a subscribe field for both Meta and Field,
 # graphene at v3.4.3 does not. As a workaround
 # the subscribe function is looked up via the following mapping:
-SUB_RESOLVER_MAPPING.update({
-    'logs': stream_log,  # type: ignore
-})
+SUB_RESOLVER_MAPPING.update(
+    {
+        'logs': stream_log,  # type: ignore
+    }
+)
 
 
 class UISSubscriptions(Subscriptions):
@@ -1086,9 +1103,9 @@ class UISSubscriptions(Subscriptions):
         file=graphene.Argument(
             graphene.String,
             required=False,
-            description='File name of job log to fetch, e.g. job.out'
+            description='File name of job log to fetch, e.g. job.out',
         ),
-        resolver=identity_resolve
+        resolver=identity_resolve,
     )
 
 
@@ -1105,7 +1122,5 @@ NODE_MAP.update(
 )
 
 schema = graphene.Schema(
-    query=UISQueries,
-    subscription=UISSubscriptions,
-    mutation=UISMutations
+    query=UISQueries, subscription=UISSubscriptions, mutation=UISMutations
 )
