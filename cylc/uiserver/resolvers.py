@@ -53,10 +53,8 @@ from cylc.flow.exceptions import CylcError
 from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.scripts.cat_log import (
-    MIXED,
-    MIXED_TRUNCATION_PREFIX,
     TAIL,
-    TAIL_FROM_START,
+    TAIL_END,
 )
 from cylc.flow.scripts.clean import CleanOptions, run
 from cylc.flow.util import natural_sort_key
@@ -395,8 +393,8 @@ class Services:
             'cat-log',
             f'--mode={mode}',
         ]
-        if mode in (TAIL, MIXED):
-            # these modes read a fixed number of lines from the file
+        if mode == TAIL_END:
+            # this mode reads a fixed number of lines from the file
             cmd.append(f'--tail-lines={max_lines}')
         cmd += [
             '--prepend-path',
@@ -464,9 +462,9 @@ class Services:
 
                 else:
                     # there *are* lines to read from the cat-log process
-                    if mode == TAIL_FROM_START and line_count > max_lines:
+                    if mode == TAIL and line_count > max_lines:
                         # we have read beyond the line count -> the *end* of
-                        # the file is truncated in tail-from-start mode
+                        # the file is truncated in tail (from-start) mode
                         yield {'lines': buffer}
                         yield {'truncated': 'end'}
                         break
@@ -490,27 +488,14 @@ class Services:
                         continue
 
                     # read in the log lines and add them to the buffer
-                    if mode == MIXED and line.startswith(
-                        MIXED_TRUNCATION_PREFIX
-                    ):
-                        # in "mixed" mode cat-log emits a marker between the
-                        # head and tail blocks -> flush the head block and tell
-                        # the client the *middle* of the file was omitted
-                        # (the marker line itself is not shown)
-                        if buffer:
-                            yield {'lines': list(buffer)}
-                            buffer.clear()
-                        yield {'truncated': 'middle'}
-                        continue
-
                     line_count += 1
                     # buffer.append(line)
 
                     buffer.append(f"{line_count - 1}: {line}") # REMEMBER to revert this
 
-                    if mode == TAIL and line_count - 1 == max_lines:
+                    if mode == TAIL_END and line_count - 1 == max_lines:
                         # we received exactly MAX_LINES lines -> the *start* of
-                        # the file is (probably) truncated in tail mode
+                        # the file is (probably) truncated in tail-end mode
                         yield {'lines': list(buffer)}
                         buffer.clear()
                         yield {'truncated': 'start'}

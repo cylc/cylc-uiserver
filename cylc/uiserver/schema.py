@@ -60,7 +60,7 @@ from cylc.flow.network.schema import (
 )
 from cylc.flow.pathutil import get_workflow_run_dir
 from cylc.flow.rundb import CylcWorkflowDAO
-from cylc.flow.scripts.cat_log import TAIL, TAIL_FROM_START
+from cylc.flow.scripts.cat_log import TAIL, TAIL_END
 from cylc.flow.task_state import (
     TASK_STATUS_FAILED,
     TASK_STATUS_RUNNING,
@@ -879,9 +879,8 @@ class UISSubscriptions(Subscriptions):
         truncated = graphene.String(
             description=(
                 'Set at the point in the stream where the file has been'
-                ' truncated: "start" (earlier lines omitted), "middle"'
-                ' (lines omitted between the head and tail blocks in "mixed"'
-                ' mode) or "end" (later lines omitted).'
+                ' truncated: "start" (earlier lines omitted) or "end"'
+                ' (later lines omitted).'
             ),
         )
 
@@ -904,9 +903,9 @@ class UISSubscriptions(Subscriptions):
             default_value=TAIL,
             description=(
                 'Log view mode: '
-                f'"{TAIL}" (follow the last lines from the end of the file), '
-                f'"{TAIL_FROM_START}" (follow from the start of the file) '
-                'or "mixed" (show the start and follow the end of the file).'
+                f'"{TAIL}" (follow from the start of the file) or '
+                f'"{TAIL_END}" (follow the last lines from the end of the '
+                'file).'
             ),
         ),
         max_lines=graphene.Argument(
