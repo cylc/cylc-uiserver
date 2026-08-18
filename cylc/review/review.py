@@ -21,7 +21,16 @@ logs via an HTTP interface.
 
 With no arguments, the status of the ad-hoc web service server is printed.
 
-For 'cylc review start', if 'PORT' is not specified, port 8080 is used."""
+For 'cylc review start', if 'PORT' is not specified, port 8080 is used.
+
+With --alt-home-dir=DIR look under DIR for user run directories instead
+of in $HOME. This can be used to view symlinked run directories directly
+when home directories are private. For example with symlinking as:
+   /home/$USER/cylc-run/<workflow> -> /project/test/$USER/cylc-run/<workflow>
+start Review like this:
+   cylc review start --alt-home-dir=/project/test
+
+"""
 
 import contextlib
 from fnmatch import fnmatch
@@ -103,9 +112,10 @@ class CylcReviewService:
         'rose-suite.conf'
     ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, alt_home_dir, *args, **kwargs):
         self.exposed = True
-        self.suite_dao = CylcReviewDAO()
+        self.alt_home_dir = alt_home_dir
+        self.suite_dao = CylcReviewDAO(alt_home_dir)
         self.logo = os.path.basename(
             get_util_home("doc", "src", "cylc-logo.png"))
         self.title = self.TITLE
@@ -363,7 +373,7 @@ class CylcReviewService:
         # Set list of task states depending on Cylc version 7 or 8
         task_statuses_ordered = CYLC7_TASK_STATUSES_ORDERED
         suite_dir = os.path.join(
-            self._get_user_home(user),
+            self._get_user_home(user, self.alt_home_dir),
             "cylc-run",
             suite)
         is_c8 = self.is_cylc8(suite_dir)
@@ -937,8 +947,8 @@ class CylcReviewService:
         return path
 
     @staticmethod
-    def _get_user_home(user):
-        """Return, e.g. ~/cylc-run/ for a cylc suite.
+    def _get_user_home(user, alt_home_dir=None):
+        """Return user home directory under alt_home_dir or $HOME.
 
         N.B. os.path.expanduser does not fail if ~user is invalid.
 
@@ -946,15 +956,17 @@ class CylcReviewService:
             cherrypy.HTTPError(404)
 
         """
+        if alt_home_dir is not None:
+            return os.path.join(alt_home_dir, str(user))
         try:
             return pwd.getpwnam(user).pw_dir
         except KeyError:
             raise cherrypy.HTTPError(404) from None
 
-    def _get_user_suite_dir_root(self, user):
+    def _get_user_suite_dir_root(self, user, alt_home_dir=None):
         """Return, e.g. ~user/cylc-run/ for a cylc suite."""
         return self._check_dir_access(
-            os.path.join(self._get_user_home(user), "cylc-run"))
+            os.path.join(self._get_user_home(user, alt_home_dir), "cylc-run"))
 
     @staticmethod
     def _check_string_for_path(string):
@@ -1100,7 +1112,7 @@ class CylcReviewService:
         for path in paths:
             self._check_path_normalised(path)
         suite_dir = os.path.join(
-            self._get_user_home(user),
+            self._get_user_home(user, self.alt_home_dir),
             "cylc-run",
             suite)
         if not paths:
@@ -1111,6 +1123,7 @@ class CylcReviewService:
             # >>> os.path.join('/foo', '/bar')
             # '/bar'
             raise cherrypy.HTTPError(403)
+
         return self._check_dir_access(path)
 
     @staticmethod
