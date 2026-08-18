@@ -223,8 +223,8 @@ def test_make_task_query_2():
                 '2022-12-14T16:10:00Z',
                 1,
                 'message debug',
-                '_cylc_profiler: {"cpu_time": 1994, "max_rss": 50064,',
-                ' "memory_allocated": 1048576}',
+                '_cylc_profiler: {"cpu_time": 1994, "max_rss": 50064, '
+                '"memory_allocated": 1048576}',
             ),
         ],
     )
