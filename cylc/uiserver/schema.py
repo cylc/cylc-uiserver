@@ -274,7 +274,7 @@ class Scan(graphene.Mutation):
     result = GenericScalar()
 
 
-def _get_requested_fields(query_type, info):
+def _get_requested_fields(query_type: Literal['tasks', 'jobs'], info):
     """Extract the GraphQL fields requested for the given node type.
 
     Args:
@@ -425,7 +425,7 @@ SELECT
   cycle,
   submit_num,
   platform_name,
-  mem_alloc,
+  MAX(mem_alloc) AS mem_alloc,
 
   -- Calculate Queue time stats
   MIN(queue_time) AS min_queue_time,
