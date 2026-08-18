@@ -507,7 +507,8 @@ GROUP BY name, platform_name;
                 'mean_queue_time': row["mean_queue_time"],
                 'max_queue_time': row["max_queue_time"],
                 'std_dev_queue_time': row["stddev_queue_time"],
-                # Prevents null entries when there are too few tasks for quartiles
+                # Prevents null entries when there are too few
+                # tasks for quartiles
                 'queue_quartiles': [
                     row["queue_quartile_1"],
                     (
@@ -526,7 +527,8 @@ GROUP BY name, platform_name;
                 'mean_run_time': row["mean_run_time"],
                 'max_run_time': row["max_run_time"],
                 'std_dev_run_time': row["stddev_run_time"],
-                # Prevents null entries when there are too few tasks for quartiles
+                # Prevents null entries when there are too few
+                # tasks for quartiles
                 'run_quartiles': [
                     row["run_quartile_1"],
                     (
@@ -545,7 +547,8 @@ GROUP BY name, platform_name;
                 'mean_total_time': row["mean_total_time"],
                 'max_total_time': row["max_total_time"],
                 'std_dev_total_time': row["stddev_total_time"],
-                # Prevents null entries when there are too few tasks for quartiles
+                # Prevents null entries when there are too few
+                # tasks for quartiles
                 'total_quartiles': [
                     row["total_quartile_1"],
                     (
@@ -564,7 +567,8 @@ GROUP BY name, platform_name;
                 'mean_max_rss': row["mean_max_rss"],
                 'max_max_rss': row["max_max_rss"],
                 'std_dev_max_rss': row["stddev_max_rss"],
-                # Prevents null entries when there are too few tasks for quartiles
+                # Prevents null entries when there are too few
+                # tasks for quartiles
                 'max_rss_quartiles': [
                     row["max_rss_quartile_1"],
                     (
@@ -584,7 +588,8 @@ GROUP BY name, platform_name;
                 'max_cpu_time': row["max_cpu_time"],
                 'total_cpu_time': row["total_cpu_time"],
                 'std_dev_cpu_time': row["stddev_cpu_time"],
-                # Prevents null entries when there are too few tasks for quartiles
+                # Prevents null entries when there are too few
+                # tasks for quartiles
                 'cpu_time_quartiles': [
                     row["cpu_time_quartile_1"],
                     (
