@@ -71,28 +71,28 @@ class CylcReviewDAO:
         "time_run_exit_asc": (
             "time_run_exit ASC, submit_num DESC, name DESC, cycle DESC"),
         "duration_queue_desc": (
-            "(CAST(strftime('%s', time_run) AS NUMERIC) -" +
-            " CAST(strftime('%s', time_submit) AS NUMERIC)) DESC, " +
+            "(CAST(strftime('%s', time_run) AS NUMERIC) -"
+            " CAST(strftime('%s', time_submit) AS NUMERIC)) DESC, "
             "submit_num DESC, name DESC, cycle DESC"),
         "duration_queue_asc": (
-            "(CAST(strftime('%s', time_run) AS NUMERIC) -" +
-            " CAST(strftime('%s', time_submit) AS NUMERIC)) ASC, " +
+            "(CAST(strftime('%s', time_run) AS NUMERIC) -"
+            " CAST(strftime('%s', time_submit) AS NUMERIC)) ASC, "
             "submit_num DESC, name DESC, cycle DESC"),
         "duration_run_desc": (
-            "(CAST(strftime('%s', time_run_exit) AS NUMERIC) -" +
-            " CAST(strftime('%s', time_run) AS NUMERIC)) DESC, " +
+            "(CAST(strftime('%s', time_run_exit) AS NUMERIC) -"
+            " CAST(strftime('%s', time_run) AS NUMERIC)) DESC, "
             "submit_num DESC, name DESC, cycle DESC"),
         "duration_run_asc": (
-            "(CAST(strftime('%s', time_run_exit) AS NUMERIC) -" +
-            " CAST(strftime('%s', time_run) AS NUMERIC)) ASC, " +
+            "(CAST(strftime('%s', time_run_exit) AS NUMERIC) -"
+            " CAST(strftime('%s', time_run) AS NUMERIC)) ASC, "
             "submit_num DESC, name DESC, cycle DESC"),
         "duration_queue_run_desc": (
-            "(CAST(strftime('%s', time_run_exit) AS NUMERIC) -" +
-            " CAST(strftime('%s', time_submit) AS NUMERIC)) DESC, " +
+            "(CAST(strftime('%s', time_run_exit) AS NUMERIC) -"
+            " CAST(strftime('%s', time_submit) AS NUMERIC)) DESC, "
             "submit_num DESC, name DESC, cycle DESC"),
         "duration_queue_run_asc": (
-            "(CAST(strftime('%s', time_run_exit) AS NUMERIC) -" +
-            " CAST(strftime('%s', time_submit) AS NUMERIC)) ASC, " +
+            "(CAST(strftime('%s', time_run_exit) AS NUMERIC) -"
+            " CAST(strftime('%s', time_submit) AS NUMERIC)) ASC, "
             "submit_num DESC, name DESC, cycle DESC"),
     }
     JOB_STATUS_COMBOS = {
@@ -258,9 +258,8 @@ class CylcReviewDAO:
         of_n_entries = 0
         stmt = (
             "SELECT COUNT(*)"
-            + " FROM task_states LEFT JOIN task_jobs USING (name, cycle)"
-            + where_expr
-        )
+            " FROM task_states LEFT JOIN task_jobs USING (name, cycle)"
+        ) + where_expr
         try:
             for row in self._db_exec(user_name, suite_name, stmt, where_args):
                 of_n_entries = row[0]
@@ -271,38 +270,53 @@ class CylcReviewDAO:
         except sqlite3.Error:
             return ([], 0)
         if self.is_cylc8:
-            stmt = (   # nosec B608
-                "SELECT" +
-                " task_states.time_updated AS time," +
-                " cycle, name," +
-                " task_jobs.submit_num AS submit_num," +
-                " task_states.submit_num AS submit_num_max," +
-                " task_states.status AS task_status," +
-                " time_submit, submit_status," +
-                " time_run, time_run_exit, run_signal, run_status," +
-                " platform_name, job_runner_name, job_id" +
-                " FROM task_states LEFT JOIN task_jobs USING " +
-                "(cycle, name, flow_nums) " +
-                where_expr +
-                " ORDER BY " +
-                self.JOB_ORDERS.get(order, self.JOB_ORDERS["time_desc"])
-            )
+            stmt = f"""
+                SELECT
+                    task_states.time_updated AS time,
+                    cycle,
+                    name,
+                    task_jobs.submit_num AS submit_num,
+                    task_states.submit_num AS submit_num_max,
+                    task_states.status AS task_status,
+                    time_submit,
+                    submit_status,
+                    time_run,
+                    time_run_exit,
+                    run_signal,
+                    run_status,
+                    platform_name,
+                    job_runner_name,
+                    job_id
+                FROM task_states
+                LEFT JOIN task_jobs USING (cycle, name, flow_nums)
+                {where_expr}
+                ORDER BY
+                {self.JOB_ORDERS.get(order, self.JOB_ORDERS["time_desc"])}
+            """  # nosec B608
         else:
-            stmt = (   # nosec B608
-                "SELECT" +
-                " task_states.time_updated AS time," +
-                " cycle, name," +
-                " task_jobs.submit_num AS submit_num," +
-                " task_states.submit_num AS submit_num_max," +
-                " task_states.status AS task_status," +
-                " time_submit, submit_status," +
-                " time_run, time_run_exit, run_signal, run_status," +
-                " user_at_host, batch_sys_name, batch_sys_job_id" +
-                " FROM task_states LEFT JOIN task_jobs USING (cycle, name)" +
-                where_expr +
-                " ORDER BY " +
-                self.JOB_ORDERS.get(order, self.JOB_ORDERS["time_desc"])
-            )
+            stmt = f"""
+                SELECT
+                    task_states.time_updated AS time,
+                    cycle,
+                    name,
+                    task_jobs.submit_num AS submit_num,
+                    task_states.submit_num AS submit_num_max,
+                    task_states.status AS task_status,
+                    time_submit,
+                    submit_status,
+                    time_run,
+                    time_run_exit,
+                    run_signal,
+                    run_status,
+                    user_at_host,
+                    batch_sys_name,
+                    batch_sys_job_id
+                FROM task_states
+                LEFT JOIN task_jobs USING (cycle, name)
+                {where_expr}
+                ORDER BY
+                {self.JOB_ORDERS.get(order, self.JOB_ORDERS["time_desc"])}
+            """  # nosec B608
         # Get entries
         entries = []
         entry_of = {}
@@ -526,8 +540,10 @@ class CylcReviewDAO:
         """
 
         of_n_entries = 0
-        stmt = ("SELECT COUNT(DISTINCT cycle) FROM task_states WHERE " +
-                "submit_num > 0")
+        stmt = (
+            "SELECT COUNT(DISTINCT cycle) FROM task_states "
+            "WHERE submit_num > 0"
+        )
         try:
             for row in self._db_exec(user_name, suite_name, stmt):
                 of_n_entries = row[0]
@@ -575,19 +591,19 @@ class CylcReviewDAO:
             states_stmt[key] = " OR ".join(
                 ["status=='%s'" % (name) for name in names])
 
-        stmt = (   # nosec B608
-            "SELECT" +
-            " cycle," +
-            " max(time_updated)," +
-            " sum(" + states_stmt["active"] + ") AS n_active," +
-            " sum(" + states_stmt["success"] + ") AS n_success,"
-            " sum(" + states_stmt["fail"] + ") AS n_fail"
-            " FROM task_states" +
-            " GROUP BY cycle" +
-            " HAVING n_active > 0" +
-            " OR n_success > 0" +
-            " OR n_fail >0"
-        )
+        stmt = f"""
+            SELECT
+                cycle,
+                max(time_updated),
+                sum({states_stmt["active"]}) AS n_active,
+                sum({states_stmt["success"]}) AS n_success,
+                sum({states_stmt["fail"]}) AS n_fail
+            FROM task_states
+            GROUP BY cycle
+            HAVING n_active > 0
+                OR n_success > 0
+                OR n_fail > 0
+        """  # nosec B608
         if integer_mode:
             stmt += " ORDER BY cast(cycle as number)"
         else:
@@ -626,23 +642,27 @@ class CylcReviewDAO:
         check_query = self._db_exec(user_name, suite_name, check_stmt,
                                     ["task_jobs"])
         if check_query.fetchone() is not None:
-            stmt = (   # nosec B608
-                "SELECT cycle," +
-                " sum(" + self.JOB_STATUS_COMBOS["submitted,running"] +
-                ") AS n_job_active," +
-                " sum(" + self.JOB_STATUS_COMBOS["succeeded"] +
-                ") AS n_job_success," +
-                " sum(" + self.JOB_STATUS_COMBOS["submission-failed,failed"] +
-                ") AS n_job_fail" +
-                " FROM task_jobs GROUP BY cycle")
+            stmt = f"""
+                SELECT
+                    cycle,
+                    sum({self.JOB_STATUS_COMBOS["submitted,running"]})
+                    AS n_job_active,
+                    sum({self.JOB_STATUS_COMBOS["succeeded"]})
+                    AS n_job_success,
+                    sum({self.JOB_STATUS_COMBOS["submission-failed,failed"]})
+                    AS n_job_fail
+                FROM task_jobs GROUP BY cycle
+            """  # nosec B608
         else:
             fail_events_stmt = " OR ".join(
                 ["event=='%s'" % (name)
                  for name in TASK_STATUS_GROUPS["fail"]])
-            stmt = (   # nosec B608
-                "SELECT cycle," +
-                " sum(" + fail_events_stmt + ") AS n_job_fail" +
-                " FROM task_events GROUP BY cycle")
+            stmt = f"""
+                SELECT
+                    cycle,
+                    sum({fail_events_stmt}) AS n_job_fail
+                FROM task_events GROUP BY cycle
+            """  # nosec B608
         self._db_close(user_name, suite_name)
         for cycle, n_job_active, n_job_success, n_job_fail in self._db_exec(
                 user_name, suite_name, stmt):
@@ -711,7 +731,7 @@ class CylcReviewDAO:
         """Query statement and args formation for select_broadcast_events."""
         form_stmt = r"SELECT time,change,point,namespace,key,value FROM %s"
         if order == "DESC":
-            ordering = (" ORDER BY " +
-                        "time DESC, point DESC, namespace DESC, key DESC")
-            form_stmt = form_stmt + ordering
+            form_stmt = form_stmt + (
+                " ORDER BY time DESC, point DESC, namespace DESC, key DESC"
+            )
         return form_stmt % CylcWorkflowDAO.TABLE_BROADCAST_EVENTS, []
