@@ -28,9 +28,11 @@ from getpass import getuser
 import logging
 from pathlib import Path
 import sys
+from time import time
 from typing import (
     TYPE_CHECKING,
     Any,
+    Set,
 )
 
 import zmq.asyncio
@@ -179,6 +181,12 @@ class WorkflowsManager:
         # will be ignored
         self._stopping = False
 
+        # Connection checker threshold, twice the check interval and buffer
+        # to allow for two check attempts.
+        self.conn_threshold = uiserver.connections_check_interval * 2 + 30
+        # Naughty bin of irresponsive workflows
+        self.irresponsive: Set[str] = set()
+
     def get_workflows(self):
         return self.uiserver.data_store_mgr.get_workflows()
 
@@ -200,6 +208,19 @@ class WorkflowsManager:
         """
         active_before, inactive_before = self.get_workflows()
 
+        # workflows stopped between scans
+        w_stops = {
+            w_id
+            for w_id in inactive_before
+            if (
+                w_id in self.workflows
+                and self.workflows[w_id].get('req_client')
+            )
+        }
+        # ensure workflows get properly dealt with by the workflow manger
+        active_before |= w_stops
+        inactive_before -= w_stops
+
         active = set()
         inactive = set()
 
@@ -212,12 +233,15 @@ class WorkflowsManager:
             flow['owner'] = self.owner
             wid = Tokens(user=flow['owner'], workflow=flow['name']).id
             flow['id'] = wid
+            workflow = self.workflows.get(wid, {})
+
+            now = time()
 
             if not flow.get('contact'):
                 inactive.add(wid)
                 if (
                     # if the workflow has previously started...
-                    self.workflows.get(wid, {}).get(CFF.UUID)
+                    workflow.get(CFF.UUID)
                     # ...but the database has since been removed...
                     and not db_file_exists(flow)
                 ):
@@ -240,8 +264,8 @@ class WorkflowsManager:
 
             active.add(wid)
 
-            if wid in self.workflows:
-                if flow[CFF.UUID] != self.workflows[wid].get(CFF.UUID):
+            if workflow:
+                if flow[CFF.UUID] != workflow.get(CFF.UUID):
                     # UUID is unique to each workflow run, it is preserved
                     # across reload/restart.
                     # This workflow has been cleaned & started since last scan
@@ -251,12 +275,41 @@ class WorkflowsManager:
                         yield (wid, '/inactive', 'active', flow)
                     continue
                 if wid in active_before and (
-                    flow[CFF.PID] != self.workflows[wid].get(CFF.PID)
-                    or flow[CFF.HOST] != self.workflows[wid].get(CFF.HOST)
+                    flow[CFF.PID] != workflow.get(CFF.PID)
+                    or flow[CFF.HOST] != workflow.get(CFF.HOST)
                 ):
                     # Process ID or host changes means workflow must have
                     # restarted (contact file was left behind so we didn't
                     # detect it as inactive earlier)
+                    yield (wid, 'active', 'active', flow)
+                    continue
+                if (
+                    wid in active_before
+                    # BACK COMPAT
+                    and workflow.get(CFF.VERSION) >= '8.6.6'
+                    # Ping/Pong test for socket/network state and workflow
+                    # responsiveness.
+                    and wid not in self.irresponsive
+                    and (
+                        (
+                            now - workflow['reqres_time']
+                        ) > self.conn_threshold
+                        or (
+                            now - workflow['pubsub_time']
+                        ) > self.conn_threshold
+                    )
+                ):
+                    # This tests if the REQ/RES or PUB/SUB connections
+                    # are irresponsive. If so, we must disconnect/reconnect.
+                    self.irresponsive.add(wid)
+                    # Apply/Send new workflow status
+                    self.uiserver.data_store_mgr.create_status_delta(
+                        wid,
+                        status='irresponsive',
+                        status_msg=(
+                            'Workflow is not responding to the UI Server.'
+                        ),
+                    )
                     yield (wid, 'active', 'active', flow)
                     continue
 
@@ -300,7 +353,7 @@ class WorkflowsManager:
         Marks the workflow as stopped.
         """
         self.uiserver.data_store_mgr.disconnect_workflow(wid)
-        with suppress(KeyError, IOError):
+        with suppress(KeyError, IOError, AttributeError):
             self.workflows[wid]['req_client'].stop(stop_loop=False)
         with suppress(KeyError):
             self.workflows[wid]['req_client'] = None
@@ -351,6 +404,9 @@ class WorkflowsManager:
 
                 elif after == 'active':
                     # workflow has restarted without earlier being disconnected
+                    # or is irresponsive for some reason:
+                    # * Some internal scheduler issue/load/exception
+                    # * Some unrecoverable state of the network/socket
                     run(
                         self._disconnect(wid),
                         self._connect(wid, flow),

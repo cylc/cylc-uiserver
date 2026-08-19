@@ -34,6 +34,7 @@ Subscriptions are currently run in a different thread (via ThreadPoolExecutor).
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+import json
 from pathlib import Path
 import time
 from typing import (
@@ -119,7 +120,7 @@ class DataStoreMgr:
         self.log = log
         self.data = {}
         self.w_subs: Dict[str, WorkflowSubscriber] = {}
-        self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown'}
+        self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown', b'ping'}
         self.loop = None
         self.executor = ThreadPoolExecutor(max_threads)
         self.delta_queues = {}
@@ -179,6 +180,10 @@ class DataStoreMgr:
 
         self.delta_queues[w_id] = {}
 
+        # Setup connection checker points
+        self.workflows_mgr.workflows[w_id]['reqres_time'] = time.time()
+        self.workflows_mgr.workflows[w_id]['pubsub_time'] = time.time()
+
         # Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.
         self.executor.submit(
@@ -194,10 +199,18 @@ class DataStoreMgr:
             # something went wrong, undo any changes to allow for subsequent
             # connection attempts
             self.log.info(f'failed to connect to {w_id}')
-            self.disconnect_workflow(w_id)
+            self._disconnect_workflow(w_id)
 
     @log_call
     def disconnect_workflow(self, w_id, update_contact=True):
+        """Terminate workflow subscriptions.
+
+        This is called externally i.e. by the workflow manager when the
+        workflow has stopped or changed state.
+        """
+        self._disconnect_workflow(w_id, update_contact)
+
+    def _disconnect_workflow(self, w_id, update_contact=True):
         """Terminate workflow subscriptions.
 
         Call this when a workflow has stopped.
@@ -245,7 +258,7 @@ class DataStoreMgr:
         """Purge the manager of a workflow's subscription and data."""
         # Ensure no old/new subscriptions exist on purge,
         # this shouldn't happen if disconnect is run before unregister.
-        self.disconnect_workflow(w_id, update_contact=False)
+        self._disconnect_workflow(w_id, update_contact=False)
         if w_id in self.data:
             del self.data[w_id]
         if w_id in self.delta_queues:
@@ -296,7 +309,23 @@ class DataStoreMgr:
         if topic == 'shutdown':
             self._delta_store_to_queues(w_id, topic, delta)
             # close connections
-            self.disconnect_workflow(w_id)
+            self._disconnect_workflow(w_id)
+            return
+        elif (
+            topic == 'ping'
+            and w_id in self.workflows_mgr.workflows
+        ):
+            self.workflows_mgr.workflows[w_id]['pubsub_time'] = time.time()
+            # workflow is now clearly responsive
+            if w_id in self.workflows_mgr.irresponsive:
+                # Bring status up to date
+                status_data = json.loads(delta.decode('utf-8'))
+                self.create_status_delta(
+                    w_id,
+                    status=status_data['status'],
+                    status_msg=status_data['status_msg'],
+                )
+                self.workflows_mgr.irresponsive.remove(w_id)
             return
         self._apply_all_delta(w_id, delta)
         self._delta_store_to_queues(w_id, topic, delta)
@@ -467,11 +496,16 @@ class DataStoreMgr:
             # workflow has been removed - do nothing
             return False
 
-        delta = DELTAS_MAP[ALL_DELTAS]()
-        delta.workflow.time = time.time()
+        delta = self.create_status_delta(
+            w_id,
+            status=status,
+            status_msg=status_msg,
+            apply=False,
+            send=False,
+        )
+
         flow = delta.workflow.updated
-        flow.id = w_id
-        flow.stamp = f'{w_id}@{delta.workflow.time}'
+
         if contact_data:
             # update with contact file data
             flow.name = contact_data['name']
@@ -488,10 +522,6 @@ class DataStoreMgr:
             flow.port = 0
             flow.api_version = 0
 
-        if status is not None:
-            flow.status = status
-        if status_msg is not None:
-            flow.status_msg = status_msg
         if pruned:
             flow.pruned = True
             delta.workflow.pruned = w_id
@@ -504,6 +534,48 @@ class DataStoreMgr:
         self._delta_store_to_queues(w_id, ALL_DELTAS, delta)
 
         return True
+
+    def create_status_delta(
+        self,
+        w_id,
+        status=None,
+        status_msg=None,
+        apply=True,
+        send=True,
+    ):
+        """Create status delta for application and/or distribution.
+
+        Args:
+            w_id: Workflow ID.
+            status: Workflow status (e.g. "running").
+            status_msg: Workflow status message (e.g. "will stop at 2000").
+            apply: Apply delta to data-store.
+            send: Add delta to subscription queue.
+
+        Returns:
+            An ALL_DELTAS with updated.workflow fields status and/or msg.
+
+        """
+
+        delta = DELTAS_MAP[ALL_DELTAS]()
+        delta.workflow.time = time.time()
+        flow = delta.workflow.updated
+        flow.id = w_id
+        flow.stamp = f'{w_id}@{delta.workflow.time}'
+
+        if status is not None:
+            flow.status = status
+        if status_msg is not None:
+            flow.status_msg = status_msg
+
+        # apply delta to data-store
+        if apply:
+            self._apply_all_delta(w_id, delta)
+        # Queue delta for subscription push
+        if send:
+            self._delta_store_to_queues(w_id, ALL_DELTAS, delta)
+
+        return delta
 
     def _get_status_msg(self, w_id: str, is_active: bool) -> str:
         """Derive a status message for the workflow.
@@ -524,3 +596,31 @@ class DataStoreMgr:
         else:
             # the workflow has not yet run
             return 'not yet run'
+
+    async def connections_checker(self):
+        """Check REQ/RES by requesting a PUB/SUB check."""
+        topic = 'ping'
+        requests = {
+            w_id: workflow_request(
+                client=info['req_client'],
+                command='reqpub',
+                log=self.log,
+                args={'topic': topic, 'payload': 'status'},
+            )
+            for w_id, info in self.workflows_mgr.workflows.items()
+            if (
+                # skip stopped workflows
+                info.get('req_client')
+                and w_id in self.w_subs
+                # BACK COMPAT
+                and info.get(CFF.VERSION) >= '8.6.6'
+            )
+        }
+        results = await asyncio.gather(
+            *requests.values(), return_exceptions=True
+        )
+        for w_id, result in zip(requests, results):
+            if isinstance(result, Exception):
+                continue
+            if result == topic:
+                self.workflows_mgr.workflows[w_id]['reqres_time'] = time.time()

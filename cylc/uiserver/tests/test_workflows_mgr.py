@@ -16,8 +16,9 @@
 from itertools import product
 import logging
 from random import random
+from time import time
 from typing import Type
-from unittest.mock import AsyncMock
+from unittest.mock import Mock, AsyncMock
 
 import pytest
 
@@ -109,13 +110,13 @@ def mk_flow(path, reg, active=True, database=True):
     'active_before,active_after',
     list(product(['active', 'inactive', None], repeat=2))
 )
-async def test_workflow_state_changes(tmp_path, active_before, active_after):
+async def test_workflow_state_changes(tmp_path, cylc_uis, active_before, active_after):
     """It correctly identifies workflow state changes from the filesystem."""
     tmp_path /= str(random())
     tmp_path.mkdir()
 
     # mock the results of the previous scan
-    wfm = WorkflowsManager(None, LOG, context=None, run_dir=tmp_path)
+    wfm = WorkflowsManager(cylc_uis, LOG, context=None, run_dir=tmp_path)
     wid = Tokens(user=wfm.owner, workflow='a').id
 
     ret = (
@@ -149,6 +150,7 @@ async def test_workflow_state_changes(tmp_path, active_before, active_after):
 )
 async def test_workflow_state_change_uuid(
     tmp_path,
+    cylc_uis,
     active_before,
     active_after
 ):
@@ -165,7 +167,7 @@ async def test_workflow_state_change_uuid(
 
     """
     # mock the result of the previous scan
-    wfm = WorkflowsManager(None, LOG, context=None, run_dir=tmp_path)
+    wfm = WorkflowsManager(cylc_uis, LOG, context=None, run_dir=tmp_path)
     wid = Tokens(user=wfm.owner, workflow='a').id
 
     wfm.workflows[wid] = {
@@ -210,28 +212,42 @@ async def test_workflow_state_change_uuid(
 
 
 @pytest.mark.parametrize(
-    'pid, host, change_expected',
+    'pid, host, reqrespubsub_time, change_expected',
     [
-        pytest.param('42', '42', False, id='no-change'),
-        pytest.param('1', '42', True, id='pid-change'),
-        pytest.param('42', '1', True, id='host-change'),
+        pytest.param('42', '42', time(), False, id='no-change'),
+        pytest.param('1', '42', time(), True, id='pid-change'),
+        pytest.param('42', '1', time(), True, id='host-change'),
+        pytest.param('42', '42', 0, True, id='irresponsive'),
     ],
 )
 async def test_workflow_state_change__killed(
-    pid, host, change_expected, tmp_path
+    pid, host, reqrespubsub_time, change_expected, cylc_uis, tmp_path
 ):
-    """It identifies workflow restarts when the contact file is left behind.
+    """It identifies killed and/or irresponsive workflows/socket-connections.
 
-    This can happen when the workflow is killed or the host dies.
+    Killed workflows can happen when it is killed or the host dies leaving
+    behind a contact file, then is restarted before the next scan.
+
+    Killed/irresponsive workflows and/or socket-connection could occur from
+    a variety of reasons, i.e. network and/or hardware/software effecting
+    scheduler operation.
     """
-    wfm = WorkflowsManager(None, LOG, context=None, run_dir=tmp_path)
+    wfm = WorkflowsManager(cylc_uis, LOG, context=None, run_dir=tmp_path)
     wid = Tokens(user=wfm.owner, workflow='a').id
     wfm.workflows[wid] = {
         CFF.API: API,
         CFF.UUID: '42',
         CFF.PID: pid,
         CFF.HOST: host,
+        CFF.VERSION: '8.6.6',
+        'reqres_time': reqrespubsub_time,
+        'pubsub_time': reqrespubsub_time,
     }
+
+    if reqrespubsub_time == 0:
+        for method in ('_apply_all_delta', '_delta_store_to_queues'):
+            setattr(wfm.uiserver.data_store_mgr, method, Mock())
+
     wfm.get_workflows = lambda: ({wid}, set())  # workflow active before...
     mk_flow(tmp_path, 'a', active=True)  # ...and active after
 
@@ -244,6 +260,11 @@ async def test_workflow_state_change__killed(
             assert changes[0][3][field] == '42'
     else:
         assert not changes
+
+    # check irresponsive workflow was flagged.
+    if reqrespubsub_time == 0:
+        assert wid in wfm.irresponsive
+        wfm.irresponsive.discard(wid)
 
     # Check that the update calls the appropriate methods
     for method in ('_register', '_unregister', '_connect', '_disconnect'):
