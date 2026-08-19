@@ -395,8 +395,6 @@ WITH profiler_stats AS (
 time_stats AS (
   SELECT
     name,
-    cycle,
-    submit_num,
     submit_status,
     run_status,
     time_run,
@@ -422,8 +420,6 @@ time_stats AS (
 )
 SELECT
   name,
-  cycle,
-  submit_num,
   platform_name,
   MAX(mem_alloc) AS mem_alloc,
 
@@ -494,11 +490,6 @@ GROUP BY name, platform_name;
         total_of_totals += row['total_cpu_time']
         tasks.append(
             {
-                'id': workflow.duplicate(
-                    cycle=row['cycle'],
-                    task=row['name'],
-                    job=f"{row['submit_num']:02d}",
-                ),
                 'name': row["name"],
                 'platform': row["platform_name"],
                 'mem_alloc': row["mem_alloc"],
