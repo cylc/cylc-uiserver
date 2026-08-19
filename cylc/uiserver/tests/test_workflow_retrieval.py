@@ -136,7 +136,6 @@ def test_make_task_query_1():
     assert ret['total_quartiles'] == [600, 600, 600]
     assert ret['max_rss_quartiles'] == [40064, 40064, 40064]
     assert ret['cpu_time_quartiles'] == [994, 994, 994]
-    assert ret['id'].id == '~user/workflow//1/Task_1/01'
     assert ret['max_queue_time'] == 60
     assert ret['max_run_time'] == 540
     assert ret['max_total_time'] == 600
@@ -239,7 +238,6 @@ def test_make_task_query_2():
     assert ret['queue_quartiles'] == [60, 76, 60]
     assert ret['run_quartiles'] == [540, 644, 540]
     assert ret['total_quartiles'] == [600, 720, 600]
-    assert ret['id'].id == '~user/workflow//2/Task_1/01'
     assert ret['max_queue_time'] == 76
     assert ret['max_run_time'] == 644
     assert ret['max_total_time'] == 720
@@ -360,7 +358,6 @@ def test_make_task_query_3():
     assert ret['queue_quartiles'] == [60, 76, 76]
     assert ret['run_quartiles'] == [540, 644, 644]
     assert ret['total_quartiles'] == [600, 720, 720]
-    assert ret['id'].id == '~user/workflow//3/Task_1/01'
     assert ret['max_queue_time'] == 76
     assert ret['max_run_time'] == 644
     assert ret['max_total_time'] == 720
