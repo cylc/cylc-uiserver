@@ -356,6 +356,24 @@ async def list_elements(
     return elements
 
 
+def get_quartiles(row, prop: str) -> list[float]:
+    # Prevents null entries when there are too few
+    # tasks for quartiles
+    return [
+        row[f"{prop}_quartile_1"],
+        (
+            row[f"{prop}_quartile_1"]
+            if row[f"{prop}_quartile_2"] is None
+            else row[f"{prop}_quartile_2"]
+        ),
+        (
+            row[f"{prop}_quartile_1"]
+            if row[f"{prop}_quartile_3"] is None
+            else row[f"{prop}_quartile_3"]
+        ),
+    ]
+
+
 def run_task_query(conn, workflow):
 
     # TODO: support all arguments including states
@@ -498,61 +516,19 @@ GROUP BY name, platform_name;
                 'mean_queue_time': row["mean_queue_time"],
                 'max_queue_time': row["max_queue_time"],
                 'std_dev_queue_time': row["stddev_queue_time"],
-                # Prevents null entries when there are too few
-                # tasks for quartiles
-                'queue_quartiles': [
-                    row["queue_quartile_1"],
-                    (
-                        row["queue_quartile_1"]
-                        if row["queue_quartile_2"] is None
-                        else row["queue_quartile_2"]
-                    ),
-                    (
-                        row["queue_quartile_1"]
-                        if row["queue_quartile_3"] is None
-                        else row["queue_quartile_3"]
-                    ),
-                ],
+                'queue_quartiles': get_quartiles(row, 'queue'),
                 # Run time stats
                 'min_run_time': row["min_run_time"],
                 'mean_run_time': row["mean_run_time"],
                 'max_run_time': row["max_run_time"],
                 'std_dev_run_time': row["stddev_run_time"],
-                # Prevents null entries when there are too few
-                # tasks for quartiles
-                'run_quartiles': [
-                    row["run_quartile_1"],
-                    (
-                        row["run_quartile_1"]
-                        if row["run_quartile_2"] is None
-                        else row["run_quartile_2"]
-                    ),
-                    (
-                        row["run_quartile_1"]
-                        if row["run_quartile_3"] is None
-                        else row["run_quartile_3"]
-                    ),
-                ],
+                'run_quartiles': get_quartiles(row, 'run'),
                 # Total
                 'min_total_time': row["min_total_time"],
                 'mean_total_time': row["mean_total_time"],
                 'max_total_time': row["max_total_time"],
                 'std_dev_total_time': row["stddev_total_time"],
-                # Prevents null entries when there are too few
-                # tasks for quartiles
-                'total_quartiles': [
-                    row["total_quartile_1"],
-                    (
-                        row["total_quartile_1"]
-                        if row["total_quartile_2"] is None
-                        else row["total_quartile_2"]
-                    ),
-                    (
-                        row["total_quartile_1"]
-                        if row["total_quartile_3"] is None
-                        else row["total_quartile_3"]
-                    ),
-                ],
+                'total_quartiles': get_quartiles(row, 'total'),
                 # Max RSS stats
                 'min_max_rss': row["min_max_rss"],
                 'mean_max_rss': row["mean_max_rss"],
