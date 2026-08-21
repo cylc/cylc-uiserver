@@ -455,10 +455,10 @@ class CylcReviewService:
         ):
             relpath = Path(dirpath).relative_to(Path(user_suite_dir_root
                                                      )).parts
-            if (len(relpath) > max_scan_depth):
-                continue
-            if any((relpath[x] == "_cylc_install" and relpath[x + 1] ==
-                    "source") for x in range(0, len(relpath) - 1)):
+            if (
+                (len(relpath) > max_scan_depth) or
+                WorkflowFiles.Install.DIRNAME in relpath
+            ):
                 continue
             yield (dirpath, dnames, fnames)
 

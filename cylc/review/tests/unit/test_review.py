@@ -21,6 +21,8 @@ import pytest
 from cylc.review.review import CylcReviewService
 from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
 
+from cylc.flow.workflow_files import WorkflowFiles
+
 param = pytest.param
 
 
@@ -149,9 +151,10 @@ def test_safe_walk_2(tmp_path):
     assert len(list(CylcReviewService.safe_walking(directory))) == depth + 1
 
     (tmp_path / "TestDirectory2").mkdir()  # 1
-    (tmp_path / "TestDirectory2/_cylc_install").mkdir()  # 2
-    (tmp_path / "TestDirectory2/_cylc_install/source").mkdir()  # 3
+    (tmp_path / "TestDirectory2" / WorkflowFiles.Install.DIRNAME).mkdir()  # 2
+    (tmp_path / "TestDirectory2" / WorkflowFiles.Install.DIRNAME /
+     "SHED").mkdir()  # 3
 
     assert (len(list(CylcReviewService.safe_walking(str(tmp_path /
                                                         "TestDirectory2"))))
-            == 2)
+            == 1)
