@@ -356,7 +356,7 @@ async def list_elements(
     return elements
 
 
-def get_quartiles(row, prop: str) -> list[float]:
+def get_quartiles(row, prop: str) -> list[int]:
     # Prevents null entries when there are too few
     # tasks for quartiles
     return [
