@@ -379,7 +379,11 @@ async def test_cat_log_timeout(workflow_run_dir, app, fast_sleep):
     assert 'error' not in responses[0]
 
 
-async def test_cat_log_truncates_end_in_tail_mode(workflow_run_dir, app, fast_sleep):
+async def test_cat_log_truncates_end_in_tail_mode(
+        workflow_run_dir,
+        app,
+        fast_sleep
+    ):
     """TAIL (from-start) mode should truncate the end when max_lines is hit."""
     (id_, log_dir) = workflow_run_dir
     log_file = log_dir / '01-start-01.log'
