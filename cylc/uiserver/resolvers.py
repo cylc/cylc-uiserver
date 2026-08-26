@@ -489,9 +489,7 @@ class Services:
 
                     # read in the log lines and add them to the buffer
                     line_count += 1
-                    # buffer.append(line)
-
-                    buffer.append(f"{line_count - 1}: {line}") # REMEMBER to revert this
+                    buffer.append(line)
 
                     if mode == TAIL_END and line_count - 1 == max_lines:
                         # we received exactly MAX_LINES lines -> the *start* of
