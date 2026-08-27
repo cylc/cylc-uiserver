@@ -163,8 +163,8 @@ class DataStoreMgr:
 
         # Start the ZMQ subscription (in its own thread) first so that
         # any scheduler deltas published while the entire workflow update
-        # (below) is in progress are not missed. These deltas wait,
-        # since _update_workflow_data() blocks until last_updated > 0.
+        # (below) is in progress are not missed. These deltas wait until
+        # _update_workflow_data() is done by looking for last_updated > 0.
         # (Might be options other than threads to achieve
         # non-blocking subscriptions, but this works.)
         self.executor.submit(
