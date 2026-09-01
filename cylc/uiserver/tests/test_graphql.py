@@ -23,7 +23,7 @@ import pytest
 from tornado.httpclient import HTTPClientError
 
 from cylc.flow.id import Tokens
-from cylc.uiserver.data_store_mgr import DataStoreMgr, ALL_DELTAS
+from cylc.uiserver.data_store_mgr import ALL_DELTAS
 
 
 @pytest.fixture
@@ -197,7 +197,7 @@ async def test_query(gql_query, dummy_workflow):
 
     # Test 'application/x-www-form-urlencoded'
     response_form = await gql_query(
-        *('cylc', f'graphql'),
+        *('cylc', 'graphql'),
         headers={'Content-Type': 'application/x-www-form-urlencoded'},
         body=urlencode({'query': query, 'pretty': True}),
     )
@@ -232,7 +232,7 @@ async def test_batch_query(gql_query, dummy_workflow):
     body = json.loads(response.body)
     assert body == [
         {
-            "id":1,
+            "id": 1,
             "data": {
                 "workflows": [
                     {
@@ -241,7 +241,7 @@ async def test_batch_query(gql_query, dummy_workflow):
                     }
                 ]
             },
-            "status":200
+            "status": 200
         }
     ]
 
@@ -431,7 +431,8 @@ async def test_subscription(gql_subscription, dummy_workflow):
 
 
 async def test_subscription_deltas(
-    cylc_uis, gql_subscription, make_all_delta):
+    cylc_uis, gql_subscription, make_all_delta
+):
     """Test deltas being processesed and recieved by a GraphQL subscription."""
 
     data_store_mgr = cylc_uis.data_store_mgr

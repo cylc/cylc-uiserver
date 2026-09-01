@@ -280,6 +280,13 @@ def patch_conf_files(monkeypatch: pytest.MonkeyPatch):
     )
 
 
+@pytest.fixture(autouse=True)
+def remove_data_store_sleep(monkeypatch):
+    monkeypatch.setattr(
+        'cylc.uiserver.data_store_mgr.time.sleep', lambda x: None
+    )
+
+
 @pytest.fixture
 def cylc_uis(jp_serverapp):
     """Return the UIS extension for the JupyterServer ServerApp."""
