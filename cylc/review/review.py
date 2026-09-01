@@ -459,6 +459,7 @@ class CylcReviewService:
                 (len(relpath) > max_scan_depth) or
                 WorkflowFiles.Install.DIRNAME in relpath
             ):
+                dnames[:] = []
                 continue
             yield (dirpath, dnames, fnames)
 
