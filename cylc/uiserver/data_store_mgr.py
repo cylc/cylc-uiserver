@@ -178,10 +178,12 @@ class DataStoreMgr:
         if w_id in self.w_subs:
             return
 
-        self.delta_queues[w_id] = {}
-
-        # Might be options other than threads to achieve
-        # non-blocking subscriptions, but this works.
+        # Start the ZMQ subscription (in its own thread) first so that
+        # any scheduler deltas published while the entire workflow update
+        # (below) is in progress are not missed. These deltas wait until
+        # _update_workflow_data() is done by looking for last_updated > 0.
+        # (Might be options other than threads to achieve
+        # non-blocking subscriptions, but this works.)
         self.executor.submit(
             self._start_subscription,
             w_id,
@@ -189,7 +191,13 @@ class DataStoreMgr:
             contact_data[CFF.HOST],
             contact_data[CFF.PUBLISH_PORT]
         )
+        # Populate the data store with the entire workflow state, setting
+        # last_updated > 0 so any queued deltas from step 1 can be applied.
         successful_updates = await self._entire_workflow_update(ids=[w_id])
+
+        # Only now clear the GraphQL subscribers' delta queues, so that they
+        # get a fresh "initial burst" snapshot of this up-to-date data store.
+        self.delta_queues[w_id] = {}
 
         if w_id not in successful_updates:
             # something went wrong, undo any changes to allow for subsequent
