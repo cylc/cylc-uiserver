@@ -52,6 +52,10 @@ from cylc.flow.data_store_mgr import WORKFLOW
 from cylc.flow.exceptions import CylcError
 from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
+from cylc.flow.scripts.cat_log import (
+    TAIL,
+    TAIL_END,
+)
 from cylc.flow.scripts.clean import CleanOptions, run
 from cylc.flow.util import natural_sort_key
 
@@ -374,15 +378,25 @@ class Services:
                 await queue.put(exc)
 
     @classmethod
-    async def cat_log(cls, id_: Tokens, app: 'CylcUIServer', info, file=None):
+    async def cat_log(
+        cls, id_: Tokens, app: 'CylcUIServer', info, file=None, mode=TAIL,
+        max_lines: Optional[int] = None,
+    ):
         """Calls `cat log`.
 
         Used for log subscriptions.
         """
+        # the maximum number of log lines to display before truncating
+        max_lines = max_lines or MAX_LINES
         cmd: List[str] = [
             'cylc',
             'cat-log',
-            '--mode=tail',
+            f'--mode={mode}',
+        ]
+        if mode == TAIL_END:
+            # this mode reads a fixed number of lines from the file
+            cmd.append(f'--tail-lines={max_lines}')
+        cmd += [
             '--prepend-path',
             id_.id,
         ]
@@ -448,15 +462,11 @@ class Services:
 
                 else:
                     # there *are* lines to read from the cat-log process
-                    if line_count > MAX_LINES:
-                        # we have read beyond the line count
+                    if mode == TAIL and line_count > max_lines:
+                        # we have read beyond the line count -> the *end* of
+                        # the file is truncated in tail (from-start) mode
                         yield {'lines': buffer}
-                        yield {
-                            'error': (
-                                'This file has been truncated because'
-                                f' it is over {MAX_LINES} lines long.'
-                            )
-                        }
+                        yield {'truncated': 'end'}
                         break
 
                     line = await queue.get()
@@ -480,6 +490,14 @@ class Services:
                     # read in the log lines and add them to the buffer
                     line_count += 1
                     buffer.append(line)
+
+                    if mode == TAIL_END and line_count - 1 == max_lines:
+                        # we received exactly MAX_LINES lines -> the *start* of
+                        # the file is (probably) truncated in tail-end mode
+                        yield {'lines': list(buffer)}
+                        buffer.clear()
+                        yield {'truncated': 'start'}
+
                     if len(buffer) >= 75:
                         yield {'lines': list(buffer)}
                         buffer.clear()
@@ -639,13 +657,17 @@ class Resolvers(BaseResolvers):
         info: 'GraphQLResolveInfo',
         _command: str,
         ids: List[Tokens],
-        file=None
+        file=None,
+        mode=TAIL,
+        max_lines: Optional[int] = None,
     ):
         async for ret in Services.cat_log(
             ids[0],
             self.app,
             info,
-            file
+            file,
+            mode,
+            max_lines,
         ):
             yield ret
 
@@ -701,6 +723,8 @@ async def stream_log(
     command='cat_log',
     id: str,  # noqa: required to match schema arg name
     file=None,
+    mode=TAIL,
+    max_lines=None,
     **kwargs: Any,
 ) -> AsyncGenerator[Any, None]:
     """Cat Log Resolver
@@ -717,6 +741,8 @@ async def stream_log(
         info,
         command,
         [tokens],
-        file
+        file,
+        mode,
+        max_lines,
     ):
         yield item

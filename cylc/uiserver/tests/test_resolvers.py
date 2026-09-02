@@ -33,6 +33,7 @@ else:
 from cylc.flow import CYLC_LOG
 from cylc.flow.exceptions import CylcError
 from cylc.flow.id import Tokens
+from cylc.flow.scripts.cat_log import TAIL, TAIL_END
 from cylc.flow.scripts.clean import CleanOptions
 from cylc.uiserver.resolvers import (
     ENOENT_MSG,
@@ -376,6 +377,100 @@ async def test_cat_log_timeout(workflow_run_dir, app, fast_sleep):
     assert len(responses) == 1
     assert responses[0]['connected'] is False
     assert 'error' not in responses[0]
+
+
+async def test_cat_log_truncates_end_in_tail_mode(
+    workflow_run_dir,
+    app,
+    fast_sleep
+):
+    """TAIL (from-start) mode should truncate the end when max_lines is hit."""
+    (id_, log_dir) = workflow_run_dir
+    log_file = log_dir / '01-start-01.log'
+    log_file.write_text('alpha\nbeta\ngamma\ndelta\n')
+
+    info = MagicMock()
+    info.root_value = 3
+    info.context = {'sub_statuses': {3: 'start'}}
+    workflow = Tokens(id_)
+
+    responses = []
+    async with timeout(10):
+        ret = services.cat_log(
+            workflow,
+            app,
+            info,
+            mode=TAIL,
+            max_lines=3,
+        )
+        async for response in ret:
+            responses.append(response)
+            if response.get('truncated') == 'end':
+                info.context['sub_statuses'][3] = 'stop'
+            await asyncio.sleep(0)
+
+    lines = [
+        line
+        for response in responses
+        for line in response.get('lines', [])
+    ]
+    truncated = [
+        response.get('truncated')
+        for response in responses
+        if response.get('truncated') is not None
+    ]
+
+    assert truncated == ['end']
+    assert len(lines) == 3
+    assert any('alpha' in line for line in lines)
+    assert any('beta' in line for line in lines)
+    assert any('gamma' in line for line in lines)
+
+
+async def test_cat_log_truncates_start_in_tail_end_mode(
+    workflow_run_dir, app, fast_sleep
+):
+    """TAIL_END mode should truncate the start when max_lines is hit."""
+    (id_, log_dir) = workflow_run_dir
+    log_file = log_dir / '01-start-01.log'
+    log_file.write_text('one\ntwo\nthree\nfour\nDONE\n')
+
+    info = MagicMock()
+    info.root_value = 4
+    info.context = {'sub_statuses': {4: 'start'}}
+    workflow = Tokens(id_)
+
+    responses = []
+    async with timeout(10):
+        ret = services.cat_log(
+            workflow,
+            app,
+            info,
+            mode=TAIL_END,
+            max_lines=3,
+        )
+        async for response in ret:
+            responses.append(response)
+            if response.get('truncated') == 'start':
+                info.context['sub_statuses'][4] = 'stop'
+            await asyncio.sleep(0)
+
+    lines = [
+        line
+        for response in responses
+        for line in response.get('lines', [])
+    ]
+    truncated = [
+        response.get('truncated')
+        for response in responses
+        if response.get('truncated') is not None
+    ]
+
+    assert truncated == ['start']
+    assert len(lines) == 3
+    assert any('three' in line for line in lines)
+    assert any('four' in line for line in lines)
+    assert any('DONE' in line for line in lines)
 
 
 @pytest.mark.parametrize(
