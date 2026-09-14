@@ -18,7 +18,9 @@ from io import BytesIO, StringIO
 import pytest
 
 from cylc.review.review import CylcReviewService
+from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
 
+from cylc.flow.workflow_files import WorkflowFiles
 
 param = pytest.param
 
@@ -131,3 +133,26 @@ def test_sort_workflows_plausible():
         '08-suites-page-2-2',
         '08-suites-page-2-1',
     ]
+
+
+# Tests the safe_walk function, ensures that it's automatically depth-limited
+# Also tests that access to _cylc_install/source is restricted
+def test_safe_walk_2(tmp_path):
+    directory = "TestDirectory"
+    (tmp_path / directory).mkdir()
+    for i in range(1, 10):
+        directory += "/" + str(i)
+        (tmp_path / directory).mkdir()
+
+    depth = glbl_cfg().get(['install', 'max depth'])
+    directory = str(tmp_path / r'TestDirectory')
+    assert len(list(CylcReviewService.safe_walking(directory))) == depth + 1
+
+    (tmp_path / "TestDirectory2").mkdir()  # 1
+    (tmp_path / "TestDirectory2" / WorkflowFiles.Install.DIRNAME).mkdir()  # 2
+    (tmp_path / "TestDirectory2" / WorkflowFiles.Install.DIRNAME /
+     "SHED").mkdir()  # 3
+
+    assert (len(list(CylcReviewService.safe_walking(str(tmp_path /
+                                                        "TestDirectory2"))))
+            == 1)
