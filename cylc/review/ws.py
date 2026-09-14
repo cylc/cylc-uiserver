@@ -54,7 +54,7 @@ def wsgi_app(service_cls, *args, **kwargs):
         cherrypy.engine.stop()
 
 
-def _ws_init(service_cls, port, service_root, *args, **kwargs):
+def _ws_init(service_cls, port, service_root, alt_home_dir, *args, **kwargs):
     """Start quick web service."""
     config = _configure(service_cls)
 
@@ -87,7 +87,11 @@ def _ws_init(service_cls, port, service_root, *args, **kwargs):
     root = '/'
     if service_root != '/':
         root = "/%s-%s/" % (service_root, service_cls.UTIL)
-    cherrypy.tree.mount(service_cls(*args, **kwargs), root, config)
+    cherrypy.tree.mount(
+        service_cls(alt_home_dir, *args, **kwargs),
+        root,
+        config
+    )
     try:
         cherrypy.engine.start()
         cherrypy.engine.block()
@@ -167,13 +171,15 @@ def get_util_home(*args):
 
 def get_review_service_config(
     port: 'Annotated[int, Ge(0)]' = 8042,
-    service_root: str = 'services/cylc'
+    service_root: str = 'services/cylc',
+    alt_home_dir: str | None = None,
 ) -> dict:
     """Get a configuration for Cylc Review as a service.
 
     Args:
         port: The port to make the Cylc Review service available on.
         service_root: Include web service name under root of URL.
+        alt_home_dir: An alternate home dir, duh.
 
     Returns:
         Dictionary of settings for Cylc Review to be run as a hub service.
@@ -184,6 +190,7 @@ def get_review_service_config(
             "cylc", "review", "start",
             f"--port={port}",
             f"--service-root={service_root}",
+            f"--alt-home-dir={alt_home_dir}",
         ],
         "url": f"http://0.0.0.0:{port}/",
     }
