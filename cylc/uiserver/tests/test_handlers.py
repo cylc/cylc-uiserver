@@ -32,7 +32,6 @@ from cylc.flow.network.graphql import (
 )
 from cylc.uiserver.authorise import AuthorizationMiddleware
 from cylc.uiserver.graphql.tornado import TornadoGraphQLHandler, ExecutionError
-from cylc.uiserver.graphql.tornado_ws import GRAPHQL_WS
 from cylc.uiserver.handlers import (
     SubscriptionHandler,
     UIServerGraphQLHandler,
@@ -327,7 +326,7 @@ class SubscriptionHandlerTest(AsyncHTTPTestCase):
     @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_websockets_subprotocol(self):
         handler = self._create_handler()
-        assert handler.select_subprotocol(subprotocols=[]) == GRAPHQL_WS
+        assert handler.select_subprotocol([]) == 'graphql-transport-ws'
 
     @pytest.mark.usefixtures("mock_authentication_yossarian")
     def test_websockets_check_origin_accepts_same_origin(self):
