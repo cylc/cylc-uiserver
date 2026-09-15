@@ -16,8 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """cylc review [start|stop]
 
-Start/stop ad-hoc Cylc Review web service server for browsing users' suite
-logs via an HTTP interface.
+A web service for viewing workflows.
+
+Start/stop ad-hoc Cylc Review web servicefor browsing users' workflows
+including task states and job logs.
 
 With no arguments, the status of the ad-hoc web service server is printed.
 """
