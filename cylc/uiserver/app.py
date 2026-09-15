@@ -79,6 +79,7 @@ from pathlib import (
     Path,
     PurePath,
 )
+from pprint import pformat
 import sys
 from textwrap import dedent
 from typing import (
@@ -95,19 +96,24 @@ from traitlets import (
     Dict,
     Float,
     Int,
-    Unicode,
     TraitError,
     TraitType,
     Undefined,
+    Unicode,
     default,
     validate,
 )
 from traitlets.config.loader import LazyConfigValue
 
+from cylc.flow import LOG as CYLC_LOG
 from cylc.flow.network.graphql import (
-    CylcExecutionContext, IgnoreFieldMiddleware
+    CylcExecutionContext,
+    IgnoreFieldMiddleware,
 )
-from cylc.uiserver import __file__ as uis_pkg
+from cylc.uiserver import (
+    __file__ as uis_pkg,
+    __version__,
+)
 from cylc.uiserver.authorise import (
     Authorization,
     AuthorizationMiddleware,
@@ -118,6 +124,7 @@ from cylc.uiserver.config_util import (
     get_conf_dir_hierarchy,
 )
 from cylc.uiserver.data_store_mgr import DataStoreMgr
+from cylc.uiserver.graphql.tornado_ws import TornadoSubscriptionServer
 from cylc.uiserver.handlers import (
     CylcStaticHandler,
     CylcVersionHandler,
@@ -128,7 +135,6 @@ from cylc.uiserver.handlers import (
 from cylc.uiserver.profilers import get_profiler
 from cylc.uiserver.resolvers import Resolvers
 from cylc.uiserver.schema import schema
-from cylc.uiserver.graphql.tornado_ws import TornadoSubscriptionServer
 from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
@@ -503,13 +509,18 @@ class CylcUIServer(ExtensionApp):
         super().initialize_settings()
 
         # startup messages
-        self.log.info("Starting Cylc UI Server")
-        self.log.info(f'Serving UI from: {self.ui_path}')
+        self.log.info(f"Starting Cylc UI Server {__version__}")
+        self.log.info(f"Serving UI from: {self.ui_path}")
+
+        try:
+            for logger in (self.log, CYLC_LOG):
+                logger.setLevel(self.log_level)
+        except Exception as exc:
+            self.log.warning(exc)
+
         self.log.debug(
-            'CylcUIServer config:\n' + '\n'.join(
-                f'  * {key} = {repr(value)}'
-                for key, value in self.config['CylcUIServer'].items()
-            )
+            "CylcUIServer config:\n"
+            f"{pformat(self.config.CylcUIServer, indent=2)}"
         )
 
         profiler_cls = get_profiler(self.profile)
