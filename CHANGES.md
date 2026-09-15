@@ -16,6 +16,8 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 ### 🔧 Fixes
 
+[#877](https://github.com/cylc/cylc-uiserver/pull/877) - Cylc Review: limit the depth of scanning for workflows to avoid performance problems.
+
 [#862](https://github.com/cylc/cylc-uiserver/pull/862) - Fixed a bug causing some workflows to show as stopped in the GUI after a restart.
 
 ## cylc-uiserver-1.9.3 (Released 2026-06-30)
