@@ -12,6 +12,12 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.9.4 (Released 2026-09-15)
+
+### 🔧 Fixes
+
+[#862](https://github.com/cylc/cylc-uiserver/pull/862) - Fixed a bug causing some workflows to show as stopped in the GUI after a restart.
+
 ## cylc-uiserver-1.9.3 (Released 2026-06-30)
 
 ### 🔧 Fixes
