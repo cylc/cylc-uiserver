@@ -35,6 +35,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 import json
+from packaging.specifiers import SpecifierSet
 from pathlib import Path
 import time
 from typing import (
@@ -621,7 +622,8 @@ class DataStoreMgr:
                 info.get('req_client')
                 and w_id in self.w_subs
                 # BACK COMPAT
-                and info.get(CFF.VERSION) >= '8.6.6'
+                and info.get(CFF.VERSION) in SpecifierSet(
+                    '>8.6.6', prereleases=True)
             )
         }
         results = await asyncio.gather(

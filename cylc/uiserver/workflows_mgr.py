@@ -26,6 +26,7 @@ import asyncio
 from contextlib import suppress
 from getpass import getuser
 import logging
+from packaging.specifiers import SpecifierSet
 from pathlib import Path
 import sys
 from time import time
@@ -290,7 +291,8 @@ class WorkflowsManager:
                 if (
                     wid in active_before
                     # BACK COMPAT
-                    and workflow.get(CFF.VERSION) >= '8.6.6'
+                    and workflow.get(CFF.VERSION) in SpecifierSet(
+                        '>8.6.6', prereleases=True)
                     # Ping/Pong test for socket/network state and workflow
                     # responsiveness.
                     and wid not in self.irresponsive

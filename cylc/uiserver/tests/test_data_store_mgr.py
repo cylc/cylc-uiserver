@@ -157,7 +157,7 @@ async def test_connections_checker(
     # Set the client used by our test workflow.
     data_store_mgr.workflows_mgr.workflows[w_id] = {
         'req_client': async_client,
-        CFF.VERSION: '8.6.6',
+        CFF.VERSION: '8.6.7',
     }
 
     # Call the connections checker method.

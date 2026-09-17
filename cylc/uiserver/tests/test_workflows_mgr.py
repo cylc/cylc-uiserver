@@ -239,7 +239,7 @@ async def test_workflow_state_change__killed(
         CFF.UUID: '42',
         CFF.PID: pid,
         CFF.HOST: host,
-        CFF.VERSION: '8.6.6',
+        CFF.VERSION: '8.6.7',
         'reqres_time': reqrespubsub_time,
         'pubsub_time': reqrespubsub_time,
     }
