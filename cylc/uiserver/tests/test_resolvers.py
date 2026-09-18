@@ -395,7 +395,7 @@ async def test_cat_log_truncates_end_in_tail_mode(
     workflow = Tokens(id_)
 
     responses = []
-    async with timeout(10):
+    async with asyncio.timeout(10):
         ret = services.cat_log(
             workflow,
             app,
@@ -441,7 +441,7 @@ async def test_cat_log_truncates_start_in_tail_end_mode(
     workflow = Tokens(id_)
 
     responses = []
-    async with timeout(10):
+    async with asyncio.timeout(10):
         ret = services.cat_log(
             workflow,
             app,
