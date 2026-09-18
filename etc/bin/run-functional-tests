@@ -21,7 +21,7 @@ usage() {
   cat <<eof
 Usage: run-functional-tests [...]
 
-Run the Cylc test battery, in <CYLC_REPO_DIR>/tests.
+Run the Cylc test battery, in cylc/review/.
 
 Options and arguments are appended to "prove -j \$NPROC -s -r \${@:-tests/f}".
 NPROC is the number of concurrent processes to run, which defaults to the
@@ -50,7 +50,7 @@ GitHub Actions to run tests, see .github/workflows for details.
 By default all tests are executed.  To run just a subset of them:
   * list individual tests or test directories to run on the command line
   * list individual tests or test directories to skip in \$CYLC_TEST_SKIP
-  List specific tests relative to \$CYLC_REPO_DIR (i.e. starting with "test/").
+  List specific tests relative to cylc/review/.
 Some platform-specific tests are automatically skipped, depending on platform.
 
 
@@ -153,7 +153,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # base dir
-cd "$(dirname "$0")/../.." || exit 1
+cd "$(dirname "$0")/../../cylc/review/" || exit 1
 export CYLC_REPO_DIR="${PWD}"
 
 export PLATFORMS

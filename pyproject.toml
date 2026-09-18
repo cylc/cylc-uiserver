@@ -51,7 +51,8 @@ doctest_optionflags = """
     ELLIPSIS
 """
 testpaths = [
-    'cylc/uiserver'
+    'cylc/uiserver',
+    'cylc/review',
 ]
 markers = [
     'integration: tests which run servers and try to connect to them'

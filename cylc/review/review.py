@@ -32,6 +32,7 @@ import os
 import pwd
 import re
 import shlex
+from socket import gethostname
 from sqlite3 import OperationalError
 import tarfile
 from tempfile import NamedTemporaryFile
@@ -41,6 +42,7 @@ from time import (
 )
 import traceback
 from urllib.parse import quote
+from pathlib import Path
 
 import cherrypy
 import jinja2
@@ -48,9 +50,9 @@ from jinja2 import select_autoescape
 import markupsafe
 
 from cylc.flow import __version__ as CYLC_VERSION
-from cylc.flow.hostuserutil import get_host
 from cylc.flow.task_state import TASK_STATUSES_ORDERED
 from cylc.flow.workflow_files import WorkflowFiles
+from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
 from cylc.review.review_dao import (
     TASK_STATUS_GROUPS,
     CylcReviewDAO,
@@ -109,9 +111,7 @@ class CylcReviewService:
         self.logo = os.path.basename(
             get_util_home("doc", "src", "cylc-logo.png"))
         self.title = self.TITLE
-        self.host_name = get_host()
-        if self.host_name and "." in self.host_name:
-            self.host_name = self.host_name.split(".", 1)[0]
+        self.host_name = gethostname()
         self.cylc_version = CYLC_VERSION
         # Autoescape markup to prevent code injection from user inputs.
         template_env = jinja2.Environment(
@@ -446,6 +446,23 @@ class CylcReviewService:
         except jinja2.TemplateError:
             traceback.print_exc()
 
+    # Filters out any os.walk results longer than max_scan_depth
+    @staticmethod
+    def safe_walking(user_suite_dir_root):
+        max_scan_depth = glbl_cfg().get(['install', 'max depth'])
+        for dirpath, dnames, fnames in os.walk(
+            user_suite_dir_root, followlinks=True
+        ):
+            relpath = Path(dirpath).relative_to(Path(user_suite_dir_root
+                                                     )).parts
+            if (
+                (len(relpath) > max_scan_depth) or
+                WorkflowFiles.Install.DIRNAME in relpath
+            ):
+                dnames[:] = []
+                continue
+            yield (dirpath, dnames, fnames)
+
     @cherrypy.expose
     def suites(
         self,
@@ -507,8 +524,8 @@ class CylcReviewService:
             "share",
             "work"
         ]
-        for dirpath, dnames, fnames in os.walk(
-            user_suite_dir_root, followlinks=True
+        for dirpath, dnames, fnames in self.safe_walking(
+            user_suite_dir_root
         ):
             if dirpath != user_suite_dir_root and (
                 any(name in dnames or name in fnames for name in sub_names)
