@@ -464,15 +464,16 @@ class Services:
                     if mode == TAIL and line_count > max_lines:
                         # we have read beyond the line count -> the *end* of
                         # the file is truncated in tail (from-start) mode
-                        yield {'lines': buffer}
-                        yield {'truncated': 'end'}
+                        yield {'lines': buffer, 'truncated': 'end'}
                         break
 
                     line = await queue.get()
 
                     if isinstance(line, Exception):
-                        yield {'lines': buffer}
-                        yield {'error': f"Error reading file: {line}"}
+                        yield {
+                            'lines': buffer,
+                            'error': f"Error reading file: {line}",
+                        }
                         app.log.warning(line)
                         break
 
@@ -493,9 +494,8 @@ class Services:
                     if mode == TAIL_END and line_count - 1 == max_lines:
                         # we received exactly MAX_LINES lines -> the *start* of
                         # the file is (probably) truncated in tail-end mode
-                        yield {'lines': list(buffer)}
+                        yield {'lines': list(buffer), 'truncated': 'start'}
                         buffer.clear()
-                        yield {'truncated': 'start'}
 
                     if len(buffer) >= 75:
                         yield {'lines': list(buffer)}
