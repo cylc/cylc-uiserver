@@ -27,7 +27,6 @@ from typing import (
     Any,
     Iterable,
     List,
-    Optional,
     Tuple,
 )
 
@@ -84,11 +83,11 @@ if TYPE_CHECKING:
 
 
 async def mutator(
-    root: Optional[Any],
+    root: Any | None,
     info: 'GraphQLResolveInfo',
     *,
     command: str,
-    workflows: Optional[List[str]] = None,
+    workflows: List[str] | None = None,
     **kwargs: Any
 ):
     """Call the resolver method that act on the workflow service
@@ -486,7 +485,7 @@ _JOB_STATUS_TO_STATE = {
 
 def _status_to_state(
     status: str
-) -> Tuple[Optional[int], Optional[int], Optional[bool]]:
+) -> Tuple[int | None, int | None, bool | None]:
     """Derive job state attributes from job status.
 
     The time_run cannot be derived from the status so is returned as a boolean.
@@ -522,9 +521,9 @@ def _status_to_state(
 
 
 def _state_to_status(
-    submit_status: Optional[int],
-    run_status: Optional[int],
-    time_run: Optional[str],
+    submit_status: int | None,
+    run_status: int | None,
+    time_run: str | None,
 ) -> str:
     """Derive job status from state attributes.
 
@@ -568,11 +567,11 @@ def _state_to_status(
 def run_jobs_query(
     conn: 'sqlite3.Connection',
     workflow: 'Tokens',
-    ids: 'Optional[Iterable[Tokens]]' = None,
-    exids: 'Optional[Iterable[Tokens]]' = None,
-    states: Optional[Iterable[str]] = None,
-    exstates: Optional[Iterable[str]] = None,
-    tasks: Optional[Iterable[str]] = None,
+    ids: 'Iterable[Tokens] | None' = None,
+    exids: 'Iterable[Tokens] | None' = None,
+    states: Iterable[str] | None = None,
+    exstates: Iterable[str] | None = None,
+    tasks: Iterable[str] | None = None,
 ) -> List[dict]:
     """Query jobs from the database.
 

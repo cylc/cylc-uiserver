@@ -40,7 +40,6 @@ from typing import (
     Dict,
     Iterable,
     List,
-    Optional,
     Tuple,
     Union,
 )
@@ -659,7 +658,7 @@ class Resolvers(BaseResolvers):
         ids: List[Tokens],
         file=None,
         mode=TAIL,
-        max_lines: Optional[int] = None,
+        max_lines: int | None = None,
     ):
         async for ret in Services.cat_log(
             ids[0],
@@ -704,7 +703,7 @@ def kill_process_tree(
 
 
 async def list_log_files(
-    root: Optional[Any],
+    root: Any | None,
     info: 'GraphQLResolveInfo',
     id: str,  # noqa: required to match schema arg name
 ):
@@ -717,7 +716,7 @@ async def list_log_files(
 
 
 async def stream_log(
-    root: Optional[Any],
+    root: Any | None,
     info: 'GraphQLResolveInfo',
     *,
     command='cat_log',
