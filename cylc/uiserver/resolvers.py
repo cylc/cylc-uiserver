@@ -380,7 +380,7 @@ class Services:
     @classmethod
     async def cat_log(
         cls, id_: Tokens, app: 'CylcUIServer', info, file=None, mode=TAIL,
-        max_lines: Optional[int] = None,
+        max_lines: int | None = None,
     ):
         """Calls `cat log`.
 
