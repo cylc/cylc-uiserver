@@ -925,12 +925,12 @@ class UISTask(Task):
                 List containing the first, second,
                 third and forth quartile run times.'''),
     )
-    min_peak_rss = graphene.Int()
+    min_peak_rss = graphene.Float()
     mean_peak_rss = graphene.Float()
-    max_peak_rss = graphene.Int()
+    max_peak_rss = graphene.Float()
     std_dev_peak_rss = graphene.Float()
     peak_rss_quartiles = graphene.List(
-        graphene.Int,
+        graphene.Float,
         description=sstrip('''
                 List containing the first, second,
                 third and forth quartile for Peak RSS.'''),
@@ -956,7 +956,7 @@ class UISJob(Job):
     total_time = graphene.Int()
     queue_time = graphene.Int()
     run_time = graphene.Int()
-    peak_rss = graphene.Int()
+    peak_rss = graphene.Float()
     cpu_time = graphene.Int()
 
 
