@@ -523,21 +523,7 @@ GROUP BY name, platform_name;
                 'mean_peak_rss': row["mean_peak_rss"],
                 'max_peak_rss': row["max_peak_rss"],
                 'std_dev_peak_rss': row["stddev_peak_rss"],
-                # Prevents null entries when there are too few
-                # tasks for quartiles
-                'peak_rss_quartiles': [
-                    row["peak_rss_quartile_1"],
-                    (
-                        row["peak_rss_quartile_1"]
-                        if row["peak_rss_quartile_2"] is None
-                        else row["peak_rss_quartile_2"]
-                    ),
-                    (
-                        row["peak_rss_quartile_1"]
-                        if row["peak_rss_quartile_3"] is None
-                        else row["peak_rss_quartile_3"]
-                    ),
-                ],
+                'peak_rss_quartiles': get_quartiles(row, 'peak_rss'),
                 # CPU time stats
                 'min_cpu_time': row["min_cpu_time"],
                 'mean_cpu_time': row["mean_cpu_time"],
@@ -546,19 +532,7 @@ GROUP BY name, platform_name;
                 'std_dev_cpu_time': row["stddev_cpu_time"],
                 # Prevents null entries when there are too few
                 # tasks for quartiles
-                'cpu_time_quartiles': [
-                    row["cpu_time_quartile_1"],
-                    (
-                        row["cpu_time_quartile_1"]
-                        if row["cpu_time_quartile_2"] is None
-                        else row["cpu_time_quartile_2"]
-                    ),
-                    (
-                        row["cpu_time_quartile_1"]
-                        if row["cpu_time_quartile_3"] is None
-                        else row["cpu_time_quartile_3"]
-                    ),
-                ],
+                'cpu_time_quartiles': get_quartiles(row, 'cpu_time'),
                 'count': row["n"],
             }
         )
