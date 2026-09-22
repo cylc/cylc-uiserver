@@ -621,7 +621,7 @@ class Services:
                     line_count += 1
                     buffer.append(line)
 
-                    if mode == TAIL_END and line_count - 1 == max_lines:
+                    if mode == TAIL_END and line_count == max_lines + 1:
                         # we received exactly MAX_LINES lines -> the *start* of
                         # the file is (probably) truncated in tail-end mode
                         yield {'lines': list(buffer), 'truncated': 'start'}
