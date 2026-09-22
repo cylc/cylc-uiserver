@@ -1,4 +1,5 @@
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -214,7 +215,6 @@ def mock_config(monkeypatch):
         conf = kwargs
 
     def _read(self):
-        nonlocal conf
         self.config = Config(conf)
 
     monkeypatch.setattr(
@@ -277,6 +277,13 @@ def patch_conf_files(monkeypatch: pytest.MonkeyPatch):
     """Auto-patches the CylcUIServer to prevent it loading config files."""
     monkeypatch.setattr(
         'cylc.uiserver.app.CylcUIServer.config_file_paths', []
+    )
+
+
+@pytest.fixture(autouse=True)
+def remove_data_store_sleep(monkeypatch):
+    monkeypatch.setattr(
+        'cylc.uiserver.data_store_mgr.time.sleep', lambda x: None
     )
 
 
@@ -424,14 +431,12 @@ def mock_glbl_cfg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """
     # TODO: modify Parsec so we can use StringIO rather than a temp file.
     def _mock_glbl_cfg(pypath: str, global_config: str) -> None:
-        nonlocal tmp_path, monkeypatch
         global_config_path = tmp_path / 'global.cylc'
         global_config_path.write_text(global_config)
         glbl_cfg = ParsecConfig(SPEC, validator=cylc_config_validate)
         glbl_cfg.loadcfg(global_config_path)
 
         def _inner(cached=False):
-            nonlocal glbl_cfg
             return glbl_cfg
 
         monkeypatch.setattr(pypath, _inner)

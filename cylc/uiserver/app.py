@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -449,7 +450,7 @@ class CylcUIServer(ExtensionApp):
             except IndexError:
                 raise Exception(
                     f'Could not find any UI builds in {build_dir}.'
-                )
+                ) from None
 
         ui_path = build_dir / version
         if (ui_path / 'index.html').exists():
