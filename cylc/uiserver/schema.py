@@ -88,7 +88,7 @@ async def mutator(
     info: 'GraphQLResolveInfo',
     *,
     command: str,
-    workflows: List[str] | None = None,
+    workflows: list[str] | None = None,
     **kwargs: Any
 ):
     """Call the resolver method that act on the workflow service
