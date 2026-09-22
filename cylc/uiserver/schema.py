@@ -562,7 +562,7 @@ _JOB_STATUS_TO_STATE = {
 
 def _status_to_state(
     status: str
-) -> Tuple[int | None, int | None, bool | None]:
+) -> tuple[int | None, int | None, bool | None]:
     """Derive job state attributes from job status.
 
     The time_run cannot be derived from the status so is returned as a boolean.
