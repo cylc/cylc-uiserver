@@ -84,7 +84,7 @@ if TYPE_CHECKING:
 
 
 async def mutator(
-    root: Any | None,
+    root: Any,
     info: 'GraphQLResolveInfo',
     *,
     command: str,

@@ -839,7 +839,7 @@ def kill_process_tree(
 
 
 async def list_log_files(
-    root: Any | None,
+    root: Any,
     info: 'GraphQLResolveInfo',
     id: str,  # noqa: required to match schema arg name
 ):
@@ -852,7 +852,7 @@ async def list_log_files(
 
 
 async def stream_log(
-    root: Any | None,
+    root: Any,
     info: 'GraphQLResolveInfo',
     *,
     command='cat_log',
