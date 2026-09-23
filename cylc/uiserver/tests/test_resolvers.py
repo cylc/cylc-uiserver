@@ -421,7 +421,7 @@ async def test_cat_log_truncates_end_in_tail_mode(
             await asyncio.sleep(0)
 
     lines = [
-        line
+        line.rstrip('\n')
         for response in responses
         for line in response.get('lines', [])
     ]
@@ -432,10 +432,7 @@ async def test_cat_log_truncates_end_in_tail_mode(
     ]
 
     assert truncated == ['end']
-    assert len(lines) == 3
-    assert any('alpha' in line for line in lines)
-    assert any('beta' in line for line in lines)
-    assert any('gamma' in line for line in lines)
+    assert lines == ['alpha', 'beta', 'gamma']
 
 
 async def test_cat_log_truncates_start_in_tail_end_mode(
@@ -467,7 +464,7 @@ async def test_cat_log_truncates_start_in_tail_end_mode(
             await asyncio.sleep(0)
 
     lines = [
-        line
+        line.rstrip('\n')
         for response in responses
         for line in response.get('lines', [])
     ]
@@ -478,10 +475,7 @@ async def test_cat_log_truncates_start_in_tail_end_mode(
     ]
 
     assert truncated == ['start']
-    assert len(lines) == 3
-    assert any('three' in line for line in lines)
-    assert any('four' in line for line in lines)
-    assert any('DONE' in line for line in lines)
+    assert lines == ['three', 'four', 'DONE']
 
 
 @pytest.mark.parametrize(
