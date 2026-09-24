@@ -576,14 +576,19 @@ class Services:
 
                     if proc.returncode is not None:
                         # process exited
-                        # -> pass any stderr text to the client
                         (_, stderr) = await proc.communicate()
-                        msg = process_cat_log_stderr(stderr) or (
-                            f"cylc cat-log exited {proc.returncode}"
-                        )
-                        yield {'error': msg}
+                        msg = process_cat_log_stderr(stderr)
+                        if proc.returncode != 0:
+                            # non-zero exit -> report the error to the client
+                            yield {
+                                'error': msg or (
+                                    f"cylc cat-log exited {proc.returncode}"
+                                )
+                            }
+                        elif msg:
+                            # clean exit but with stderr text -> surface it
+                            yield {'error': msg}
 
-                        # stop reading log lines
                         break
 
                     # sleep set at 1, which matches the `tail` default interval
