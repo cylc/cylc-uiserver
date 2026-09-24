@@ -27,7 +27,6 @@ from typing import (
     Any,
     Iterable,
     List,
-    Optional,
     Tuple,
 )
 
@@ -61,6 +60,7 @@ from cylc.flow.network.schema import (
 )
 from cylc.flow.pathutil import get_workflow_run_dir
 from cylc.flow.rundb import CylcWorkflowDAO
+from cylc.flow.scripts.cat_log import TAIL, TAIL_END
 from cylc.flow.task_state import (
     TASK_STATUS_FAILED,
     TASK_STATUS_RUNNING,
@@ -84,11 +84,11 @@ if TYPE_CHECKING:
 
 
 async def mutator(
-    root: Optional[Any],
+    root: Any,
     info: 'GraphQLResolveInfo',
     *,
     command: str,
-    workflows: Optional[List[str]] = None,
+    workflows: list[str] | None = None,
     **kwargs: Any
 ):
     """Call the resolver method that act on the workflow service
@@ -562,7 +562,7 @@ _JOB_STATUS_TO_STATE = {
 
 def _status_to_state(
     status: str
-) -> Tuple[Optional[int], Optional[int], Optional[bool]]:
+) -> tuple[int | None, int | None, bool | None]:
     """Derive job state attributes from job status.
 
     The time_run cannot be derived from the status so is returned as a boolean.
@@ -598,9 +598,9 @@ def _status_to_state(
 
 
 def _state_to_status(
-    submit_status: Optional[int],
-    run_status: Optional[int],
-    time_run: Optional[str],
+    submit_status: int | None,
+    run_status: int | None,
+    time_run: str | None,
 ) -> str:
     """Derive job status from state attributes.
 
@@ -644,11 +644,11 @@ def _state_to_status(
 def run_jobs_query(
     conn: 'sqlite3.Connection',
     workflow: 'Tokens',
-    ids: 'Optional[Iterable[Tokens]]' = None,
-    exids: 'Optional[Iterable[Tokens]]' = None,
-    states: Optional[Iterable[str]] = None,
-    exstates: Optional[Iterable[str]] = None,
-    tasks: Optional[Iterable[str]] = None,
+    ids: 'Iterable[Tokens] | None' = None,
+    exids: 'Iterable[Tokens] | None' = None,
+    states: Iterable[str] | None = None,
+    exstates: Iterable[str] | None = None,
+    tasks: Iterable[str] | None = None,
 ) -> List[dict]:
     """Query jobs from the database.
 
@@ -952,6 +952,13 @@ class UISSubscriptions(Subscriptions):
         connected = graphene.Boolean()
         path = graphene.String()
         error = graphene.String()
+        truncated = graphene.String(
+            description=(
+                'Set at the point in the stream where the file has been'
+                ' truncated: "start" (earlier lines omitted) or "end"'
+                ' (later lines omitted).'
+            ),
+        )
 
     logs = graphene.Field(
         Logs,
@@ -965,6 +972,25 @@ class UISSubscriptions(Subscriptions):
             graphene.String,
             required=False,
             description='File name of job log to fetch, e.g. job.out'
+        ),
+        mode=graphene.Argument(
+            graphene.String,
+            required=False,
+            default_value=TAIL,
+            description=(
+                'Log view mode: '
+                f'"{TAIL}" (follow from the start of the file) or '
+                f'"{TAIL_END}" (follow the last lines from the end of the '
+                'file).'
+            ),
+        ),
+        max_lines=graphene.Argument(
+            graphene.Int,
+            required=False,
+            description=(
+                'The maximum number of log lines to display before'
+                ' truncating the file.'
+            ),
         ),
         resolver=identity_resolve
     )
