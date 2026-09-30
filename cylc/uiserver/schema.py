@@ -433,22 +433,18 @@ async def list_elements(
     return elements
 
 
-def get_quartiles(row, prop: str) -> list[int]:
-    # Prevents null entries when there are too few
-    # tasks for quartiles
-    return [
-        row[f"{prop}_quartile_1"],
-        (
-            row[f"{prop}_quartile_1"]
-            if row[f"{prop}_quartile_2"] is None
-            else row[f"{prop}_quartile_2"]
-        ),
-        (
-            row[f"{prop}_quartile_1"]
-            if row[f"{prop}_quartile_3"] is None
-            else row[f"{prop}_quartile_3"]
-        ),
-    ]
+def get_quartiles(row, prop: str) -> List[Optional[float]]:
+    """Return the [Q1, Q2, Q3] values of a property for a task.
+
+    Any quartile which could not be calculated (e.g. because there were too
+    few jobs) falls back to the first quartile which could be calculated.
+    This prevents null entries being returned when there is data available.
+    """
+    quartiles = [row[f"{prop}_quartile_{index}"] for index in (1, 2, 3)]
+    fallback = next(
+        (value for value in quartiles if value is not None), None
+    )
+    return [fallback if value is None else value for value in quartiles]
 
 
 def run_task_query(conn, workflow):
@@ -487,15 +483,19 @@ time_stats AS (
     run_time,
     total_time,
     mem_alloc,
-    NTILE(4) OVER (PARTITION BY name ORDER BY queue_time)
-    AS queue_time_quartile,
-    NTILE(4) OVER (PARTITION BY name ORDER BY run_time)
-    AS run_time_quartile,
-    NTILE(4) OVER (PARTITION BY name ORDER BY total_time)
-    AS total_time_quartile,
-    NTILE(4) OVER (PARTITION BY name ORDER BY peak_rss) AS peak_rss_quartile,
+    -- Note: rows where the value is NULL are put in their own
+    -- partition so that they do not use up quartiles of the real data.
+    NTILE(4) OVER (PARTITION BY name, queue_time IS NULL ORDER BY queue_time
+    ) AS queue_time_quartile,
+    NTILE(4) OVER (PARTITION BY name, run_time IS NULL ORDER BY run_time
+    ) AS run_time_quartile,
+    NTILE(4) OVER (PARTITION BY name, total_time IS NULL ORDER BY total_time
+    ) AS total_time_quartile,
+    NTILE(4) OVER (PARTITION BY name, peak_rss IS NULL ORDER BY peak_rss
+    ) AS peak_rss_quartile,
     peak_rss,
-    NTILE(4) OVER (PARTITION BY name ORDER BY cpu_time) AS cpu_time_quartile,
+    NTILE(4) OVER (PARTITION BY name, cpu_time IS NULL ORDER BY cpu_time
+    ) AS cpu_time_quartile,
     cpu_time
   FROM profiler_stats
 )
@@ -607,8 +607,6 @@ GROUP BY name, platform_name;
                 'max_cpu_time': row["max_cpu_time"],
                 'total_cpu_time': row["total_cpu_time"],
                 'std_dev_cpu_time': row["stddev_cpu_time"],
-                # Prevents null entries when there are too few
-                # tasks for quartiles
                 'cpu_time_quartiles': get_quartiles(row, 'cpu_time'),
                 'count': row["n"],
             }
@@ -998,7 +996,7 @@ class UISTask(Task):
                 third and forth quartile for CPU time.'''),
     )
     total_of_totals = graphene.Int()
-    mem_alloc = graphene.Int()
+    mem_alloc = graphene.Float()
     count = graphene.Int()
 
 
