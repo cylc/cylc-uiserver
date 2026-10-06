@@ -27,7 +27,6 @@ from typing import (
     Any,
     Iterable,
     List,
-    Tuple,
 )
 
 import graphene

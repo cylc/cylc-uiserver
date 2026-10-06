@@ -521,14 +521,12 @@ class Services:
             'cylc',
             'cat-log',
             f'--mode={mode}',
+            '--prepend-path',
+            id_.id,
         ]
         if mode == TAIL_END:
             # this mode reads a fixed number of lines from the file
             cmd.append(f'--tail-lines={max_lines}')
-        cmd += [
-            '--prepend-path',
-            id_.id,
-        ]
         if file:
             cmd += ['-f', file]
         app.log.info(f'$ {" ".join(cmd)}')
