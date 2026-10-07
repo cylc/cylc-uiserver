@@ -39,7 +39,6 @@ from pathlib import Path
 import time
 from typing import (
     TYPE_CHECKING,
-    Dict,
     cast,
 )
 
@@ -49,6 +48,7 @@ from cylc.flow.data_store_mgr import (
     DELTAS_MAP,
     EDGES,
     WORKFLOW,
+    DataStoreBase,
     apply_delta,
     create_delta_store,
     generate_checksum,
@@ -75,6 +75,7 @@ if TYPE_CHECKING:
     from collections.abc import Container
 
     from cylc.flow.data_messages_pb2 import PbWorkflow
+    from cylc.uiserver.workflows_mgr import WorkflowsManager
 
 
 def log_call(fcn):
@@ -91,7 +92,7 @@ def log_call(fcn):
     return _inner
 
 
-class DataStoreMgr:
+class DataStoreMgr(DataStoreBase):
     """Manage the local data-store acquisition/updates for all workflows.
 
     Args:
@@ -116,14 +117,13 @@ class DataStoreMgr:
     PENDING_DELTA_CHECK_INTERVAL = 0.5
 
     def __init__(self, workflows_mgr, log, max_threads=10):
-        self.workflows_mgr = workflows_mgr
+        super().__init__()
+        self.workflows_mgr: WorkflowsManager = workflows_mgr
         self.log = log
-        self.data = {}
-        self.w_subs: Dict[str, WorkflowSubscriber] = {}
+        self.w_subs: dict[str, WorkflowSubscriber] = {}
         self.topics = {ALL_DELTAS.encode('utf-8'), b'shutdown'}
         self.loop = None
         self.executor = ThreadPoolExecutor(max_threads)
-        self.delta_queues = {}
 
     @log_call
     async def register_workflow(self, w_id: str, is_active: bool) -> None:
@@ -337,7 +337,7 @@ class DataStoreMgr:
             except Exception as exc:
                 self.log.exception(exc)
 
-    def _delta_store_to_queues(self, w_id, topic, delta):
+    def _delta_store_to_queues(self, w_id: str, topic: str, delta) -> None:
         # Queue delta for graphql subscription resolving
         if self.delta_queues[w_id]:
             delta_store = create_delta_store(delta, w_id)
@@ -404,9 +404,6 @@ class DataStoreMgr:
         Returns:
             Set of IDs for workflows that were successfully updated.
         """
-        if ids is None:
-            ids = []
-
         # Request new data
         req_time = time.time()
         req_method = 'pb_entire_workflow'
