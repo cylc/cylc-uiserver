@@ -468,8 +468,6 @@ class CylcUIServer(ExtensionApp):
             self.log,
             self.max_threads,
         )
-        # sub_status dictionary storing status of subscriptions
-        self.sub_statuses = {}
         self.resolvers = Resolvers(
             self,
             self.data_store_mgr,
@@ -576,7 +574,6 @@ class CylcUIServer(ExtensionApp):
                 {
                     'sub_server': self.subscription_server,
                     'resolvers': self.resolvers,
-                    'sub_statuses': self.sub_statuses
                 }
             ),
             (
