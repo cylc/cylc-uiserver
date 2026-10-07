@@ -203,3 +203,7 @@ known_first_party = ["cylc"]
 lines-after-imports = 2
 combine-as-imports = true
 force-sort-within-sections = true
+
+[tool.codespell]
+skip = '*.js,*.css'
+ignore-words-list = ["runN", "userA"]

@@ -292,7 +292,7 @@ class Authorization:
         allowed_operations = set()
         for item in items_to_check:
             permission = self.owner_auth_conf.get(item, "")
-            # Specifiying empty list equates to removing of all permissions.
+            # Specifying empty list equates to removing of all permissions.
             if permission == []:
                 raise_auth_config_exception("user")
             if isinstance(permission, str):
@@ -651,7 +651,7 @@ def get_list_of_mutations(control: bool = False) -> List[str]:
         # Broadcast is an ALL mutation
         list_of_mutations.remove("broadcast")
     else:
-        # 'read' is used soley for authorization and is not a UISMutation
+        # 'read' is used solely for authorization and is not a UISMutation
         list_of_mutations.append(Authorization.READ_OPERATION)
     return list_of_mutations
 

@@ -220,7 +220,7 @@ class GraphQLHandlersTest(AsyncHTTPTestCase):
         assert status_code == 400
         handler.schema.graphql_schema._validation_errors = []
 
-        # by-pass auth middleware
+        # bypass auth middleware
         h_kwargs['middleware'] = []
         doc['operationName'] = 'null'
         handler = self._create_handler(r_kwargs=r_kwargs, h_kwargs=h_kwargs)
