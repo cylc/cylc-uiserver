@@ -1,11 +1,124 @@
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 [build-system]
-# NOTE: `pip install build` to build with `python -m build`
 requires = [
-  "setuptools >= 40.9.0",
-  "wheel"
+  "setuptools >= 77.0.0",
 ]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "cylc-uiserver"
+authors = [
+    {name = "Earth Sciences New Zealand & British Crown (Met Office) & Contributors"},
+]
+description = "Cylc UI Server"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "GPL-3.0-or-later"
+license-files = ["COPYING", "CONTRIBUTING.md"]
+classifiers = [
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Operating System :: POSIX",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+dependencies = [
+    # NB: We have cylc-flow at the top to force it to install its transitive
+    # dependencies first. This way, if other dependencies (e.g. jupyterhub)
+    # don't pin versions, we will get whatever cylc-flow needs, and not the
+    # bleeding-edge version.
+    "cylc-flow==8.7.*",
+
+    "ansimarkup>=1.0.0",
+    "jupyter_server>=2.13.0",
+    "packaging",
+    "psutil",
+    "requests",
+    "tornado>=6.5.0",
+    "traitlets>=5.2.1",  # required for logging_config (5.2.0 had bugs)
+
+    # cylc review
+    "cherrypy",
+
+    # Transitive dependencies that we directly (lightly) use:
+    "pyzmq",
+    "graphene",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+hub = [
+    "jupyterhub>=4",
+]
+tests = [
+    "annotated_types",
+    "coverage>=5.0.0",
+    "flake8-broken-line>=0.3.0",
+    "flake8-bugbear>=21.0.0",
+    "flake8-builtins>=1.5.0",
+    "flake8-comprehensions>=3.5.0",
+    "flake8-debugger>=4.0.0",
+    "flake8-implicit-str-concat>=0.4",
+    "flake8-mutable>=1.2.0",
+    "flake8-simplify>=0.14.0; python_version<'3.14'",
+    "flake8-type-checking",
+    "flake8>=3.0.0",
+    "jupyter_server[test]",
+    "mypy>=0.900",
+    "pytest-cov>=2.8.0",
+    "pytest-tornasync>=0.5.0",
+    "pytest>=6",
+    "towncrier>=24.7.0",
+    "types-setuptools",
+    "types-requests>2",
+]
+all = ["cylc-uiserver[hub,tests]"]
+
+[project.scripts]
+# jupyter commands
+jupyter-cylc = "cylc.uiserver.scripts.gui:main"
+jupyter-cylchubapp = "cylc.uiserver.scripts.hubapp:main" #  hub
+
+[project.entry-points."cylc.command"]
+gui = "cylc.uiserver.scripts.gui:main"
+hub = "cylc.uiserver.scripts.hub:main"  # hub
+hubapp = "cylc.uiserver.scripts.hubapp:main"  # hub
+review = "cylc.review.scripts.review:main"
+
+[project.urls]
+Home = "https://cylc.org/"
+Source = "https://github.com/cylc/cylc-uiserver"
+Tracker = "https://github.com/cylc/cylc-uiserver/issues"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "cylc.uiserver.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["cylc*"]
+namespaces = true
 
 [tool.towncrier]
 directory = "changes.d"
