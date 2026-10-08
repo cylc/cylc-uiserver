@@ -1,0 +1,109 @@
+var e=new RegExp(`
+    (?=.)
+        (?:
+          (?:
+            ~
+            ([^/:
+~]+)
+            (/|$)
+          )
+          |^
+        )
+        (?:
+          (
+            (?!//)
+            [^:~
+/]+
+            (?:
+              (?:
+                /
+                [^:~
+/]+
+              )+
+            )?
+
+          )
+          (?:
+            :
+            ([^/:
+]+)
+          )?
+          (?:
+            (?:
+                //(?!/)
+            )?
+            (?:
+
+    //
+    ([^~/:
+]+)
+    (?:
+      :
+      ([^/:
+]+)
+    )?
+    (?:
+      /
+      (?:
+        ([^/:
+]+)
+        (?:
+          :
+          ([^/:
+]+)
+        )?
+        (?:
+          /
+          (?:
+            ([^/:
+]+)
+            (?:
+              :
+              ([^/:
+]+)
+            )?
+          )?
+        )?
+      )?
+    )?
+
+            )?
+          )?
+        )?
+        $
+`.replace(/[\s\n\r]/g,``)),t=new RegExp(`
+    ^
+        //
+        ([^~/:
+]+)
+        (?:
+          :
+          ([^/:
+]+)
+        )?
+        (?:
+          /
+          (?:
+            ([^/:
+]+)
+            (?:
+              :
+              ([^/:
+]+)
+            )?
+            (?:
+              /
+              (?:
+                ([^/:
+]+)
+                (?:
+                  :
+                  ([^/:
+]+)
+                )?
+              )?
+            )?
+          )?
+        )?
+    $
+`.replace(/[\s\n\r]/g,``)),n=/^(\d+|NN)$/;function r(e,{workflow:t,relative:n}={workflow:!0,relative:!0}){let r=[],i=``;return t&&(e.user&&r.push(`~${e.user}`),e.workflow&&r.push(e.workflow),i=r.join(`/`),r=[]),n&&e.cycle&&(r.push(e.cycle),e.task&&(r.push(e.task),e.job&&r.push(e.job)),i&&(i+=`//`),i+=r.join(`/`)),i}var i=class i{static KEYS=[`user`,`workflow`,`cycle`,`task`,`job`];constructor(n,r=!1){let i,a,o,s,c,l;if(n==null||(r&&(i=`//${n}`.match(t),i&&(a=void 0,o=void 0,s=i[1],c=i[3],l=i[5])),i||(i=n.match(e),i&&(a=i[1],o=i[3],s=i[5],c=i[7],l=i[9])),!i))throw Error(`Invalid ID ${n}`);this.user=a,this.workflow=o,this.cycle=s,this.task=c,this.job=l,this.namespace=void 0,this.edge=void 0,this.id=void 0,this.workflowID=void 0,this.relativeID=void 0,this.compute()}compute(){if(this.id=r(this),this.cycle&&this.cycle.startsWith(`$namespace|`))this.namespace=this.cycle.replace(`$namespace|`,``),this.cycle=void 0,this.task=void 0,this.job=void 0;else if(this.cycle&&this.cycle.startsWith(`$edge|`)){let[e,t]=this.id.replace(/.*\$edge\|/,``).split(`|`);this.edge=[new i(e,!0),new i(t,!0)],this.cycle=void 0,this.task=void 0,this.job=void 0}if(this.job&&!n.test(this.job))throw Error(`Invalid job ID: ${this.job}`);this.workflowID=r(this,{workflow:!0}),this.relativeID=r(this,{relative:!0})}set(e){if(e instanceof i)for(let t of i.KEYS)e[t]&&(this[t]=e[t]);else for(let[t,n]of Object.entries(e)){if(!i.KEYS.includes(t))throw Error(`Invalid key: ${t}`);if(typeof n!=`string`&&n!=null)throw Error(`Invalid type for value: ${n}`);this[t]=n??void 0}this.compute()}clone(e=null){let t=Object.create(Object.getPrototypeOf(this),Object.getOwnPropertyDescriptors(this));return e&&t.set(e),t}workflowHierarchy(){let e=[],t=[],n;for(let r of this.workflow.split(`/`))e.push(r),n=this.clone(),n.set({workflow:e.join(`/`),cycle:void 0,task:void 0,job:void 0}),t.push([r,n]);return t}lowestToken(){let e;for(let t=i.KEYS.length;t>=0;t--)if(e=i.KEYS[t],this[e])return e}tree(){let e=[];if(this.user){let t=new i(`~${this.user}`);if(e.push([`user`,this.user,t]),this.workflow){let n=this.workflow.split(`/`),r=n.pop();for(let r of n)t=t.workflow?t.clone({workflow:`${t.workflow}/${r}`}):t.clone({workflow:r}),e.push([`workflow-part`,r,t]);t=t.workflow?t.clone({workflow:`${t.workflow}/${r}`}):t.clone({workflow:r}),e.push([`workflow`,r,t]),this.cycle&&this.cycle[0]!==`$`&&(t=t.clone({cycle:this.cycle}),e.push([`cycle`,this.cycle,t]),this.task&&(t=t.clone({task:this.task}),e.push([`task`,this.task,t]),this.job&&(t=t.clone({job:this.job}),e.push([`job`,this.job,t]))))}}return e}static validate(e,t=!1){try{new i(e,t)}catch(e){return e.message}}};export{r as n,i as t};
