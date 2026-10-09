@@ -1,0 +1,1 @@
+import{a as e}from"./isSymbol-CmW3dkoN.js";import{i as t,o as n,t as r}from"./isLength-CAkTUbqi.js";function i(e){return e!=null&&r(e.length)&&!n(e)}function a(e){return function(t){return e(t)}}var o=t(e,`Set`);export{a as n,i as r,o as t};

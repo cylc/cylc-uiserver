@@ -1,1 +1,0 @@
-const o=new Intl.RelativeTimeFormat("en",{numeric:"auto"});function r(n){let t=(n-new Date)/1e3;for(const[a,e]of[["seconds",60],["minutes",60],["hours",24],["days",7],["weeks",4.34524],["months",12],["years",1/0]]){if(Math.abs(t)<e)return o.format(Math.round(t),a);t=t/e}}function i(n){return`${n.toISOString().slice(0,-5)}Z`}export{i as f,r as h};
