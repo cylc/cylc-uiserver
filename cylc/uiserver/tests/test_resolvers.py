@@ -106,7 +106,7 @@ def test_Services_anciliary_methods(func, message, expect):
             {'CYLC_VERSION': 'charm', 'CYLC_ENV_NAME': 'quark'},
             (True, r"Workflow\(s\) .*ed"),
             {'CYLC_VERSION': 'charm', 'CYLC_ENV_NAME': 'quark'},
-            id="cylc env not overriden if no version specified"
+            id="cylc env not overridden if no version specified"
         ),
     ]
 )
