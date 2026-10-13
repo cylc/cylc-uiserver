@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # THIS FILE IS PART OF THE CYLC WORKFLOW ENGINE.
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,8 +17,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """cylc review [start|stop]
 
-Start/stop ad-hoc Cylc Review web service server for browsing users' suite
-logs via an HTTP interface.
+A web service for viewing workflows.
+
+Start/stop ad-hoc Cylc Review web servicefor browsing users' workflows
+including task states and job logs.
 
 With no arguments, the status of the ad-hoc web service server is printed.
 """

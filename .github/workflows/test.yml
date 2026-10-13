@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Patch DNS
         uses: cylc/release-actions/patch-dns@v1
@@ -54,17 +54,14 @@ jobs:
             bash
             coreutils
 
-      - name: install cylc-flow
+      - name: Install Cylc components
         uses: cylc/release-actions/install-cylc-components@v1
         with:
           cylc_flow: true
           cylc_flow_opts: ''
+          local_source: '.[all]'
           # Required for coverage collection
           editable_installations: true
-
-      - name: install cylc-uiserver
-        run: |
-          pip install -e .[all]
 
       - name: Style test
         if: startsWith(matrix.os, 'ubuntu')
@@ -81,7 +78,7 @@ jobs:
       - name: Test
         run: pytest
 
-      - name: Cylc Review tests
+      - name: Cylc Review functional tests
         id: review_tests
         run: |
           CONF_PATH="$HOME/.cylc/flow/8"
@@ -135,13 +132,13 @@ jobs:
     timeout-minutes: 2
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download coverage artifacts
         uses: actions/download-artifact@v8
 
       - name: Codecov upload
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           name: ${{ github.workflow }}
           fail_ci_if_error: true

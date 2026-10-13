@@ -28,23 +28,26 @@ from asyncio.queues import QueueEmpty
 from contextlib import suppress
 from inspect import isawaitable
 import json
-from weakref import WeakSet
+from typing import TYPE_CHECKING
 
-from tornado.websocket import WebSocketClosedError
 from graphql import (
-    parse,
-    validate,
     ExecutionResult,
     GraphQLError,
     MiddlewareManager,
+    parse,
+    validate,
 )
 from graphql.pyutils import is_awaitable
+from tornado.websocket import WebSocketClosedError
 
 from cylc.flow.network.graphql import instantiate_middleware
 from cylc.flow.network.graphql_subscribe import subscribe
-
 from cylc.uiserver.authorise import AuthorizationMiddleware
 from cylc.uiserver.schema import SUB_RESOLVER_MAPPING
+
+
+if TYPE_CHECKING:
+    from cylc.uiserver.handlers import SubscriptionHandler
 
 
 NO_MSG_DELAY = 1.0
@@ -72,17 +75,13 @@ REQ_HEADER_INFO = {
 }
 
 
-class ConnectionClosedException(Exception):
-    pass
-
-
 class TornadoConnectionContext:
 
     def __init__(self, ws, request_context=None):
-        self.ws = ws
+        self.ws: SubscriptionHandler = ws
         self.operations = {}
         self.request_context = request_context
-        self.pending_tasks = WeakSet()
+        self.pending_tasks: set[asyncio.Task] = set()
 
     def has_operation(self, op_id):
         return op_id in self.operations
@@ -100,32 +99,15 @@ class TornadoConnectionContext:
             return
 
     async def receive(self):
-        try:
-            return self.ws.recv_nowait()
-        except WebSocketClosedError:
-            raise ConnectionClosedException()
-
-    async def send(self, data):
-        if self.ws.ws_connection and not self.ws.ws_connection.is_closing():
-            await self.ws.write_message(data)
-        else:
-            raise WebSocketClosedError
+        return self.ws.recv_nowait()
 
     @property
     def closed(self):
         return self.ws.close_code is not None
 
-    async def close(self, code):
-        ws_close = self.ws.close(code)
-        if ws_close is not None:
-            await ws_close
-
-    def remember_task(self, task):
+    def remember_task(self, task: asyncio.Task) -> None:
         self.pending_tasks.add(task)
-        # Clear completed tasks
-        self.pending_tasks -= WeakSet(
-            task for task in self.pending_tasks if task.done()
-        )
+        task.add_done_callback(self.pending_tasks.discard)
 
     async def unsubscribe(self, op_id):
         async_iterator = self._unsubscribe(op_id)
@@ -159,7 +141,6 @@ class TornadoSubscriptionServer:
     def __init__(
         self,
         schema,
-        keep_alive=True,
         loop=None,
         middleware=None,
         execution_context_class=None,
@@ -235,13 +216,13 @@ class TornadoSubscriptionServer:
         except Exception as e:
             await self.send_error(
                 connection_context, op_id, e, GQL_CONNECTION_ERROR)
-            await connection_context.close(1011)
+            await connection_context.ws.close(1011)
 
     async def on_connect(self, connection_context, payload):
         pass
 
     def on_connection_terminate(self, connection_context, op_id):
-        return connection_context.close(1011)
+        return connection_context.ws.close(1011)
 
     def get_graphql_params(self, connection_context, payload):
         # Create a new context object for each subscription,
@@ -291,20 +272,13 @@ class TornadoSubscriptionServer:
     async def _handle(self, ws, request_context=None):
         connection_context = TornadoConnectionContext(ws, request_context)
         await self.on_open(connection_context)
-        while True:
-            message = None
+        while not connection_context.closed:
             try:
-                if connection_context.closed:
-                    raise ConnectionClosedException()
                 message = await connection_context.receive()
             except QueueEmpty:
-                pass
-            except ConnectionClosedException:
-                break
-            if message:
-                await self.on_message(connection_context, message)
-            else:
                 await asyncio.sleep(NO_MSG_DELAY)
+            else:
+                await self.on_message(connection_context, message)
 
         await self.on_close(connection_context)
 
@@ -347,7 +321,7 @@ class TornadoSubscriptionServer:
     ):
         message = self.build_message(op_id, op_type, payload)
         try:
-            return await connection_context.send(message)
+            return await connection_context.ws.write_message(message)
         except WebSocketClosedError:
             resolvers = connection_context.request_context.get('resolvers')
             if resolvers is not None:

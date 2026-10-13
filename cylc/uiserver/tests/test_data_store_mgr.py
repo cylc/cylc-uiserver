@@ -1,4 +1,5 @@
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -28,11 +29,14 @@ from cylc.flow.workflow_files import ContactFileFields as CFF
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr, ALL_DELTAS
 
-from .conftest import AsyncClientFixture
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .conftest import AsyncClientFixture
 
 
 async def test_entire_workflow_update(
-    async_client: AsyncClientFixture,
+    async_client: 'AsyncClientFixture',
     data_store_mgr: DataStoreMgr,
     make_entire_workflow
 ):
@@ -63,7 +67,7 @@ async def test_entire_workflow_update(
 
 
 async def test_entire_workflow_update_ignores_timeout_message(
-    async_client: AsyncClientFixture,
+    async_client: 'AsyncClientFixture',
     data_store_mgr: DataStoreMgr
 ):
     """
@@ -90,7 +94,7 @@ async def test_entire_workflow_update_ignores_timeout_message(
 
 
 async def test_entire_workflow_update_gather_error(
-    async_client: AsyncClientFixture,
+    async_client: 'AsyncClientFixture',
     data_store_mgr: DataStoreMgr,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -122,11 +126,11 @@ async def test_entire_workflow_update_gather_error(
          'Failed to update entire local data-store of a workflow: x'),
     ]
     exc_info = caplog.records[1].exc_info
-    assert exc_info and exc_info[0] == ValueError
+    assert exc_info and exc_info[0] is ValueError
 
 
 async def test_entire_workflow_update__stopped_workflow(
-    async_client: AsyncClientFixture,
+    async_client: 'AsyncClientFixture',
     data_store_mgr: DataStoreMgr,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -285,7 +289,7 @@ async def test_workflow_connect_fail(
 
 
 async def test_update_workflow_data(
-    async_client: AsyncClientFixture,
+    async_client: 'AsyncClientFixture',
     data_store_mgr: DataStoreMgr,
     make_all_delta,
     threadsafe_loop,
@@ -304,7 +308,8 @@ async def test_update_workflow_data(
     # Create a delta that will force conciliation,
     # i.e. the running of ``_reconcile_update``.
     tp_id = w_tokens.duplicate(cycle='1', task='foo').id
-    all_updated_delta = make_all_delta(w_id, 'updated', tp_id, 'waiting', time())
+    all_updated_delta = make_all_delta(w_id,
+                                       'updated', tp_id, 'waiting', time())
     all_updated_delta.workflow.updated.status = 'running'
     all_updated_delta.workflow.reloaded = True
 
