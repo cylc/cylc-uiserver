@@ -126,6 +126,17 @@ jobs:
           path: coverage.xml
           retention-days: 4
 
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check spelling
+        uses: codespell-project/actions-codespell@v2
+        # If a false-positive is triggered, modify pyproject.toml [tool.codespell]
+
   codecov:
     needs: test
     runs-on: ubuntu-latest

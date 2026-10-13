@@ -523,7 +523,7 @@ class DataStoreMgr:
         """
         if is_active:
             # this will get overridden when we sync with the workflow
-            # set a sensible default here incase the sync takes a while
+            # set a sensible default here in case the sync takes a while
             return 'running'
         w_id = Tokens(w_id)['workflow']
         db_file = Path(get_workflow_srv_dir(w_id), WorkflowFiles.Service.DB)

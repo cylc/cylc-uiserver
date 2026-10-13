@@ -433,7 +433,7 @@ async def test_subscription(gql_subscription, dummy_workflow):
 async def test_subscription_deltas(
     cylc_uis, gql_subscription, make_all_delta
 ):
-    """Test deltas being processesed and recieved by a GraphQL subscription."""
+    """Test deltas being processesed and received by a GraphQL subscription."""
 
     data_store_mgr = cylc_uis.data_store_mgr
 
