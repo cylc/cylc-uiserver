@@ -63,6 +63,7 @@ below.
  - James Frost
  - Samuel Denton
  - Scott Owen James
+ - Mike Taves
  <!-- end-shortlog -->
 
 (All contributors are identifiable with email addresses in the git version

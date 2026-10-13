@@ -12,6 +12,26 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.10.0 (Released 2026-10-13)
+
+[Updated cylc-ui to 2.15.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🚀 Enhancements
+
+[#746](https://github.com/cylc/cylc-uiserver/pull/746) - Add support for the `cylc validate-reinstall` command.
+
+### 🔧 Fixes
+
+[#866](https://github.com/cylc/cylc-uiserver/pull/866) - Removed the `--force-remote` flag from Cylc UI `cat-log` calls so that the log view no longer forces remote file checking.
+
+## cylc-uiserver-1.9.4 (Released 2026-09-15)
+
+### 🔧 Fixes
+
+[#877](https://github.com/cylc/cylc-uiserver/pull/877) - Cylc Review: limit the depth of scanning for workflows to avoid performance problems.
+
+[#862](https://github.com/cylc/cylc-uiserver/pull/862) - Fixed a bug causing some workflows to show as stopped in the GUI after a restart.
+
 ## cylc-uiserver-1.9.3 (Released 2026-06-30)
 
 ### 🔧 Fixes
