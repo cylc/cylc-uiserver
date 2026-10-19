@@ -38,7 +38,7 @@ def test_rollover(tmp_path: Path, rotating_log_setup):
     """Check log file rotates on restart."""
     log_dir = tmp_path / 'log_dir'
     log_dir.mkdir(parents=True)
-    log_file = log_dir / 'log'
+    log_file = log_dir / 'foo-01.log'
     logger_name = f'test_{token_hex(3)}'
     logging_config = {
         'version': 1,
@@ -64,13 +64,13 @@ def test_rollover(tmp_path: Path, rotating_log_setup):
     # Traitlets may reconfigure logging several times; it should not rollover
     dictConfig(logging_config)
     logger.info('C')
-    assert set(os.listdir(log_dir)) == {'log'}
+    assert set(os.listdir(log_dir)) == {'foo-01.log'}
 
     # Simulate starting the application again, which should cause a rollover
     logging_util.log_started = False
     dictConfig(logging_config)
     logger.info('Z')
-    assert set(os.listdir(log_dir)) == {'log', 'log.1'}
+    assert set(os.listdir(log_dir)) == {'foo-01.log', 'foo-02.log'}
 
     assert log_file.read_text().splitlines() == ['Z']
-    assert (log_dir / 'log.1').read_text().splitlines() == ['A', 'B', 'C']
+    assert (log_dir / 'foo-02.log').read_text().splitlines() == ['A', 'B', 'C']

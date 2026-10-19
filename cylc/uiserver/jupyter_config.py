@@ -29,9 +29,9 @@ from cylc.uiserver.authorise import CylcAuthorizer
 
 
 LOG_PATH = USER_CONF_ROOT / 'log' / (
-    'log'
+    'uiserver-01.log'
     if (sys.argv[0].endswith('jupyter-cylc') or sys.argv[1] == 'gui')
-    else 'hubapp-log'
+    else 'hubapp-01.log'
 )
 
 
