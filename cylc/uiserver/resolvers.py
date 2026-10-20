@@ -576,12 +576,14 @@ class Services:
                         (_, stderr) = await proc.communicate()
                         msg = process_cat_log_stderr(stderr)
                         if proc.returncode != 0 or msg or line_count == 0:
-                            # a live-job tailer exiting 0 once the job has finished is
-                            # normal; only surface bad exits, stderr, or a clean exit that
-                            # produced no output at all
+                            # a live-job tailer exiting 0 once the job has
+                            # finished is normal; only surface bad exits,
+                            # stderr, or a clean exit that produced
+                            # no output at all
                             yield {
                                 'error': msg or (
-                                    f"cylc cat-log exited unexpectedly ({proc.returncode})"
+                                    f"cylc cat-log exited unexpectedly "
+                                    f"({proc.returncode})"
                                 )
                             }
                         break
