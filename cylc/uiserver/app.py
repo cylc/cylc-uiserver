@@ -122,6 +122,7 @@ from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.handlers import (
     CylcStaticHandler,
     CylcVersionHandler,
+    ShutdownHandler,
     SubscriptionHandler,
     UIServerGraphQLHandler,
     UserProfileHandler,
@@ -582,6 +583,11 @@ class CylcUIServer(ExtensionApp):
             (
                 'cylc/userprofile',
                 UserProfileHandler,
+                {'auth': self.authobj}
+            ),
+            (
+                'cylc/shutdown',
+                ShutdownHandler,
                 {'auth': self.authobj}
             ),
             (
