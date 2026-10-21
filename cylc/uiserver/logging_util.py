@@ -15,59 +15,61 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from contextlib import suppress
-from glob import glob
-import logging
-import os
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from typing import List
 
-from cylc.uiserver.app import USER_CONF_ROOT
+# Global var to track whether logging has been started before.
+# This is needed as Traitlets may reconfigure logging several times
+# within the lifetime of the application, which creates new instances
+# of the handler.
+log_started = False
 
 
-class RotatingUISFileHandler(logging.handlers.RotatingFileHandler):
-    """Rotate logs on ui-server restart"""
+class RotatingUISFileHandler(RotatingFileHandler):
+    """Rotate logs on ui-server restart or when reaching maxBytes."""
 
-    LOG_NAME_EXTENSION = "-uiserver.log"
+    def __init__(self, filename: str, *args, **kwargs):
+        global log_started
+        if log_started:
+            do_initial_rollover = False
+        else:
+            log_started = True
+            do_initial_rollover = Path(filename).is_file()
 
-    def __init__(self):
-        self.file_path = Path(USER_CONF_ROOT / "log").expanduser()
+        # Ensure the log directory exists:
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
-    def on_start(self):
-        """Set up logging"""
-        self.file_path.mkdir(parents=True, exist_ok=True)
-        self.delete_symlink()
-        self.update_log_archive()
-        self.setup_new_log()
+        super().__init__(filename, *args, **kwargs)
+        if do_initial_rollover:
+            self.doRollover()
 
-    def update_log_archive(self):
-        """Ensure log archive retains only 5 logs"""
-        log_files = sorted(glob(os.path.join(
-            self.file_path, f"[0-9]*{self.LOG_NAME_EXTENSION}")), reverse=True)
-        while len(log_files) > 4:
-            os.unlink(log_files.pop(0))
-        # rename logs, logs sent in descending order to prevent conflicts
-        self.rename_logs(log_files)
+        # BACK COMPAT: Remove any log files under old naming schemes
+        # to: 1.10.x
+        # remove at: 1.12
+        log_dir = Path(filename).parent
+        for old_log in log_dir.glob('[0-9][0-9]-uiserver.log'):
+            # old-style log files
+            with suppress(OSError):
+                old_log.unlink()
+        for old_log in (log_dir / 'log', *log_dir.glob('log.[0-9]')):
+            # old-style rotated filenames
+            with suppress(OSError):
+                old_log.unlink()
 
-    def rename_logs(self, log_files: List[str]):
-        """Increment the log number by one for each log"""
-        for file in log_files:
-            log_num = int(Path(file).name.partition('-')[0]) + 1
-            new_file_name = Path(
-                f"{self.file_path}/{log_num:02d}{self.LOG_NAME_EXTENSION}"
-            )
-            Path(file).rename(new_file_name)
+    def rotation_filename(self, default_name: str) -> str:
+        """Override the default naming scheme.
 
-    def delete_symlink(self):
-        """Deletes an existing log symlink."""
-        symlink_path = Path(self.file_path / 'log')
-        if symlink_path.exists() and symlink_path.is_symlink():
-            symlink_path.unlink()
-
-    def setup_new_log(self):
-        """Create log"""
-        log = Path(self.file_path / f'01{self.LOG_NAME_EXTENSION}')
-        log.touch()
-        symlink_path = Path(self.file_path / 'log')
-        with suppress(OSError):
-            symlink_path.symlink_to(log)
+        Args:
+            default_name: By default, RotatingFileHandler passes this in
+                as <base-file-path>.<num>
+        """
+        _path, _num = default_name.rsplit(".", 1)
+        path = Path(_path)
+        # The rotation num should be 1 higher to account for the fact that
+        # we include `-01` in the initial log file name
+        num = int(_num) + 1
+        return str(
+            path.parent
+            / f"{path.stem.removesuffix('-01')}-{num:02d}{path.suffix}"
+        )
