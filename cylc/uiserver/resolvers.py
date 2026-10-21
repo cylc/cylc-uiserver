@@ -1,4 +1,5 @@
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,11 +23,13 @@ from copy import deepcopy
 import errno
 from getpass import getuser
 import os
+import re
 import signal
 from subprocess import (
     DEVNULL,
     PIPE,
     Popen,
+    TimeoutExpired,
 )
 from textwrap import indent
 from time import time
@@ -52,6 +55,8 @@ from cylc.flow.id import Tokens
 from cylc.flow.network.resolvers import BaseResolvers
 from cylc.flow.scripts.clean import CleanOptions, run
 from cylc.flow.util import natural_sort_key
+
+from cylc.uiserver.utils import cast_non_null
 
 if TYPE_CHECKING:
     from concurrent.futures import Executor
@@ -152,6 +157,35 @@ def _build_cmd(cmd: List, args: Dict) -> List:
     return cmd
 
 
+def _rename_keys(
+    dictionary: dict[str, Any], substitutions: Iterable[tuple[str, str]]
+) -> dict[str, Any]:
+    """Rename dictionary keys.
+
+    Args:
+        dictionary: The dictionary to modify.
+        substitutions: `[(before, after)]` pairs of keys to rename.
+
+    Returns:
+        The provided dictionary post-modification.
+
+    Examples:
+        >>> _rename_keys({'a': 1, 'b': 2}, [('b', 'c')])
+        {'a': 1, 'c': 2}
+
+        >>> _rename_keys({'a': 1, 'b': 2}, [('b', 'c'), ('c', 'd')])
+        {'a': 1, 'd': 2}
+
+        >>> _rename_keys({'a': 1, 'b': 2}, [('x', 'y')])
+        {'a': 1, 'b': 2}
+
+    """
+    for before, after in substitutions:
+        if before in dictionary:
+            dictionary[after] = dictionary.pop(before)
+    return dictionary
+
+
 def process_cat_log_stderr(text: bytes) -> str:
     """Tidy up cylc cat-log stderr.
 
@@ -216,31 +250,34 @@ class Services:
     # log file stream lag
     CAT_LOG_SLEEP = 1
 
+    #  command timeout for commands which start schedulers
+    START_TIMEOUT = 120
+
     @staticmethod
     def _error(message: Union[Exception, str]):
         """Format error case response."""
-        return [
+        return (
             False,
             str(message)
-        ]
+        )
 
     @staticmethod
     def _return(message: str):
         """Format success case response."""
-        return [
+        return (
             True,
             message
-        ]
+        )
 
     @classmethod
     async def clean(
         cls,
+        workflows_mgr: 'WorkflowsManager',
         workflows: Iterable['Tokens'],
         args: dict,
-        workflows_mgr: 'WorkflowsManager',
         executor: 'Executor',
         log: 'Logger'
-    ):
+    ) -> tuple[bool, str]:
         """Calls `cylc clean`"""
         # Convert Schema options → cylc.flow.workflow_files.init_clean opts:
         opts = _schema_opts_to_api_opts(args, schema=CleanOptions)
@@ -273,25 +310,51 @@ class Services:
         cls,
         args: dict,
         workflows_mgr: 'WorkflowsManager',
-    ):
+    ) -> tuple[bool, str]:
         await workflows_mgr.scan()
         return cls._return("Scan requested")
 
     @classmethod
-    async def play(
+    async def run_command(
         cls,
+        command: Iterable[str],
         workflows: Iterable[Tokens],
         args: Dict[str, Any],
-        workflows_mgr: 'WorkflowsManager',
         log: 'Logger',
-    ) -> List[Union[bool, str]]:
-        """Calls `cylc play`."""
+        timeout: int,
+        success_msg: str = 'Command succeeded',
+        fail_msg: str = 'Command failed',
+    ) -> tuple[bool, str]:
+        """Calls the specified Cylc command.
+
+        Args:
+            command:
+                The Cylc subcommand to run.
+                e.g ["play"] or ["cat-log", "-m", "p"].
+            workflows:
+                The workflows to run this command against.
+            args:
+                CLI arguments to be provided to this command.
+                e.g {'color': 'never'} would result in "--color=never".
+            log:
+                The application log, used to record this command invocation.
+            timeout:
+                Length of time to wait for the command to complete.
+                The command will be killed if the timeout elapses.
+            success_msg:
+                Message to be used in the response if the command succeeds.
+            fail_msg:
+                Message to be used in the response if the command fails.
+
+        Returns:
+
+        """
         cylc_version = args.pop('cylc_version', None)
         results: Dict[str, str] = {}
         failed = False
         for tokens in workflows:
             try:
-                cmd = _build_cmd(['cylc', 'play', '--color=never'], args)
+                cmd = _build_cmd(['cylc', *command, '--color=never'], args)
 
                 if tokens['user'] and tokens['user'] != getuser():
                     return cls._error(
@@ -313,7 +376,7 @@ class Services:
                     env.pop('CYLC_ENV_NAME', None)
                     env['CYLC_VERSION'] = cylc_version
 
-                # run cylc play
+                # run command
                 proc = Popen(
                     cmd,
                     env=env,
@@ -322,11 +385,21 @@ class Services:
                     stderr=PIPE,
                     text=True
                 )
-                ret_code = proc.wait(timeout=120)
+
+                try:
+                    ret_code = proc.wait(timeout=timeout)
+                except TimeoutExpired as exc:
+                    proc.kill()
+                    ret_code = 124  # mimic `timeout` command error code
+                    # NOTE: preserve any stderr that the command produced this
+                    # far as this may help with debugging
+                    out, err = proc.communicate()
+                    err = str(exc) + (('\n' + err) if err else '')
+                else:
+                    out, err = proc.communicate()
 
                 if ret_code:
-                    msg = f"Command failed ({ret_code}): {cmd_repr}"
-                    out, err = proc.communicate()
+                    msg = f"{fail_msg} ({ret_code}): {cmd_repr}"
                     results[wflow] = err.strip() or out.strip() or msg
                     log.error(
                         f"{msg}\n"
@@ -335,7 +408,7 @@ class Services:
                     )
                     failed = True
                 else:
-                    results[wflow] = 'started'
+                    results[wflow] = success_msg
 
             except Exception as exc:  # unexpected error
                 log.exception(exc)
@@ -343,23 +416,92 @@ class Services:
 
         if failed:
             if len(results) == 1:
+                # all commands failed
                 return cls._error(results.popitem()[1])
-            # else log each workflow result on separate lines
+
+            # some commands failed
             return cls._error(
+                # log each workflow result on separate lines
                 "\n\n" + "\n\n".join(
                     f"{wflow}: {msg}" for wflow, msg in results.items()
                 )
             )
 
+        # all commands succeeded
+        return cls._return(f'Workflow(s) {success_msg}')
+
+    @classmethod
+    async def play(
+        cls,
+        workflows_mgr: 'WorkflowsManager',
+        workflows: Iterable[Tokens],
+        args: dict,
+        log,
+        **kwargs,
+    ) -> tuple[bool, str]:
+        """Calls `cylc play`."""
+        ret = await cls.run_command(
+            ('play',),
+            workflows,
+            args,
+            log,
+            cls.START_TIMEOUT,
+            **kwargs,
+            success_msg='started',
+        )
+
         # trigger a re-scan
         await workflows_mgr.scan()
-        # send a success message
-        return cls._return('Workflow(s) started')
+
+        # return results
+        return ret
+
+    @classmethod
+    async def validate_reinstall(
+        cls,
+        workflows_mgr: 'WorkflowsManager',
+        workflows: Iterable[Tokens],
+        args: dict,
+        log,
+        **kwargs,
+    ) -> tuple[bool, str]:
+        """Calls `cylc validate-reinstall`."""
+        ret = await cls.run_command(
+            ('validate-reinstall', '--yes'),
+            workflows,
+            # map GraphQL fields to CLI args where they differ
+            _rename_keys(args, [
+                # from "cylc reload":
+                ('reload_global', 'global'),
+                # from "cylc reinstall"
+                ('rose_opt_conf_keys', 'opt_conf_key'),
+                ('rose_suite_defines', 'define'),
+                ('rose_template_variables', 'rose_template_variable'),
+            ]),
+            log,
+            cls.START_TIMEOUT,
+            **kwargs,
+            success_msg='reinstalled',
+        )
+
+        # trigger a re-scan
+        await workflows_mgr.scan()
+
+        # return results
+        return ret
 
     @staticmethod
-    async def enqueue(stream, queue):
-        async for line in stream:
-            await queue.put(line.decode())
+    async def enqueue(
+        stream: asyncio.StreamReader, queue: asyncio.Queue[str | Exception]
+    ):
+        try:
+            async for line in stream:
+                await queue.put(line.decode())
+        except Exception as exc:
+            if re.match(r'Separator .+ chunk .+ limit', str(exc)):
+                await queue.put(ValueError('line too long'))
+            else:
+                await queue.put(exc)
 
     @classmethod
     async def cat_log(cls, id_: Tokens, app: 'CylcUIServer', info, file=None):
@@ -371,7 +513,6 @@ class Services:
             'cylc',
             'cat-log',
             '--mode=tail',
-            '--force-remote',
             '--prepend-path',
             id_.id,
         ]
@@ -382,15 +523,18 @@ class Services:
         # For info, below subprocess is safe (uses shell=false by default)
         proc = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
+            limit=200 * 1024,  # increase line limit to 200 kiB
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         buffer: List[str] = []
-        queue: asyncio.Queue = asyncio.Queue()
+        queue: asyncio.Queue[str | Exception] = asyncio.Queue()
         # Farm out reading from stdout stream to a background task
         # This is to get around problem where stream is not EOF until
         # subprocess ends
-        enqueue_task = asyncio.create_task(cls.enqueue(proc.stdout, queue))
+        enqueue_task = asyncio.create_task(
+            cls.enqueue(cast_non_null(proc.stdout), queue)
+        )
 
         # GraphQL operation ID
         op_id = info.root_value
@@ -445,18 +589,25 @@ class Services:
                         }
                         break
 
-                    elif line_count == 0:
+                    line = await queue.get()
+
+                    if isinstance(line, Exception):
+                        yield {'lines': buffer}
+                        yield {'error': f"Error reading file: {line}"}
+                        app.log.warning(line)
+                        break
+
+                    if line_count == 0:
                         # this is the first line
                         # (this is a special line contains the file path)
                         line_count += 1
                         yield {
                             'connected': True,
-                            'path': (await queue.get())[2:].strip(),
+                            'path': line[2:].strip(),
                         }
                         continue
 
                     # read in the log lines and add them to the buffer
-                    line = await queue.get()
                     line_count += 1
                     buffer.append(line)
                     if len(buffer) >= 75:
@@ -488,7 +639,7 @@ class Services:
         This uses the Cylc cat-log interface, list dir mode, forcing remote
         file checking.
         """
-        cmd: List[str] = ['cylc', 'cat-log', '-m', 'l', '-o', id_.id]
+        cmd: List[str] = ['cylc', 'cat-log', '-m', 'l', id_.id]
         log.debug(f"$ {' '.join(cmd)}")
         proc_job = await asyncio.subprocess.create_subprocess_exec(
             *cmd,
@@ -581,8 +732,7 @@ class Resolvers(BaseResolvers):
         command: str,
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any],
-    ) -> List[Union[bool, str]]:
-
+    ) -> tuple[bool, str]:
         # GraphQL v3 includes all variables that are set, even if set to null.
         kwargs = {
             k: v
@@ -592,18 +742,25 @@ class Resolvers(BaseResolvers):
 
         if command == 'clean':  # noqa: SIM116
             return await Services.clean(
+                self.workflows_mgr,
                 workflows,
                 kwargs,
-                self.workflows_mgr,
                 log=self.log,
                 executor=self.executor
             )
-        elif command == 'play':
+        elif command == 'play':  # noqa: SIM116
             return await Services.play(
+                self.workflows_mgr,
                 workflows,
                 kwargs,
-                self.workflows_mgr,
                 log=self.log
+            )
+        elif command == 'validate_reinstall':
+            return await Services.validate_reinstall(
+                self.workflows_mgr,
+                workflows,
+                kwargs,
+                log=self.log,
             )
         elif command == 'scan':
             return await Services.scan(

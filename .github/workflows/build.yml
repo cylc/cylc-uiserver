@@ -9,7 +9,6 @@ on:
       - 'README.md'       # check markdown is valid
       - 'MANIFEST.in'     # check packaging
       - 'pyproject.toml'  # check build config
-      - 'setup.cfg'       # check deps and project config
       - '.gitignore'
       - '.github/workflows/build.yml'
 
@@ -35,10 +34,10 @@ jobs:
         python: ['3.12', '3']  # oldest/newest supported versions
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Python
-        uses: mamba-org/setup-micromamba@v2
+        uses: mamba-org/setup-micromamba@v3
         with:
           cache-environment: true
           post-cleanup: 'all'
@@ -58,3 +57,6 @@ jobs:
           grep -E 'cylc_uiserver.*.dist-info/.*COPYING' files
           grep 'cylc/uiserver/py.typed' files
           grep 'cylc/uiserver/ui' files
+          grep 'cylc/review/static/css/.*\.css' files
+          grep 'cylc/review/static/js/.*\.js' files
+          grep 'cylc/review/template/index.html' files

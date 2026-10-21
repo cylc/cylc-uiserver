@@ -1,4 +1,5 @@
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,15 +30,13 @@ omit =
     venv/*
     cylc/uiserver/tests/*
     cylc/uiserver/jupyter*_config.py
+    cylc/review/tests/*
 parallel = True
-plugins=
-include=
-    cylc/uiserver/*
 timid = False
+source = ./cylc
 
 
 [report]
-
 exclude_lines =
     pragma: no cover
     def __repr__
@@ -61,19 +60,19 @@ omit =
     venv/*
     cylc/uiserver/tests/*
     cylc/uiserver/jupyter*_config.py
+    cylc/review/tests/*
 precision=2
 show_missing=False
 skip_covered=False
 sort=Name
 
-[html]
 
+[html]
 directory=htmlcov
 extra_css=
 title=
 
 
 [xml]
-
 output=coverage.xml
 package_depth=99

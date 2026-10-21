@@ -1,0 +1,1 @@
+var e=(e,t)=>e.toLowerCase().localeCompare(t.toLowerCase(),void 0,{numeric:!0,sensitivity:`base`});function t(t,n,r=e=>e,i={}){if(t.length===0)return 0;let a=i.comparator||((t,n,r,i)=>e(n,i)),o=0,s=t.length,c=r(n);for(;o<s;){let e=Math.floor((o+s)/2),l=r(t[e]),u=a(n,c,t[e],l);i.reverse&&(u*=-1),u>0?o=e+1:s=e}return s}export{t as n,e as t};

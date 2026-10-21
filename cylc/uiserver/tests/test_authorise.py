@@ -1,4 +1,5 @@
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,6 +41,8 @@ CONTROL_OPS = [
     "pause",
     "play",
     "poll",
+    "reinstall_reload",
+    "reinstall_restart",
     "release",
     "release_hold_point",
     "reload",
@@ -55,28 +58,9 @@ CONTROL_OPS = [
 ]
 
 ALL_OPS = [
-    "clean",
+    *CONTROL_OPS,
     "read",
     "broadcast",
-    "ext_trigger",
-    "hold",
-    "kill",
-    "message",
-    "pause",
-    "play",
-    "poll",
-    "release",
-    "release_hold_point",
-    "reload",
-    "remove",
-    "resume",
-    "scan",
-    "set",
-    "set_graph_window_extent",
-    "set_hold_point",
-    "set_verbosity",
-    "stop",
-    "trigger",
 ]
 
 FAKE_SITE_CONF = {
@@ -151,9 +135,10 @@ FAKE_USER_CONF = {
                 "release_hold_point",
                 "ext_trigger",
                 "pause",
-                "pause",
                 "set",
                 "release",
+                "reinstall_reload",
+                "reinstall_restart",
             },
             id="user in * and groups, owner in * and groups",
         ),
@@ -441,7 +426,7 @@ def test_case_conversion(caplog):
     assert not auth_obj.is_permitted('other', 'Release_Hold_Point')
 
     # calls should be logged
-    # (successfull call)
+    # (successful call)
     caplog.clear()
     assert auth_obj.is_permitted('other', 'release_hold_point')
     assert caplog.messages[-1] == 'other: authorized to release_hold_point'

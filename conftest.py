@@ -1,4 +1,5 @@
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -12,6 +13,13 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 pytest_plugins = [
     'jupyter_server.pytest_plugin'
@@ -28,9 +36,9 @@ ignore_collect = [
 ]
 
 
-def pytest_ignore_collect(path):
+def pytest_ignore_collect(collection_path: 'Path'):
     # --doctest-modules seems to ignore the value if configured in pyproject
     return any(
-        ignore_path in str(path)
+        ignore_path in str(collection_path)
         for ignore_path in ignore_collect
     )

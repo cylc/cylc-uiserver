@@ -12,6 +12,76 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.10.0 (Released 2026-10-13)
+
+[Updated cylc-ui to 2.15.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🚀 Enhancements
+
+[#746](https://github.com/cylc/cylc-uiserver/pull/746) - Add support for the `cylc validate-reinstall` command.
+
+### 🔧 Fixes
+
+[#866](https://github.com/cylc/cylc-uiserver/pull/866) - Removed the `--force-remote` flag from Cylc UI `cat-log` calls so that the log view no longer forces remote file checking.
+
+## cylc-uiserver-1.9.4 (Released 2026-09-15)
+
+### 🔧 Fixes
+
+[#877](https://github.com/cylc/cylc-uiserver/pull/877) - Cylc Review: limit the depth of scanning for workflows to avoid performance problems.
+
+[#862](https://github.com/cylc/cylc-uiserver/pull/862) - Fixed a bug causing some workflows to show as stopped in the GUI after a restart.
+
+## cylc-uiserver-1.9.3 (Released 2026-06-30)
+
+### 🔧 Fixes
+
+[#847](https://github.com/cylc/cylc-uiserver/pull/847) - Cylc Review: fixed a bug where a newly-installed workflow would be stuck with an error banner incorrectly mentioning Cylc 8.0.x.
+
+[#853](https://github.com/cylc/cylc-uiserver/pull/853) - Fix workflow sort order in Cylc Review.
+
+[#856](https://github.com/cylc/cylc-uiserver/pull/856) - Fixed detection of workflows that were restarted after having crashed.
+
+## cylc-uiserver-1.9.2 (Released 2026-06-18)
+
+### 🔧 Fixes
+
+[#832](https://github.com/cylc/cylc-uiserver/pull/832) - Fix a traceback in Cylc Review which could occur on the "task jobs" page.
+
+## cylc-uiserver-1.9.1 (Released 2026-05-22)
+
+### 🔧 Fixes
+
+[#824](https://github.com/cylc/cylc-uiserver/pull/824) - Fixed files missing from the package, needed for Cylc Review.
+
+## cylc-uiserver-1.9.0 (Released 2026-05-13)
+
+[Updated cylc-ui to 2.14.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🚀 Enhancements
+
+[#755](https://github.com/cylc/cylc-uiserver/pull/755) - Cylc Review converted to Python 3 and added to Cylc UIServer bundle.
+
+## cylc-uiserver-1.8.4 (Released 2026-02-24)
+
+[Updated cylc-ui to 2.13.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🔧 Fixes
+
+[#752](https://github.com/cylc/cylc-uiserver/pull/752) - Improved handling of very long lines in `cat-log` / the UI log view.
+
+## cylc-uiserver-1.8.3 (Released 2026-01-12)
+
+[Updated cylc-ui to 2.12.2](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+## cylc-uiserver-1.8.2 (Released 2026-01-08)
+
+[Updated cylc-ui to 2.12.1](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🔧 Fixes
+
+[#761](https://github.com/cylc/cylc-uiserver/pull/761) - Fixed a bug causing "unknown" status and delay to data appearing on workflow startup.
+
 ## cylc-uiserver-1.8.1 (Released 2025-11-27)
 
 [Updated cylc-ui to 2.11.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)

@@ -1,0 +1,1 @@
+import{$ as e,dt as t}from"./runtime-core.esm-bundler-CilEyzAc.js";var n={type:Object,required:!1,default:()=>({})},r=`update:initialOptions`;function i(n,{props:i,emit:a},o){let s=t(i.initialOptions[n]??o);return e(s,(e,t)=>a(r,{...i.initialOptions,[n]:e}),{deep:!0}),s}export{r as n,i as r,n as t};

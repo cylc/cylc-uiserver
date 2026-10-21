@@ -1,4 +1,5 @@
-# Copyright (C) NIWA & British Crown (Met Office) & Contributors.
+# Copyright (C) Earth Sciences New Zealand & British Crown (Met Office)
+# & Contributors.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,7 +41,6 @@ from cylc.flow.data_messages_pb2 import (  # type: ignore
 )
 from cylc.flow.data_store_mgr import generate_checksum
 from cylc.flow.network.client import WorkflowRuntimeClient
-from cylc.flow.workflow_files import ContactFileFields as CFF
 
 from cylc.uiserver.data_store_mgr import DataStoreMgr
 from cylc.uiserver.workflows_mgr import WorkflowsManager
@@ -215,7 +215,6 @@ def mock_config(monkeypatch):
         conf = kwargs
 
     def _read(self):
-        nonlocal conf
         self.config = Config(conf)
 
     monkeypatch.setattr(
@@ -278,6 +277,13 @@ def patch_conf_files(monkeypatch: pytest.MonkeyPatch):
     """Auto-patches the CylcUIServer to prevent it loading config files."""
     monkeypatch.setattr(
         'cylc.uiserver.app.CylcUIServer.config_file_paths', []
+    )
+
+
+@pytest.fixture(autouse=True)
+def remove_data_store_sleep(monkeypatch):
+    monkeypatch.setattr(
+        'cylc.uiserver.data_store_mgr.time.sleep', lambda x: None
     )
 
 
@@ -349,15 +355,7 @@ def dummy_workflow(
 
     async def _register(name):
         await cylc_workflows_mgr._register(
-            Tokens(user='me', workflow=name).id,
-            {
-                'name': name,
-                'owner': 'me',
-                CFF.HOST: 'localhost',
-                CFF.PORT: 1234,
-                CFF.API: 1,
-            },
-            True,
+            Tokens(user='me', workflow=name).id, is_active=True
         )
 
     return _register
@@ -409,13 +407,13 @@ def mock_glbl_cfg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     Args:
         pypath (str):
-            The python-like path to the global configuation object you want
+            The python-like path to the global configuration object you want
             to fiddle.
             E.G. if you want to hack the `glbl_cfg` in
             `cylc.flow.scheduler` you would provide
             `cylc.flow.scheduler.glbl_cfg`
         global_config (str):
-            The globlal configuration as a multi-line string.
+            The global configuration as a multi-line string.
 
     Example:
         Change the value of `UTC mode` in the global config as seen from
@@ -433,14 +431,12 @@ def mock_glbl_cfg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """
     # TODO: modify Parsec so we can use StringIO rather than a temp file.
     def _mock_glbl_cfg(pypath: str, global_config: str) -> None:
-        nonlocal tmp_path, monkeypatch
         global_config_path = tmp_path / 'global.cylc'
         global_config_path.write_text(global_config)
         glbl_cfg = ParsecConfig(SPEC, validator=cylc_config_validate)
         glbl_cfg.loadcfg(global_config_path)
 
         def _inner(cached=False):
-            nonlocal glbl_cfg
             return glbl_cfg
 
         monkeypatch.setattr(pypath, _inner)

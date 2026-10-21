@@ -14,6 +14,7 @@ concurrency:
 
 env:
   FORCE_COLOR: 2
+  PIP_PROGRESS_BAR: 'off'
 
 defaults:
   run:
@@ -36,13 +37,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Patch DNS
         uses: cylc/release-actions/patch-dns@v1
 
       - name: Install System Dependencies
-        uses: mamba-org/setup-micromamba@v2
+        uses: mamba-org/setup-micromamba@v3
         with:
           cache-environment: true
           post-cleanup: 'all'
@@ -53,14 +54,14 @@ jobs:
             bash
             coreutils
 
-      - name: install cylc-flow
+      - name: Install Cylc components
         uses: cylc/release-actions/install-cylc-components@v1
         with:
           cylc_flow: true
           cylc_flow_opts: ''
-
-      - name: install cylc-uiserver
-        run: pip install -e .[all]
+          local_source: '.[all]'
+          # Required for coverage collection
+          editable_installations: true
 
       - name: Style test
         if: startsWith(matrix.os, 'ubuntu')
@@ -71,22 +72,70 @@ jobs:
         run: mypy
 
       - name: Check changelog
+        if: startsWith(matrix.os, 'ubuntu')
         uses: cylc/release-actions/towncrier-draft@v1
 
       - name: Test
         run: pytest
 
+      - name: Cylc Review functional tests
+        id: review_tests
+        run: |
+          CONF_PATH="$HOME/.cylc/flow/8"
+          mkdir -p "$CONF_PATH"
+          touch "$CONF_PATH/global.cylc"
+          ln -s "$CONF_PATH/global.cylc" "$CONF_PATH/global-tests.cylc"
+
+          cat >> "$CONF_PATH/global.cylc" <<__HERE__
+          [platforms]
+            [[_local_background_shared_tcp]]
+              hosts = localhost
+              install target = localhost
+              ssh command = ssh -oBatchMode=yes -oConnectTimeout=8 -oStrictHostKeyChecking=no
+          __HERE__
+
+          # Check that Cylc Review is installed!
+          # (We're only interested if it emits an error):
+          cylc review --help > /dev/null || exit 1
+
+          # Run tests on Cylc Review
+          export CYLC_COVERAGE=1
+          export CYLC_COVERAGE_BASE=$PWD
+          ./etc/bin/run-functional-tests
+
+      - name: Debug
+        if: failure() && steps.review_tests.outcome == 'failure'
+        timeout-minutes: 1
+        run: |
+          find "$HOME/cylc-run" -name '*.err' -type f \
+            -exec echo \; -exec echo '====== {} ======' \; -exec cat '{}' \;
+          find "$HOME/cylc-run" -name '*.log' -type f \
+            -exec echo \; -exec echo '====== {} ======' \; -exec cat '{}' \;
+          find "${TMPDIR:-/tmp}/${USER}/cylctb-"* -type f \
+            -exec echo \; -exec echo '====== {} ======' \; -exec cat '{}' \;
+
       - name: Coverage report
         run: |
-          coverage xml --ignore-errors
+          coverage xml
           coverage report
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: coverage_${{ matrix.os }}_py-${{ matrix.python-version }}
           path: coverage.xml
           retention-days: 4
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check spelling
+        uses: codespell-project/actions-codespell@v2
+        # If a false-positive is triggered, modify pyproject.toml [tool.codespell]
 
   codecov:
     needs: test
@@ -94,13 +143,13 @@ jobs:
     timeout-minutes: 2
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download coverage artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
 
       - name: Codecov upload
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           name: ${{ github.workflow }}
           fail_ci_if_error: true
