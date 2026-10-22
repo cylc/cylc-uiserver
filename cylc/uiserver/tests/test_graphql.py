@@ -24,6 +24,7 @@ from tornado.httpclient import HTTPClientError
 
 from cylc.flow.id import Tokens
 from cylc.uiserver.data_store_mgr import ALL_DELTAS
+from cylc.uiserver.graphql.tornado_ws import WS_PROTOCOL
 
 
 @pytest.fixture
@@ -80,7 +81,7 @@ def gql_subscription(jp_ws_fetch):
         *('cylc', 'subscriptions'),
         sub={
             'id': '1',
-            'type': 'start',
+            'type': 'subscribe',
             'payload': {
                 'query': '''
                     subscription {
@@ -104,7 +105,7 @@ def gql_subscription(jp_ws_fetch):
         headers = headers or {}
         headers = {
             'Content-Type': 'application/json',
-            'Sec-Websocket-Protocol': 'graphql-ws',
+            'Sec-Websocket-Protocol': WS_PROTOCOL,
             **headers,
         }
         ws = await jp_ws_fetch(
@@ -113,7 +114,6 @@ def gql_subscription(jp_ws_fetch):
             **kwargs
         )
 
-        # Using graphql-ws protocol, so send connection_init
         await ws.write_message(
             json.dumps({"type": "connection_init", "payload": {}})
         )
@@ -392,7 +392,7 @@ async def test_subscription(gql_subscription, dummy_workflow):
         *('cylc', 'subscriptions'),
         sub={
             "id": sub_id,
-            "type": "start",
+            "type": "subscribe",
             "payload": {
                 "query": """
                     subscription {
@@ -411,7 +411,7 @@ async def test_subscription(gql_subscription, dummy_workflow):
 
     assert response == {
         'id': sub_id,
-        'type': 'data',
+        'type': 'next',
         'payload': {
             'data': {
                 'workflows': [
@@ -425,7 +425,7 @@ async def test_subscription(gql_subscription, dummy_workflow):
     }
 
     # Run the stop/cleanup code
-    await ws.write_message(json.dumps({"id": sub_id, "type": "stop"}))
+    await ws.write_message(json.dumps({"id": sub_id, "type": "complete"}))
 
     ws.close()
 
@@ -443,7 +443,7 @@ async def test_subscription_deltas(
         *('cylc', 'subscriptions'),
         sub={
             "id": sub_id,
-            "type": "start",
+            "type": "subscribe",
             "payload": {
                 "query": """
                     subscription {
@@ -487,7 +487,7 @@ async def test_subscription_deltas(
     response = json.loads(await ws.read_message())
     assert response == {
         'id': sub_id,
-        'type': 'data',
+        'type': 'next',
         'payload': {
             'data': {
                 'deltas': {
@@ -515,7 +515,7 @@ async def test_subscription_deltas(
     response = json.loads(await ws.read_message())
     assert response == {
         'id': sub_id,
-        'type': 'data',
+        'type': 'next',
         'payload': {
             'data': {
                 'deltas': {
@@ -571,6 +571,6 @@ async def test_subscription_deltas(
     ]['status'] == 'stopped'
 
     # Run the stop/cleanup code
-    await ws.write_message(json.dumps({"id": sub_id, "type": "stop"}))
+    await ws.write_message(json.dumps({"id": sub_id, "type": "complete"}))
 
     ws.close()
