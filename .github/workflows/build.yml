@@ -11,6 +11,8 @@ on:
       - 'pyproject.toml'  # check build config
       - '.gitignore'
       - '.github/workflows/build.yml'
+  schedule:
+    - cron: '37 06 * * 1' # 06:37, Monday
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
