@@ -208,25 +208,24 @@ class TornadoSubscriptionServer:
     async def _process_message(
         self,
         connection_context: TornadoConnectionContext,
-        parsed_message: dict,
+        message: dict,
     ) -> None:
-        op_id = parsed_message.get("id")
-        op_type = parsed_message.get("type")
-        payload = parsed_message.get("payload")
+        op_type = message.get("type")
 
         match op_type:
             case OperationType.CONNECTION_INIT.value:
                 await self.on_connection_init(connection_context)
 
             case OperationType.SUBSCRIBE.value:
-                if not isinstance(payload, dict):
-                    raise AssertionError("The payload must be a dict")
-                assert op_id, "The message must have an operation ID"
-                params = self.get_graphql_params(connection_context, payload)
-                await self.on_subscribe(connection_context, op_id, params)
+                params = self.get_graphql_params(
+                    connection_context, message['payload']
+                )
+                await self.on_subscribe(
+                    connection_context, message['id'], params
+                )
 
             case OperationType.COMPLETE.value:
-                assert op_id, "The message must have an operation ID"
+                op_id = message['id']
                 await connection_context.unsubscribe(op_id)
                 connection_context.request_context['sub_statuses'][op_id] = (
                     'stop'
@@ -239,6 +238,7 @@ class TornadoSubscriptionServer:
                 pass
 
             case _:
+                # https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md#invalid-message
                 connection_context.ws.close(
                     4400, f"Invalid message type: {op_type}"
                 )
@@ -251,6 +251,7 @@ class TornadoSubscriptionServer:
                 connection_context, op_type=OperationType.CONNECTION_ACK
             )
         except Exception as e:
+            # https://www.rfc-editor.org/info/rfc6455/#section-7.4.1
             connection_context.ws.close(1011, str(e))
 
     def get_graphql_params(
@@ -400,7 +401,6 @@ class TornadoSubscriptionServer:
     def build_message(
         op_type: SendOperationType, op_id: str | None, payload
     ):
-        assert op_type, "Message must have a type"
         message: dict[str, Any] = {"type": str(op_type)}
         if op_id is not None:
             message["id"] = op_id
@@ -433,10 +433,10 @@ class TornadoSubscriptionServer:
     ) -> None:
         try:
             parsed_message = json.loads(message)
-            if not isinstance(parsed_message, dict):
-                raise AssertionError("Message must be an object")
         except Exception as e:
+            # https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md#invalid-message
             connection_context.ws.close(4400, str(e))
+            connection_context.request_context['resolvers'].log.exception(e)
             return None
 
         self.process_message(connection_context, parsed_message)
