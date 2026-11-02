@@ -26,7 +26,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Iterable,
-    List,
     Literal,
     Optional,
     Tuple,
@@ -90,7 +89,7 @@ async def mutator(
     info: 'GraphQLResolveInfo',
     *,
     command: str,
-    workflows: Optional[List[str]] = None,
+    workflows: Optional[list[str]] = None,
     **kwargs: Any
 ):
     """Call the resolver method that act on the workflow service
@@ -451,7 +450,7 @@ async def list_elements(
     return elements
 
 
-def get_quartiles(row, prop: str) -> List[Optional[float]]:
+def get_quartiles(row, prop: str) -> list[float | None]:
     """Return the [Q1, Q2, Q3] values of a property for a task.
 
     Any quartile which could not be calculated (e.g. because there were too
@@ -742,7 +741,7 @@ def run_jobs_query(
     states: Optional[Iterable[str]] = None,
     exstates: Optional[Iterable[str]] = None,
     tasks: Optional[Iterable[str]] = None,
-) -> List[dict]:
+) -> list[dict]:
     """Query jobs from the database.
 
     Args:
