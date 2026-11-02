@@ -461,16 +461,15 @@ def get_quartiles(row, prop: str) -> List[Optional[float]]:
     whilst keeping the quartiles in ascending order.
     """
     quartiles = [row[f"{prop}_quartile_{index}"] for index in (1, 2, 3)]
+    # find the first existing quartile to use as the initial value
+    previous = next((value for value in quartiles if value is not None), None)
     # fill forwards from the nearest lower quartile
-    previous = None
     for index, value in enumerate(quartiles):
         if value is None:
             quartiles[index] = previous
         else:
             previous = value
-    # fill any leading gaps backwards from the first available quartile
-    fallback = next((value for value in quartiles if value is not None), None)
-    return [fallback if value is None else value for value in quartiles]
+    return quartiles
 
 
 def run_task_query(conn, workflow):
