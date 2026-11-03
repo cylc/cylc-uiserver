@@ -616,11 +616,7 @@ class CylcReviewService:
                 raise cherrypy.HTTPError(404) from None
             f_size = tar_info.size
             handle = tar_f.extractfile(path_in_tar)
-            if self._has_shebang(handle):
-                mime = self.MIME_TEXT_PLAIN
-            else:
-                mime = mimetypes.guess_type(
-                    quote(path_in_tar))[0]
+            mime = self._get_mimetype(path_in_tar)
             handle.seek(0)
             if (
                 mode == "download"
@@ -643,18 +639,14 @@ class CylcReviewService:
             text = self._get_file_text(handle)
         else:
             f_size = os.stat(f_name).st_size
-            if self._has_shebang(f_name):
-                mime = self.MIME_TEXT_PLAIN
-            else:
-                mime = mimetypes.guess_type(quote(f_name))[0]
-            if not mime:
-                mime = self.MIME_TEXT_PLAIN
+            mime = self._get_mimetype(f_name)
             if (
                 mode == "download"
                 or f_size > view_size_max
                 or mime
                 and (not mime.startswith("text/") or mime.endswith("html"))
             ):
+                # setting the Content-Type
                 cherrypy.response.headers["Content-Type"] = mime
                 return cherrypy.lib.static.serve_file(f_name, mime)
             text = self._get_file_text(f_name)
@@ -1214,3 +1206,37 @@ class CylcReviewService:
         if isinstance(filecontent, bytes):
             return filecontent.decode('utf-8', errors='replace')
         return filecontent
+
+    def _get_mimetype(self, filename):
+        """Guess the mimetype for the given filename.
+
+        When the mimetype is used to set the "Content-Type" HTTP header, this
+        will determine how the browser handles the file.
+
+        Anything which starts "text/" will be displayed within HTML as usual.
+
+        However, things which start "application/" will be handed according to
+        browser settings. E.g, "application/json" will most likely be opened by
+        the browser's JSON explorer - which is generall helpful.
+
+        If you throw something at the browser that it can't handle, it'll just
+        download the file or offer you the choice to open it in an external
+        application.
+        """
+        if self._has_shebang(filename):
+            # executable scripts get handled like plain text
+            mime = self.MIME_TEXT_PLAIN
+        else:
+            # otherwise we gess the type based on the file extension
+            mime = mimetypes.guess_type(quote(filename))[0]
+
+        if mime == 'application/yaml':
+            # most browsers don't have a YAML viewer (yet), so we hack this
+            # mimetype to prevent
+            mime = 'text/yaml'
+
+        if not mime:
+            # fallback to plain text
+            mime = self.MIME_TEXT_PLAIN
+
+        return mime
