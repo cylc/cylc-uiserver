@@ -7,6 +7,8 @@ on:
     branches:
       - master
       - '*.*.x'
+  schedule:
+    - cron: '37 06 * * 1' # 06:37, Monday
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
