@@ -1188,11 +1188,11 @@ class CylcReviewService:
         # It's a filepath
         if isinstance(file, str):
             with open(file, 'rb') as handle:
-                return handle.read(2) == b'!#'
+                return handle.read(2) == b'#!'
 
         # It's a file handle: Make sure that you close it later!
         first_chars = file.read(2)
-        return first_chars in [b'!#', '!#']
+        return first_chars in [b'#!', '#!']
 
     @staticmethod
     def _get_file_text(file):
