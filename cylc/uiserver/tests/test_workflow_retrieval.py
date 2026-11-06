@@ -180,29 +180,31 @@ def test_make_task_query_1():
     assert ret['queue_quartiles'] == [60, 60, 60]
     assert ret['run_quartiles'] == [540, 540, 540]
     assert ret['total_quartiles'] == [600, 600, 600]
-    assert ret['peak_rss_quartiles'] == [40064, 40064, 40064]
+    assert ret['q1_max_rss'] == 40064
+    assert ret['q2_max_rss'] == 40064
+    assert ret['q3_max_rss'] == 40064
     assert ret['cpu_time_quartiles'] == [994, 994, 994]
     assert ret['max_queue_time'] == 60
     assert ret['max_run_time'] == 540
     assert ret['max_total_time'] == 600
-    assert ret['max_peak_rss'] == 40064
+    assert ret['q4_max_rss'] == 40064
     assert ret['max_cpu_time'] == 994
     assert ret['mean_queue_time'] == pytest.approx(60.0, 0.01)
     assert ret['mean_run_time'] == pytest.approx(540.0, 0.01)
     assert ret['mean_total_time'] == pytest.approx(600.0, 0.01)
-    assert ret['mean_peak_rss'] == pytest.approx(40064.0, 0.01)
+    assert ret['mean_max_rss'] == pytest.approx(40064.0, 0.01)
     assert ret['mean_cpu_time'] == pytest.approx(994.0, 0.01)
     assert ret['min_queue_time'] == 60
     assert ret['min_run_time'] == 540
     assert ret['min_total_time'] == 600
-    assert ret['min_peak_rss'] == 40064
+    assert ret['q0_max_rss'] == 40064
     assert ret['min_cpu_time'] == 994
     assert ret['name'] == 'Task_1'
     assert ret['platform'] == 'MyPlatform'
     assert ret['std_dev_queue_time'] == pytest.approx(0.0, 0.01)
     assert ret['std_dev_run_time'] == pytest.approx(0.0, 0.01)
     assert ret['std_dev_total_time'] == pytest.approx(0.0, 0.01)
-    assert ret['std_dev_peak_rss'] == pytest.approx(0.0, 0.01)
+    assert ret['std_dev_max_rss'] == pytest.approx(0.0, 0.01)
     assert ret['std_dev_cpu_time'] == pytest.approx(0.0, 0.01)
     assert ret['mem_alloc'] == 1048576
 
@@ -694,7 +696,7 @@ async def test_get_elements(
     )
     monkeypatch.setattr(
         'cylc.uiserver.schema._get_requested_fields',
-        lambda _x, _y: {'id', 'peak_rss'},
+        lambda _x, _y: {'id', 'max_rss'},
     )
 
     assert await get_elements(
