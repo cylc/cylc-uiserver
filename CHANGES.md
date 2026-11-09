@@ -12,6 +12,18 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.10.1 (Released 2026-11-09)
+
+[Updated cylc-ui to 2.16.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
+
+### 🔧 Fixes
+
+[#867](https://github.com/cylc/cylc-uiserver/pull/867) - Fixed logging issues:
+  - Separated log files for UI servers run by `cylc gui` and JupyterHub - the latter now uses the name `hubapp` instead of `log`.
+  - Log file rotation was not always working correctly. Log file names now rotate as `uiserver-01.log`, `uiserver-02.log` etc. (or `hubapp-01.log`, `hubapp-02.log` etc.).
+
+[#908](https://github.com/cylc/cylc-uiserver/pull/908) - Fixed a couple of issues where Cylc Review would download rather than display files.
+
 ## cylc-uiserver-1.10.0 (Released 2026-10-13)
 
 [Updated cylc-ui to 2.15.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
