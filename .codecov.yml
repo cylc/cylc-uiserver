@@ -23,5 +23,9 @@ coverage:
       default:
         target: '85%'
 
+# Don't measure coverage for bundled UI, as that is tested separately.
+ignore:
+  - "cylc/uiserver/ui"
+
 # turn off comments to pull requests
 comment: false
