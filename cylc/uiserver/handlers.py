@@ -305,6 +305,15 @@ class UserProfileHandler(CylcJSONHandler):
         self.write(json.dumps(user_info))
 
 
+class ShutdownHandler(CylcAppHandler):
+    """Endpoint for shutting down the server."""
+
+    @authorised
+    @web.authenticated
+    def post(self):
+        self.serverapp.stop()
+
+
 class UIServerGraphQLHandler(CylcAppHandler, TornadoGraphQLHandler):
     """Endpoint for performing GraphQL queries.
 
