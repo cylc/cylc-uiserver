@@ -1217,7 +1217,7 @@ class CylcReviewService:
 
         However, things which start "application/" will be handed according to
         browser settings. E.g, "application/json" will most likely be opened by
-        the browser's JSON explorer - which is generall helpful.
+        the browser's JSON explorer - which is generally helpful.
 
         If you throw something at the browser that it can't handle, it'll just
         download the file or offer you the choice to open it in an external
@@ -1232,7 +1232,7 @@ class CylcReviewService:
 
         if mime == 'application/yaml':
             # most browsers don't have a YAML viewer (yet), so we hack this
-            # mimetype to prevent
+            # mimetype to prevent the browser downloading it.
             mime = 'text/yaml'
 
         if not mime:
