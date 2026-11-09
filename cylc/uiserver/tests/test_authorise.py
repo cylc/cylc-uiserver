@@ -426,7 +426,7 @@ def test_case_conversion(caplog):
     assert not auth_obj.is_permitted('other', 'Release_Hold_Point')
 
     # calls should be logged
-    # (successfull call)
+    # (successful call)
     caplog.clear()
     assert auth_obj.is_permitted('other', 'release_hold_point')
     assert caplog.messages[-1] == 'other: authorized to release_hold_point'

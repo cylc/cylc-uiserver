@@ -1227,7 +1227,7 @@ class CylcReviewService:
             # executable scripts get handled like plain text
             mime = self.MIME_TEXT_PLAIN
         else:
-            # otherwise we gess the type based on the file extension
+            # otherwise we guess the type based on the file extension
             mime = mimetypes.guess_type(quote(filename))[0]
 
         if mime == 'application/yaml':
