@@ -16,12 +16,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from io import BytesIO, StringIO
+from pathlib import Path
+
+from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
+from cylc.flow.workflow_files import WorkflowFiles
+
 import pytest
 
 from cylc.review.review import CylcReviewService
-from cylc.flow.cfgspec.glbl_cfg import glbl_cfg
 
-from cylc.flow.workflow_files import WorkflowFiles
 
 param = pytest.param
 
@@ -51,9 +54,9 @@ def test_has_shebang_handle_contains_garbage():
 
 def test_has_shebang_handle_is_true():
     """It recognizes shebangs in text and binary files."""
-    handle = StringIO('!#HelloWorld')
+    handle = StringIO('#!HelloWorld')
     assert CylcReviewService._has_shebang(handle) is True
-    handle = BytesIO(b'!#HelloWorld')
+    handle = BytesIO(b'#!HelloWorld')
     assert CylcReviewService._has_shebang(handle) is True
 
 
@@ -158,3 +161,26 @@ def test_safe_walk_2(tmp_path):
     assert (len(list(CylcReviewService.safe_walking(str(tmp_path /
                                                         "TestDirectory2"))))
             == 1)
+
+
+@pytest.mark.parametrize(
+    'filename, has_shebang, mimetypes',
+    [
+        # no extension
+        ('foo', False, ('text/plain',)),
+        ('foo', True, ('text/plain',)),
+        # .html
+        ('foo.html', False, ('text/html',)),
+        ('foo.html', True, ('text/plain',)),  # shebang beats extension
+        # yaml - mimetype overridden for convenience
+        ('foo.yaml', False, ('text/plain', 'text/yaml')),
+        ('foo.yml', False, ('text/plain', 'text/yaml')),
+    ],
+)
+def test_get_mimetype(tmp_path, filename, has_shebang, mimetypes):
+    filepath = Path(tmp_path / filename)
+    filepath.write_text(
+        ('#!/usr/bin/env elephant' if has_shebang else '')
+        + '\nxxx'
+    )
+    assert CylcReviewService()._get_mimetype(str(filepath)) in mimetypes
