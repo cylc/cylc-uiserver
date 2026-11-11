@@ -459,7 +459,7 @@ def get_quartiles(row, prop: str) -> list[float | None]:
     This prevents null entries being returned when there is data available
     whilst keeping the quartiles in ascending order.
     """
-    quartiles = [row[f"{prop}_quartile_{index}"] for index in (1, 2, 3)]
+    quartiles = [row[f"q{index}_{prop}"] for index in (1, 2, 3)]
     # find the first existing quartile to use as the initial value
     previous = next((value for value in quartiles if value is not None), None)
     # fill forwards from the nearest lower quartile
@@ -469,6 +469,21 @@ def get_quartiles(row, prop: str) -> list[float | None]:
         else:
             previous = value
     return quartiles
+
+
+def get_stats(row, prop: str) -> dict[str, float | None]:
+    """Return the Q0-Q4, mean and standard deviation of a property for a task.
+    """
+    q1, q2, q3 = get_quartiles(row, prop)
+    return {
+        f'q0_{prop}': row[f"q0_{prop}"],
+        f'q1_{prop}': q1,
+        f'q2_{prop}': q2,
+        f'q3_{prop}': q3,
+        f'q4_{prop}': row[f"q4_{prop}"],
+        f'mean_{prop}': row[f"mean_{prop}"],
+        f'std_dev_{prop}': row[f"stddev_{prop}"],
+    }
 
 
 def run_task_query(conn, workflow):
@@ -503,18 +518,18 @@ time_stats AS (
   SELECT
     name,
     platform_name,
-    queue_time,
-    run_time,
-    total_time,
     mem_alloc,
     -- Note: rows where the value is NULL are put in their own
     -- partition so that they do not use up quartiles of the real data.
     NTILE(4) OVER (PARTITION BY name, queue_time IS NULL ORDER BY queue_time
     ) AS queue_time_quartile,
+    queue_time,
     NTILE(4) OVER (PARTITION BY name, run_time IS NULL ORDER BY run_time
     ) AS run_time_quartile,
+    run_time,
     NTILE(4) OVER (PARTITION BY name, total_time IS NULL ORDER BY total_time
     ) AS total_time_quartile,
+    total_time,
     NTILE(4) OVER (PARTITION BY name, max_rss IS NULL ORDER BY max_rss
     ) AS max_rss_quartile,
     max_rss,
@@ -529,112 +544,87 @@ SELECT
   MAX(mem_alloc) AS mem_alloc,
 
   -- Calculate Queue time stats
-  MIN(queue_time) AS min_queue_time,
+  MIN(queue_time) AS q0_queue_time,
   CAST(AVG(queue_time) AS INT) AS mean_queue_time,
-  MAX(queue_time) AS max_queue_time,
+  MAX(queue_time) AS q4_queue_time,
   SQRT(AVG(queue_time * queue_time) - AVG(queue_time) * AVG(queue_time))
   AS stddev_queue_time,
   MAX(CASE WHEN queue_time_quartile = 1 THEN queue_time END)
-  AS queue_quartile_1,
+  AS q1_queue_time,
   MAX(CASE WHEN queue_time_quartile = 2 THEN queue_time END)
-  AS queue_quartile_2,
+  AS q2_queue_time,
   MAX(CASE WHEN queue_time_quartile = 3 THEN queue_time END)
-  AS queue_quartile_3,
+  AS q3_queue_time,
 
   -- Calculate Run time stats
-  MIN(run_time) AS min_run_time,
+  MIN(run_time) AS q0_run_time,
   CAST(AVG(run_time) AS INT) AS mean_run_time,
-  MAX(run_time) AS max_run_time,
+  MAX(run_time) AS q4_run_time,
   SQRT(AVG(run_time * run_time) - AVG(run_time) * AVG(run_time))
   AS stddev_run_time,
-  MAX(CASE WHEN run_time_quartile = 1 THEN run_time END) AS run_quartile_1,
-  MAX(CASE WHEN run_time_quartile = 2 THEN run_time END) AS run_quartile_2,
-  MAX(CASE WHEN run_time_quartile = 3 THEN run_time END) AS run_quartile_3,
+  MAX(CASE WHEN run_time_quartile = 1 THEN run_time END)
+  AS q1_run_time,
+  MAX(CASE WHEN run_time_quartile = 2 THEN run_time END)
+  AS q2_run_time,
+  MAX(CASE WHEN run_time_quartile = 3 THEN run_time END)
+  AS q3_run_time,
 
   -- Calculate Total time stats
-  MIN(total_time) AS min_total_time,
+  MIN(total_time) AS q0_total_time,
   CAST(AVG(total_time) AS INT) AS mean_total_time,
-  MAX(total_time) AS max_total_time,
+  MAX(total_time) AS q4_total_time,
   SQRT(AVG(total_time * total_time) - AVG(total_time) * AVG(total_time))
   AS stddev_total_time,
   MAX(CASE WHEN total_time_quartile = 1 THEN total_time END)
-  AS total_quartile_1,
+  AS q1_total_time,
   MAX(CASE WHEN total_time_quartile = 2 THEN total_time END)
-  AS total_quartile_2,
+  AS q2_total_time,
   MAX(CASE WHEN total_time_quartile = 3 THEN total_time END)
-  AS total_quartile_3,
+  AS q3_total_time,
 
   -- Calculate RSS stats
-  MIN(max_rss) AS min_max_rss,
+  MIN(max_rss) AS q0_max_rss,
   AVG(max_rss) AS mean_max_rss,
-  MAX(max_rss) AS max_max_rss,
+  MAX(max_rss) AS q4_max_rss,
   SQRT(AVG(max_rss * max_rss) - AVG(max_rss) * AVG(max_rss))
   AS stddev_max_rss,
   MAX(CASE WHEN max_rss_quartile = 1 THEN max_rss END)
-  AS max_rss_quartile_1,
+  AS q1_max_rss,
   MAX(CASE WHEN max_rss_quartile = 2 THEN max_rss END)
-  AS max_rss_quartile_2,
+  AS q2_max_rss,
   MAX(CASE WHEN max_rss_quartile = 3 THEN max_rss END)
-  AS max_rss_quartile_3,
+  AS q3_max_rss,
 
   -- Calculate CPU time
-  MIN(cpu_time) AS min_cpu_time,
+  MIN(cpu_time) AS q0_cpu_time,
   AVG(cpu_time) AS mean_cpu_time,
-  MAX(cpu_time) AS max_cpu_time,
+  MAX(cpu_time) AS q4_cpu_time,
   SUM(cpu_time) AS total_cpu_time,
   SQRT(AVG(cpu_time * cpu_time) - AVG(cpu_time) * AVG(cpu_time))
   AS stddev_cpu_time,
   MAX(CASE WHEN cpu_time_quartile = 1 THEN cpu_time END)
-  AS cpu_time_quartile_1,
+  AS q1_cpu_time,
   MAX(CASE WHEN cpu_time_quartile = 2 THEN cpu_time END)
-  AS cpu_time_quartile_2,
+  AS q2_cpu_time,
   MAX(CASE WHEN cpu_time_quartile = 3 THEN cpu_time END)
-  AS cpu_time_quartile_3,
+  AS q3_cpu_time,
 
   COUNT(*) AS n
 FROM time_stats
 GROUP BY name, platform_name;
 '''):
         total_of_totals += row['total_cpu_time'] or 0
-        q1_max_rss, q2_max_rss, q3_max_rss = get_quartiles(row, 'max_rss')
         tasks.append(
             {
                 'name': row["name"],
                 'platform': row["platform_name"],
                 'mem_alloc': row["mem_alloc"],
-                # Queue time stats
-                'min_queue_time': row["min_queue_time"],
-                'mean_queue_time': row["mean_queue_time"],
-                'max_queue_time': row["max_queue_time"],
-                'std_dev_queue_time': row["stddev_queue_time"],
-                'queue_quartiles': get_quartiles(row, 'queue'),
-                # Run time stats
-                'min_run_time': row["min_run_time"],
-                'mean_run_time': row["mean_run_time"],
-                'max_run_time': row["max_run_time"],
-                'std_dev_run_time': row["stddev_run_time"],
-                'run_quartiles': get_quartiles(row, 'run'),
-                # Total
-                'min_total_time': row["min_total_time"],
-                'mean_total_time': row["mean_total_time"],
-                'max_total_time': row["max_total_time"],
-                'std_dev_total_time': row["stddev_total_time"],
-                'total_quartiles': get_quartiles(row, 'total'),
-                # Max RSS stats
-                'q0_max_rss': row["min_max_rss"],
-                'q1_max_rss': q1_max_rss,
-                'q2_max_rss': q2_max_rss,
-                'q3_max_rss': q3_max_rss,
-                'q4_max_rss': row["max_max_rss"],
-                'mean_max_rss': row["mean_max_rss"],
-                'std_dev_max_rss': row["stddev_max_rss"],
-                # CPU time stats
-                'min_cpu_time': row["min_cpu_time"],
-                'mean_cpu_time': row["mean_cpu_time"],
-                'max_cpu_time': row["max_cpu_time"],
+                **get_stats(row, 'queue_time'),
+                **get_stats(row, 'run_time'),
+                **get_stats(row, 'total_time'),
+                **get_stats(row, 'max_rss'),
+                **get_stats(row, 'cpu_time'),
                 'total_cpu_time': row["total_cpu_time"],
-                'std_dev_cpu_time': row["stddev_cpu_time"],
-                'cpu_time_quartiles': get_quartiles(row, 'cpu_time'),
                 'count': row["n"],
             }
         )
@@ -971,35 +961,68 @@ class UISTask(Task):
 
     platform = graphene.String()
 
-    min_total_time = graphene.Int()
-    mean_total_time = graphene.Float()
-    max_total_time = graphene.Int()
-    std_dev_total_time = graphene.Float()
-    total_quartiles = graphene.List(
-        graphene.Int,
-        description=sstrip('''
-                List containing the first, second,
-                third and forth quartile total times.'''),
+    q0_queue_time = graphene.Int(
+        description='Minimum (Q0) of the queue time of all jobs.',
     )
-    min_queue_time = graphene.Int()
-    mean_queue_time = graphene.Float()
-    max_queue_time = graphene.Int()
-    std_dev_queue_time = graphene.Float()
-    queue_quartiles = graphene.List(
-        graphene.Int,
-        description=sstrip('''
-            List containing the first, second,
-            third and forth quartile queue times.'''),
+    q1_queue_time = graphene.Int(
+        description='First quartile (Q1) of the queue time of all jobs.',
     )
-    min_run_time = graphene.Int()
-    mean_run_time = graphene.Float()
-    max_run_time = graphene.Int()
-    std_dev_run_time = graphene.Float()
-    run_quartiles = graphene.List(
-        graphene.Int,
-        description=sstrip('''
-                List containing the first, second,
-                third and forth quartile run times.'''),
+    q2_queue_time = graphene.Int(
+        description='Median (Q2) of the queue time of all jobs.',
+    )
+    q3_queue_time = graphene.Int(
+        description='Third quartile (Q3) of the queue time of all jobs.',
+    )
+    q4_queue_time = graphene.Int(
+        description='Maximum (Q4) of the queue time of all jobs.',
+    )
+    mean_queue_time = graphene.Float(
+        description='Mean of the queue time of all jobs.',
+    )
+    std_dev_queue_time = graphene.Float(
+        description='Standard deviation of the queue time of all jobs.',
+    )
+    q0_run_time = graphene.Int(
+        description='Minimum (Q0) of the run time of all jobs.',
+    )
+    q1_run_time = graphene.Int(
+        description='First quartile (Q1) of the run time of all jobs.',
+    )
+    q2_run_time = graphene.Int(
+        description='Median (Q2) of the run time of all jobs.',
+    )
+    q3_run_time = graphene.Int(
+        description='Third quartile (Q3) of the run time of all jobs.',
+    )
+    q4_run_time = graphene.Int(
+        description='Maximum (Q4) of the run time of all jobs.',
+    )
+    mean_run_time = graphene.Float(
+        description='Mean of the run time of all jobs.',
+    )
+    std_dev_run_time = graphene.Float(
+        description='Standard deviation of the run time of all jobs.',
+    )
+    q0_total_time = graphene.Int(
+        description='Minimum (Q0) of the total time of all jobs.',
+    )
+    q1_total_time = graphene.Int(
+        description='First quartile (Q1) of the total time of all jobs.',
+    )
+    q2_total_time = graphene.Int(
+        description='Median (Q2) of the total time of all jobs.',
+    )
+    q3_total_time = graphene.Int(
+        description='Third quartile (Q3) of the total time of all jobs.',
+    )
+    q4_total_time = graphene.Int(
+        description='Maximum (Q4) of the total time of all jobs.',
+    )
+    mean_total_time = graphene.Float(
+        description='Mean of the total time of all jobs.',
+    )
+    std_dev_total_time = graphene.Float(
+        description='Standard deviation of the total time of all jobs.',
     )
     q0_max_rss = graphene.Float(
         description='Minimum (Q0) of the Max RSS of all jobs.',
@@ -1016,18 +1039,35 @@ class UISTask(Task):
     q4_max_rss = graphene.Float(
         description='Maximum (Q4) of the Max RSS of all jobs.',
     )
-    mean_max_rss = graphene.Float()
-    std_dev_max_rss = graphene.Float()
-    min_cpu_time = graphene.Int()
-    mean_cpu_time = graphene.Float()
-    max_cpu_time = graphene.Int()
-    total_cpu_time = graphene.Int()
-    std_dev_cpu_time = graphene.Float()
-    cpu_time_quartiles = graphene.List(
-        graphene.Int,
-        description=sstrip('''
-                List containing the first, second,
-                third and forth quartile for CPU time.'''),
+    mean_max_rss = graphene.Float(
+        description='Mean of the Max RSS of all jobs.',
+    )
+    std_dev_max_rss = graphene.Float(
+        description='Standard deviation of the Max RSS of all jobs.',
+    )
+    q0_cpu_time = graphene.Int(
+        description='Minimum (Q0) of the CPU time of all jobs.',
+    )
+    q1_cpu_time = graphene.Int(
+        description='First quartile (Q1) of the CPU time of all jobs.',
+    )
+    q2_cpu_time = graphene.Int(
+        description='Median (Q2) of the CPU time of all jobs.',
+    )
+    q3_cpu_time = graphene.Int(
+        description='Third quartile (Q3) of the CPU time of all jobs.',
+    )
+    q4_cpu_time = graphene.Int(
+        description='Maximum (Q4) of the CPU time of all jobs.',
+    )
+    mean_cpu_time = graphene.Float(
+        description='Mean of the CPU time of all jobs.',
+    )
+    std_dev_cpu_time = graphene.Float(
+        description='Standard deviation of the CPU time of all jobs.',
+    )
+    total_cpu_time = graphene.Int(
+        description='Total of the CPU time of all jobs.',
     )
     total_of_totals = graphene.Int()
     mem_alloc = graphene.Float()
