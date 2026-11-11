@@ -616,6 +616,7 @@ GROUP BY name, platform_name;
         total_of_totals += row['total_cpu_time'] or 0
         tasks.append(
             {
+                'id': workflow.duplicate(cycle=f'$namespace|{row['name']}').id,
                 'name': row["name"],
                 'platform': row["platform_name"],
                 'mem_alloc': row["mem_alloc"],
