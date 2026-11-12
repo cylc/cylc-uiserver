@@ -38,9 +38,9 @@ from cylc.uiserver.schema import (
 def _quartile_row(prop, q1, q2, q3):
     """Create a fake DB row containing quartile columns for a property."""
     return {
-        f'{prop}_quartile_1': q1,
-        f'{prop}_quartile_2': q2,
-        f'{prop}_quartile_3': q3,
+        f'q1_{prop}': q1,
+        f'q2_{prop}': q2,
+        f'q3_{prop}': q3,
     }
 
 
@@ -72,9 +72,9 @@ def test_get_quartiles_sqlite_row():
     conn = sqlite3.connect(':memory:')
     conn.row_factory = sqlite3.Row
     row = conn.execute(
-        'SELECT 10 AS cpu_time_quartile_1,'
-        ' NULL AS cpu_time_quartile_2,'
-        ' 30 AS cpu_time_quartile_3'
+        'SELECT 10 AS q1_cpu_time,'
+        ' NULL AS q2_cpu_time,'
+        ' 30 AS q3_cpu_time'
     ).fetchone()
     assert get_quartiles(row, 'cpu_time') == [10, 10, 30]
     conn.close()
@@ -177,28 +177,36 @@ def test_make_task_query_1():
     ret = run_task_query(conn, workflow)[0]
 
     assert ret['count'] == 1
-    assert ret['queue_quartiles'] == [60, 60, 60]
-    assert ret['run_quartiles'] == [540, 540, 540]
-    assert ret['total_quartiles'] == [600, 600, 600]
+    assert ret['q1_queue_time'] == 60
+    assert ret['q2_queue_time'] == 60
+    assert ret['q3_queue_time'] == 60
+    assert ret['q1_run_time'] == 540
+    assert ret['q2_run_time'] == 540
+    assert ret['q3_run_time'] == 540
+    assert ret['q1_total_time'] == 600
+    assert ret['q2_total_time'] == 600
+    assert ret['q3_total_time'] == 600
     assert ret['q1_max_rss'] == 40064
     assert ret['q2_max_rss'] == 40064
     assert ret['q3_max_rss'] == 40064
-    assert ret['cpu_time_quartiles'] == [994, 994, 994]
-    assert ret['max_queue_time'] == 60
-    assert ret['max_run_time'] == 540
-    assert ret['max_total_time'] == 600
+    assert ret['q1_cpu_time'] == 994
+    assert ret['q2_cpu_time'] == 994
+    assert ret['q3_cpu_time'] == 994
+    assert ret['q4_queue_time'] == 60
+    assert ret['q4_run_time'] == 540
+    assert ret['q4_total_time'] == 600
     assert ret['q4_max_rss'] == 40064
-    assert ret['max_cpu_time'] == 994
+    assert ret['q4_cpu_time'] == 994
     assert ret['mean_queue_time'] == pytest.approx(60.0, 0.01)
     assert ret['mean_run_time'] == pytest.approx(540.0, 0.01)
     assert ret['mean_total_time'] == pytest.approx(600.0, 0.01)
     assert ret['mean_max_rss'] == pytest.approx(40064.0, 0.01)
     assert ret['mean_cpu_time'] == pytest.approx(994.0, 0.01)
-    assert ret['min_queue_time'] == 60
-    assert ret['min_run_time'] == 540
-    assert ret['min_total_time'] == 600
+    assert ret['q0_queue_time'] == 60
+    assert ret['q0_run_time'] == 540
+    assert ret['q0_total_time'] == 600
     assert ret['q0_max_rss'] == 40064
-    assert ret['min_cpu_time'] == 994
+    assert ret['q0_cpu_time'] == 994
     assert ret['name'] == 'Task_1'
     assert ret['platform'] == 'MyPlatform'
     assert ret['std_dev_queue_time'] == pytest.approx(0.0, 0.01)
@@ -283,18 +291,24 @@ def test_make_task_query_2():
     ret = run_task_query(conn, workflow)[0]
 
     assert ret['count'] == 2
-    assert ret['queue_quartiles'] == [60, 76, 76]
-    assert ret['run_quartiles'] == [540, 644, 644]
-    assert ret['total_quartiles'] == [600, 720, 720]
-    assert ret['max_queue_time'] == 76
-    assert ret['max_run_time'] == 644
-    assert ret['max_total_time'] == 720
+    assert ret['q1_queue_time'] == 60
+    assert ret['q2_queue_time'] == 76
+    assert ret['q3_queue_time'] == 76
+    assert ret['q1_run_time'] == 540
+    assert ret['q2_run_time'] == 644
+    assert ret['q3_run_time'] == 644
+    assert ret['q1_total_time'] == 600
+    assert ret['q2_total_time'] == 720
+    assert ret['q3_total_time'] == 720
+    assert ret['q4_queue_time'] == 76
+    assert ret['q4_run_time'] == 644
+    assert ret['q4_total_time'] == 720
     assert ret['mean_queue_time'] == pytest.approx(68.0, 0.01)
     assert ret['mean_run_time'] == pytest.approx(592.0, 0.01)
     assert ret['mean_total_time'] == pytest.approx(660.0, 0.01)
-    assert ret['min_queue_time'] == 60
-    assert ret['min_run_time'] == 540
-    assert ret['min_total_time'] == 600
+    assert ret['q0_queue_time'] == 60
+    assert ret['q0_run_time'] == 540
+    assert ret['q0_total_time'] == 600
     assert ret['name'] == 'Task_1'
     assert ret['platform'] == 'MyPlatform'
     assert ret['std_dev_queue_time'] == pytest.approx(8.00, 0.01)
@@ -403,18 +417,24 @@ def test_make_task_query_3():
     ret = run_task_query(conn, workflow)[0]
 
     assert ret['count'] == 3
-    assert ret['queue_quartiles'] == [60, 76, 76]
-    assert ret['run_quartiles'] == [540, 644, 644]
-    assert ret['total_quartiles'] == [600, 720, 720]
-    assert ret['max_queue_time'] == 76
-    assert ret['max_run_time'] == 644
-    assert ret['max_total_time'] == 720
+    assert ret['q1_queue_time'] == 60
+    assert ret['q2_queue_time'] == 76
+    assert ret['q3_queue_time'] == 76
+    assert ret['q1_run_time'] == 540
+    assert ret['q2_run_time'] == 644
+    assert ret['q3_run_time'] == 644
+    assert ret['q1_total_time'] == 600
+    assert ret['q2_total_time'] == 720
+    assert ret['q3_total_time'] == 720
+    assert ret['q4_queue_time'] == 76
+    assert ret['q4_run_time'] == 644
+    assert ret['q4_total_time'] == 720
     assert ret['mean_queue_time'] == pytest.approx(70.66, 0.01)
     assert ret['mean_run_time'] == pytest.approx(609.33, 0.01)
     assert ret['mean_total_time'] == pytest.approx(680.0, 0.01)
-    assert ret['min_queue_time'] == 60
-    assert ret['min_run_time'] == 540
-    assert ret['min_total_time'] == 600
+    assert ret['q0_queue_time'] == 60
+    assert ret['q0_run_time'] == 540
+    assert ret['q0_total_time'] == 600
     assert ret['name'] == 'Task_1'
     assert ret['platform'] == 'MyPlatform'
     assert ret['std_dev_queue_time'] == pytest.approx(7.54, 0.01)
