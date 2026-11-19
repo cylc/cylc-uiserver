@@ -450,7 +450,7 @@ async def list_elements(
     return elements
 
 
-def get_quartiles(row, prop: str) -> list[float | None]:
+def get_quartiles(row: sqlite3.Row, prop: str) -> list[float | None]:
     """Return the [Q1, Q2, Q3] values of a property for a task.
 
     Any quartile which could not be calculated (e.g. because there were too
@@ -471,16 +471,19 @@ def get_quartiles(row, prop: str) -> list[float | None]:
     return quartiles
 
 
-def get_stats(row, prop: str) -> dict[str, float | None]:
-    """Return the Q0-Q4, mean and standard deviation of a property for a task.
+def get_stats(
+    row: sqlite3.Row, prop: str
+) -> dict[str, list[float | None] | float | None]:
+    """Return the quartiles, mean and standard deviation of a property.
+
+    The quartiles are returned as a list of [Q0, Q1, Q2, Q3, Q4].
     """
-    q1, q2, q3 = get_quartiles(row, prop)
     return {
-        f'q0_{prop}': row[f"q0_{prop}"],
-        f'q1_{prop}': q1,
-        f'q2_{prop}': q2,
-        f'q3_{prop}': q3,
-        f'q4_{prop}': row[f"q4_{prop}"],
+        f'{prop}_quartiles': [
+            row[f"q0_{prop}"],
+            *get_quartiles(row, prop),
+            row[f"q4_{prop}"],
+        ],
         f'mean_{prop}': row[f"mean_{prop}"],
         f'std_dev_{prop}': row[f"stddev_{prop}"],
     }
@@ -961,20 +964,12 @@ class UISTask(Task):
 
     platform = graphene.String()
 
-    q0_queue_time = graphene.Int(
-        description='Minimum (Q0) of the queue time of all jobs.',
-    )
-    q1_queue_time = graphene.Int(
-        description='First quartile (Q1) of the queue time of all jobs.',
-    )
-    q2_queue_time = graphene.Int(
-        description='Median (Q2) of the queue time of all jobs.',
-    )
-    q3_queue_time = graphene.Int(
-        description='Third quartile (Q3) of the queue time of all jobs.',
-    )
-    q4_queue_time = graphene.Int(
-        description='Maximum (Q4) of the queue time of all jobs.',
+    queue_time_quartiles = graphene.List(
+        graphene.Int,
+        description=(
+            'Quartiles [Q0 (min), Q1, Q2 (median), Q3, Q4 (max)] of the'
+            ' queue time of all jobs.'
+        ),
     )
     mean_queue_time = graphene.Float(
         description='Mean of the queue time of all jobs.',
@@ -982,20 +977,12 @@ class UISTask(Task):
     std_dev_queue_time = graphene.Float(
         description='Standard deviation of the queue time of all jobs.',
     )
-    q0_run_time = graphene.Int(
-        description='Minimum (Q0) of the run time of all jobs.',
-    )
-    q1_run_time = graphene.Int(
-        description='First quartile (Q1) of the run time of all jobs.',
-    )
-    q2_run_time = graphene.Int(
-        description='Median (Q2) of the run time of all jobs.',
-    )
-    q3_run_time = graphene.Int(
-        description='Third quartile (Q3) of the run time of all jobs.',
-    )
-    q4_run_time = graphene.Int(
-        description='Maximum (Q4) of the run time of all jobs.',
+    run_time_quartiles = graphene.List(
+        graphene.Int,
+        description=(
+            'Quartiles [Q0 (min), Q1, Q2 (median), Q3, Q4 (max)] of the'
+            ' run time of all jobs.'
+        ),
     )
     mean_run_time = graphene.Float(
         description='Mean of the run time of all jobs.',
@@ -1003,20 +990,12 @@ class UISTask(Task):
     std_dev_run_time = graphene.Float(
         description='Standard deviation of the run time of all jobs.',
     )
-    q0_total_time = graphene.Int(
-        description='Minimum (Q0) of the total time of all jobs.',
-    )
-    q1_total_time = graphene.Int(
-        description='First quartile (Q1) of the total time of all jobs.',
-    )
-    q2_total_time = graphene.Int(
-        description='Median (Q2) of the total time of all jobs.',
-    )
-    q3_total_time = graphene.Int(
-        description='Third quartile (Q3) of the total time of all jobs.',
-    )
-    q4_total_time = graphene.Int(
-        description='Maximum (Q4) of the total time of all jobs.',
+    total_time_quartiles = graphene.List(
+        graphene.Int,
+        description=(
+            'Quartiles [Q0 (min), Q1, Q2 (median), Q3, Q4 (max)] of the'
+            ' total time of all jobs.'
+        ),
     )
     mean_total_time = graphene.Float(
         description='Mean of the total time of all jobs.',
@@ -1024,20 +1003,12 @@ class UISTask(Task):
     std_dev_total_time = graphene.Float(
         description='Standard deviation of the total time of all jobs.',
     )
-    q0_max_rss = graphene.Float(
-        description='Minimum (Q0) of the Max RSS of all jobs.',
-    )
-    q1_max_rss = graphene.Float(
-        description='First quartile (Q1) of the Max RSS of all jobs.',
-    )
-    q2_max_rss = graphene.Float(
-        description='Median (Q2) of the Max RSS of all jobs.',
-    )
-    q3_max_rss = graphene.Float(
-        description='Third quartile (Q3) of the Max RSS of all jobs.',
-    )
-    q4_max_rss = graphene.Float(
-        description='Maximum (Q4) of the Max RSS of all jobs.',
+    max_rss_quartiles = graphene.List(
+        graphene.Float,
+        description=(
+            'Quartiles [Q0 (min), Q1, Q2 (median), Q3, Q4 (max)] of the'
+            ' Max RSS of all jobs.'
+        ),
     )
     mean_max_rss = graphene.Float(
         description='Mean of the Max RSS of all jobs.',
@@ -1045,20 +1016,12 @@ class UISTask(Task):
     std_dev_max_rss = graphene.Float(
         description='Standard deviation of the Max RSS of all jobs.',
     )
-    q0_cpu_time = graphene.Int(
-        description='Minimum (Q0) of the CPU time of all jobs.',
-    )
-    q1_cpu_time = graphene.Int(
-        description='First quartile (Q1) of the CPU time of all jobs.',
-    )
-    q2_cpu_time = graphene.Int(
-        description='Median (Q2) of the CPU time of all jobs.',
-    )
-    q3_cpu_time = graphene.Int(
-        description='Third quartile (Q3) of the CPU time of all jobs.',
-    )
-    q4_cpu_time = graphene.Int(
-        description='Maximum (Q4) of the CPU time of all jobs.',
+    cpu_time_quartiles = graphene.List(
+        graphene.Int,
+        description=(
+            'Quartiles [Q0 (min), Q1, Q2 (median), Q3, Q4 (max)] of the'
+            ' CPU time of all jobs.'
+        ),
     )
     mean_cpu_time = graphene.Float(
         description='Mean of the CPU time of all jobs.',

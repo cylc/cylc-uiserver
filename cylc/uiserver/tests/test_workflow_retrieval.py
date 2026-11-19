@@ -177,36 +177,16 @@ def test_make_task_query_1():
     ret = run_task_query(conn, workflow)[0]
 
     assert ret['count'] == 1
-    assert ret['q1_queue_time'] == 60
-    assert ret['q2_queue_time'] == 60
-    assert ret['q3_queue_time'] == 60
-    assert ret['q1_run_time'] == 540
-    assert ret['q2_run_time'] == 540
-    assert ret['q3_run_time'] == 540
-    assert ret['q1_total_time'] == 600
-    assert ret['q2_total_time'] == 600
-    assert ret['q3_total_time'] == 600
-    assert ret['q1_max_rss'] == 40064
-    assert ret['q2_max_rss'] == 40064
-    assert ret['q3_max_rss'] == 40064
-    assert ret['q1_cpu_time'] == 994
-    assert ret['q2_cpu_time'] == 994
-    assert ret['q3_cpu_time'] == 994
-    assert ret['q4_queue_time'] == 60
-    assert ret['q4_run_time'] == 540
-    assert ret['q4_total_time'] == 600
-    assert ret['q4_max_rss'] == 40064
-    assert ret['q4_cpu_time'] == 994
+    assert ret['queue_time_quartiles'] == [60, 60, 60, 60, 60]
+    assert ret['run_time_quartiles'] == [540, 540, 540, 540, 540]
+    assert ret['total_time_quartiles'] == [600, 600, 600, 600, 600]
+    assert ret['max_rss_quartiles'] == [40064, 40064, 40064, 40064, 40064]
+    assert ret['cpu_time_quartiles'] == [994, 994, 994, 994, 994]
     assert ret['mean_queue_time'] == pytest.approx(60.0, 0.01)
     assert ret['mean_run_time'] == pytest.approx(540.0, 0.01)
     assert ret['mean_total_time'] == pytest.approx(600.0, 0.01)
     assert ret['mean_max_rss'] == pytest.approx(40064.0, 0.01)
     assert ret['mean_cpu_time'] == pytest.approx(994.0, 0.01)
-    assert ret['q0_queue_time'] == 60
-    assert ret['q0_run_time'] == 540
-    assert ret['q0_total_time'] == 600
-    assert ret['q0_max_rss'] == 40064
-    assert ret['q0_cpu_time'] == 994
     assert ret['name'] == 'Task_1'
     assert ret['platform'] == 'MyPlatform'
     assert ret['std_dev_queue_time'] == pytest.approx(0.0, 0.01)
@@ -291,24 +271,12 @@ def test_make_task_query_2():
     ret = run_task_query(conn, workflow)[0]
 
     assert ret['count'] == 2
-    assert ret['q1_queue_time'] == 60
-    assert ret['q2_queue_time'] == 76
-    assert ret['q3_queue_time'] == 76
-    assert ret['q1_run_time'] == 540
-    assert ret['q2_run_time'] == 644
-    assert ret['q3_run_time'] == 644
-    assert ret['q1_total_time'] == 600
-    assert ret['q2_total_time'] == 720
-    assert ret['q3_total_time'] == 720
-    assert ret['q4_queue_time'] == 76
-    assert ret['q4_run_time'] == 644
-    assert ret['q4_total_time'] == 720
+    assert ret['queue_time_quartiles'] == [60, 60, 76, 76, 76]
+    assert ret['run_time_quartiles'] == [540, 540, 644, 644, 644]
+    assert ret['total_time_quartiles'] == [600, 600, 720, 720, 720]
     assert ret['mean_queue_time'] == pytest.approx(68.0, 0.01)
     assert ret['mean_run_time'] == pytest.approx(592.0, 0.01)
     assert ret['mean_total_time'] == pytest.approx(660.0, 0.01)
-    assert ret['q0_queue_time'] == 60
-    assert ret['q0_run_time'] == 540
-    assert ret['q0_total_time'] == 600
     assert ret['name'] == 'Task_1'
     assert ret['platform'] == 'MyPlatform'
     assert ret['std_dev_queue_time'] == pytest.approx(8.00, 0.01)
@@ -417,24 +385,12 @@ def test_make_task_query_3():
     ret = run_task_query(conn, workflow)[0]
 
     assert ret['count'] == 3
-    assert ret['q1_queue_time'] == 60
-    assert ret['q2_queue_time'] == 76
-    assert ret['q3_queue_time'] == 76
-    assert ret['q1_run_time'] == 540
-    assert ret['q2_run_time'] == 644
-    assert ret['q3_run_time'] == 644
-    assert ret['q1_total_time'] == 600
-    assert ret['q2_total_time'] == 720
-    assert ret['q3_total_time'] == 720
-    assert ret['q4_queue_time'] == 76
-    assert ret['q4_run_time'] == 644
-    assert ret['q4_total_time'] == 720
+    assert ret['queue_time_quartiles'] == [60, 60, 76, 76, 76]
+    assert ret['run_time_quartiles'] == [540, 540, 644, 644, 644]
+    assert ret['total_time_quartiles'] == [600, 600, 720, 720, 720]
     assert ret['mean_queue_time'] == pytest.approx(70.66, 0.01)
     assert ret['mean_run_time'] == pytest.approx(609.33, 0.01)
     assert ret['mean_total_time'] == pytest.approx(680.0, 0.01)
-    assert ret['q0_queue_time'] == 60
-    assert ret['q0_run_time'] == 540
-    assert ret['q0_total_time'] == 600
     assert ret['name'] == 'Task_1'
     assert ret['platform'] == 'MyPlatform'
     assert ret['std_dev_queue_time'] == pytest.approx(7.54, 0.01)
