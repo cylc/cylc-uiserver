@@ -12,6 +12,12 @@ $ towncrier create <PR-number>.<break|feat|fix>.md --content "Short description"
 
 <!-- towncrier release notes start -->
 
+## cylc-uiserver-1.10.2 (Released 2026-11-20)
+
+### 🔧 Fixes
+
+[#918](https://github.com/cylc/cylc-uiserver/pull/918) - Fix an issue where Cylc Review was unable to access archived log files.
+
 ## cylc-uiserver-1.10.1 (Released 2026-11-09)
 
 [Updated cylc-ui to 2.16.0](https://github.com/cylc/cylc-ui/blob/master/CHANGES.md)
