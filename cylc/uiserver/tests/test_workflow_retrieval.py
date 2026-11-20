@@ -289,7 +289,7 @@ def test_make_task_query_3():
 
 
 def test_make_task_query_different_platforms():
-    """We should get different entries for tasks that submited to different
+    """We should get different entries for tasks that submitted to different
     platforms on different cycles.
 
     https://github.com/cylc/cylc-uiserver/issues/696

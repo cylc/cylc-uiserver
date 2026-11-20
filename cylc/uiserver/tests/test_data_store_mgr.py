@@ -334,6 +334,6 @@ async def test_update_workflow_data(
     # Call the _update_workflow_data function.
     data_store_mgr._update_workflow_data(ALL_DELTAS, all_updated_delta, w_id)
 
-    # The data-store sould now contain info from the delta
+    # The data-store should now contain info from the delta
     assert w_id_data['workflow'].status == 'running'
     assert w_id_data['task_proxies'][tp_id].state == 'running'
