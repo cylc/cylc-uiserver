@@ -206,4 +206,4 @@ force-sort-within-sections = true
 
 [tool.codespell]
 skip = '*.js,*.css'
-ignore-words-list = ["runN", "userA"]
+ignore-words-list = ["runN", "userA", "te"]
