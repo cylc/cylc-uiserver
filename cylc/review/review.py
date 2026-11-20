@@ -41,6 +41,7 @@ from time import (
     strftime,
 )
 import traceback
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 from pathlib import Path
 
@@ -58,6 +59,10 @@ from cylc.review.review_dao import (
     CylcReviewDAO,
 )
 from cylc.review.ws import get_util_home
+
+
+if TYPE_CHECKING:
+    from typing_extensions import Buffer
 
 
 # Cylc 7 Task states.
@@ -616,7 +621,7 @@ class CylcReviewService:
                 raise cherrypy.HTTPError(404) from None
             f_size = tar_info.size
             handle = tar_f.extractfile(path_in_tar)
-            mime = self._get_mimetype(path_in_tar)
+            mime = self._get_mimetype(path_in_tar, handle)
             handle.seek(0)
             if (
                 mode == "download"
@@ -1207,8 +1212,8 @@ class CylcReviewService:
             return filecontent.decode('utf-8', errors='replace')
         return filecontent
 
-    def _get_mimetype(self, filename):
-        """Guess the mimetype for the given filename.
+    def _get_mimetype(self, filename: str, handle: 'Buffer | None' = None):
+        """Guess the mimetype for the given file.
 
         When the mimetype is used to set the "Content-Type" HTTP header, this
         will determine how the browser handles the file.
@@ -1222,8 +1227,17 @@ class CylcReviewService:
         If you throw something at the browser that it can't handle, it'll just
         download the file or offer you the choice to open it in an external
         application.
+
+        Args:
+            filename:
+                The name of the file :)
+            handle:
+                If the file is not directly accessible via the filesystem (e.g,
+                if it is in an archive, this should be set to a file handle
+                that is open for reading (in either text or bytes mode).
+
         """
-        if self._has_shebang(filename):
+        if self._has_shebang(handle or filename):
             # executable scripts get handled like plain text
             mime = self.MIME_TEXT_PLAIN
         else:
